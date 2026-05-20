@@ -1,54 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
 :root {
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Poppins", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #dce8e3;
-  background: #0b0f0e;
+  color: #192a3d;
+  background: #fafbfc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0;
 
-  --bg: #0b0f0e;
-  --bg-soft: #111714;
-  --surface: rgba(20, 28, 25, 0.88);
-  --surface-muted: rgba(255, 255, 255, 0.045);
-  --text: #dce8e3;
-  --text-strong: #f6fbf8;
-  --text-muted: #91a19a;
-  --border: rgba(218, 234, 226, 0.13);
-  --accent: #32dfb5;
-  --accent-soft: rgba(50, 223, 181, 0.11);
-  --warn: #ffb657;
-  --danger: #ff6b6b;
-  --focus: #ffb657;
-  --meter-track: rgba(255, 255, 255, 0.1);
-  --chart-rail: rgba(220, 232, 227, 0.16);
-  --shadow-soft: 0 18px 46px rgba(0, 0, 0, 0.28);
+  --bg: #fafbfc;
+  --bg-soft: #f0f4f7;
+  --surface: #ffffff;
+  --surface-muted: rgba(25, 42, 61, 0.04);
+  --text: #192a3d;
+  --text-strong: #0c1d2d;
+  --text-muted: #5a6b7d;
+  --border: rgba(25, 42, 61, 0.12);
+  --accent: #00426e;
+  --accent-soft: rgba(0, 66, 110, 0.12);
+  --warn: #f0a22f;
+  --danger: #d24b4b;
+  --focus: #006fb9;
+  --meter-track: rgba(25, 42, 61, 0.12);
+  --chart-rail: rgba(25, 42, 61, 0.16);
+  --shadow-soft: 0 18px 46px rgba(10, 28, 50, 0.12);
 }
 
-html[data-theme='light'] {
-  color: #17201d;
-  background: #f6f8f6;
+html[data-theme='dark'] {
+  color: #e5edf6;
+  background: #0b1521;
 
-  --bg: #f6f8f6;
-  --bg-soft: #edf3ef;
-  --surface: rgba(255, 255, 255, 0.9);
-  --surface-muted: rgba(12, 40, 33, 0.052);
-  --text: #26332f;
-  --text-strong: #101714;
-  --text-muted: #65746f;
-  --border: rgba(17, 38, 31, 0.14);
-  --accent: #078c73;
-  --accent-soft: rgba(7, 140, 115, 0.1);
-  --warn: #d77718;
-  --danger: #c93e3e;
-  --focus: #d77718;
-  --meter-track: rgba(7, 31, 25, 0.1);
-  --chart-rail: rgba(17, 38, 31, 0.14);
-  --shadow-soft: 0 18px 46px rgba(22, 44, 37, 0.1);
+  --bg: #0b1521;
+  --bg-soft: #111f2f;
+  --surface: rgba(16, 28, 43, 0.92);
+  --surface-muted: rgba(255, 255, 255, 0.06);
+  --text: #dbe6f2;
+  --text-strong: #ffffff;
+  --text-muted: #9cb0c4;
+  --border: rgba(219, 230, 242, 0.18);
+  --accent: #58aee6;
+  --accent-soft: rgba(88, 174, 230, 0.15);
+  --warn: #f0a22f;
+  --danger: #f07a7a;
+  --focus: #58aee6;
+  --meter-track: rgba(255, 255, 255, 0.14);
+  --chart-rail: rgba(219, 230, 242, 0.16);
+  --shadow-soft: 0 18px 46px rgba(5, 12, 20, 0.5);
 }
 
 * {
@@ -62,6 +65,8 @@ html {
 body {
   min-width: 320px;
   margin: 0;
+  background: var(--bg);
+  color: var(--text);
 }
 
 button,

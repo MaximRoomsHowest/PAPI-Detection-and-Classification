@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import createPlotlyComponentFactory from 'react-plotly.js/factory'
@@ -7,9 +7,9 @@ import bar from 'plotly.js/lib/bar'
 import heatmap from 'plotly.js/lib/heatmap'
 import {
   Activity,
-  Camera,
   Cpu,
   Crosshair,
+  Download,
   Gauge,
   Moon,
   Pause,
@@ -97,7 +97,7 @@ const plotlyPalette = {
   white: '#f8fbff',
   red: '#ff4545',
   transition: '#ffb11f',
-  warn: '#ffb657',
+  warn: '#f0a22f',
 }
 
 const scenarios = [
@@ -228,11 +228,13 @@ const pipeline = [
 ]
 
 function App() {
-  const [theme, setTheme] = useState('dark')
+  const [theme, setTheme] = useState('light')
   const [activeId, setActiveId] = useState('clean')
   const [isPlaying, setIsPlaying] = useState(true)
   const [media, setMedia] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const insightsRef = useRef(null)
 
   const activeScenario = useMemo(
     () => scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0],
@@ -249,21 +251,21 @@ function App() {
       theme === 'dark'
         ? {
             paper: 'rgba(0,0,0,0)',
-            plot: 'rgba(255,255,255,0.035)',
-            text: '#dce8e3',
-            strong: '#f6fbf8',
-            muted: '#91a19a',
-            grid: 'rgba(220,232,227,0.14)',
-            border: 'rgba(218,234,226,0.15)',
+            plot: 'rgba(255,255,255,0.04)',
+            text: '#dbe6f2',
+            strong: '#ffffff',
+            muted: '#9cb0c4',
+            grid: 'rgba(219, 230, 242, 0.16)',
+            border: 'rgba(219, 230, 242, 0.18)',
           }
         : {
             paper: 'rgba(0,0,0,0)',
-            plot: 'rgba(12,40,33,0.035)',
-            text: '#26332f',
-            strong: '#101714',
-            muted: '#65746f',
-            grid: 'rgba(17,38,31,0.14)',
-            border: 'rgba(17,38,31,0.16)',
+            plot: 'rgba(25,42,61,0.035)',
+            text: '#192a3d',
+            strong: '#0c1d2d',
+            muted: '#5a6b7d',
+            grid: 'rgba(25, 42, 61, 0.16)',
+            border: 'rgba(25, 42, 61, 0.18)',
           },
     [theme],
   )
@@ -295,8 +297,8 @@ function App() {
     }
   }, [media?.url])
 
-  function handleMediaChange(event) {
-    const file = event.target.files?.[0]
+  function handleMediaFiles(files) {
+    const file = files?.[0]
     if (!file) {
       return
     }
@@ -316,6 +318,65 @@ function App() {
     setIsPlaying(false)
   }
 
+  function handleMediaChange(event) {
+    handleMediaFiles(event.target.files)
+  }
+
+  async function handleDownloadCharts() {
+    if (!insightsRef.current || isExporting) {
+      return
+    }
+
+    setIsExporting(true)
+
+    try {
+      const { jsPDF } = await import('jspdf')
+      const chartNodes = Array.from(
+        insightsRef.current.querySelectorAll('.js-plotly-plot'),
+      )
+
+      if (!chartNodes.length) {
+        return
+      }
+
+      const images = []
+      for (const node of chartNodes) {
+        const rect = node.getBoundingClientRect()
+        const width = Math.max(1, Math.round(rect.width))
+        const height = Math.max(1, Math.round(rect.height))
+        const dataUrl = await Plotly.toImage(node, {
+          format: 'png',
+          width,
+          height,
+          scale: 2,
+        })
+        images.push({
+          dataUrl,
+          width,
+          height,
+          orientation: width >= height ? 'landscape' : 'portrait',
+        })
+      }
+
+      const [first, ...rest] = images
+      const pdf = new jsPDF({
+        orientation: first.orientation,
+        unit: 'px',
+        format: [first.width, first.height],
+      })
+      pdf.addImage(first.dataUrl, 'PNG', 0, 0, first.width, first.height)
+      rest.forEach((image) => {
+        pdf.addPage([image.width, image.height], image.orientation)
+        pdf.addImage(image.dataUrl, 'PNG', 0, 0, image.width, image.height)
+      })
+      pdf.save('papi-vision-insights.pdf')
+    } catch (error) {
+      console.error('PDF export failed', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   function runMockInference() {
     setIsAnalyzing(true)
     setIsPlaying(false)
@@ -329,12 +390,25 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <Link className="brand" to="/" aria-label="PAPI Vision dashboard">
-          <span className="brand-mark">
-            <Camera size={20} />
+          <span className="brand-logo" aria-hidden="true">
+            <img
+              className="logo-light"
+              src="/intersoft-electronics-logo.svg"
+              alt=""
+            />
+            <img
+              className="logo-dark"
+              src="/intersoft-electronics-logo-white-inverse.svg"
+              alt=""
+            />
           </span>
-          <span>
+          <span className="brand-text">
             <strong>PAPI Vision</strong>
             <small>AI detection prototype</small>
+            <small className="brand-company">
+              On your radar
+              <span>Intersoft Electronics</span>
+            </small>
           </span>
         </Link>
 
@@ -382,6 +456,7 @@ function App() {
               isAnalyzing={isAnalyzing}
               isPlaying={isPlaying}
               media={media}
+              handleMediaFiles={handleMediaFiles}
               runMockInference={runMockInference}
               setActiveId={setActiveId}
               setIsPlaying={setIsPlaying}
@@ -391,7 +466,15 @@ function App() {
         />
         <Route
           path="/insights"
-          element={<InsightsPage activeScenario={activeScenario} plotTheme={plotTheme} />}
+          element={
+            <InsightsPage
+              activeScenario={activeScenario}
+              plotTheme={plotTheme}
+              insightsRef={insightsRef}
+              isExporting={isExporting}
+              onDownloadCharts={handleDownloadCharts}
+            />
+          }
         />
         <Route path="*" element={<IntroductionPage activeScenario={activeScenario} />} />
       </Routes>
@@ -400,9 +483,37 @@ function App() {
 }
 
 function IntroductionPage({ activeScenario }) {
+  const videoRef = useRef(null)
+
+  const ensurePlayback = () => {
+    const video = videoRef.current
+    if (!video || !video.paused) {
+      return
+    }
+
+    const playPromise = video.play()
+    if (playPromise?.catch) {
+      playPromise.catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    ensurePlayback()
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        ensurePlayback()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
   return (
     <section className="intro-hero">
       <video
+        ref={videoRef}
         className="intro-video"
         src="/Background-vid.mp4"
         autoPlay
@@ -410,6 +521,9 @@ function IntroductionPage({ activeScenario }) {
         loop
         playsInline
         preload="auto"
+        onLoadedData={ensurePlayback}
+        onPause={ensurePlayback}
+        onEnded={ensurePlayback}
         aria-hidden="true"
       />
       <div className="intro-hero-inner">
@@ -454,6 +568,55 @@ function IntroductionPage({ activeScenario }) {
             </div>
           ))}
         </section>
+
+        <section className="airport-section">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Airport context</p>
+              <h2>Bodensee-Airport Friedrichshafen runway snapshot.</h2>
+            </div>
+            <span className="source-note">Runway 06/24, asphalt, 2,356 m (7,729 ft)</span>
+          </div>
+
+          <div className="airport-grid">
+            <div className="airport-card">
+              <h3>Runway details</h3>
+              <p>
+                The project focuses on the single runway at Bodensee-Airport Friedrichshafen. The
+                runway designation is 06/24 with an asphalt surface and a length of 2,356 meters
+                (7,729 feet).
+              </p>
+              <div className="airport-meta">
+                <div>
+                  <span>Coordinates</span>
+                  <strong>47.67139 N, 9.51139 E</strong>
+                </div>
+                <div>
+                  <span>Elevation</span>
+                  <strong>414 m AMSL</strong>
+                </div>
+              </div>
+              <a
+                className="text-link"
+                href="https://www.bodensee-airport.eu/en/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Bodensee-Airport Friedrichshafen
+              </a>
+            </div>
+
+            <div className="airport-map">
+              <iframe
+                title="Bodensee-Airport Friedrichshafen map"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src="https://www.openstreetmap.org/export/embed.html?bbox=9.4896%2C47.6572%2C9.5332%2C47.6856&layer=mapnik&marker=47.67139%2C9.51139"
+              />
+              <span className="map-caption">47.67139 N, 9.51139 E</span>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
   )
@@ -466,6 +629,7 @@ function LiveDemoPage({
   isAnalyzing,
   isPlaying,
   media,
+  handleMediaFiles,
   runMockInference,
   setActiveId,
   setIsPlaying,
@@ -524,7 +688,12 @@ function LiveDemoPage({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45 }}
         >
-          <FrameStage scenario={activeScenario} media={media} analyzing={isAnalyzing} />
+          <FrameStage
+            scenario={activeScenario}
+            media={media}
+            analyzing={isAnalyzing}
+            onFilesSelected={handleMediaFiles}
+          />
         </motion.div>
 
         <aside className="analysis-panel">
@@ -555,7 +724,7 @@ function LiveDemoPage({
   )
 }
 
-function InsightsPage({ activeScenario, plotTheme }) {
+function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onDownloadCharts }) {
   return (
     <section className="insights-section">
       <div className="section-heading">
@@ -563,10 +732,21 @@ function InsightsPage({ activeScenario, plotTheme }) {
           <p className="eyebrow">Insights</p>
           <h2>Accuracy, transitions, robustness, and speed without boring chart filler.</h2>
         </div>
-        <span className="source-note">Inspired by visual forms from Data Viz Project</span>
+        <div className="section-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onDownloadCharts}
+            disabled={isExporting}
+          >
+            <Download size={18} />
+            {isExporting ? 'Preparing PDF' : 'Download charts (PDF)'}
+          </button>
+          <span className="source-note">Inspired by visual forms from Data Viz Project</span>
+        </div>
       </div>
 
-      <div className="insight-grid">
+      <div className="insight-grid" ref={insightsRef}>
         <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} />
         <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} />
       </div>
@@ -619,12 +799,30 @@ function LampCard({ lamp }) {
   )
 }
 
-function FrameStage({ scenario, media, analyzing }) {
+function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
+  const [isDragActive, setIsDragActive] = useState(false)
   const boxStyle = {
     left: `${scenario.box.left}%`,
     top: `${scenario.box.top}%`,
     width: `${scenario.box.width}%`,
     height: `${scenario.box.height}%`,
+  }
+
+  const handleDrop = (event) => {
+    event.preventDefault()
+    setIsDragActive(false)
+    if (event.dataTransfer?.files?.length) {
+      onFilesSelected?.(event.dataTransfer.files)
+    }
+  }
+
+  const handleDragOver = (event) => {
+    event.preventDefault()
+    setIsDragActive(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragActive(false)
   }
 
   return (
@@ -634,35 +832,56 @@ function FrameStage({ scenario, media, analyzing }) {
         <span>{scenario.condition}</span>
       </div>
 
-      <div className="video-surface">
+      <div
+        className="video-surface"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         {media?.type === 'video' ? (
           <video src={media.url} autoPlay muted loop playsInline controls />
         ) : media?.type === 'image' ? (
           <img src={media.url} alt="Uploaded PAPI test frame" />
         ) : (
-          <SyntheticRunway />
+          <DropzonePlaceholder isDragActive={isDragActive} />
         )}
 
-        <div className="scan-grid" />
-        <div className="target-box" style={boxStyle}>
-          <span className="box-label">PAPI {scenario.metrics.boxConfidence}%</span>
-          <div className="lamp-overlay">
-            {scenario.lamps.map((lamp) => (
-              <span
-                className={clsx('overlay-lamp', `overlay-${lamp.status}`)}
-                key={lamp.id}
-                title={`Lamp ${lamp.id}: ${statusCopy[lamp.status].label}`}
-              />
-            ))}
-          </div>
-        </div>
-        {scenario.environmentClass === 'storm' && <div className="weather-layer" />}
+        {media && (
+          <>
+            <div className="scan-grid" />
+            <div className="target-box" style={boxStyle}>
+              <span className="box-label">PAPI {scenario.metrics.boxConfidence}%</span>
+              <div className="lamp-overlay">
+                {scenario.lamps.map((lamp) => (
+                  <span
+                    className={clsx('overlay-lamp', `overlay-${lamp.status}`)}
+                    key={lamp.id}
+                    title={`Lamp ${lamp.id}: ${statusCopy[lamp.status].label}`}
+                  />
+                ))}
+              </div>
+            </div>
+            {scenario.environmentClass === 'storm' && <div className="weather-layer" />}
+          </>
+        )}
         {analyzing && (
           <div className="analyzing-layer">
             <Radar size={34} />
             <span>Mock inference running</span>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function DropzonePlaceholder({ isDragActive }) {
+  return (
+    <div className={clsx('dropzone-placeholder', isDragActive && 'active')}>
+      <div className="dropzone-card">
+        <Upload size={28} />
+        <strong>Drag and drop an image or video</strong>
+        <span>Or use the upload button above</span>
       </div>
     </div>
   )
@@ -828,7 +1047,7 @@ function PapiDecisionPlot({ evidence, activeIndex, selectedIndex, setHovered, pl
         margin: { l: 54, r: 34, t: 8, b: 34 },
         paper_bgcolor: plotTheme.paper,
         plot_bgcolor: plotTheme.plot,
-        font: { color: plotTheme.text, family: 'Inter, Segoe UI, sans-serif' },
+        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
         bargap: 0.34,
         xaxis: {
           range: [0, 100],
@@ -908,7 +1127,7 @@ function TransitionRibbon({ activeScenario, plotTheme }) {
             margin: { l: 56, r: 14, t: 6, b: 38 },
             paper_bgcolor: plotTheme.paper,
             plot_bgcolor: plotTheme.paper,
-            font: { color: plotTheme.text, family: 'Inter, Segoe UI, sans-serif' },
+            font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
             xaxis: { fixedrange: true, tickfont: { color: plotTheme.muted } },
             yaxis: {
               autorange: 'reversed',
