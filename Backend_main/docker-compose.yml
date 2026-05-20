@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: papi-backend-postgres
+    environment:
+      POSTGRES_DB: papi_backend
+      POSTGRES_USER: papi
+      POSTGRES_PASSWORD: papi
+    ports:
+      - "5434:5432"
+    volumes:
+      - papi_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papi -d papi_backend"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  papi_postgres_data:
