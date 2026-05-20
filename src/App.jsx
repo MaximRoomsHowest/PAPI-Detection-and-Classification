@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import createPlotlyComponentFactory from 'react-plotly.js/factory'
 import Plotly from 'plotly.js/lib/core'
@@ -327,7 +328,7 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#live-demo" aria-label="PAPI Vision dashboard">
+        <Link className="brand" to="/" aria-label="PAPI Vision dashboard">
           <span className="brand-mark">
             <Camera size={20} />
           </span>
@@ -335,11 +336,28 @@ function App() {
             <strong>PAPI Vision</strong>
             <small>AI detection prototype</small>
           </span>
-        </a>
+        </Link>
 
-        <nav className="topnav" aria-label="Page sections">
-          <a href="#live-demo">Live demo</a>
-          <a href="#insights">Insights</a>
+        <nav className="topnav" aria-label="Primary">
+          <NavLink
+            className={({ isActive }) => clsx('nav-link', isActive && 'active')}
+            to="/"
+            end
+          >
+            Introduction
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => clsx('nav-link', isActive && 'active')}
+            to="/live-demo"
+          >
+            Live Demo
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => clsx('nav-link', isActive && 'active')}
+            to="/insights"
+          >
+            Insights
+          </NavLink>
         </nav>
 
         <button
@@ -352,139 +370,207 @@ function App() {
         </button>
       </header>
 
-      <section className="intro-band">
-        <div className="intro-copy">
-          <p className="eyebrow">Intersoft Electronics Services BV</p>
-          <h1>Real-time PAPI detection and glidepath classification.</h1>
-          <p>
-            A front-end prototype for testing model output, explaining lamp transitions,
-            and presenting accuracy, speed, and robustness in one polished flow.
-          </p>
-        </div>
+      <Routes>
+        <Route path="/" element={<IntroductionPage activeScenario={activeScenario} />} />
+        <Route
+          path="/live-demo"
+          element={
+            <LiveDemoPage
+              activeId={activeId}
+              activeScenario={activeScenario}
+              activeState={activeState}
+              isAnalyzing={isAnalyzing}
+              isPlaying={isPlaying}
+              media={media}
+              runMockInference={runMockInference}
+              setActiveId={setActiveId}
+              setIsPlaying={setIsPlaying}
+              handleMediaChange={handleMediaChange}
+            />
+          }
+        />
+        <Route
+          path="/insights"
+          element={<InsightsPage activeScenario={activeScenario} plotTheme={plotTheme} />}
+        />
+        <Route path="*" element={<IntroductionPage activeScenario={activeScenario} />} />
+      </Routes>
+    </main>
+  )
+}
 
-        <div className="hero-metrics" aria-label="Current run summary">
-          <MetricTile icon={Gauge} label="Live FPS" value={activeScenario.metrics.fps} suffix="fps" />
-          <MetricTile
-            icon={Zap}
-            label="Latency"
-            value={activeScenario.metrics.latency}
-            suffix="ms"
-          />
-          <MetricTile
-            icon={Crosshair}
-            label="Box confidence"
-            value={activeScenario.metrics.boxConfidence}
-            suffix="%"
-          />
-        </div>
-      </section>
-
-      <section className="workflow-strip" aria-label="Model workflow">
-        {pipeline.map((step) => (
-          <div className="workflow-step" key={step.label}>
-            <step.icon size={18} />
-            <span>{step.label}</span>
-            <small>{step.value}</small>
+function IntroductionPage({ activeScenario }) {
+  return (
+    <section className="intro-hero">
+      <video
+        className="intro-video"
+        src="/Background-vid.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        aria-hidden="true"
+      />
+      <div className="intro-hero-inner">
+        <section className="intro-band">
+          <div className="intro-copy">
+            <p className="eyebrow">Intersoft Electronics Services BV</p>
+            <h1>Real-time PAPI detection and glidepath classification.</h1>
+            <p>
+              A front-end prototype for testing model output, explaining lamp transitions,
+              and presenting accuracy, speed, and robustness in one polished flow.
+            </p>
+            <div className="intro-actions">
+              <Link className="cta-button" to="/live-demo">
+                Try It Out
+              </Link>
+            </div>
           </div>
-        ))}
-      </section>
 
-      <section className="demo-section" id="live-demo">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Live demo</p>
-            <h2>Upload media, run a mocked inference, and inspect the detected PAPI unit.</h2>
+          <div className="hero-metrics" aria-label="Current run summary">
+            <MetricTile icon={Gauge} label="Live FPS" value={activeScenario.metrics.fps} suffix="fps" />
+            <MetricTile
+              icon={Zap}
+              label="Latency"
+              value={activeScenario.metrics.latency}
+              suffix="ms"
+            />
+            <MetricTile
+              icon={Crosshair}
+              label="Box confidence"
+              value={activeScenario.metrics.boxConfidence}
+              suffix="%"
+            />
           </div>
-          <div className="demo-actions">
-            <label className="upload-button">
-              <Upload size={18} />
-              <span>{media ? media.name : 'Upload media'}</span>
-              <input accept="image/*,video/*" type="file" onChange={handleMediaChange} />
-            </label>
-            <button className="primary-button" type="button" onClick={runMockInference}>
-              <Zap size={18} />
-              {isAnalyzing ? 'Analyzing' : 'Run mock model'}
-            </button>
-          </div>
-        </div>
+        </section>
 
-        <div className="scenario-tabs" role="tablist" aria-label="Demo scenarios">
-          {scenarios.map((scenario) => (
-            <button
-              className={clsx('scenario-tab', scenario.id === activeId && 'active')}
-              key={scenario.id}
-              type="button"
-              onClick={() => {
-                setActiveId(scenario.id)
-                setIsPlaying(false)
-              }}
-            >
-              <span>{scenario.label}</span>
-              <small>{scenario.badge}</small>
-            </button>
+        <section className="workflow-strip" aria-label="Model workflow">
+          {pipeline.map((step) => (
+            <div className="workflow-step" key={step.label}>
+              <step.icon size={18} />
+              <span>{step.label}</span>
+              <small>{step.value}</small>
+            </div>
           ))}
-          <button
-            className="scenario-tab play-tab"
-            type="button"
-            onClick={() => setIsPlaying((current) => !current)}
-            aria-label={isPlaying ? 'Pause scenario playback' : 'Play scenario loop'}
-          >
-            {isPlaying ? <Pause size={17} /> : <Play size={17} />}
-            <span>{isPlaying ? 'Auto' : 'Paused'}</span>
+        </section>
+      </div>
+    </section>
+  )
+}
+
+function LiveDemoPage({
+  activeId,
+  activeScenario,
+  activeState,
+  isAnalyzing,
+  isPlaying,
+  media,
+  runMockInference,
+  setActiveId,
+  setIsPlaying,
+  handleMediaChange,
+}) {
+  return (
+    <section className="demo-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Live demo</p>
+          <h2>Upload media, run a mocked inference, and inspect the detected PAPI unit.</h2>
+        </div>
+        <div className="demo-actions">
+          <label className="upload-button">
+            <Upload size={18} />
+            <span>{media ? media.name : 'Upload media'}</span>
+            <input accept="image/*,video/*" type="file" onChange={handleMediaChange} />
+          </label>
+          <button className="primary-button" type="button" onClick={runMockInference}>
+            <Zap size={18} />
+            {isAnalyzing ? 'Analyzing' : 'Run mock model'}
           </button>
         </div>
+      </div>
 
-        <div className="live-grid">
-          <motion.div
-            className="frame-tool"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
+      <div className="scenario-tabs" role="tablist" aria-label="Demo scenarios">
+        {scenarios.map((scenario) => (
+          <button
+            className={clsx('scenario-tab', scenario.id === activeId && 'active')}
+            key={scenario.id}
+            type="button"
+            onClick={() => {
+              setActiveId(scenario.id)
+              setIsPlaying(false)
+            }}
           >
-            <FrameStage scenario={activeScenario} media={media} analyzing={isAnalyzing} />
-          </motion.div>
+            <span>{scenario.label}</span>
+            <small>{scenario.badge}</small>
+          </button>
+        ))}
+        <button
+          className="scenario-tab play-tab"
+          type="button"
+          onClick={() => setIsPlaying((current) => !current)}
+          aria-label={isPlaying ? 'Pause scenario playback' : 'Play scenario loop'}
+        >
+          {isPlaying ? <Pause size={17} /> : <Play size={17} />}
+          <span>{isPlaying ? 'Auto' : 'Paused'}</span>
+        </button>
+      </div>
 
-          <aside className="analysis-panel">
-            <div className="state-summary">
-              <span className="status-dot" style={{ '--dot-color': activeState.color }} />
-              <div>
-                <p>{activeScenario.summary}</p>
-                <h3>{activeState.label}</h3>
-                <small>{activeState.description}</small>
-              </div>
+      <div className="live-grid">
+        <motion.div
+          className="frame-tool"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+        >
+          <FrameStage scenario={activeScenario} media={media} analyzing={isAnalyzing} />
+        </motion.div>
+
+        <aside className="analysis-panel">
+          <div className="state-summary">
+            <span className="status-dot" style={{ '--dot-color': activeState.color }} />
+            <div>
+              <p>{activeScenario.summary}</p>
+              <h3>{activeState.label}</h3>
+              <small>{activeState.description}</small>
             </div>
-
-            <div className="lamp-list">
-              {activeScenario.lamps.map((lamp) => (
-                <LampCard key={lamp.id} lamp={lamp} />
-              ))}
-            </div>
-
-            <div className="metric-grid">
-              <InlineMetric label="Detection" value={activeScenario.metrics.boxConfidence} suffix="%" />
-              <InlineMetric label="Global state" value={activeScenario.metrics.globalConfidence} suffix="%" />
-              <InlineMetric label="Transitions" value={activeScenario.metrics.transitionRecall} suffix="%" />
-              <InlineMetric label="Edge memory" value={activeScenario.metrics.edgeMemory} suffix="MB" />
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section className="insights-section" id="insights">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Insights</p>
-            <h2>Accuracy, transitions, robustness, and speed without boring chart filler.</h2>
           </div>
-          <span className="source-note">Inspired by visual forms from Data Viz Project</span>
-        </div>
 
-        <div className="insight-grid">
-          <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} />
-          <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} />
+          <div className="lamp-list">
+            {activeScenario.lamps.map((lamp) => (
+              <LampCard key={lamp.id} lamp={lamp} />
+            ))}
+          </div>
+
+          <div className="metric-grid">
+            <InlineMetric label="Detection" value={activeScenario.metrics.boxConfidence} suffix="%" />
+            <InlineMetric label="Global state" value={activeScenario.metrics.globalConfidence} suffix="%" />
+            <InlineMetric label="Transitions" value={activeScenario.metrics.transitionRecall} suffix="%" />
+            <InlineMetric label="Edge memory" value={activeScenario.metrics.edgeMemory} suffix="MB" />
+          </div>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
+function InsightsPage({ activeScenario, plotTheme }) {
+  return (
+    <section className="insights-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Insights</p>
+          <h2>Accuracy, transitions, robustness, and speed without boring chart filler.</h2>
         </div>
-      </section>
-    </main>
+        <span className="source-note">Inspired by visual forms from Data Viz Project</span>
+      </div>
+
+      <div className="insight-grid">
+        <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} />
+        <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} />
+      </div>
+    </section>
   )
 }
 
