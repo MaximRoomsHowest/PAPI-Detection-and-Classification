@@ -504,11 +504,21 @@ html[data-theme='dark'] .brand-logo .logo-light {
 }
 
 .demo-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  justify-content: end;
+}
+
+.demo-actions .upload-button,
+.demo-actions .primary-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.demo-actions .upload-button {
+  max-width: none;
 }
 
 .upload-button,
@@ -1531,6 +1541,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
   }
 
   .demo-actions {
+    grid-template-columns: 1fr;
     justify-content: stretch;
   }
 
