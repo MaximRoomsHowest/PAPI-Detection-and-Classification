@@ -4,14 +4,14 @@
 
 This folder contains a local-only FastAPI backend prototype for the PAPI Detection and Classification project. It is separate from the frontend work and is meant to prove the backend flow before connecting it to the React UI.
 
-The backend lets a user upload an image or video, run the trained PAPI YOLO model, store an anonymous analysis log, export annotated media, and calculate the drone elevation angle when GPS/altitude metadata is available.
+The backend lets a user upload an image or video, run the trained PAPI YOLO model immediately, store an anonymous result log, export annotated media, and calculate the drone elevation angle when GPS/altitude metadata is available.
 
 ## What Is Implemented
 
 - Public FastAPI API with no login/authentication.
-- Image and video upload through one analysis endpoint.
-- Background processing job flow for uploaded media.
-- PostgreSQL database models for analysis jobs and results.
+- Image/frame upload through `POST /api/analyze-frame`; legacy image/video upload remains available through `POST /api/analyze`.
+- Immediate inference response from `POST /api/analyze`; no job polling is used for v1.
+- PostgreSQL result logs that store metadata/results, not uploaded image/video bytes.
 - Seeded PAPI runway coordinates for `papi_06` and `papi_24`.
 - YOLO `.pt` inference using the trained model from `data_analysis`.
 - Lamp-level result output: each detected lamp is reported as `white`, `red`, or `unknown`.
@@ -34,16 +34,20 @@ Backend_main/
     main.py                 FastAPI app entrypoint
     config.py               Environment/settings loading
     database.py             SQLAlchemy engine/session setup
-    models.py               Database tables
-    schemas.py              API response/request models
     api/routes.py           API endpoints
+    models/
+      analysis_log.py       SQLAlchemy analysis log entity
+    repositories/
+      analysis_logs.py      Database read/write logic for result logs
     services/
       angle.py              EXIF metadata + drone angle calculation
       inference.py          YOLO/OpenCV media analysis
       media.py              Upload and media-type helpers
-      processor.py          Background job processor
       runways.py            Seeded PAPI runway coordinates
       state.py              Lamp and global-state logic
+    validation/
+      analyze.py            Request validation helpers
+      schemas.py            API response/request models
   models/
     best.pt                 Local trained YOLO model, ignored by Git
   storage/
@@ -51,7 +55,7 @@ Backend_main/
     exports/                Annotated output files, ignored by Git
     tmp/                    Temporary processing files, ignored by Git
   tests/                    Unit tests
-  docker-compose.yml        Local PostgreSQL service
+  docker-compose.yml        Local PostgreSQL service for logs
   requirements.txt          Python dependencies
   .env.example              Example local environment config
 ```
@@ -60,17 +64,23 @@ Backend_main/
 
 - `GET /health`
 - `POST /api/analyze`
-- `GET /api/analyze/{job_id}`
+- `POST /api/analyze-frame`
 - `GET /api/logs`
-- `GET /api/logs/{job_id}`
+- `GET /api/logs/{id}`
 - `GET /api/runways`
 
-`POST /api/analyze` expects form data:
+`POST /api/analyze-frame` is the expected frontend workflow for split video frames. It expects form data:
 
-- `file`: image or video upload
+- `file`: image frame upload
 - `runway_id`: optional, defaults to `papi_06`
 - `drone_id`: optional
-- `notes`: optional
+- `drone_latitude`, `drone_longitude`, `drone_altitude_m`: optional manual drone metadata for angle calculation
+
+Backend work per received frame:
+
+- Run inference on the image and decide each PAPI lamp state plus global state.
+- Calculate drone elevation angle from submitted metadata and seeded runway coordinates.
+- Return the result immediately and save only a lightweight DB log.
 
 ## How To Run Locally
 
@@ -115,9 +125,10 @@ Current unit test coverage includes:
 - This is local-only work. Nothing has been pushed.
 - The frontend is not connected yet.
 - `models/best.pt` is intentionally ignored by Git.
-- Uploaded files, exports, temp files, `.env`, and virtual environments are ignored by Git.
+- Uploaded originals are used for processing and deleted after analysis.
+- Annotated exports, temp files, `.env`, and virtual environments are ignored by Git.
 - Docker Desktop must be running before `docker compose up -d` will work.
-- The exact drone angle is only calculated when GPS/altitude metadata is available.
+- The exact drone angle is only calculated when GPS/altitude metadata is available in the uploaded media or provided manually in the request. For frontend-split frames, metadata should normally be sent as request form fields.
 - Transition/yellow-orange lamp detection is reserved for later unless the model gains a transition class.
 
 ## Suggested Next Steps
@@ -125,5 +136,5 @@ Current unit test coverage includes:
 - Start PostgreSQL with Docker and run the FastAPI app.
 - Test `/api/analyze` with a real image and video.
 - Verify annotated exports visually.
-- Add frontend polling once the backend result shape is confirmed.
-- Later, decide whether to keep PostgreSQL or temporarily support SQLite for easier teammate setup.
+- Connect the frontend upload flow to the direct `/api/analyze` response.
+- Later, decide if large video files need a separate background-job endpoint.

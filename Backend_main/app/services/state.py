@@ -1,6 +1,6 @@
 from collections import Counter
 
-from app.schemas import BoundingBox, LampResult
+from app.validation.schemas import BoundingBox, LampResult
 
 
 DETECTION_CLASS_TO_STATE = {
@@ -53,7 +53,7 @@ def global_state_from_lamps(lamps: list[LampResult]) -> str:
     counts = Counter(lamp.state for lamp in lamps)
     known_count = counts["white"] + counts["red"]
 
-    if known_count == 0:
+    if known_count < 4:
         return "unknown"
 
     white_ratio = counts["white"] / known_count
@@ -73,4 +73,3 @@ def confidence_from_lamps(lamps: list[LampResult]) -> float:
     if not known:
         return 0.0
     return round(sum(known) / len(known), 4)
-

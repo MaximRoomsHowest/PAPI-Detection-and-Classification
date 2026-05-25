@@ -2,7 +2,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from app.schemas import AnglePerLight, AngleResult
+from app.validation.schemas import AnglePerLight, AngleResult
 from app.services.runways import get_runway
 
 
@@ -23,6 +23,7 @@ def compute_elevation_angles(
     drone_longitude: float,
     drone_altitude_m: float,
     runway_id: str,
+    angle_source: str = "metadata",
 ) -> AngleResult:
     runway = get_runway(runway_id)
     per_light = []
@@ -48,7 +49,7 @@ def compute_elevation_angles(
         angle_available=True,
         elevation_angle_deg=round(avg_angle, 6),
         per_light_angles=per_light,
-        angle_source="metadata",
+        angle_source=angle_source,
         angle_note="Calculated from drone GPS/altitude metadata and seeded PAPI coordinates.",
     )
 
@@ -127,4 +128,3 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
         altitude = -altitude
 
     return latitude, longitude, altitude
-

@@ -31,4 +31,3 @@ def on_startup() -> None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-

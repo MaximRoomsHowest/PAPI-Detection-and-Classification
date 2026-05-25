@@ -1,11 +1,9 @@
-from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 LampState = Literal["white", "red", "transition", "unknown"]
-JobStatus = Literal["pending", "running", "completed", "failed"]
 MediaType = Literal["image", "video"]
 
 
@@ -38,6 +36,11 @@ class AngleResult(BaseModel):
 
 
 class AnalysisPayload(BaseModel):
+    log_id: str | None = None
+    media_type: MediaType
+    original_filename: str
+    runway_id: str
+    drone_id: str | None = None
     global_state: str
     lamps: list[LampResult]
     confidence: float
@@ -48,42 +51,20 @@ class AnalysisPayload(BaseModel):
     detections: list[dict] = Field(default_factory=list)
 
 
-class AnalyzeAccepted(BaseModel):
-    job_id: str
-    status: JobStatus
-
-
-class AnalysisJobResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    status: JobStatus
-    progress: int
-    media_type: MediaType
-    runway_id: str
-    drone_id: str | None
-    notes: str | None
-    original_filename: str
-    artifact_url: str | None = None
-    created_at: datetime
-    started_at: datetime | None
-    completed_at: datetime | None
-    error_message: str | None
-    result: AnalysisPayload | None = None
-
-
 class LogListItem(BaseModel):
     id: str
-    status: JobStatus
     media_type: MediaType
     runway_id: str
     drone_id: str | None
     original_filename: str
-    global_state: str | None
-    confidence: float | None
+    global_state: str
+    confidence: float
+    angle_available: bool
     elevation_angle_deg: float | None
-    created_at: datetime
-    completed_at: datetime | None
+    frame_count: int
+    processing_ms: int
+    artifact_url: str | None = None
+    created_at: str
 
 
 class RunwayLight(BaseModel):

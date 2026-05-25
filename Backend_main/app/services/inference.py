@@ -1,11 +1,12 @@
 from collections import Counter, deque
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
 from app.config import Settings
-from app.schemas import AnalysisPayload
+from app.validation.schemas import AnalysisPayload, LampResult
 from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
 from app.services.state import confidence_from_lamps, global_state_from_lamps, normalize_detections
 
@@ -15,11 +16,19 @@ class InferenceService:
         self.settings = settings
         self._model: Any | None = None
 
-    def analyze(self, media_path: Path, media_type: str, runway_id: str) -> AnalysisPayload:
+    def analyze(
+        self,
+        media_path: Path,
+        media_type: str,
+        runway_id: str,
+        original_filename: str,
+        drone_id: str | None = None,
+        drone_metadata: tuple[float, float, float] | None = None,
+    ) -> AnalysisPayload:
         if media_type == "image":
-            return self.analyze_image(media_path, runway_id)
+            return self.analyze_image(media_path, runway_id, original_filename, drone_id, drone_metadata)
         if media_type == "video":
-            return self.analyze_video(media_path, runway_id)
+            return self.analyze_video(media_path, runway_id, original_filename, drone_id, drone_metadata)
         raise ValueError(f"Unsupported media type: {media_type}")
 
     @property
@@ -34,7 +43,14 @@ class InferenceService:
             self._model = YOLO(str(self.settings.model_path))
         return self._model
 
-    def analyze_image(self, media_path: Path, runway_id: str) -> AnalysisPayload:
+    def analyze_image(
+        self,
+        media_path: Path,
+        runway_id: str,
+        original_filename: str,
+        drone_id: str | None,
+        drone_metadata: tuple[float, float, float] | None,
+    ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
         frame = cv2.imread(str(media_path))
@@ -45,7 +61,7 @@ class InferenceService:
         lamps = normalize_detections(detections)
         global_state = global_state_from_lamps(lamps)
         confidence = confidence_from_lamps(lamps)
-        angle = self._angle_for_media(media_path, runway_id)
+        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
 
         annotated = self._draw_overlay(frame, lamps, global_state, confidence, angle.elevation_angle_deg)
         artifact_path = self.settings.exports_dir / f"{uuid4()}_annotated.jpg"
@@ -53,6 +69,10 @@ class InferenceService:
 
         processing_ms = int((perf_counter() - start) * 1000)
         return AnalysisPayload(
+            media_type="image",
+            original_filename=original_filename,
+            runway_id=runway_id,
+            drone_id=drone_id,
             global_state=global_state,
             lamps=lamps,
             confidence=confidence,
@@ -63,7 +83,14 @@ class InferenceService:
             detections=detections,
         )
 
-    def analyze_video(self, media_path: Path, runway_id: str) -> AnalysisPayload:
+    def analyze_video(
+        self,
+        media_path: Path,
+        runway_id: str,
+        original_filename: str,
+        drone_id: str | None,
+        drone_metadata: tuple[float, float, float] | None,
+    ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
         cap = cv2.VideoCapture(str(media_path))
@@ -78,11 +105,11 @@ class InferenceService:
         writer = cv2.VideoWriter(str(artifact_path), fourcc, fps, (frame_width, frame_height))
 
         history = deque(maxlen=self.settings.video_history_size)
-        final_lamps = normalize_detections([])
         all_states: list[str] = []
         all_confidences: list[float] = []
+        lamp_history: dict[int, list[LampResult]] = {1: [], 2: [], 3: [], 4: []}
         frame_count = 0
-        angle = self._angle_for_media(media_path, runway_id)
+        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
         last_detections: list[dict] = []
 
         try:
@@ -107,7 +134,8 @@ class InferenceService:
                 )
                 writer.write(annotated)
 
-                final_lamps = lamps
+                for lamp in lamps:
+                    lamp_history[lamp.index].append(lamp)
                 last_detections = detections
                 all_states.append(smoothed_state)
                 all_confidences.append(frame_confidence)
@@ -119,11 +147,16 @@ class InferenceService:
         if frame_count == 0:
             raise ValueError("Uploaded video did not contain readable frames.")
 
-        global_state = Counter(all_states).most_common(1)[0][0]
-        confidence = round(sum(all_confidences) / len(all_confidences), 4) if all_confidences else 0.0
+        final_lamps = self._aggregate_video_lamps(lamp_history)
+        global_state = global_state_from_lamps(final_lamps)
+        confidence = confidence_from_lamps(final_lamps)
         processing_ms = int((perf_counter() - start) * 1000)
 
         return AnalysisPayload(
+            media_type="video",
+            original_filename=original_filename,
+            runway_id=runway_id,
+            drone_id=drone_id,
             global_state=global_state,
             lamps=final_lamps,
             confidence=confidence,
@@ -133,6 +166,30 @@ class InferenceService:
             artifact_url=f"/media/{artifact_path.name}",
             detections=last_detections,
         )
+
+    @staticmethod
+    def _aggregate_video_lamps(lamp_history: dict[int, list[LampResult]]) -> list[LampResult]:
+        final_lamps: list[LampResult] = []
+        for index in range(1, 5):
+            history = lamp_history.get(index, [])
+            known = [lamp for lamp in history if lamp.state != "unknown"]
+            if not known:
+                final_lamps.append(LampResult(index=index, state="unknown", confidence=0.0))
+                continue
+
+            state = Counter(lamp.state for lamp in known).most_common(1)[0][0]
+            matching = [lamp for lamp in known if lamp.state == state]
+            confidence = round(sum(lamp.confidence for lamp in matching) / len(matching), 4)
+            bbox = next((lamp.bbox for lamp in reversed(matching) if lamp.bbox is not None), None)
+            final_lamps.append(
+                LampResult(
+                    index=index,
+                    state=state,
+                    confidence=confidence,
+                    bbox=bbox,
+                )
+            )
+        return final_lamps
 
     def _detect_frame(self, frame: Any, use_tracking: bool) -> list[dict]:
         if use_tracking:
@@ -170,12 +227,21 @@ class InferenceService:
             )
         return detections
 
-    def _angle_for_media(self, media_path: Path, runway_id: str):
-        metadata = extract_gps_metadata(media_path)
+    def _angle_for_media(
+        self,
+        media_path: Path,
+        runway_id: str,
+        drone_metadata: tuple[float, float, float] | None,
+    ):
+        angle_source = "request_metadata" if drone_metadata else "file_metadata"
+        metadata = drone_metadata or extract_gps_metadata(media_path)
         if metadata is None:
-            return unavailable_angle("GPS/altitude metadata not available for this media.")
+            return unavailable_angle(
+                "GPS/altitude metadata not available. Browser uploads usually preserve the original file bytes, "
+                "but many exported/compressed videos and images do not contain drone telemetry."
+            )
         latitude, longitude, altitude = metadata
-        return compute_elevation_angles(latitude, longitude, altitude, runway_id)
+        return compute_elevation_angles(latitude, longitude, altitude, runway_id, angle_source=angle_source)
 
     def _draw_overlay(
         self,
@@ -221,3 +287,9 @@ class InferenceService:
             raise RuntimeError("OpenCV is not installed. Run `pip install -r requirements.txt`.") from exc
         return cv2
 
+
+@lru_cache
+def get_inference_service() -> InferenceService:
+    from app.config import get_settings
+
+    return InferenceService(get_settings())

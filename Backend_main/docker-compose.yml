@@ -18,3 +18,4 @@ services:
 
 volumes:
   papi_postgres_data:
+

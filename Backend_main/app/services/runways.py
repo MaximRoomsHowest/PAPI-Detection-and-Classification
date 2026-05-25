@@ -1,4 +1,4 @@
-from app.schemas import RunwayResponse
+from app.validation.schemas import RunwayResponse
 
 
 RUNWAYS: dict[str, dict] = {
@@ -34,4 +34,3 @@ def get_runway(runway_id: str) -> dict:
         return RUNWAYS[runway_id]
     except KeyError as exc:
         raise ValueError(f"Unknown runway_id: {runway_id}") from exc
-

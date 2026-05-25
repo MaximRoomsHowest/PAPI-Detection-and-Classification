@@ -17,6 +17,7 @@ def test_normalize_detections_sorts_lamps_left_to_right():
 
 def test_global_state_mapping_uses_papi_ratios():
     assert global_state_from_lamps(normalize_detections([])) == "unknown"
+    assert _state_for_classes([0]) == "unknown"
     assert _state_for_classes([1, 1, 1, 1]) == "far_too_high"
     assert _state_for_classes([1, 1, 1, 0]) == "too_high"
     assert _state_for_classes([1, 1, 0, 0]) == "correct_glidepath"
@@ -45,4 +46,3 @@ def _state_for_classes(classes):
         for index, class_id in enumerate(classes)
     ]
     return global_state_from_lamps(normalize_detections(detections))
-
