@@ -1,0 +1,22 @@
+# Flight-level train/val/test split. Splitting by flight (not random frames) is critical
+# because the same standoff distance + camera + lighting regime would otherwise leak across
+# train and test. See BigBrain dataset-preparation-for-applied-ai for the rationale.
+#
+# Test set spans the three regimes we most want to evaluate on:
+#   - 1000m day wide: longest-range detection test
+#   - 300m day zoom: zoom-camera generalization test
+#   - 500m night wide: night regime test
+#
+# Val mirrors the same regime axes at different standoffs/dates to catch overfitting.
+
+test_flights:
+  - DJI_202604281946_014_1000              # 1000m day wide  -- range test
+  - DJI_202604291738_042_300mday2dwntiltedzoom  # 300m day zoom  -- camera test
+  - DJI_202604290007_023_500mrwy06night    # 500m night wide  -- regime test
+
+val_flights:
+  - DJI_202604291357_034_600day2up         # 600m day wide
+  - DJI_202604291300_032_day2700mdwnzoom   # 700m day zoom
+  - DJI_202604290007_021_400mrwy06night    # 400m night wide
+
+# Everything else is train.

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "papi-detection"
+version = "0.1.0"
+description = "Real-time PAPI detection + per-lamp white/red/transition classification on DJI Matrice 4E drone imagery (Howest x Intersoft)."
+requires-python = ">=3.10"
+readme = "README.md"
+authors = [{ name = "Howest Industry-Project Team" }]
+
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "Pillow>=10.0",
+    "exifread>=3.0",
+    "pymap3d>=3.0",
+    "scipy>=1.11",
+    "PyYAML>=6.0",
+    "tqdm>=4.66",
+    "lxml>=5.0",
+    "openpyxl>=3.1",
+    "ultralytics>=8.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501"]  # line-length handled by formatter; allow exceptions
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"

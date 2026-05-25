@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+src/*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Local assistant/browser tooling
+.claude/
+.playwright-cli/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+.env.*
+
+# Client/raw data and generated ML artifacts
+PROJECT1-PAPI/
+data/raw/
+data/work/
+data/interim/*.csv
+data/interim/*.json
+data/labels/*.yaml
+data/labels/auto/
+data/labels/verified/
+data/annotations/
+data/datasets/
+runs/
+*.pt
+
+# Generated CVAT/export archives
+data/cvat/
+*.zip
