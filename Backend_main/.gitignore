@@ -1,13 +1,7 @@
 .env
 .venv/
-models/*.pt
-models/*.onnx
-storage/uploads/*
-storage/exports/*
-storage/tmp/*
-!storage/uploads/.gitkeep
-!storage/exports/.gitkeep
-!storage/tmp/.gitkeep
+models/
+storage/
 __pycache__/
 .pytest_cache/
 *.pyc

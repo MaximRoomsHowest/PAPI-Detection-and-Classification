@@ -36,14 +36,7 @@ DEFAULT_TASK = REPO_ROOT / "data" / "cvat" / "day_batches" / "batch_007"
 DEFAULT_MANUAL = REPO_ROOT / "data" / "annotations" / "manual_corrections" / "batch_001_corrected_300"
 DEFAULT_RAW = REPO_ROOT / "data" / "raw"
 DEFAULT_METADATA = REPO_ROOT / "data" / "interim" / "images_metadata.csv"
-DEFAULT_MODEL = (
-    REPO_ROOT
-    / "runs"
-    / "papi"
-    / "yolov26m_seed1800_batch001_006_corrected_day_cuda"
-    / "weights"
-    / "best.pt"
-)
+DEFAULT_MODEL = REPO_ROOT / "models" / "serving" / "best.pt"
 DEFAULT_OUT = REPO_ROOT / "data" / "work" / "assisted_cvat_export"
 DEFAULT_ZIP = REPO_ROOT / "data" / "cvat" / "day_batches" / "batch_007" / "annotations.zip"
 DEFAULT_PREDICT_IMAGES = REPO_ROOT / "data" / "work" / "assisted_predictions" / "images"

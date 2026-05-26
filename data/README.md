@@ -1,24 +1,31 @@
 # Data Folder Structure
 
-This project now uses a video-oriented dataset layout for human-facing data.
-Do not add new generated folders directly under `data/`; put temporary
-rebuildable files under `work/` only when a workflow needs scratch space, and
-put durable datasets under `datasets/`.
+This project uses a video-oriented dataset layout for human-facing data. The
+large local data folders were archived outside the repo during the 2026-05-26
+cleanup to keep Git lean:
+
+```text
+..\PAPI-artifacts\2026-05-26-cleanup\data\
+```
+
+Do not commit generated folders directly under `data/`; recreate or junction
+them locally from the archive when a workflow needs them.
 
 ## Stable Sources
 
-- `raw/` - original client image drop. Treat as read-only.
+- `raw/` - optional local junction to the archived original client image drop.
+  Treat as read-only.
 - `interim/` - extracted metadata, sample manifests, and pipeline intermediates.
 - `labels/` - project-owned label tables and durable label metadata.
-- `annotations/manual_corrections/` - CVAT exports corrected by a human. These
-  are durable correction milestones and should not be deleted.
+- `annotations/manual_corrections/` - archived CVAT exports corrected by a
+  human. These are durable correction milestones and should not be deleted.
 
 ## Canonical Dataset
 
-- `datasets/papi_lamp_sequences/daytime/` - corrected daytime frames grouped by
-  source video folder.
-- `datasets/papi_lamp_sequences/nighttime/` - trusted nighttime frames grouped
-  by source video folder.
+- `datasets/papi_lamp_sequences/daytime/` - archived corrected daytime frames
+  grouped by source video folder.
+- `datasets/papi_lamp_sequences/nighttime/` - archived trusted nighttime frames
+  grouped by source video folder.
 - Each regime folder has:
   - `<video_id>/images/*.JPG`
   - `<video_id>/labels/*.txt`

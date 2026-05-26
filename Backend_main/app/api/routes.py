@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -10,19 +12,25 @@ from app.services.runways import get_runway, list_runways
 from app.validation.analyze import parse_manual_drone_metadata
 from app.validation.schemas import AnalysisPayload, LogListItem, RunwayResponse
 
-
 router = APIRouter(prefix="/api")
+
+
+def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None) -> None:
+    settings = get_settings()
+    if settings.api_key and x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 
 @router.post("/analyze", response_model=AnalysisPayload)
 async def analyze_media(
-    file: UploadFile = File(...),
-    runway_id: str = Form("papi_06"),
-    drone_id: str | None = Form(None),
-    drone_latitude: float | None = Form(None),
-    drone_longitude: float | None = Form(None),
-    drone_altitude_m: float | None = Form(None),
-    db: Session = Depends(get_session),
+    file: Annotated[UploadFile, File()],
+    runway_id: Annotated[str, Form()] = "papi_06",
+    drone_id: Annotated[str | None, Form()] = None,
+    drone_latitude: Annotated[float | None, Form()] = None,
+    drone_longitude: Annotated[float | None, Form()] = None,
+    drone_altitude_m: Annotated[float | None, Form()] = None,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> AnalysisPayload:
     return await _analyze_upload(
         file=file,
@@ -38,13 +46,14 @@ async def analyze_media(
 
 @router.post("/analyze-frame", response_model=AnalysisPayload)
 async def analyze_frame(
-    file: UploadFile = File(...),
-    runway_id: str = Form("papi_06"),
-    drone_id: str | None = Form(None),
-    drone_latitude: float | None = Form(None),
-    drone_longitude: float | None = Form(None),
-    drone_altitude_m: float | None = Form(None),
-    db: Session = Depends(get_session),
+    file: Annotated[UploadFile, File()],
+    runway_id: Annotated[str, Form()] = "papi_06",
+    drone_id: Annotated[str | None, Form()] = None,
+    drone_latitude: Annotated[float | None, Form()] = None,
+    drone_longitude: Annotated[float | None, Form()] = None,
+    drone_altitude_m: Annotated[float | None, Form()] = None,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> AnalysisPayload:
     return await _analyze_upload(
         file=file,
@@ -109,14 +118,19 @@ def get_runways() -> list[RunwayResponse]:
 def list_logs(
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_session),
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> list[LogListItem]:
     repository = AnalysisLogRepository(db)
     return [repository.to_list_item(log) for log in repository.list_recent(limit, offset)]
 
 
 @router.get("/logs/{log_id}", response_model=AnalysisPayload)
-def get_log(log_id: str, db: Session = Depends(get_session)) -> AnalysisPayload:
+def get_log(
+    log_id: str,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
+) -> AnalysisPayload:
     log = AnalysisLogRepository(db).get(log_id)
     if log is None:
         raise HTTPException(status_code=404, detail="Analysis log not found.")

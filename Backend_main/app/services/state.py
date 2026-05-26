@@ -2,7 +2,6 @@ from collections import Counter
 
 from app.validation.schemas import BoundingBox, LampResult
 
-
 DETECTION_CLASS_TO_STATE = {
     0: "red",
     1: "white",

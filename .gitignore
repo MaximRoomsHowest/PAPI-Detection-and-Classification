@@ -48,6 +48,14 @@ data/annotations/
 data/datasets/
 runs/
 *.pt
+models/**/*.pt
+models/**/*.onnx
+models/**/*.engine
+models/**/*.torchscript
+models/**/*.safetensors
+frontend/node_modules/
+frontend/dist/
+Backend_main/storage/
 
 # Generated CVAT/export archives
 data/cvat/

@@ -37,7 +37,8 @@ for installation-level debugging exports.
 ## Per-lamp ordering
 
 Lights are numbered **1 (innermost) to 4 (outermost)** following the surveyed XLSX ordering at
-`PROJECT1-PAPI/PAPI_Coords_Fred_DE.xlsx`. This matches the FAA standard where the innermost
+`..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI\PAPI_Coords_Fred_DE.xlsx`.
+This matches the FAA standard where the innermost
 light has the **lowest** set-angle (closest to the glideslope; turns red first when the pilot
 sinks below path):
 

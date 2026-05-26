@@ -10,16 +10,18 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEQUENCE_ROOT = REPO_ROOT / "data" / "datasets" / "papi_lamp_sequences"
+TRACKING_MANIFEST = SEQUENCE_ROOT / "tracking_manifest.json"
+COMBINED_DATASET = SEQUENCE_ROOT / "yolo26n_combined"
 
 
 pytestmark = pytest.mark.skipif(
-    not SEQUENCE_ROOT.exists(),
+    not TRACKING_MANIFEST.exists() or not COMBINED_DATASET.exists(),
     reason="generated sequence dataset artifacts are not committed",
 )
 
 
 def test_tracking_manifest_matches_sequence_dataset_counts():
-    manifest_path = SEQUENCE_ROOT / "tracking_manifest.json"
+    manifest_path = TRACKING_MANIFEST
     assert manifest_path.exists(), "run scripts/build_sequence_tracking.py"
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -47,7 +49,7 @@ def test_tracking_rows_have_unique_track_ids_per_frame():
 
 
 def test_yolo26n_combined_split_entries_resolve_to_images_and_labels():
-    combined = SEQUENCE_ROOT / "yolo26n_combined"
+    combined = COMBINED_DATASET
     assert combined.exists(), "run scripts/prepare_yolo_sequence_dataset.py"
 
     for split in ("train", "val", "test"):

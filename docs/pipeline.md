@@ -3,7 +3,8 @@
 ## Prerequisites
 
 - Python 3.10+ in a venv with `pip install -e .[dev]` done.
-- `data/raw/` resolves to `PROJECT1-PAPI/` (Windows: `cmd /c mklink /J data\raw PROJECT1-PAPI`).
+- `data/raw/` resolves to the archived raw artifact folder. From the repo root on Windows:
+  `cmd /c mklink /J data\raw ..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI`.
 - `configs/papi_edny_rwy06.yaml` and `configs/split.yaml` present (committed).
 
 ## Pipeline entrypoint
@@ -119,7 +120,7 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 - The notebook `notebooks/01_pipeline_walkthrough.ipynb` runs one image end-to-end with the
   intermediate matrices printed.
 - If `data/raw/` does not resolve, the `extract` stage will report "Found 0 JPGs" — verify
-  the junction with `dir data\raw` from cmd.
+  the junction with `dir data\raw` from cmd and confirm the archived artifacts are present.
 
 ## Verification gates (run before declaring sprint-1 done)
 

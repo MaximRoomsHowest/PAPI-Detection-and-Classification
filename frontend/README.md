@@ -6,7 +6,8 @@ classification.
 ## What is included
 
 - Media upload for image or video test input.
-- Mock model run button that switches to a transition-frame example.
+- Backend API mode that calls the FastAPI inference service.
+- Mock mode that switches to a transition-frame example for demo fallback.
 - Detected PAPI bounding box overlay.
 - Four individual lamp statuses: white, red, transition, or occluded.
 - Five-state global glidepath result.
@@ -17,9 +18,10 @@ classification.
 
 ## Run locally
 
-```bash
+```powershell
 cd frontend
 npm install
+copy .env.example .env
 npm run dev
 ```
 
@@ -33,22 +35,30 @@ $pid = (Get-NetTCPConnection -LocalPort 5173 -State Listen).OwningProcess
 Stop-Process -Id $pid
 ```
 
-## Backend integration shape
+## Backend integration
 
-The UI is currently mocked, but the frontend is structured around the data the backend/model
-should eventually return:
+Set `VITE_PAPI_API_URL` in `.env` if the backend is not running on
+`http://127.0.0.1:8000`. Backend API mode calls:
+
+- `POST /api/analyze-frame` for uploaded images.
+- `POST /api/analyze` for uploaded videos.
+
+The UI maps the backend response into the dashboard cards:
 
 ```js
 {
-  boundingBox: { x, y, width, height },
+  log_id: '...',
+  global_state: 'correct_glidepath',
   lamps: [
-    { id: 1, status: 'white', confidence: 98, transition: 3 },
-    { id: 2, status: 'transition', confidence: 88, transition: 83 },
-    { id: 3, status: 'red', confidence: 95, transition: 7 },
-    { id: 4, status: 'red', confidence: 94, transition: 8 },
+    { index: 1, state: 'white', confidence: 0.98 },
+    { index: 2, state: 'white', confidence: 0.97 },
+    { index: 3, state: 'red', confidence: 0.96 },
+    { index: 4, state: 'red', confidence: 0.95 },
   ],
-  globalState: 'correct',
-  runtime: { fps: 54, latency: 19.6, deviceProfile: 'edge' },
+  confidence: 0.96,
+  processing_ms: 17,
+  artifact_url: '/media/...',
+  angle: { angle_available: false },
 }
 ```
 

@@ -6,9 +6,9 @@ from typing import Any
 from uuid import uuid4
 
 from app.config import Settings
-from app.validation.schemas import AnalysisPayload, LampResult
 from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
 from app.services.state import confidence_from_lamps, global_state_from_lamps, normalize_detections
+from app.validation.schemas import AnalysisPayload, LampResult
 
 
 class InferenceService:
@@ -65,7 +65,8 @@ class InferenceService:
 
         annotated = self._draw_overlay(frame, lamps, global_state, confidence, angle.elevation_angle_deg)
         artifact_path = self.settings.exports_dir / f"{uuid4()}_annotated.jpg"
-        cv2.imwrite(str(artifact_path), annotated)
+        if not cv2.imwrite(str(artifact_path), annotated):
+            raise RuntimeError("Could not write annotated image artifact.")
 
         processing_ms = int((perf_counter() - start) * 1000)
         return AnalysisPayload(
@@ -100,13 +101,22 @@ class InferenceService:
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 15
+        max_frames = self._video_frame_limit(fps)
+        source_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if source_frame_count > max_frames:
+            cap.release()
+            raise ValueError(
+                f"Uploaded video is too long. Limit is {max_frames} frames "
+                f"or {self.settings.max_video_seconds} seconds."
+            )
         artifact_path = self.settings.exports_dir / f"{uuid4()}_annotated.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(artifact_path), fourcc, fps, (frame_width, frame_height))
+        if not writer.isOpened():
+            cap.release()
+            raise RuntimeError("Could not write annotated video artifact.")
 
         history = deque(maxlen=self.settings.video_history_size)
-        all_states: list[str] = []
-        all_confidences: list[float] = []
         lamp_history: dict[int, list[LampResult]] = {1: [], 2: [], 3: [], 4: []}
         frame_count = 0
         angle = self._angle_for_media(media_path, runway_id, drone_metadata)
@@ -114,6 +124,11 @@ class InferenceService:
 
         try:
             while True:
+                if frame_count >= max_frames:
+                    raise ValueError(
+                        f"Uploaded video is too long. Limit is {max_frames} frames "
+                        f"or {self.settings.max_video_seconds} seconds."
+                    )
                 ok, frame = cap.read()
                 if not ok:
                     break
@@ -137,14 +152,13 @@ class InferenceService:
                 for lamp in lamps:
                     lamp_history[lamp.index].append(lamp)
                 last_detections = detections
-                all_states.append(smoothed_state)
-                all_confidences.append(frame_confidence)
                 frame_count += 1
         finally:
             cap.release()
             writer.release()
 
         if frame_count == 0:
+            artifact_path.unlink(missing_ok=True)
             raise ValueError("Uploaded video did not contain readable frames.")
 
         final_lamps = self._aggregate_video_lamps(lamp_history)
@@ -195,7 +209,7 @@ class InferenceService:
         if use_tracking:
             results = self.model.track(
                 frame,
-                persist=True,
+                persist=False,
                 tracker="bytetrack.yaml",
                 conf=self.settings.confidence_threshold,
                 verbose=False,
@@ -286,6 +300,13 @@ class InferenceService:
         except ImportError as exc:
             raise RuntimeError("OpenCV is not installed. Run `pip install -r requirements.txt`.") from exc
         return cv2
+
+    def _video_frame_limit(self, fps: float) -> int:
+        frame_limit = max(1, self.settings.max_video_frames)
+        if self.settings.max_video_seconds <= 0:
+            return frame_limit
+        seconds_limit = max(1, int(fps * self.settings.max_video_seconds))
+        return min(frame_limit, seconds_limit)
 
 
 @lru_cache

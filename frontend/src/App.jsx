@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import createPlotlyComponentFactory from 'react-plotly.js/factory'
-import Plotly from 'plotly.js/lib/core'
-import bar from 'plotly.js/lib/bar'
-import heatmap from 'plotly.js/lib/heatmap'
 import {
   Activity,
   Cpu,
@@ -22,12 +18,23 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import './App.css'
+import heroPoster from './assets/hero.png'
 
-Plotly.register([bar, heatmap])
+const API_BASE_URL = (import.meta.env.VITE_PAPI_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
+const API_KEY = import.meta.env.VITE_PAPI_API_KEY
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+const REQUEST_TIMEOUT_MS = 90_000
+let plotlyBundlePromise
 
-const createPlotlyComponent =
-  createPlotlyComponentFactory.default ?? createPlotlyComponentFactory
-const Plot = createPlotlyComponent(Plotly)
+const backendStateToScenarioId = {
+  far_too_high: 'far-high',
+  too_high: 'too-high',
+  correct_glidepath: 'correct',
+  too_low: 'too-low',
+  far_too_low: 'far-low',
+}
+
+const legalStateIds = ['far-high', 'too-high', 'correct', 'too-low', 'far-low']
 
 const stateCatalog = [
   {
@@ -227,6 +234,105 @@ const pipeline = [
   { label: 'Edge runtime', value: 'low latency export target', icon: Cpu },
 ]
 
+function loadPlotlyBundle() {
+  if (!plotlyBundlePromise) {
+    plotlyBundlePromise = Promise.all([
+      import('react-plotly.js/factory'),
+      import('plotly.js/lib/core'),
+      import('plotly.js/lib/bar'),
+      import('plotly.js/lib/heatmap'),
+    ]).then(([factoryModule, plotlyModule, barModule, heatmapModule]) => {
+      const createPlotlyComponent =
+        factoryModule.default?.default ?? factoryModule.default ?? factoryModule
+      const plotly = plotlyModule.default ?? plotlyModule
+      plotly.register([barModule.default ?? barModule, heatmapModule.default ?? heatmapModule])
+      return {
+        Plot: createPlotlyComponent(plotly),
+        Plotly: plotly,
+      }
+    })
+  }
+  return plotlyBundlePromise
+}
+
+function resolveMediaType(file) {
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (file.type.startsWith('video') || ['avi', 'mkv', 'mov', 'mp4'].includes(extension)) {
+    return 'video'
+  }
+  return 'image'
+}
+
+function formatPercent(value, fallback = 0) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return fallback
+  }
+  const normalized = value <= 1 ? value * 100 : value
+  return Math.round(normalized * 10) / 10
+}
+
+function evidenceForState(stateId, confidence) {
+  const activeIndex = legalStateIds.indexOf(stateId)
+  const activeEvidence = Math.max(45, Math.min(96, Math.round(confidence)))
+  return legalStateIds.map((_, index) => {
+    if (index === activeIndex) {
+      return activeEvidence
+    }
+    return Math.max(1, Math.round((100 - activeEvidence) / (legalStateIds.length - 1)))
+  })
+}
+
+function buildScenarioFromPayload(payload, fallbackScenario) {
+  const stateId = backendStateToScenarioId[payload.global_state] ?? fallbackScenario.stateId
+  const activeState = stateCatalog.find((state) => state.id === stateId)
+  const confidence = formatPercent(payload.confidence, fallbackScenario.metrics.globalConfidence)
+  const latency = Math.max(1, Math.round(payload.processing_ms ?? fallbackScenario.metrics.latency))
+  const frameCount = payload.frame_count ?? 1
+  const fps = payload.media_type === 'video' ? Math.round((frameCount / latency) * 1000) : '1 img'
+  const lamps = (payload.lamps?.length ? payload.lamps : fallbackScenario.lamps).map((lamp, index) => {
+    const status = lamp.state === 'unknown' ? 'occluded' : lamp.state
+    return {
+      id: lamp.index ?? index + 1,
+      status,
+      confidence: formatPercent(lamp.confidence, 0),
+      transition: status === 'transition' ? 82 : status === 'occluded' ? 12 : 4,
+    }
+  })
+
+  return {
+    ...fallbackScenario,
+    id: `backend-${payload.log_id ?? Date.now()}`,
+    label: 'Backend result',
+    badge: payload.media_type,
+    stateId,
+    summary: `${activeState?.pattern ?? payload.global_state} = ${activeState?.label ?? 'Backend result'}`,
+    frame: payload.log_id ? `Log ${payload.log_id.slice(0, 8)}` : `Processed ${frameCount} frame(s)`,
+    condition: payload.angle?.angle_available
+      ? `Angle ${payload.angle.elevation_angle_deg?.toFixed(3)} deg from ${payload.angle.angle_source}`
+      : (payload.angle?.angle_note ?? 'Backend inference result'),
+    lamps,
+    metrics: {
+      ...fallbackScenario.metrics,
+      fps,
+      latency,
+      boxConfidence: confidence,
+      globalConfidence: confidence,
+    },
+    evidence: evidenceForState(stateId, confidence),
+    environmentClass: payload.media_type === 'video' ? 'night' : 'clear',
+  }
+}
+
+function artifactUrlFor(payload) {
+  if (!payload.artifact_url) {
+    return null
+  }
+  if (payload.artifact_url.startsWith('http')) {
+    return payload.artifact_url
+  }
+  return `${API_BASE_URL}${payload.artifact_url}`
+}
+
 function App() {
   const [theme, setTheme] = useState('light')
   const [activeId, setActiveId] = useState('clean')
@@ -234,11 +340,17 @@ function App() {
   const [media, setMedia] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [analysisMode, setAnalysisMode] = useState('backend')
+  const [analysisResult, setAnalysisResult] = useState(null)
+  const [apiStatus, setApiStatus] = useState({
+    tone: 'idle',
+    message: `Backend API: ${API_BASE_URL}`,
+  })
   const insightsRef = useRef(null)
 
   const activeScenario = useMemo(
-    () => scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0],
-    [activeId],
+    () => analysisResult ?? scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0],
+    [activeId, analysisResult],
   )
 
   const activeState = useMemo(
@@ -302,6 +414,13 @@ function App() {
     if (!file) {
       return
     }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setApiStatus({
+        tone: 'error',
+        message: 'Upload rejected locally: files must be 100 MB or smaller.',
+      })
+      return
+    }
 
     const url = URL.createObjectURL(file)
     setMedia((previous) => {
@@ -311,10 +430,13 @@ function App() {
 
       return {
         name: file.name,
-        type: file.type.startsWith('video') ? 'video' : 'image',
+        type: resolveMediaType(file),
+        file,
         url,
       }
     })
+    setAnalysisResult(null)
+    setApiStatus({ tone: 'idle', message: `Ready for backend API: ${API_BASE_URL}` })
     setIsPlaying(false)
   }
 
@@ -331,6 +453,7 @@ function App() {
 
     try {
       const { jsPDF } = await import('jspdf')
+      const { Plotly } = await loadPlotlyBundle()
       const chartNodes = Array.from(
         insightsRef.current.querySelectorAll('.js-plotly-plot'),
       )
@@ -377,13 +500,79 @@ function App() {
     }
   }
 
+  async function runBackendInference() {
+    if (!media?.file) {
+      setApiStatus({ tone: 'error', message: 'Upload an image or video before calling the backend.' })
+      return
+    }
+
+    setIsAnalyzing(true)
+    setIsPlaying(false)
+    setApiStatus({ tone: 'pending', message: 'Sending media to the backend model...' })
+
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const formData = new FormData()
+    formData.append('file', media.file)
+    formData.append('runway_id', 'papi_06')
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${media.type === 'image' ? '/api/analyze-frame' : '/api/analyze'}`,
+        {
+          method: 'POST',
+          headers: API_KEY ? { 'X-API-Key': API_KEY } : undefined,
+          body: formData,
+          signal: controller.signal,
+        },
+      )
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload.detail ?? `Backend returned ${response.status}`)
+      }
+
+      setAnalysisResult(buildScenarioFromPayload(payload, activeScenario))
+      setMedia((current) =>
+        current
+          ? {
+              ...current,
+              resultUrl: artifactUrlFor(payload),
+            }
+          : current,
+      )
+      setApiStatus({
+        tone: 'success',
+        message: `Backend result saved${payload.log_id ? ` as log ${payload.log_id.slice(0, 8)}` : ''}.`,
+      })
+    } catch (error) {
+      const message =
+        error.name === 'AbortError'
+          ? 'Backend request timed out. Try a shorter clip or smaller image.'
+          : error.message
+      setApiStatus({ tone: 'error', message })
+    } finally {
+      window.clearTimeout(timeoutId)
+      setIsAnalyzing(false)
+    }
+  }
+
   function runMockInference() {
     setIsAnalyzing(true)
     setIsPlaying(false)
+    setAnalysisResult(null)
+    setApiStatus({ tone: 'pending', message: 'Running local mock inference...' })
     window.setTimeout(() => {
       setActiveId('transition')
+      setApiStatus({ tone: 'success', message: 'Mock result loaded for UI review.' })
       setIsAnalyzing(false)
     }, 900)
+  }
+
+  function runAnalysis() {
+    if (analysisMode === 'backend') {
+      return runBackendInference()
+    }
+    return runMockInference()
   }
 
   return (
@@ -456,8 +645,13 @@ function App() {
               isAnalyzing={isAnalyzing}
               isPlaying={isPlaying}
               media={media}
+              analysisMode={analysisMode}
+              apiBaseUrl={API_BASE_URL}
+              apiStatus={apiStatus}
               handleMediaFiles={handleMediaFiles}
-              runMockInference={runMockInference}
+              runAnalysis={runAnalysis}
+              setAnalysisMode={setAnalysisMode}
+              setAnalysisResult={setAnalysisResult}
               setActiveId={setActiveId}
               setIsPlaying={setIsPlaying}
               handleMediaChange={handleMediaChange}
@@ -483,47 +677,12 @@ function App() {
 }
 
 function IntroductionPage({ activeScenario }) {
-  const videoRef = useRef(null)
-
-  const ensurePlayback = () => {
-    const video = videoRef.current
-    if (!video || !video.paused) {
-      return
-    }
-
-    const playPromise = video.play()
-    if (playPromise?.catch) {
-      playPromise.catch(() => {})
-    }
-  }
-
-  useEffect(() => {
-    ensurePlayback()
-
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        ensurePlayback()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
-
   return (
     <section className="intro-hero">
-      <video
-        ref={videoRef}
+      <img
         className="intro-video"
-        src="/Background-vid.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        onLoadedData={ensurePlayback}
-        onPause={ensurePlayback}
-        onEnded={ensurePlayback}
+        src={heroPoster}
+        alt=""
         aria-hidden="true"
       />
       <div className="intro-hero-inner">
@@ -626,11 +785,16 @@ function LiveDemoPage({
   activeId,
   activeScenario,
   activeState,
+  analysisMode,
+  apiBaseUrl,
+  apiStatus,
   isAnalyzing,
   isPlaying,
   media,
   handleMediaFiles,
-  runMockInference,
+  runAnalysis,
+  setAnalysisMode,
+  setAnalysisResult,
   setActiveId,
   setIsPlaying,
   handleMediaChange,
@@ -640,19 +804,49 @@ function LiveDemoPage({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Live demo</p>
-          <h2>Upload media, run a mocked inference, and inspect the detected PAPI unit.</h2>
+          <h2>Upload media, run backend or mock inference, and inspect the detected PAPI unit.</h2>
         </div>
         <div className="demo-actions">
+          <div className="mode-toggle" role="group" aria-label="Analysis mode">
+            <button
+              className={clsx(analysisMode === 'backend' && 'active')}
+              type="button"
+              onClick={() => setAnalysisMode('backend')}
+            >
+              Backend API
+            </button>
+            <button
+              className={clsx(analysisMode === 'mock' && 'active')}
+              type="button"
+              onClick={() => setAnalysisMode('mock')}
+            >
+              Mock
+            </button>
+          </div>
           <label className="upload-button">
             <Upload size={18} />
             <span>{media ? media.name : 'Upload media'}</span>
             <input accept="image/*,video/*" type="file" onChange={handleMediaChange} />
           </label>
-          <button className="primary-button" type="button" onClick={runMockInference}>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={runAnalysis}
+            disabled={isAnalyzing}
+          >
             <Zap size={18} />
-            {isAnalyzing ? 'Analyzing' : 'Run mock model'}
+            {isAnalyzing
+              ? 'Analyzing'
+              : analysisMode === 'backend'
+                ? 'Run backend model'
+                : 'Run mock model'}
           </button>
         </div>
+      </div>
+
+      <div className={clsx('api-status', `api-status-${apiStatus.tone}`)}>
+        <span>{analysisMode === 'backend' ? apiBaseUrl : 'Local mock mode'}</span>
+        <strong>{apiStatus.message}</strong>
       </div>
 
       <div className="scenario-tabs" role="tablist" aria-label="Demo scenarios">
@@ -662,6 +856,7 @@ function LiveDemoPage({
             key={scenario.id}
             type="button"
             onClick={() => {
+              setAnalysisResult(null)
               setActiveId(scenario.id)
               setIsPlaying(false)
             }}
@@ -839,9 +1034,9 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
         onDrop={handleDrop}
       >
         {media?.type === 'video' ? (
-          <video src={media.url} autoPlay muted loop playsInline controls />
+          <video src={media.resultUrl ?? media.url} autoPlay muted loop playsInline controls />
         ) : media?.type === 'image' ? (
-          <img src={media.url} alt="Uploaded PAPI test frame" />
+          <img src={media.resultUrl ?? media.url} alt="Uploaded PAPI test frame" />
         ) : (
           <DropzonePlaceholder isDragActive={isDragActive} />
         )}
@@ -867,7 +1062,7 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
         {analyzing && (
           <div className="analyzing-layer">
             <Radar size={34} />
-            <span>Mock inference running</span>
+            <span>Inference running</span>
           </div>
         )}
       </div>
@@ -982,9 +1177,31 @@ function GlobalStateDecoder({ scenario, plotTheme }) {
   )
 }
 
+function LazyPlot(props) {
+  const [PlotComponent, setPlotComponent] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+    loadPlotlyBundle().then(({ Plot }) => {
+      if (isMounted) {
+        setPlotComponent(() => Plot)
+      }
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  if (!PlotComponent) {
+    return <div className="plot-loading">Loading chart</div>
+  }
+
+  return <PlotComponent {...props} />
+}
+
 function PapiDecisionPlot({ evidence, activeIndex, selectedIndex, setHovered, plotTheme }) {
   return (
-    <Plot
+    <LazyPlot
       className="plotly-chart"
       config={plotlyConfig}
       data={[
@@ -1067,7 +1284,7 @@ function TransitionRibbon({ activeScenario, plotTheme }) {
       </div>
 
       <div className="plotly-panel">
-        <Plot
+        <LazyPlot
           className="plotly-chart"
           config={plotlyConfig}
           data={[

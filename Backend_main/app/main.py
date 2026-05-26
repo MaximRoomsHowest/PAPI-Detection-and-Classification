@@ -6,7 +6,6 @@ from app.api.routes import router
 from app.config import get_settings
 from app.database import init_db
 
-
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name)

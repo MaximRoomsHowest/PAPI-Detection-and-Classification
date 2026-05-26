@@ -2,18 +2,18 @@
 
 ## Purpose
 
-This folder contains a local-only FastAPI backend prototype for the PAPI Detection and Classification project. It is separate from the frontend work and is meant to prove the backend flow before connecting it to the React UI.
+This folder contains the local FastAPI backend for the PAPI Detection and Classification project. It now serves the React frontend's Backend API mode while still being runnable on its own.
 
 The backend lets a user upload an image or video, run the trained PAPI YOLO model immediately, store an anonymous result log, export annotated media, and calculate the drone elevation angle when GPS/altitude metadata is available.
 
 ## What Is Implemented
 
-- Public FastAPI API with no login/authentication.
+- FastAPI API with optional `PAPI_API_KEY` protection for hosted/local shared use.
 - Image/frame upload through `POST /api/analyze-frame`; legacy image/video upload remains available through `POST /api/analyze`.
 - Immediate inference response from `POST /api/analyze`; no job polling is used for v1.
 - PostgreSQL result logs that store metadata/results, not uploaded image/video bytes.
 - Seeded PAPI runway coordinates for `papi_06` and `papi_24`.
-- YOLO `.pt` inference using the trained model from `data_analysis`.
+- YOLO `.pt` inference using `../models/serving/best.pt` by default.
 - Lamp-level result output: each detected lamp is reported as `white`, `red`, or `unknown`.
 - Global PAPI state output: `far_too_high`, `too_high`, `correct_glidepath`, `too_low`, `far_too_low`, or `unknown`.
 - Annotated image/video export support.
@@ -48,8 +48,6 @@ Backend_main/
     validation/
       analyze.py            Request validation helpers
       schemas.py            API response/request models
-  models/
-    best.pt                 Local trained YOLO model, ignored by Git
   storage/
     uploads/                Uploaded files, ignored by Git
     exports/                Annotated output files, ignored by Git
@@ -58,6 +56,8 @@ Backend_main/
   docker-compose.yml        Local PostgreSQL service for logs
   requirements.txt          Python dependencies
   .env.example              Example local environment config
+../models/
+  serving/best.pt           Local backend model, ignored by Git
 ```
 
 ## API Endpoints
@@ -122,9 +122,9 @@ Current unit test coverage includes:
 
 ## Important Notes
 
-- This is local-only work. Nothing has been pushed.
-- The frontend is not connected yet.
-- `models/best.pt` is intentionally ignored by Git.
+- This is local-first work. Nothing has been pushed.
+- The frontend is connected through Backend API mode using `VITE_PAPI_API_URL`.
+- `../models/serving/best.pt` is intentionally ignored by Git.
 - Uploaded originals are used for processing and deleted after analysis.
 - Annotated exports, temp files, `.env`, and virtual environments are ignored by Git.
 - Docker Desktop must be running before `docker compose up -d` will work.
@@ -134,7 +134,7 @@ Current unit test coverage includes:
 ## Suggested Next Steps
 
 - Start PostgreSQL with Docker and run the FastAPI app.
-- Test `/api/analyze` with a real image and video.
+- Test `/api/analyze-frame` and `/api/analyze` with real media.
 - Verify annotated exports visually.
-- Connect the frontend upload flow to the direct `/api/analyze` response.
+- Keep frontend Backend API mode aligned with backend response schemas.
 - Later, decide if large video files need a separate background-job endpoint.

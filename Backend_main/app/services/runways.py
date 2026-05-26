@@ -1,6 +1,5 @@
 from app.validation.schemas import RunwayResponse
 
-
 RUNWAYS: dict[str, dict] = {
     "papi_06": {
         "id": "papi_06",

@@ -24,11 +24,11 @@ pip install -e .[dev]
 ### Link the raw dataset
 
 The pipeline reads images from `data/raw/<flight>/<file>.JPG`. To avoid copying ~12 GB, create
-a Windows directory junction from `data/raw` to the on-disk `PROJECT1-PAPI/`:
+a Windows directory junction from `data/raw` to the archived raw artifact folder:
 
 ```powershell
 # from the repo root, in cmd.exe or PowerShell (no admin needed for /J)
-cmd /c mklink /J data\raw PROJECT1-PAPI
+cmd /c mklink /J data\raw ..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI
 ```
 
 If that fails (e.g. cross-drive or restricted environment), copy or symlink the folder by
@@ -85,22 +85,45 @@ For the current detector scope, use two classes only: `papi_light_red` and
 `papi_light_white`. Transitions are inferred later by tracking each individual
 lamp over time and detecting red/white state changes.
 
-Run `pytest` and `ruff check src tests scripts` before committing changes.
+Run `pytest` and `ruff check src tests scripts Backend_main` before committing changes.
+
+## Run the integrated app
+
+Local model binaries live outside Git under `models/`.
+
+```powershell
+# from the repo root
+Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
+
+# terminal 1: backend
+cd Backend_main
+copy .env.example .env
+docker compose up -d
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# terminal 2: frontend
+cd frontend
+copy .env.example .env
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+Open `http://127.0.0.1:5173/live-demo`, keep **Backend API** selected, upload an image or short video, and run the backend model. The frontend calls `POST /api/analyze-frame` for images and `POST /api/analyze` for videos through `VITE_PAPI_API_URL`.
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| `PROJECT1-PAPI/` | Raw dataset (4,058 JPGs across 21 flights + `.MRK/.NAV/.OBS/.RTK/.pbk` PPK files + surveyed coords XLSX). Do not modify. |
-| `data/raw/` | Junction to `PROJECT1-PAPI/`; resolved-path source the scripts read. |
+| `models/` | Ignored local model weights. `models/base/` holds base weights; `models/serving/best.pt` is the backend runtime model. |
+| `Backend_main/` | FastAPI backend for upload analysis, result logs, and annotated artifact serving. |
+| `frontend/` | Vite/React dashboard with Backend API mode and Mock mode. |
+| `..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI/` | Archived raw dataset (4,058 JPGs across 21 flights + `.MRK/.NAV/.OBS/.RTK/.pbk` PPK files + surveyed coords XLSX). Do not modify. |
+| `data/raw/` | Optional local junction to the archived `PROJECT1-PAPI/`; resolved-path source the scripts read. |
 | `data/interim/` | `images_metadata.csv`, `lamp_state.csv`, `verification_sample.csv`. |
 | `data/labels/auto/` | YOLO `.txt` auto-labels per image (WideCamera only in sprint 1). |
 | `data/labels/verified/` | Post-CVAT corrected labels (empty until verification round). |
-| `data/annotations/manual_corrections/` | Human-corrected CVAT exports, grouped by correction milestone. |
-| `data/datasets/papi_lamp_sequences/daytime/` | Canonical corrected daytime sequence dataset, grouped by source video. |
-| `data/datasets/papi_lamp_sequences/nighttime/` | Canonical corrected nighttime sequence dataset, grouped by source video. |
-| `data/datasets/papi_lamp_sequences/tracking_manifest.json` | Per-lamp track and red/white transition summary. |
-| `data/datasets/papi_lamp_sequences/yolo26n_combined/` | No-copy YOLO train/val/test config for the small YOLOv26 detector. |
+| `..\PAPI-artifacts\2026-05-26-cleanup\data\annotations\manual_corrections/` | Archived human-corrected CVAT exports, grouped by correction milestone. |
+| `..\PAPI-artifacts\2026-05-26-cleanup\data\datasets\papi_lamp_sequences/` | Archived canonical corrected sequence dataset and tracking artifacts. |
 | `data/README.md` | Data organization rules and the current sequence dataset workflow. |
 | `src/papi/` | Python package: metadata, geometry, projection, lamp-state, sampling, CVAT export, YOLO I/O. |
 | `scripts/` | Numbered runnable entrypoints. |

@@ -2,8 +2,8 @@ import math
 from pathlib import Path
 from typing import Any
 
-from app.validation.schemas import AnglePerLight, AngleResult
 from app.services.runways import get_runway
+from app.validation.schemas import AnglePerLight, AngleResult
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

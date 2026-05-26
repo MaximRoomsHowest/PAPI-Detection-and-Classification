@@ -21,14 +21,16 @@ The API will run at `http://127.0.0.1:8000`.
 The local model should be available at:
 
 ```text
-models/best.pt
+../models/serving/best.pt
 ```
 
-This file is intentionally ignored by Git. It can be copied from the `data_analysis` branch:
+This file is intentionally ignored by Git. For local smoke testing, copy a local base weight:
 
-```bash
-git show origin/data_analysis:data/runs/detect/train-2/weights/best.pt > models/best.pt
+```powershell
+Copy-Item ..\models\base\yolo26n.pt ..\models\serving\best.pt -Force
 ```
+
+For project-quality demos, replace `models/serving/best.pt` with the intended trained PAPI checkpoint.
 
 ## Endpoints
 
@@ -60,6 +62,8 @@ app/
   config.py         Environment/settings loading
   database.py       Database engine/session setup
   main.py           FastAPI app entrypoint
+../models/
+  serving/best.pt   Ignored local backend model loaded by default
 ```
 
 ## Angle Calculation

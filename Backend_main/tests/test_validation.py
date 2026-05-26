@@ -1,7 +1,6 @@
 import pytest
-from fastapi import HTTPException
-
 from app.validation.analyze import parse_manual_drone_metadata
+from fastapi import HTTPException
 
 
 def test_parse_manual_drone_metadata_accepts_empty_metadata():
