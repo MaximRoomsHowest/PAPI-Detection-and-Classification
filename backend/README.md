@@ -4,13 +4,23 @@ Local-only FastAPI backend trial for immediate PAPI image/video analysis with da
 
 ## Setup
 
+From the repository root, the easiest local full-stack start is:
+
 ```bash
-cd Backend_main
+docker compose up --build
+```
+
+That starts PostgreSQL, FastAPI, and the React frontend together.
+
+For backend-only development:
+
+```bash
+cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-docker compose up -d
+docker compose up -d postgres
 python -m uvicorn app.main:app
 ```
 
@@ -18,16 +28,16 @@ The API will run at `http://127.0.0.1:8000`.
 
 ## Model
 
-The local model should be available at:
+Backend-only runs expect the local model at:
 
 ```text
 models/best.pt
 ```
 
-This file is intentionally ignored by Git. It can be copied from the `data_analysis` branch:
+This file is intentionally ignored by Git. The root Docker Compose flow mounts the model directly from:
 
-```bash
-git show origin/data_analysis:data/runs/detect/train-2/weights/best.pt > models/best.pt
+```text
+../data/runs/detect/train-3/weights/best.pt
 ```
 
 ## Endpoints
@@ -41,12 +51,12 @@ git show origin/data_analysis:data/runs/detect/train-2/weights/best.pt > models/
 
 `POST /api/analyze` accepts a form upload named `file`, plus optional `runway_id`, `drone_id`, `drone_latitude`, `drone_longitude`, and `drone_altitude_m`.
 
-For the frontend video workflow, use `POST /api/analyze-frame`: the frontend splits video into image frames and sends each frame with drone metadata. The backend then runs exactly two tasks for that frame:
+For the frontend workflow, use `POST /api/analyze-frame` for images and `POST /api/analyze` for videos. The backend then runs these tasks:
 
 1. YOLO inference on the image to decide lamp states and global PAPI state.
 2. Angle calculation from the submitted drone metadata and selected runway coordinates.
 
-The endpoint returns both results immediately and stores a lightweight database log with result metadata, not the uploaded image/video bytes. Uploaded originals are deleted after processing; annotated exports stay in `storage/exports`.
+The endpoint returns results immediately and stores a lightweight database log with result metadata, not the uploaded image/video bytes. Uploaded originals are deleted after processing; annotated image and full labeled video exports stay in `storage/exports`.
 
 ## Structure
 
@@ -60,6 +70,7 @@ app/
   config.py         Environment/settings loading
   database.py       Database engine/session setup
   main.py           FastAPI app entrypoint
+Dockerfile          FastAPI container used by the root compose file
 ```
 
 ## Angle Calculation

@@ -1,3 +1,14 @@
 PAPI_*
 *.mp4
 *.avi
+.DS_Store
+frontend/node_modules/
+frontend/dist/
+backend/.venv/
+backend/.env
+backend/storage/uploads/*
+backend/storage/exports/*
+backend/storage/tmp/*
+!backend/storage/uploads/.gitkeep
+!backend/storage/exports/.gitkeep
+!backend/storage/tmp/.gitkeep

@@ -56,6 +56,7 @@ class InferenceService:
         frame = cv2.imread(str(media_path))
         if frame is None:
             raise ValueError("Could not read uploaded image.")
+        frame_height, frame_width = frame.shape[:2]
 
         detections = self._detect_frame(frame, use_tracking=False)
         lamps = normalize_detections(detections)
@@ -76,6 +77,8 @@ class InferenceService:
             global_state=global_state,
             lamps=lamps,
             confidence=confidence,
+            frame_width=frame_width,
+            frame_height=frame_height,
             frame_count=1,
             processing_ms=processing_ms,
             angle=angle,
@@ -160,6 +163,8 @@ class InferenceService:
             global_state=global_state,
             lamps=final_lamps,
             confidence=confidence,
+            frame_width=frame_width,
+            frame_height=frame_height,
             frame_count=frame_count,
             processing_ms=processing_ms,
             angle=angle,

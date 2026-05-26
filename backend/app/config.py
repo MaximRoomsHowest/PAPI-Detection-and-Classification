@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+import json
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,22 +17,15 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "PAPI Backend"
-    database_url: str = "postgresql+psycopg://papi:papi@localhost:5432/papi_backend"
+    database_url: str = "postgresql+psycopg://papi:papi@localhost:5434/papi_backend"
     model_path: Path = Field(default=BACKEND_ROOT / "models" / "best.pt", alias="PAPI_MODEL_PATH")
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")
-    cors_origins: list[str] = Field(
-        default=["http://localhost:5173", "http://127.0.0.1:5173"],
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173",
         alias="PAPI_CORS_ORIGINS",
     )
     confidence_threshold: float = Field(default=0.4, alias="PAPI_CONFIDENCE_THRESHOLD")
     video_history_size: int = Field(default=5, alias="PAPI_VIDEO_HISTORY_SIZE")
-
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, value: Any) -> list[str]:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
 
     @field_validator("model_path", "storage_dir")
     @classmethod
@@ -40,6 +33,13 @@ class Settings(BaseSettings):
         if value.is_absolute():
             return value
         return BACKEND_ROOT / value
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        value = self.cors_origins.strip()
+        if value.startswith("["):
+            return [str(origin).strip() for origin in json.loads(value) if str(origin).strip()]
+        return [origin.strip() for origin in value.split(",") if origin.strip()]
 
     @property
     def uploads_dir(self) -> Path:

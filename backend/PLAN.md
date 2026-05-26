@@ -2,14 +2,14 @@
 
 ## Purpose
 
-This folder contains a local-only FastAPI backend prototype for the PAPI Detection and Classification project. It is separate from the frontend work and is meant to prove the backend flow before connecting it to the React UI.
+This folder contains the FastAPI backend for the PAPI Detection and Classification project. On the `integration/full-flow` branch it is connected to the React UI through local image and video analysis endpoints.
 
-The backend lets a user upload an image or video, run the trained PAPI YOLO model immediately, store an anonymous result log, export annotated media, and calculate the drone elevation angle when GPS/altitude metadata is available.
+The backend lets a user upload an image frame, run the trained PAPI YOLO model immediately, store an anonymous result log, export annotated media, and calculate the drone elevation angle when GPS/altitude metadata is submitted by the frontend.
 
 ## What Is Implemented
 
 - Public FastAPI API with no login/authentication.
-- Image/frame upload through `POST /api/analyze-frame`; legacy image/video upload remains available through `POST /api/analyze`.
+- Image/frame upload through `POST /api/analyze-frame`; video upload uses `POST /api/analyze` so the backend can return a full labeled video export.
 - Immediate inference response from `POST /api/analyze`; no job polling is used for v1.
 - PostgreSQL result logs that store metadata/results, not uploaded image/video bytes.
 - Seeded PAPI runway coordinates for `papi_06` and `papi_24`.
@@ -29,7 +29,7 @@ If GPS/altitude metadata is missing, the backend returns `angle_available: false
 ## Folder Contents
 
 ```text
-Backend_main/
+backend/
   app/
     main.py                 FastAPI app entrypoint
     config.py               Environment/settings loading
@@ -55,7 +55,7 @@ Backend_main/
     exports/                Annotated output files, ignored by Git
     tmp/                    Temporary processing files, ignored by Git
   tests/                    Unit tests
-  docker-compose.yml        Local PostgreSQL service for logs
+  Dockerfile                FastAPI container used by the root compose file
   requirements.txt          Python dependencies
   .env.example              Example local environment config
 ```
@@ -69,28 +69,28 @@ Backend_main/
 - `GET /api/logs/{id}`
 - `GET /api/runways`
 
-`POST /api/analyze-frame` is the expected frontend workflow for split video frames. It expects form data:
+`POST /api/analyze-frame` is the expected frontend workflow for images. `POST /api/analyze` is the expected frontend workflow for videos. Both expect form data:
 
 - `file`: image frame upload
 - `runway_id`: optional, defaults to `papi_06`
 - `drone_id`: optional
 - `drone_latitude`, `drone_longitude`, `drone_altitude_m`: optional manual drone metadata for angle calculation
 
-Backend work per received frame:
+Backend work per received image or video:
 
 - Run inference on the image and decide each PAPI lamp state plus global state.
 - Calculate drone elevation angle from submitted metadata and seeded runway coordinates.
-- Return the result immediately and save only a lightweight DB log.
+- Return the result immediately and save only a lightweight DB log. Video responses include an annotated video export URL.
 
 ## How To Run Locally
 
 ```bash
-cd Backend_main
+cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-docker compose up -d
+docker compose up -d postgres
 python -m uvicorn app.main:app
 ```
 
@@ -109,9 +109,9 @@ http://127.0.0.1:8000/docs
 ## How To Test
 
 ```bash
-cd Backend_main
+cd backend
 source .venv/bin/activate
-pytest
+python -m pytest
 ```
 
 Current unit test coverage includes:
@@ -123,7 +123,7 @@ Current unit test coverage includes:
 ## Important Notes
 
 - This is local-only work. Nothing has been pushed.
-- The frontend is not connected yet.
+- The frontend is connected locally through `POST /api/analyze-frame` for images and `POST /api/analyze` for videos.
 - `models/best.pt` is intentionally ignored by Git.
 - Uploaded originals are used for processing and deleted after analysis.
 - Annotated exports, temp files, `.env`, and virtual environments are ignored by Git.
@@ -136,5 +136,5 @@ Current unit test coverage includes:
 - Start PostgreSQL with Docker and run the FastAPI app.
 - Test `/api/analyze` with a real image and video.
 - Verify annotated exports visually.
-- Connect the frontend upload flow to the direct `/api/analyze` response.
-- Later, decide if large video files need a separate background-job endpoint.
+- Keep improving frontend frame sampling and aggregation.
+- Later, decide if large server-side video files need a separate background-job endpoint.

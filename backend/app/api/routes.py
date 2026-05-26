@@ -1,3 +1,5 @@
+from time import perf_counter
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
@@ -8,7 +10,7 @@ from app.services.inference import get_inference_service
 from app.services.media import detect_media_type, save_upload
 from app.services.runways import get_runway, list_runways
 from app.validation.analyze import parse_manual_drone_metadata
-from app.validation.schemas import AnalysisPayload, LogListItem, RunwayResponse
+from app.validation.schemas import AnalysisPayload, FrameBatchPayload, LogListItem, RunwayResponse
 
 
 router = APIRouter(prefix="/api")
@@ -55,6 +57,42 @@ async def analyze_frame(
         drone_altitude_m=drone_altitude_m,
         db=db,
         image_only=True,
+    )
+
+
+@router.post("/analyze-frames", response_model=FrameBatchPayload)
+async def analyze_frames(
+    files: list[UploadFile] = File(...),
+    runway_id: str = Form("papi_06"),
+    drone_id: str | None = Form(None),
+    drone_latitude: float | None = Form(None),
+    drone_longitude: float | None = Form(None),
+    drone_altitude_m: float | None = Form(None),
+    db: Session = Depends(get_session),
+) -> FrameBatchPayload:
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one image file.")
+
+    start = perf_counter()
+    results: list[AnalysisPayload] = []
+    for file in files:
+        payload = await _analyze_upload(
+            file=file,
+            runway_id=runway_id,
+            drone_id=drone_id,
+            drone_latitude=drone_latitude,
+            drone_longitude=drone_longitude,
+            drone_altitude_m=drone_altitude_m,
+            db=db,
+            image_only=True,
+        )
+        results.append(payload)
+
+    processing_ms = int((perf_counter() - start) * 1000)
+    return FrameBatchPayload(
+        frame_count=len(results),
+        processing_ms=processing_ms,
+        results=results,
     )
 
 

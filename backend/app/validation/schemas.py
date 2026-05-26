@@ -44,11 +44,19 @@ class AnalysisPayload(BaseModel):
     global_state: str
     lamps: list[LampResult]
     confidence: float
+    frame_width: int | None = None
+    frame_height: int | None = None
     frame_count: int
     processing_ms: int
     angle: AngleResult
     artifact_url: str | None = None
     detections: list[dict] = Field(default_factory=list)
+
+
+class FrameBatchPayload(BaseModel):
+    frame_count: int
+    processing_ms: int
+    results: list[AnalysisPayload]
 
 
 class LogListItem(BaseModel):
@@ -78,4 +86,3 @@ class RunwayResponse(BaseModel):
     id: str
     label: str
     lights: list[RunwayLight]
-
