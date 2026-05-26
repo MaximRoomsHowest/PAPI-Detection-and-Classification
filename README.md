@@ -33,21 +33,21 @@ The canonical corrected sequence dataset is archived under:
 
 ## Run The ML Pipeline
 
-One entrypoint: `scripts/pipeline.py` with five named stages. Run them all in
+One entrypoint: `workflows/scripts/pipeline.py` with five named stages. Run them all in
 order, or target an individual stage:
 
 ```powershell
-python scripts/pipeline.py all
-python scripts/pipeline.py all --skip export
-python scripts/pipeline.py autolabel --limit 100
-python scripts/pipeline.py export --limit 300
+python workflows/scripts/pipeline.py all
+python workflows/scripts/pipeline.py all --skip export
+python workflows/scripts/pipeline.py autolabel --limit 100
+python workflows/scripts/pipeline.py export --limit 300
 ```
 
 For active-learning preprocessing and training workflows, use the notebooks:
 
-- `notebooks/02_active_learning_preprocessing_template.ipynb`
-- `notebooks/03_yolov26n_detection_tracking_training.ipynb`
-- `notebooks/04_yolov26n_sequence_model_evaluation.ipynb`
+- `workflows/notebooks/02_active_learning_preprocessing_template.ipynb`
+- `workflows/notebooks/03_yolov26n_detection_tracking_training.ipynb`
+- `workflows/notebooks/04_yolov26n_sequence_model_evaluation.ipynb`
 
 For the current detector scope, use two classes only:
 `papi_light_red` and `papi_light_white`. Transitions are inferred later by
@@ -62,13 +62,13 @@ Local model binaries live outside Git under `models/`.
 Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
 
 # terminal 1: backend
-cd backend
+cd apps\backend
 copy .env.example .env
 docker compose up -d
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+..\..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 # terminal 2: frontend
-cd frontend
+cd apps\frontend
 copy .env.example .env
 npm install
 npm run dev -- --host 127.0.0.1 --port 5173
@@ -87,33 +87,40 @@ testing, not for model training.
 
 ## Repository Layout
 
+Start here when looking for a part of the project:
+
+- App work lives in `apps/`: FastAPI backend in `apps/backend/`, React frontend in `apps/frontend/`.
+- Reusable ML/data Python code lives in `packages/papi/`.
+- Human-facing ML workflows live in `workflows/`: notebooks in `workflows/notebooks/`, runnable data scripts in `workflows/scripts/`.
+- Shared project inputs stay at the root: `configs/`, `data/`, `models/`, `docs/`, and `test_videos/`.
+
 | Path | Purpose |
 |---|---|
+| `apps/backend/` | FastAPI backend for upload analysis, result logs, and annotated artifact serving. |
+| `apps/frontend/` | Vite/React dashboard with Backend API mode and Mock mode. |
+| `packages/papi/src/papi/` | Python package: metadata, geometry, projection, lamp-state, sampling, CVAT export, YOLO I/O. |
+| `packages/papi/tests/` | Root `pytest` suite for ML/data code. |
+| `workflows/scripts/` | Runnable ML/data entrypoints. |
+| `workflows/notebooks/` | Notebook-first ML workflows. |
 | `models/` | Ignored local model weights. `models/base/` holds base weights; `models/serving/best.pt` is the backend runtime model. |
-| `backend/` | FastAPI backend for upload analysis, result logs, and annotated artifact serving. |
-| `frontend/` | Vite/React dashboard with Backend API mode and Mock mode. |
 | `test_videos/` | Small MP4 fixtures for end-to-end upload smoke tests. |
 | `..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI/` | Archived raw dataset. Do not modify. |
 | `data/raw/` | Optional local junction to the archived raw dataset. |
 | `..\PAPI-artifacts\2026-05-26-cleanup\data\datasets\papi_lamp_sequences/` | Archived canonical corrected sequence dataset and tracking artifacts. |
 | `data/README.md` | Data organization rules and current sequence dataset workflow. |
-| `src/papi/` | Python package: metadata, geometry, projection, lamp-state, sampling, CVAT export, YOLO I/O. |
-| `scripts/` | Runnable ML/data entrypoints. |
 | `configs/` | PAPI coordinates, split config, and projection config. |
-| `tests/` | Root `pytest` suite for ML/data code. |
 | `docs/` | Annotation conventions and pipeline documentation. |
-| `notebooks/` | Notebook-first ML workflows. |
 
 ## Verification
 
 Recommended checks before committing:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest
-.venv\Scripts\python.exe -m ruff check src tests scripts backend
-cd backend; ..\.venv\Scripts\python.exe -m pytest
-cd frontend; npm run lint
-cd frontend; npm run build
+.venv\Scripts\python.exe -m pytest packages/papi/tests
+.venv\Scripts\python.exe -m ruff check packages/papi workflows/scripts apps/backend
+cd apps\backend; ..\..\.venv\Scripts\python.exe -m pytest
+cd apps\frontend; npm run lint
+cd apps\frontend; npm run build
 ```
 
 ## Notes

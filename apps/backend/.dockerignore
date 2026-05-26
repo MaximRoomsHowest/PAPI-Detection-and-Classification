@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local secrets / settings
+.env
+.env.*
+!.env.example
+
+# Runtime artefacts (recreated inside the container at /storage)
+storage/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Project meta we don't need at runtime
+README.md
+PLAN.md
+tests/
+docker-compose.yml
+Dockerfile
+.dockerignore

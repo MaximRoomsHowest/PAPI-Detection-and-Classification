@@ -7,7 +7,6 @@ __pycache__/
 .eggs/
 build/
 dist/
-src/*.egg-info/
 
 # Virtual environments
 .venv/
@@ -34,6 +33,7 @@ Thumbs.db
 # Local secrets
 .env
 .env.*
+!**/.env.example
 
 # Client/raw data and generated ML artifacts
 PROJECT1-PAPI/
@@ -49,6 +49,8 @@ data/annotations/
 data/datasets/
 data/runs/
 runs/
+!models/runs/
+!models/runs/**
 *.pt
 *.onnx
 models/**/*.pt
@@ -58,10 +60,12 @@ models/**/*.torchscript
 models/**/*.safetensors
 
 # Frontend/backend generated outputs
+apps/frontend/node_modules/
+apps/frontend/dist/
+apps/backend/storage/
 frontend/node_modules/
 frontend/dist/
 backend/storage/
-Backend_main/storage/
 
 # Generated CVAT/export archives and videos
 data/cvat/

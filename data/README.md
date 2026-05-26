@@ -67,8 +67,8 @@ evaluation, and video reconstruction.
 1. Correct annotations in CVAT when needed.
 2. Export corrected annotations into `annotations/manual_corrections/`.
 3. Rebuild `datasets/papi_lamp_sequences/` by grouping frames by `video_id`.
-4. Run `scripts/build_sequence_tracking.py` to assign stable lamp tracks and
+4. Run `workflows/scripts/build_sequence_tracking.py` to assign stable lamp tracks and
    derive transition events.
-5. Run `scripts/prepare_yolo_sequence_dataset.py` to refresh the combined
+5. Run `workflows/scripts/prepare_yolo_sequence_dataset.py` to refresh the combined
    `yolo26n_combined` training config.
 6. Use each `<video_id>/images/` folder to reconstruct videos for live testing.

@@ -1,7 +1,0 @@
-.env
-.venv/
-models/
-storage/
-__pycache__/
-.pytest_cache/
-*.pyc

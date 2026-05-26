@@ -10,14 +10,14 @@
 ## Pipeline entrypoint
 
 All five stages live in **one script** with argparse subcommands:
-`scripts/pipeline.py`.
+`workflows/scripts/pipeline.py`.
 
 ```powershell
-python scripts/pipeline.py all                    # run everything in order
-python scripts/pipeline.py all --skip export      # skip a stage
-python scripts/pipeline.py all --only extract,calibrate  # run only a subset
-python scripts/pipeline.py <stage>                # run a single stage
-python scripts/pipeline.py <stage> --help         # per-stage flags
+python workflows/scripts/pipeline.py all                    # run everything in order
+python workflows/scripts/pipeline.py all --skip export      # skip a stage
+python workflows/scripts/pipeline.py all --only extract,calibrate  # run only a subset
+python workflows/scripts/pipeline.py <stage>                # run a single stage
+python workflows/scripts/pipeline.py <stage> --help         # per-stage flags
 ```
 
 | Stage | Reads | Writes | Typical runtime |
@@ -37,11 +37,11 @@ will be added as a sixth subcommand once `data/labels/verified/` is populated.
 CVAT Online rejects uploads above 4 GiB. Use normal-only batches instead of one
 large mixed export:
 
-Run `notebooks/02_active_learning_preprocessing_template.ipynb`; it is the
+Run `workflows/notebooks/02_active_learning_preprocessing_template.ipynb`; it is the
 single human-facing entrypoint for preprocessing, YOLOv26m training, assisted
 annotation, and CVAT batch generation.
 
-Use `notebooks/03_yolov26n_detection_tracking_training.ipynb` for the small
+Use `workflows/notebooks/03_yolov26n_detection_tracking_training.ipynb` for the small
 YOLOv26 detector run. It rebuilds per-lamp tracking annotations, prepares the
 combined day/night training config, and keeps transition detection as temporal
 post-processing rather than a YOLO class.
@@ -114,10 +114,10 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 
 ## Debugging tips
 
-- `python scripts/pipeline.py extract --limit 50` — fast metadata smoke test.
-- `python scripts/pipeline.py autolabel --limit 100` — auto-label first 100 frames to inspect coverage.
-- `python scripts/pipeline.py export --limit 300` — small CVAT bundle for an upload smoke test.
-- The notebook `notebooks/01_pipeline_walkthrough.ipynb` runs one image end-to-end with the
+- `python workflows/scripts/pipeline.py extract --limit 50` — fast metadata smoke test.
+- `python workflows/scripts/pipeline.py autolabel --limit 100` — auto-label first 100 frames to inspect coverage.
+- `python workflows/scripts/pipeline.py export --limit 300` — small CVAT bundle for an upload smoke test.
+- The notebook `workflows/notebooks/01_pipeline_walkthrough.ipynb` runs one image end-to-end with the
   intermediate matrices printed.
 - If `data/raw/` does not resolve, the `extract` stage will report "Found 0 JPGs" — verify
   the junction with `dir data\raw` from cmd and confirm the archived artifacts are present.
@@ -126,9 +126,9 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 
 - [ ] `pip install -e .[dev]` succeeds from a clean venv.
 - [ ] `pytest` runs and all tests pass (LRF round-trip skipped if calibration not yet run).
-- [ ] `python scripts/pipeline.py extract` writes a CSV with 4,058 rows.
-- [ ] `python scripts/pipeline.py calibrate` writes `configs/projection.yaml` with median residual ≤ 100 px.
-- [ ] `python scripts/pipeline.py autolabel` writes ~3,240 YOLO `.txt` files (WideCamera count) + `lamp_state.csv` with 4,058 rows.
-- [ ] `python scripts/pipeline.py sample` writes the verification sample with reason counts printed.
-- [ ] `python scripts/pipeline.py export` writes a `.zip` that CVAT can import.
-- [ ] `ruff check src tests scripts` is clean.
+- [ ] `python workflows/scripts/pipeline.py extract` writes a CSV with 4,058 rows.
+- [ ] `python workflows/scripts/pipeline.py calibrate` writes `configs/projection.yaml` with median residual ≤ 100 px.
+- [ ] `python workflows/scripts/pipeline.py autolabel` writes ~3,240 YOLO `.txt` files (WideCamera count) + `lamp_state.csv` with 4,058 rows.
+- [ ] `python workflows/scripts/pipeline.py sample` writes the verification sample with reason counts printed.
+- [ ] `python workflows/scripts/pipeline.py export` writes a `.zip` that CVAT can import.
+- [ ] `ruff check packages/papi workflows/scripts` is clean.
