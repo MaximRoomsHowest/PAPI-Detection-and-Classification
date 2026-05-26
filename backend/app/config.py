@@ -24,7 +24,12 @@ class Settings(BaseSettings):
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
     cors_origins: list[str] = Field(
-        default=["http://localhost:5173", "http://127.0.0.1:5173"],
+        default=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ],
         alias="PAPI_CORS_ORIGINS",
     )
     confidence_threshold: float = Field(default=0.4, alias="PAPI_CONFIDENCE_THRESHOLD")

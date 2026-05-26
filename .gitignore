@@ -37,6 +37,7 @@ Thumbs.db
 
 # Client/raw data and generated ML artifacts
 PROJECT1-PAPI/
+PAPI_*/
 data/raw/
 data/work/
 data/interim/*.csv
@@ -46,17 +47,25 @@ data/labels/auto/
 data/labels/verified/
 data/annotations/
 data/datasets/
+data/runs/
 runs/
 *.pt
+*.onnx
 models/**/*.pt
 models/**/*.onnx
 models/**/*.engine
 models/**/*.torchscript
 models/**/*.safetensors
+
+# Frontend/backend generated outputs
 frontend/node_modules/
 frontend/dist/
+backend/storage/
 Backend_main/storage/
 
-# Generated CVAT/export archives
+# Generated CVAT/export archives and videos
 data/cvat/
 *.zip
+*.mp4
+*.avi
+!test_videos/*.mp4
