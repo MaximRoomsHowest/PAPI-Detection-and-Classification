@@ -887,36 +887,6 @@ function DropzonePlaceholder({ isDragActive }) {
   )
 }
 
-function SyntheticRunway() {
-  return (
-    <div className="synthetic-runway" aria-label="Synthetic runway frame">
-      <div className="sky-layer" />
-      <div className="horizon-line" />
-      <div className="runway">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="runway-markings">
-        {Array.from({ length: 8 }).map((_, index) => (
-          <span key={index} />
-        ))}
-      </div>
-      <div className="approach-lights">
-        {Array.from({ length: 18 }).map((_, index) => (
-          <i key={index} />
-        ))}
-      </div>
-      <div className="synthetic-papi">
-        <span />
-        <span />
-        <span />
-        <span />
-      </div>
-    </div>
-  )
-}
-
 function GlobalStateDecoder({ scenario, plotTheme }) {
   const [hovered, setHovered] = useState(null)
   const activeIndex = stateCatalog.findIndex((state) => state.id === scenario.stateId)
