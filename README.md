@@ -74,10 +74,17 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Open `http://127.0.0.1:5173/live-demo`, keep **Backend API** selected, upload
-an image or short video, and run the backend model. The frontend calls
-`POST /api/analyze-frame` for images and `POST /api/analyze` for videos through
-`VITE_PAPI_API_URL`.
+Open `http://127.0.0.1:5173/live-demo`, keep **Backend API** selected, and pick
+one of three upload paths:
+
+- **Single image**: frontend calls `POST /api/analyze-frame`.
+- **Video**: frontend calls `POST /api/analyze`.
+- **Folder of images**: frontend extracts files client-side and calls
+  `POST /api/analyze-frames` to batch-analyze every image in one request.
+
+All endpoints accept optional drone metadata fields (`runway_id`, `drone_id`,
+`drone_latitude`, `drone_longitude`, `drone_altitude_m`) and respect
+`VITE_PAPI_API_URL` / `VITE_PAPI_API_KEY` env vars.
 
 ## Test Videos
 

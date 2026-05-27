@@ -35,6 +35,7 @@ For project-quality demos, replace `models/serving/best.pt` with the intended tr
 - `GET /health`
 - `POST /api/analyze`
 - `POST /api/analyze-frame`
+- `POST /api/analyze-frames`
 - `GET /api/logs`
 - `GET /api/logs/{id}`
 - `GET /api/runways`
@@ -46,7 +47,9 @@ For the frontend video workflow, use `POST /api/analyze-frame`: the frontend spl
 1. YOLO inference on the image to decide lamp states and global PAPI state.
 2. Angle calculation from the submitted drone metadata and selected runway coordinates.
 
-The endpoint returns both results immediately and stores a lightweight database log with result metadata, not the uploaded image/video bytes. Uploaded originals are deleted after processing; annotated exports stay in `storage/exports`.
+`POST /api/analyze-frames` is the batch variant: accepts a multipart upload named `files` (plural) with multiple image files plus the same optional drone metadata. The backend processes each image with the same per-frame logic and returns a single `FrameBatchPayload` aggregating per-frame results plus total processing time. This powers the frontend folder-upload workflow.
+
+The single-frame endpoints return their results immediately and store a lightweight database log with result metadata, not the uploaded image/video bytes. Uploaded originals are deleted after processing; annotated exports stay in `storage/exports`.
 
 ## Structure
 

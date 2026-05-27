@@ -69,6 +69,7 @@ apps/backend/
 - `GET /health`
 - `POST /api/analyze`
 - `POST /api/analyze-frame`
+- `POST /api/analyze-frames`
 - `GET /api/logs`
 - `GET /api/logs/{id}`
 - `GET /api/runways`
@@ -79,6 +80,8 @@ apps/backend/
 - `runway_id`: optional, defaults to `papi_06`
 - `drone_id`: optional
 - `drone_latitude`, `drone_longitude`, `drone_altitude_m`: optional manual drone metadata for angle calculation
+
+`POST /api/analyze-frames` is the batch variant powering the frontend folder-upload workflow. It accepts the same drone-metadata fields plus a multipart upload named `files` (plural) containing multiple image files. The response is a `FrameBatchPayload` with `frame_count`, total `processing_ms`, and `results: list[AnalysisPayload]` mirroring each `analyze-frame` call.
 
 Backend work per received frame:
 
