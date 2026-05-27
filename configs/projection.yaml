@@ -1,0 +1,33 @@
+note: Written by scripts/pipeline.py calibrate -- re-run if camera or gimbal config
+  changes
+calibrated_against_n_frames: 48
+median_residual_px: 6.054397138957903
+max_residual_px: 21.017832246980248
+enu_swap_name: ENU_to_NED
+body_swap_name: body_to_image_fwd
+convention:
+  enu_to_intermediate:
+  - - 0.0
+    - 1.0
+    - 0.0
+  - - 1.0
+    - 0.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - -1.0
+  euler_order: ZYX
+  yaw_sign: 1
+  pitch_sign: 1
+  roll_sign: 1
+  body_to_image:
+  - - 0.0
+    - 1.0
+    - 0.0
+  - - 0.0
+    - 0.0
+    - 1.0
+  - - 1.0
+    - 0.0
+    - 0.0
+  invert_rotation: true

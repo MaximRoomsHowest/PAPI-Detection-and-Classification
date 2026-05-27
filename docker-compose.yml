@@ -1,0 +1,80 @@
+# Full-stack PAPI Detection & Classification compose.
+#
+# Brings up postgres, the FastAPI backend, and the nginx-served frontend
+# bundle. The backend model is bind-mounted from ./models so the image stays
+# code-only and you can swap weights without rebuilding.
+#
+# Quick start:
+#   docker compose up -d --build
+#   open http://localhost:5173
+#
+# The browser will call the backend at http://localhost:8000 — that's the
+# URL Vite bakes into the frontend bundle by default. Override with
+#   FRONTEND_PAPI_API_URL=https://your-host docker compose build frontend
+# if you publish behind a different hostname.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: papi-postgres
+    environment:
+      POSTGRES_DB: papi_backend
+      POSTGRES_USER: papi
+      POSTGRES_PASSWORD: papi
+    ports:
+      - "5434:5432"
+    volumes:
+      - papi_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papi -d papi_backend"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./apps/backend
+    container_name: papi-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://papi:papi@postgres:5432/papi_backend
+      PAPI_MODEL_PATH: /models/serving/best.pt
+      PAPI_STORAGE_DIR: /storage
+      PAPI_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      PAPI_CONFIDENCE_THRESHOLD: "0.4"
+      PAPI_VIDEO_HISTORY_SIZE: "5"
+      PAPI_MAX_UPLOAD_MB: "100"
+      PAPI_MAX_VIDEO_FRAMES: "600"
+      PAPI_MAX_VIDEO_SECONDS: "30"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Model weights are git-ignored binaries living on the host. Bind mount
+      # them read-only so the container picks up the current checkpoint
+      # without a rebuild.
+      - ./models:/models:ro
+      # Uploaded originals + annotated exports persist across container
+      # restarts in a named volume.
+      - papi_backend_storage:/storage
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      args:
+        # Browser-side URL — what the user's machine resolves, not what the
+        # container resolves. Override at build time for non-localhost hosts.
+        VITE_PAPI_API_URL: ${FRONTEND_PAPI_API_URL:-http://localhost:8000}
+    container_name: papi-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  papi_postgres_data:
+  papi_backend_storage:

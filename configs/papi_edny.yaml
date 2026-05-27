@@ -1,0 +1,57 @@
+# PAPI geometry + camera intrinsics for Friedrichshafen Airport (EDNY).
+#
+# EDNY has a single physical runway with two designations:
+#   - runway 06 (NE-bound landing): PAPI cluster at the SW end of the runway
+#   - runway 24 (SW-bound landing): PAPI cluster at the NE end of the runway
+# The dataset contains flights targeting BOTH runways (originally documented as rwy-06 only —
+# the assumption was wrong; day2 flights target rwy 24, see docs/pipeline.md).
+#
+# TODO (confirm with Intersoft / Daoud Yousef):
+#   1. set_angle_deg per light per runway: currently FAA-standard defaults for a 3.0deg glideslope.
+#      Real EDNY commissioned set-angles may differ.
+#   2. alt per light: surveyed XLSX has lat/lon but no altitude per lamp. We fall back to
+#      default_alt_wgs84_m (field-elevation estimate, ~465 m WGS84).
+#   3. ZoomCamera calibrated_focal_px: absent from XMP. Sprint-1 pipeline skips zoom bbox
+#      autolabel; sprint 2 needs either a separate calibration or a EXIF-derived approximation.
+#
+# Coordinates are WGS84 lat/lon from PROJECT1-PAPI/PAPI_Coords_Fred_DE.xlsx.
+# Lights are ordered innermost (1) to outermost (4), matching FAA-standard convention.
+
+airport: EDNY
+
+runways:
+  '06':
+    papi:
+      light_1: { lat: 47.668810, lon: 9.504007, alt: null, set_angle_deg: null }
+      light_2: { lat: 47.668881, lon: 9.503948, alt: null, set_angle_deg: null }
+      light_3: { lat: 47.668951, lon: 9.503888, alt: null, set_angle_deg: null }
+      light_4: { lat: 47.669021, lon: 9.503828, alt: null, set_angle_deg: null }
+  '24':
+    papi:
+      light_1: { lat: 47.673521, lon: 9.518154, alt: null, set_angle_deg: null }
+      light_2: { lat: 47.673450, lon: 9.518214, alt: null, set_angle_deg: null }
+      light_3: { lat: 47.673380, lon: 9.518274, alt: null, set_angle_deg: null }
+      light_4: { lat: 47.673309, lon: 9.518333, alt: null, set_angle_deg: null }
+
+# FAA defaults for a 3.0deg glideslope (used when set_angle_deg above is null):
+faa_default_set_angles_deg: [2.50, 2.83, 3.17, 3.50]
+glideslope_deg: 3.0
+transition_half_width_deg: 0.10
+# Field elevation at EDNY ~417 m AMSL, ~465 m WGS84 ellipsoidal.
+default_alt_wgs84_m: 465.0
+
+cameras:
+  wide:
+    sensor: WideCamera
+    width: 5280
+    height: 3956
+    calibrated_focal_px: 3725.151611
+    optical_center_x: 2640.0
+    optical_center_y: 1978.0
+  zoom:
+    sensor: ZoomCamera
+    width: 8192
+    height: 6144
+    calibrated_focal_px: null
+    optical_center_x: 4096.0
+    optical_center_y: 3072.0
