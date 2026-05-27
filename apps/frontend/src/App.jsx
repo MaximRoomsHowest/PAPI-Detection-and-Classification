@@ -3,38 +3,50 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Activity,
-  Cpu,
-  Crosshair,
+  ChevronLeft,
+  ChevronRight,
+  Cookie,
   Download,
+  FolderOpen,
+  Frown,
   Gauge,
   Moon,
   Pause,
   Play,
   Radar,
+  Smile,
   Sun,
   Upload,
-  Video,
   Zap,
 } from 'lucide-react'
 import clsx from 'clsx'
 import './App.css'
-import heroPoster from './assets/hero.png'
+import { analyzeFrame, analyzeFrames, analyzeMedia, fetchRunways, mediaUrl } from './lib/api'
+import { extractFrameImages } from './lib/frameExtraction'
 
-const API_BASE_URL = (import.meta.env.VITE_PAPI_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
-const API_KEY = import.meta.env.VITE_PAPI_API_KEY
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
-const REQUEST_TIMEOUT_MS = 90_000
+// Plotly is lazy-loaded to keep the initial JS bundle small (saves ~700kB gzipped on first paint).
+// Use `loadPlotlyBundle()` for direct API access (e.g. PDF export) and `<LazyPlot>` in JSX.
 let plotlyBundlePromise
 
-const backendStateToScenarioId = {
-  far_too_high: 'far-high',
-  too_high: 'too-high',
-  correct_glidepath: 'correct',
-  too_low: 'too-low',
-  far_too_low: 'far-low',
+function loadPlotlyBundle() {
+  if (!plotlyBundlePromise) {
+    plotlyBundlePromise = Promise.all([
+      import('react-plotly.js/factory'),
+      import('plotly.js/lib/core'),
+      import('plotly.js/lib/bar'),
+      import('plotly.js/lib/heatmap'),
+    ]).then(([factoryModule, plotlyModule, barModule, heatmapModule]) => {
+      const Plotly = plotlyModule.default ?? plotlyModule
+      const bar = barModule.default ?? barModule
+      const heatmap = heatmapModule.default ?? heatmapModule
+      Plotly.register([bar, heatmap])
+      const factory = factoryModule.default ?? factoryModule
+      const Plot = factory(Plotly)
+      return { Plot, Plotly }
+    })
+  }
+  return plotlyBundlePromise
 }
-
-const legalStateIds = ['far-high', 'too-high', 'correct', 'too-low', 'far-low']
 
 const stateCatalog = [
   {
@@ -77,7 +89,17 @@ const stateCatalog = [
     description: 'Immediate correction needed',
     color: '#ff6b6b',
   },
+  {
+    id: 'unknown',
+    label: 'Unknown',
+    short: 'N/A',
+    pattern: 'Incomplete detection',
+    description: 'Not enough lamps detected for a reliable PAPI state',
+    color: '#9aa5b1',
+  },
 ]
+
+const legalStateCatalog = stateCatalog.filter((state) => state.id !== 'unknown')
 
 const statusCopy = {
   white: { label: 'White', tone: 'white', color: '#f8fbff' },
@@ -92,12 +114,393 @@ const stateLampPatterns = {
   correct: ['white', 'white', 'red', 'red'],
   'too-low': ['white', 'red', 'red', 'red'],
   'far-low': ['red', 'red', 'red', 'red'],
+  unknown: ['occluded', 'occluded', 'occluded', 'occluded'],
+}
+
+const backendStateId = {
+  far_too_high: 'far-high',
+  too_high: 'too-high',
+  correct_glidepath: 'correct',
+  too_low: 'too-low',
+  far_too_low: 'far-low',
+  unknown: 'unknown',
+}
+
+const defaultMetadata = {
+  runwayId: 'papi_06',
+  droneId: '',
+  droneLatitude: '',
+  droneLongitude: '',
+  droneAltitudeM: '',
+}
+
+const translations = {
+  en: {
+    brand: {
+      subtitle: 'AI detection prototype',
+      radar: 'On your radar',
+      company: 'Intersoft Electronics',
+    },
+    nav: {
+      introduction: 'Introduction',
+      liveDemo: 'Live Demo',
+      insights: 'Insights',
+    },
+    intro: {
+      eyebrow: 'Intersoft Electronics Services BV',
+      title: 'Real-time PAPI detection and glidepath classification.',
+      description:
+        'A front-end prototype for testing model output, explaining lamp transitions, and presenting accuracy, speed, and robustness in one polished flow.',
+      cta: 'Try It Out',
+      scroll: 'Airport details',
+      airportEyebrow: 'Airport context',
+      airportTitle: 'Bodensee-Airport Friedrichshafen runway snapshot.',
+      runwayNote: 'Runway 06/24, asphalt, 2,356 m (7,729 ft)',
+      runwayDetails: 'Runway details',
+      runwayDescription:
+        'The project focuses on the single runway at Bodensee-Airport Friedrichshafen. The runway designation is 06/24 with an asphalt surface and a length of 2,356 meters (7,729 feet).',
+      coordinates: 'Coordinates',
+      elevation: 'Elevation',
+    },
+    live: {
+      eyebrow: 'Live demo',
+      title: 'Upload media, run backend inference, and inspect the detected PAPI unit.',
+      upload: 'Upload media',
+      uploadFolder: 'Upload folder',
+      analyzing: 'Analyzing',
+      runModel: 'Run backend model',
+      previousFrame: 'Previous frame',
+      nextFrame: 'Next frame',
+      runway: 'Runway',
+      droneId: 'Drone ID',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      altitude: 'Altitude m',
+      optional: 'optional',
+      metadata: 'metadata',
+      demoScenarios: 'Demo scenarios',
+      pauseLoop: 'Pause scenario playback',
+      playLoop: 'Play scenario loop',
+      auto: 'Auto',
+      paused: 'Paused',
+      detection: 'Detection',
+      globalState: 'Global state',
+      transitions: 'Transitions',
+      edgeMemory: 'Edge memory',
+      droneAngle: 'Drone elevation angle',
+      angleUnavailable: 'Angle unavailable',
+      missingMetadata: 'missing metadata',
+      backendInference: 'Backend inference running',
+      dropTitle: 'Drag and drop an image or video',
+      dropText: 'Or use the upload button above',
+    },
+    insights: {
+      eyebrow: 'Insights',
+      title: 'Accuracy, transitions, robustness, and speed without boring chart filler.',
+      preparing: 'Preparing PDF',
+      download: 'Download charts (PDF)',
+      source: 'Inspired by visual forms from Data Viz Project',
+      decoderTitle: 'PAPI state decoder',
+      decoderText: 'All five legal outputs, their lamp pattern, and model evidence.',
+      activeDecision: 'Active decision',
+      compareState: 'Compare state',
+      evidence: 'Evidence',
+      highestScore: 'Highest model score in this frame',
+      pointsBelow: 'points below the selected result',
+      transitionTitle: 'Transition ribbon',
+      transitionText: 'Each cell is one lamp across consecutive frames.',
+      transitionDetected: 'Transition detected',
+      frame: 'Frame',
+      status: 'Status',
+    },
+    cookies: {
+      title: 'Cookies?',
+      text: 'This demo does not save anything; this choice is only visual.',
+      yes: 'Yes',
+      no: 'No',
+      happyTitle: 'Lovely, thanks.',
+      happyText: 'Happy little UI moment unlocked.',
+      sadTitle: 'No worries.',
+      sadText: 'We will keep things plain for now.',
+    },
+    states: {
+      'far-high': ['Far too high', 'Aircraft is well above glidepath'],
+      'too-high': ['Too high', 'Slightly above the ideal angle'],
+      correct: ['Correct glidepath', 'Stable 3 degree approach'],
+      'too-low': ['Too low', 'Below desired approach path'],
+      'far-low': ['Far too low', 'Immediate correction needed'],
+      unknown: ['Unknown', 'Not enough lamps detected for a reliable PAPI state'],
+    },
+    status: {
+      white: 'White',
+      red: 'Red',
+      transition: 'Transition',
+      occluded: 'Occluded',
+    },
+    scenarios: {
+      clean: ['Clean example', 'baseline', '2 white + 2 red = correct glidepath', 'Clear evening, steady camera'],
+      transition: ['Transition pause', 'yellow/orange', '2 white + 2 red = correct glidepath', 'Lamp 2 changing from white to red'],
+      'hard-case': ['Hard case', 'weather + occlusion', '1 white + 3 red = too low', 'Rain, shallow angle, partial occlusion'],
+      edge: ['Edge device', 'limited hardware', '4 red = far too low', 'Low light, compressed stream'],
+      backend: ['Backend result', 'live'],
+    },
+  },
+  nl: {
+    brand: {
+      subtitle: 'AI-detectieprototype',
+      radar: 'Op uw radar',
+      company: 'Intersoft Electronics',
+    },
+    nav: {
+      introduction: 'Introductie',
+      liveDemo: 'Live demo',
+      insights: 'Inzichten',
+    },
+    intro: {
+      eyebrow: 'Intersoft Electronics Services BV',
+      title: 'Realtime PAPI-detectie en glidepath-classificatie.',
+      description:
+        'Een frontendprototype om modeloutput te testen, lampovergangen uit te leggen en nauwkeurigheid, snelheid en robuustheid helder te presenteren.',
+      cta: 'Probeer het',
+      scroll: 'Luchthavendetails',
+      airportEyebrow: 'Luchthavencontext',
+      airportTitle: 'Overzicht van de baan van Bodensee-Airport Friedrichshafen.',
+      runwayNote: 'Baan 06/24, asfalt, 2.356 m (7.729 ft)',
+      runwayDetails: 'Baangegevens',
+      runwayDescription:
+        'Het project richt zich op de enige baan van Bodensee-Airport Friedrichshafen. De baanaanduiding is 06/24, met asfaltverharding en een lengte van 2.356 meter (7.729 feet).',
+      coordinates: 'Coordinaten',
+      elevation: 'Hoogte',
+    },
+    live: {
+      eyebrow: 'Live demo',
+      title: 'Upload media, voer backend-inferentie uit en bekijk de gedetecteerde PAPI-unit.',
+      upload: 'Media uploaden',
+      uploadFolder: 'Map uploaden',
+      analyzing: 'Analyseren',
+      runModel: 'Backendmodel starten',
+      previousFrame: 'Vorig frame',
+      nextFrame: 'Volgend frame',
+      runway: 'Baan',
+      droneId: 'Drone-ID',
+      latitude: 'Breedtegraad',
+      longitude: 'Lengtegraad',
+      altitude: 'Hoogte m',
+      optional: 'optioneel',
+      metadata: 'metadata',
+      demoScenarios: 'Demoscenario’s',
+      pauseLoop: 'Scenariolus pauzeren',
+      playLoop: 'Scenariolus afspelen',
+      auto: 'Auto',
+      paused: 'Gepauzeerd',
+      detection: 'Detectie',
+      globalState: 'Globale status',
+      transitions: 'Overgangen',
+      edgeMemory: 'Edge-geheugen',
+      droneAngle: 'Elevatiehoek drone',
+      angleUnavailable: 'Hoek niet beschikbaar',
+      missingMetadata: 'metadata ontbreekt',
+      backendInference: 'Backend-inferentie actief',
+      dropTitle: 'Sleep een afbeelding of video hierheen',
+      dropText: 'Of gebruik de uploadknop hierboven',
+    },
+    insights: {
+      eyebrow: 'Inzichten',
+      title: 'Nauwkeurigheid, overgangen, robuustheid en snelheid in duidelijke grafieken.',
+      preparing: 'PDF voorbereiden',
+      download: 'Grafieken downloaden (PDF)',
+      source: 'Geinspireerd door vormen van Data Viz Project',
+      decoderTitle: 'PAPI-statusdecoder',
+      decoderText: 'Alle vijf geldige outputs, hun lamppatroon en modelbewijs.',
+      activeDecision: 'Actieve beslissing',
+      compareState: 'Status vergelijken',
+      evidence: 'Bewijs',
+      highestScore: 'Hoogste modelscore in dit frame',
+      pointsBelow: 'punten onder de geselecteerde uitkomst',
+      transitionTitle: 'Overgangslint',
+      transitionText: 'Elke cel is een lamp over opeenvolgende frames.',
+      transitionDetected: 'Overgang gedetecteerd',
+      frame: 'Frame',
+      status: 'Status',
+    },
+    cookies: {
+      title: 'Cookies?',
+      text: 'Deze demo slaat niets op; deze keuze is alleen visueel.',
+      yes: 'Ja',
+      no: 'Nee',
+      happyTitle: 'Fijn, bedankt.',
+      happyText: 'Vrolijk UI-moment ontgrendeld.',
+      sadTitle: 'Geen probleem.',
+      sadText: 'We houden het eenvoudig.',
+    },
+    states: {
+      'far-high': ['Veel te hoog', 'Het toestel zit ruim boven het glijpad'],
+      'too-high': ['Te hoog', 'Iets boven de ideale hoek'],
+      correct: ['Correct glijpad', 'Stabiele nadering van 3 graden'],
+      'too-low': ['Te laag', 'Onder het gewenste naderingspad'],
+      'far-low': ['Veel te laag', 'Directe correctie nodig'],
+      unknown: ['Onbekend', 'Niet genoeg lampen gedetecteerd voor een betrouwbare PAPI-status'],
+    },
+    status: {
+      white: 'Wit',
+      red: 'Rood',
+      transition: 'Overgang',
+      occluded: 'Afgeschermd',
+    },
+    scenarios: {
+      clean: ['Schoon voorbeeld', 'basis', '2 wit + 2 rood = correct glijpad', 'Heldere avond, stabiele camera'],
+      transition: ['Overgangspauze', 'geel/oranje', '2 wit + 2 rood = correct glijpad', 'Lamp 2 verandert van wit naar rood'],
+      'hard-case': ['Moeilijk geval', 'weer + afscherming', '1 wit + 3 rood = te laag', 'Regen, lage hoek, gedeeltelijke afscherming'],
+      edge: ['Edge-apparaat', 'beperkte hardware', '4 rood = veel te laag', 'Weinig licht, gecomprimeerde stream'],
+      backend: ['Backendresultaat', 'live'],
+    },
+  },
+  fr: {
+    brand: {
+      subtitle: 'Prototype de detection IA',
+      radar: 'Sur votre radar',
+      company: 'Intersoft Electronics',
+    },
+    nav: {
+      introduction: 'Introduction',
+      liveDemo: 'Demo live',
+      insights: 'Analyses',
+    },
+    intro: {
+      eyebrow: 'Intersoft Electronics Services BV',
+      title: 'Detection PAPI en temps reel et classification du plan de descente.',
+      description:
+        'Un prototype frontend pour tester la sortie du modele, expliquer les transitions des lampes et presenter precision, vitesse et robustesse clairement.',
+      cta: 'Essayer',
+      scroll: 'Details aeroport',
+      airportEyebrow: 'Contexte aeroport',
+      airportTitle: 'Apercu de la piste de Bodensee-Airport Friedrichshafen.',
+      runwayNote: 'Piste 06/24, asphalte, 2 356 m (7 729 ft)',
+      runwayDetails: 'Details de piste',
+      runwayDescription:
+        'Le projet se concentre sur la piste unique de Bodensee-Airport Friedrichshafen. La designation est 06/24, avec une surface en asphalte et une longueur de 2 356 metres (7 729 feet).',
+      coordinates: 'Coordonnees',
+      elevation: 'Altitude',
+    },
+    live: {
+      eyebrow: 'Demo live',
+      title: 'Importez un media, lancez l’inference backend et inspectez l’unite PAPI detectee.',
+      upload: 'Importer media',
+      uploadFolder: 'Importer dossier',
+      analyzing: 'Analyse',
+      runModel: 'Lancer le modele backend',
+      previousFrame: 'Frame precedent',
+      nextFrame: 'Frame suivant',
+      runway: 'Piste',
+      droneId: 'ID drone',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      altitude: 'Altitude m',
+      optional: 'optionnel',
+      metadata: 'metadonnees',
+      demoScenarios: 'Scenarios demo',
+      pauseLoop: 'Mettre la boucle en pause',
+      playLoop: 'Lancer la boucle',
+      auto: 'Auto',
+      paused: 'Pause',
+      detection: 'Detection',
+      globalState: 'Etat global',
+      transitions: 'Transitions',
+      edgeMemory: 'Memoire edge',
+      droneAngle: 'Angle d’elevation drone',
+      angleUnavailable: 'Angle indisponible',
+      missingMetadata: 'metadonnees manquantes',
+      backendInference: 'Inference backend en cours',
+      dropTitle: 'Glissez une image ou une video',
+      dropText: 'Ou utilisez le bouton d’import ci-dessus',
+    },
+    insights: {
+      eyebrow: 'Analyses',
+      title: 'Precision, transitions, robustesse et vitesse dans des graphiques clairs.',
+      preparing: 'Preparation du PDF',
+      download: 'Telecharger les graphiques (PDF)',
+      source: 'Inspire des formes du Data Viz Project',
+      decoderTitle: 'Decodeur d’etat PAPI',
+      decoderText: 'Les cinq sorties valides, leur schema de lampes et la preuve du modele.',
+      activeDecision: 'Decision active',
+      compareState: 'Comparer l’etat',
+      evidence: 'Preuve',
+      highestScore: 'Score modele le plus eleve dans ce frame',
+      pointsBelow: 'points sous le resultat selectionne',
+      transitionTitle: 'Ruban de transition',
+      transitionText: 'Chaque cellule represente une lampe sur des frames consecutifs.',
+      transitionDetected: 'Transition detectee',
+      frame: 'Frame',
+      status: 'Etat',
+    },
+    cookies: {
+      title: 'Cookies ?',
+      text: 'Cette demo ne sauvegarde rien ; ce choix est uniquement visuel.',
+      yes: 'Oui',
+      no: 'Non',
+      happyTitle: 'Parfait, merci.',
+      happyText: 'Petit moment UI joyeux active.',
+      sadTitle: 'Pas de souci.',
+      sadText: 'Nous restons simples.',
+    },
+    states: {
+      'far-high': ['Beaucoup trop haut', 'L’appareil est largement au-dessus du plan'],
+      'too-high': ['Trop haut', 'Legerement au-dessus de l’angle ideal'],
+      correct: ['Plan correct', 'Approche stable a 3 degres'],
+      'too-low': ['Trop bas', 'Sous le plan d’approche souhaite'],
+      'far-low': ['Beaucoup trop bas', 'Correction immediate necessaire'],
+      unknown: ['Inconnu', 'Pas assez de lampes detectees pour un etat PAPI fiable'],
+    },
+    status: {
+      white: 'Blanc',
+      red: 'Rouge',
+      transition: 'Transition',
+      occluded: 'Masque',
+    },
+    scenarios: {
+      clean: ['Exemple clair', 'base', '2 blancs + 2 rouges = plan correct', 'Soiree claire, camera stable'],
+      transition: ['Pause transition', 'jaune/orange', '2 blancs + 2 rouges = plan correct', 'La lampe 2 passe du blanc au rouge'],
+      'hard-case': ['Cas difficile', 'meteo + masquage', '1 blanc + 3 rouges = trop bas', 'Pluie, angle bas, masquage partiel'],
+      edge: ['Appareil edge', 'materiel limite', '4 rouges = beaucoup trop bas', 'Faible lumiere, flux compresse'],
+      backend: ['Resultat backend', 'live'],
+    },
+  },
 }
 
 const plotlyConfig = {
   responsive: true,
   displaylogo: false,
   modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+}
+
+function translateState(state, copy) {
+  const translated = copy.states[state.id]
+  if (!translated) {
+    return state
+  }
+  return { ...state, label: translated[0], description: translated[1] }
+}
+
+function translateScenario(scenario, copy) {
+  const translated = copy.scenarios[scenario.id]
+  if (!translated) {
+    return scenario
+  }
+  return {
+    ...scenario,
+    label: translated[0],
+    badge: scenario.id === 'backend' && scenario.logId ? scenario.badge : translated[1],
+    summary: translated[2] ?? scenario.summary,
+    condition: translated[3] ?? scenario.condition,
+    angle: scenario.angle === translations.en.live.angleUnavailable ? copy.live.angleUnavailable : scenario.angle,
+    angleSummary:
+      scenario.angleSummary && !scenario.angleSummary.available
+        ? {
+            ...scenario.angleSummary,
+            source: copy.live.missingMetadata,
+          }
+        : scenario.angleSummary,
+  }
 }
 
 const plotlyPalette = {
@@ -226,111 +629,130 @@ const transitionFrames = [
   ['red', 'red', 'red', 'red'],
 ]
 
-const pipeline = [
-  { label: 'Frame input', value: 'image, video, or stream', icon: Video },
-  { label: 'PAPI detector', value: 'bounding box + confidence', icon: Crosshair },
-  { label: 'Lamp classifier', value: 'white, red, transition', icon: Activity },
-  { label: 'State aggregator', value: '5 glidepath states', icon: Gauge },
-  { label: 'Edge runtime', value: 'low latency export target', icon: Cpu },
-]
-
-function loadPlotlyBundle() {
-  if (!plotlyBundlePromise) {
-    plotlyBundlePromise = Promise.all([
-      import('react-plotly.js/factory'),
-      import('plotly.js/lib/core'),
-      import('plotly.js/lib/bar'),
-      import('plotly.js/lib/heatmap'),
-    ]).then(([factoryModule, plotlyModule, barModule, heatmapModule]) => {
-      const createPlotlyComponent =
-        factoryModule.default?.default ?? factoryModule.default ?? factoryModule
-      const plotly = plotlyModule.default ?? plotlyModule
-      plotly.register([barModule.default ?? barModule, heatmapModule.default ?? heatmapModule])
-      return {
-        Plot: createPlotlyComponent(plotly),
-        Plotly: plotly,
-      }
-    })
-  }
-  return plotlyBundlePromise
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max)
 }
 
-function resolveMediaType(file) {
-  const extension = file.name.split('.').pop()?.toLowerCase()
-  if (file.type.startsWith('video') || ['avi', 'mkv', 'mov', 'mp4'].includes(extension)) {
-    return 'video'
-  }
-  return 'image'
+function percent(value) {
+  return Math.round(clamp(Number(value) || 0, 0, 1) * 100)
 }
 
-function formatPercent(value, fallback = 0) {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return fallback
+function lampPattern(lamps) {
+  const labels = lamps.map((lamp) => {
+    if (lamp.state === 'white') {
+      return 'white'
+    }
+    if (lamp.state === 'red') {
+      return 'red'
+    }
+    if (lamp.state === 'transition') {
+      return 'transition'
+    }
+    return 'unknown'
+  })
+  return labels.join(' + ')
+}
+
+function isVideoFile(file) {
+  return file.type.startsWith('video') || /\.(avi|mov|mp4|mkv|webm)$/i.test(file.name)
+}
+
+function isImageFile(file) {
+  return file.type.startsWith('image') || /\.(jpg|jpeg|png|bmp|webp)$/i.test(file.name)
+}
+
+function fileDisplayPath(file) {
+  return file.webkitRelativePath || file.name
+}
+
+function boxFromLamps(lamps, frameWidth, frameHeight) {
+  const boxes = lamps.map((lamp) => lamp.bbox).filter(Boolean)
+  if (!boxes.length || !frameWidth || !frameHeight) {
+    return { left: 58, top: 45, width: 28, height: 17 }
   }
-  const normalized = value <= 1 ? value * 100 : value
-  return Math.round(normalized * 10) / 10
+
+  const x1 = Math.min(...boxes.map((box) => box.x1))
+  const y1 = Math.min(...boxes.map((box) => box.y1))
+  const x2 = Math.max(...boxes.map((box) => box.x2))
+  const y2 = Math.max(...boxes.map((box) => box.y2))
+  const padX = frameWidth * 0.015
+  const padY = frameHeight * 0.025
+
+  return {
+    left: clamp(((x1 - padX) / frameWidth) * 100, 0, 100),
+    top: clamp(((y1 - padY) / frameHeight) * 100, 0, 100),
+    width: clamp(((x2 - x1 + padX * 2) / frameWidth) * 100, 4, 100),
+    height: clamp(((y2 - y1 + padY * 2) / frameHeight) * 100, 4, 100),
+  }
 }
 
 function evidenceForState(stateId, confidence) {
-  const activeIndex = legalStateIds.indexOf(stateId)
-  const activeEvidence = Math.max(45, Math.min(96, Math.round(confidence)))
-  return legalStateIds.map((_, index) => {
-    if (index === activeIndex) {
-      return activeEvidence
+  const selectedIndex = Math.max(
+    0,
+    legalStateCatalog.findIndex((state) => state.id === stateId),
+  )
+  return legalStateCatalog.map((_, index) => {
+    if (stateId === 'unknown') {
+      return index === 2 ? 20 : 10
     }
-    return Math.max(1, Math.round((100 - activeEvidence) / (legalStateIds.length - 1)))
+    return index === selectedIndex ? percent(confidence) : Math.max(1, 18 - Math.abs(index - selectedIndex) * 5)
   })
 }
 
-function buildScenarioFromPayload(payload, fallbackScenario) {
-  const stateId = backendStateToScenarioId[payload.global_state] ?? fallbackScenario.stateId
-  const activeState = stateCatalog.find((state) => state.id === stateId)
-  const confidence = formatPercent(payload.confidence, fallbackScenario.metrics.globalConfidence)
-  const latency = Math.max(1, Math.round(payload.processing_ms ?? fallbackScenario.metrics.latency))
-  const frameCount = payload.frame_count ?? 1
-  const fps = payload.media_type === 'video' ? Math.round((frameCount / latency) * 1000) : '1 img'
-  const lamps = (payload.lamps?.length ? payload.lamps : fallbackScenario.lamps).map((lamp, index) => {
-    const status = lamp.state === 'unknown' ? 'occluded' : lamp.state
-    return {
-      id: lamp.index ?? index + 1,
-      status,
-      confidence: formatPercent(lamp.confidence, 0),
-      transition: status === 'transition' ? 82 : status === 'occluded' ? 12 : 4,
-    }
-  })
+function scenarioFromBackendResult(result, context) {
+  const stateId = backendStateId[result.global_state] ?? 'unknown'
+  const activeState = stateCatalog.find((state) => state.id === stateId) ?? stateCatalog[stateCatalog.length - 1]
+  const lamps = result.lamps.map((lamp) => ({
+    id: lamp.index,
+    status: lamp.state === 'unknown' ? 'occluded' : lamp.state,
+    confidence: percent(lamp.confidence),
+    transition: lamp.state === 'transition' ? percent(lamp.confidence) : Math.max(3, 100 - percent(lamp.confidence)),
+    bbox: lamp.bbox,
+  }))
+  const angle = result.angle?.angle_available
+    ? `${result.angle.elevation_angle_deg.toFixed(3)} deg`
+    : 'Angle unavailable'
+  const angleSummary = result.angle?.angle_available
+    ? {
+        available: true,
+        value: result.angle.elevation_angle_deg.toFixed(3),
+        source: result.angle.angle_source ?? 'metadata',
+        note: result.angle.angle_note,
+      }
+    : {
+        available: false,
+        value: 'N/A',
+        source: 'missing metadata',
+        note: result.angle?.angle_note ?? 'GPS/altitude metadata was not available.',
+      }
+  const latency = Math.max(0, Number(result.processing_ms) || 0)
 
   return {
-    ...fallbackScenario,
-    id: `backend-${payload.log_id ?? Date.now()}`,
+    id: 'backend',
     label: 'Backend result',
-    badge: payload.media_type,
+    badge: result.log_id ? `log ${result.log_id.slice(0, 8)}` : 'live',
     stateId,
-    summary: `${activeState?.pattern ?? payload.global_state} = ${activeState?.label ?? 'Backend result'}`,
-    frame: payload.log_id ? `Log ${payload.log_id.slice(0, 8)}` : `Processed ${frameCount} frame(s)`,
-    condition: payload.angle?.angle_available
-      ? `Angle ${payload.angle.elevation_angle_deg?.toFixed(3)} deg from ${payload.angle.angle_source}`
-      : (payload.angle?.angle_note ?? 'Backend inference result'),
+    summary: `${lampPattern(result.lamps)} = ${activeState.label.toLowerCase()}`,
+    frame: context.totalFrames > 1 ? `${context.frameLabel} of ${context.totalFrames}` : context.frameLabel,
+    condition: angle,
     lamps,
     metrics: {
-      ...fallbackScenario.metrics,
-      fps,
+      fps: latency ? Number((1000 / latency).toFixed(1)) : 0,
       latency,
-      boxConfidence: confidence,
-      globalConfidence: confidence,
+      boxConfidence: percent(result.confidence),
+      globalConfidence: percent(result.confidence),
+      transitionRecall: result.angle?.angle_available ? 100 : 0,
+      edgeMemory: result.frame_count ?? 1,
     },
-    evidence: evidenceForState(stateId, confidence),
-    environmentClass: payload.media_type === 'video' ? 'night' : 'clear',
+    evidence: evidenceForState(stateId, result.confidence),
+    box: boxFromLamps(result.lamps, result.frame_width, result.frame_height),
+    environmentClass: 'clear',
+    artifactUrl: mediaUrl(result.artifact_url),
+    artifactType: result.media_type,
+    logId: result.log_id,
+    angle: result.angle,
+    angleSummary,
   }
-}
-
-function artifactUrlFor(payload) {
-  if (!payload.artifact_url) {
-    return null
-  }
-  if (payload.artifact_url.startsWith('http')) {
-    return payload.artifact_url
-  }
-  return `${API_BASE_URL}${payload.artifact_url}`
 }
 
 function App() {
@@ -340,22 +762,40 @@ function App() {
   const [media, setMedia] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [analysisMode, setAnalysisMode] = useState('backend')
-  const [analysisResult, setAnalysisResult] = useState(null)
-  const [apiStatus, setApiStatus] = useState({
-    tone: 'idle',
-    message: `Backend API: ${API_BASE_URL}`,
-  })
+  const [backendScenario, setBackendScenario] = useState(null)
+  const [backendFrames, setBackendFrames] = useState([])
+  const [backendFrameIndex, setBackendFrameIndex] = useState(0)
+  const [runways, setRunways] = useState([])
+  const [metadata, setMetadata] = useState(defaultMetadata)
+  const [analysisError, setAnalysisError] = useState('')
+  const [analysisProgress, setAnalysisProgress] = useState('')
+  const [cookieMood, setCookieMood] = useState('asking')
+  const [language, setLanguage] = useState('en')
   const insightsRef = useRef(null)
+  const copy = translations[language]
+
+  const activeScenarioRaw = useMemo(
+    () => {
+      if (activeId === 'backend' && backendScenario) {
+        return backendScenario
+      }
+      return scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0]
+    },
+    [activeId, backendScenario],
+  )
 
   const activeScenario = useMemo(
-    () => analysisResult ?? scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0],
-    [activeId, analysisResult],
+    () => translateScenario(activeScenarioRaw, copy),
+    [activeScenarioRaw, copy],
   )
 
   const activeState = useMemo(
-    () => stateCatalog.find((state) => state.id === activeScenario.stateId),
-    [activeScenario],
+    () =>
+      translateState(
+        stateCatalog.find((state) => state.id === activeScenario.stateId) ?? stateCatalog[stateCatalog.length - 1],
+        copy,
+      ),
+    [activeScenario, copy],
   )
 
   const plotTheme = useMemo(
@@ -387,6 +827,26 @@ function App() {
   }, [theme])
 
   useEffect(() => {
+    let ignore = false
+
+    fetchRunways()
+      .then((items) => {
+        if (!ignore) {
+          setRunways(items)
+        }
+      })
+      .catch((error) => {
+        if (!ignore) {
+          setAnalysisError(error.message)
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isPlaying) {
       return undefined
     }
@@ -410,38 +870,57 @@ function App() {
   }, [media?.url])
 
   function handleMediaFiles(files) {
-    const file = files?.[0]
-    if (!file) {
-      return
-    }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setApiStatus({
-        tone: 'error',
-        message: 'Upload rejected locally: files must be 100 MB or smaller.',
-      })
+    const selectedFiles = Array.from(files ?? [])
+    if (!selectedFiles.length) {
       return
     }
 
+    const imageFiles = selectedFiles
+      .filter(isImageFile)
+      .sort((first, second) => fileDisplayPath(first).localeCompare(fileDisplayPath(second), undefined, { numeric: true }))
+    const isFolderBatch = imageFiles.length > 1
+    const file = isFolderBatch ? imageFiles[0] : selectedFiles[0]
     const url = URL.createObjectURL(file)
+
     setMedia((previous) => {
       if (previous?.url) {
         URL.revokeObjectURL(previous.url)
       }
 
       return {
-        name: file.name,
-        type: resolveMediaType(file),
         file,
+        files: isFolderBatch ? imageFiles : null,
+        name: isFolderBatch
+          ? `${fileDisplayPath(imageFiles[0]).split('/')[0]} (${imageFiles.length} images)`
+          : file.name,
+        type: isFolderBatch ? 'folder' : isVideoFile(file) ? 'video' : 'image',
         url,
+        annotatedUrl: null,
       }
     })
-    setAnalysisResult(null)
-    setApiStatus({ tone: 'idle', message: `Ready for backend API: ${API_BASE_URL}` })
     setIsPlaying(false)
+    setBackendScenario(null)
+    setBackendFrames([])
+    setBackendFrameIndex(0)
+    setAnalysisError('')
+    setAnalysisProgress('')
   }
 
   function handleMediaChange(event) {
     handleMediaFiles(event.target.files)
+    event.target.value = ''
+  }
+
+  function selectBackendFrame(index) {
+    if (!backendFrames.length) {
+      return
+    }
+
+    const nextIndex = Math.min(Math.max(index, 0), backendFrames.length - 1)
+    setBackendFrameIndex(nextIndex)
+    setBackendScenario(backendFrames[nextIndex])
+    setActiveId('backend')
+    setIsPlaying(false)
   }
 
   async function handleDownloadCharts() {
@@ -500,79 +979,89 @@ function App() {
     }
   }
 
+  function handleMetadataChange(field, value) {
+    setMetadata((current) => ({ ...current, [field]: value }))
+  }
+
   async function runBackendInference() {
-    if (!media?.file) {
-      setApiStatus({ tone: 'error', message: 'Upload an image or video before calling the backend.' })
+    if (!media?.file || isAnalyzing) {
       return
     }
 
     setIsAnalyzing(true)
     setIsPlaying(false)
-    setApiStatus({ tone: 'pending', message: 'Sending media to the backend model...' })
-
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    const formData = new FormData()
-    formData.append('file', media.file)
-    formData.append('runway_id', 'papi_06')
+    setAnalysisError('')
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}${media.type === 'image' ? '/api/analyze-frame' : '/api/analyze'}`,
-        {
-          method: 'POST',
-          headers: API_KEY ? { 'X-API-Key': API_KEY } : undefined,
-          body: formData,
-          signal: controller.signal,
-        },
-      )
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(payload.detail ?? `Backend returned ${response.status}`)
+      let bestScenario = null
+      let nextBackendFrames = []
+
+      if (media.type === 'folder') {
+        const folderImages = media.files ?? []
+        if (!folderImages.length) {
+          throw new Error('No images were found in the selected folder.')
+        }
+
+        setAnalysisProgress(`Uploading ${folderImages.length} folder images to backend analysis`)
+        const batch = await analyzeFrames(folderImages, metadata)
+        nextBackendFrames = batch.results.map((result, index) =>
+          scenarioFromBackendResult(result, {
+            frameLabel: `Frame ${index + 1}`,
+            totalFrames: batch.results.length,
+          }),
+        )
+        bestScenario = nextBackendFrames[0]
+      } else if (media.type === 'video') {
+        setAnalysisProgress('Uploading video to backend video analysis')
+        const result = await analyzeMedia(media.file, metadata)
+        bestScenario = scenarioFromBackendResult(result, {
+          frameLabel: `${result.frame_count ?? 0} labeled frames`,
+          totalFrames: 1,
+        })
+      } else {
+        setAnalysisProgress('Extracting frames')
+        const frames = await extractFrameImages(media.file)
+        let bestScore = -1
+
+        for (const [index, frame] of frames.entries()) {
+          setAnalysisProgress(`Analyzing frame ${index + 1}/${frames.length}`)
+          const result = await analyzeFrame(frame.file, metadata)
+          const scenario = scenarioFromBackendResult(result, {
+            frameLabel: frame.label,
+            totalFrames: frames.length,
+          })
+          const score = result.global_state === 'unknown' ? result.confidence : result.confidence + 1
+          if (score >= bestScore) {
+            bestScore = score
+            bestScenario = scenario
+          }
+        }
       }
 
-      setAnalysisResult(buildScenarioFromPayload(payload, activeScenario))
+      if (!bestScenario) {
+        throw new Error('No media was analyzed.')
+      }
+
+      setBackendFrames(nextBackendFrames)
+      setBackendFrameIndex(0)
+      setBackendScenario(bestScenario)
+      setActiveId('backend')
       setMedia((current) =>
         current
           ? {
               ...current,
-              resultUrl: artifactUrlFor(payload),
+              annotatedUrl: bestScenario.artifactUrl,
+              annotatedType: bestScenario.artifactType,
             }
           : current,
       )
-      setApiStatus({
-        tone: 'success',
-        message: `Backend result saved${payload.log_id ? ` as log ${payload.log_id.slice(0, 8)}` : ''}.`,
-      })
+      setAnalysisProgress('Analysis complete')
     } catch (error) {
-      const message =
-        error.name === 'AbortError'
-          ? 'Backend request timed out. Try a shorter clip or smaller image.'
-          : error.message
-      setApiStatus({ tone: 'error', message })
+      setAnalysisError(error.message)
+      setAnalysisProgress('')
     } finally {
-      window.clearTimeout(timeoutId)
       setIsAnalyzing(false)
     }
-  }
-
-  function runMockInference() {
-    setIsAnalyzing(true)
-    setIsPlaying(false)
-    setAnalysisResult(null)
-    setApiStatus({ tone: 'pending', message: 'Running local mock inference...' })
-    window.setTimeout(() => {
-      setActiveId('transition')
-      setApiStatus({ tone: 'success', message: 'Mock result loaded for UI review.' })
-      setIsAnalyzing(false)
-    }, 900)
-  }
-
-  function runAnalysis() {
-    if (analysisMode === 'backend') {
-      return runBackendInference()
-    }
-    return runMockInference()
   }
 
   return (
@@ -593,10 +1082,10 @@ function App() {
           </span>
           <span className="brand-text">
             <strong>PAPI Vision</strong>
-            <small>AI detection prototype</small>
+            <small>{copy.brand.subtitle}</small>
             <small className="brand-company">
-              On your radar
-              <span>Intersoft Electronics</span>
+              {copy.brand.radar}
+              <span>{copy.brand.company}</span>
             </small>
           </span>
         </Link>
@@ -607,34 +1096,49 @@ function App() {
             to="/"
             end
           >
-            Introduction
+            {copy.nav.introduction}
           </NavLink>
           <NavLink
             className={({ isActive }) => clsx('nav-link', isActive && 'active')}
             to="/live-demo"
           >
-            Live Demo
+            {copy.nav.liveDemo}
           </NavLink>
           <NavLink
             className={({ isActive }) => clsx('nav-link', isActive && 'active')}
             to="/insights"
           >
-            Insights
+            {copy.nav.insights}
           </NavLink>
         </nav>
 
-        <button
-          className="icon-button"
-          type="button"
-          onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-        >
-          {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-        </button>
+        <div className="topbar-actions">
+          <div className="language-switch" aria-label="Language">
+            {['en', 'nl', 'fr'].map((option) => (
+              <button
+                className={clsx(option === language && 'active')}
+                key={option}
+                type="button"
+                onClick={() => setLanguage(option)}
+                aria-pressed={option === language}
+              >
+                {option.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+          </button>
+        </div>
       </header>
 
       <Routes>
-        <Route path="/" element={<IntroductionPage activeScenario={activeScenario} />} />
+        <Route path="/" element={<IntroductionPage copy={copy} />} />
         <Route
           path="/live-demo"
           element={
@@ -645,16 +1149,21 @@ function App() {
               isAnalyzing={isAnalyzing}
               isPlaying={isPlaying}
               media={media}
-              analysisMode={analysisMode}
-              apiBaseUrl={API_BASE_URL}
-              apiStatus={apiStatus}
+              backendScenario={backendScenario}
+              backendFrames={backendFrames}
+              backendFrameIndex={backendFrameIndex}
+              runways={runways}
+              metadata={metadata}
+              analysisError={analysisError}
+              analysisProgress={analysisProgress}
               handleMediaFiles={handleMediaFiles}
-              runAnalysis={runAnalysis}
-              setAnalysisMode={setAnalysisMode}
-              setAnalysisResult={setAnalysisResult}
+              runBackendInference={runBackendInference}
               setActiveId={setActiveId}
               setIsPlaying={setIsPlaying}
+              selectBackendFrame={selectBackendFrame}
               handleMediaChange={handleMediaChange}
+              handleMetadataChange={handleMetadataChange}
+              copy={copy}
             />
           }
         />
@@ -667,91 +1176,143 @@ function App() {
               insightsRef={insightsRef}
               isExporting={isExporting}
               onDownloadCharts={handleDownloadCharts}
+              copy={copy}
             />
           }
         />
-        <Route path="*" element={<IntroductionPage activeScenario={activeScenario} />} />
+        <Route path="*" element={<IntroductionPage copy={copy} />} />
       </Routes>
+      <CookieConsent mood={cookieMood} setMood={setCookieMood} copy={copy} />
     </main>
   )
 }
 
-function IntroductionPage({ activeScenario }) {
+function CookieConsent({ mood, setMood, copy }) {
+  if (mood === 'hidden') {
+    return null
+  }
+
+  const hasAnswered = mood === 'happy' || mood === 'sad'
+  const handleChoice = (choice) => {
+    setMood(choice)
+    window.setTimeout(() => setMood('hidden'), 1500)
+  }
+
+  return (
+    <div className={clsx('cookie-consent', hasAnswered && `cookie-${mood}`)}>
+      <div className="cookie-face" aria-hidden="true">
+        {mood === 'happy' ? <Smile size={34} /> : mood === 'sad' ? <Frown size={34} /> : <Cookie size={32} />}
+      </div>
+      <div className="cookie-copy">
+        <strong>{hasAnswered ? (mood === 'happy' ? copy.cookies.happyTitle : copy.cookies.sadTitle) : copy.cookies.title}</strong>
+        <span>
+          {hasAnswered
+            ? mood === 'happy'
+              ? copy.cookies.happyText
+              : copy.cookies.sadText
+            : copy.cookies.text}
+        </span>
+      </div>
+      {!hasAnswered && (
+        <div className="cookie-actions">
+          <button type="button" onClick={() => handleChoice('sad')}>
+            {copy.cookies.no}
+          </button>
+          <button type="button" onClick={() => handleChoice('happy')}>
+            {copy.cookies.yes}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IntroductionPage({ copy }) {
+  const videoRef = useRef(null)
+
+  const ensurePlayback = () => {
+    const video = videoRef.current
+    if (!video || !video.paused) {
+      return
+    }
+
+    const playPromise = video.play()
+    if (playPromise?.catch) {
+      playPromise.catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    ensurePlayback()
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        ensurePlayback()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
   return (
     <section className="intro-hero">
-      <img
+      <video
+        ref={videoRef}
         className="intro-video"
-        src={heroPoster}
-        alt=""
+        src="/Background-vid.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        onLoadedData={ensurePlayback}
+        onPause={ensurePlayback}
+        onEnded={ensurePlayback}
         aria-hidden="true"
       />
       <div className="intro-hero-inner">
         <section className="intro-band">
           <div className="intro-copy">
-            <p className="eyebrow">Intersoft Electronics Services BV</p>
-            <h1>Real-time PAPI detection and glidepath classification.</h1>
-            <p>
-              A front-end prototype for testing model output, explaining lamp transitions,
-              and presenting accuracy, speed, and robustness in one polished flow.
+            <p className="eyebrow">{copy.intro.eyebrow}</p>
+            <h1>{copy.intro.title}</h1>
+            <p className="intro-description">
+              {copy.intro.description}
             </p>
             <div className="intro-actions">
               <Link className="cta-button" to="/live-demo">
-                Try It Out
+                {copy.intro.cta}
               </Link>
             </div>
-          </div>
-
-          <div className="hero-metrics" aria-label="Current run summary">
-            <MetricTile icon={Gauge} label="Live FPS" value={activeScenario.metrics.fps} suffix="fps" />
-            <MetricTile
-              icon={Zap}
-              label="Latency"
-              value={activeScenario.metrics.latency}
-              suffix="ms"
-            />
-            <MetricTile
-              icon={Crosshair}
-              label="Box confidence"
-              value={activeScenario.metrics.boxConfidence}
-              suffix="%"
-            />
+            <a className="scroll-cue" href="#airport-context" aria-label="Scroll to airport details">
+              <span />
+              <small>{copy.intro.scroll}</small>
+            </a>
           </div>
         </section>
 
-        <section className="workflow-strip" aria-label="Model workflow">
-          {pipeline.map((step) => (
-            <div className="workflow-step" key={step.label}>
-              <step.icon size={18} />
-              <span>{step.label}</span>
-              <small>{step.value}</small>
-            </div>
-          ))}
-        </section>
-
-        <section className="airport-section">
+        <section className="airport-section" id="airport-context">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Airport context</p>
-              <h2>Bodensee-Airport Friedrichshafen runway snapshot.</h2>
+              <p className="eyebrow">{copy.intro.airportEyebrow}</p>
+              <h2>{copy.intro.airportTitle}</h2>
             </div>
-            <span className="source-note">Runway 06/24, asphalt, 2,356 m (7,729 ft)</span>
+            <span className="source-note">{copy.intro.runwayNote}</span>
           </div>
 
           <div className="airport-grid">
             <div className="airport-card">
-              <h3>Runway details</h3>
+              <h3>{copy.intro.runwayDetails}</h3>
               <p>
-                The project focuses on the single runway at Bodensee-Airport Friedrichshafen. The
-                runway designation is 06/24 with an asphalt surface and a length of 2,356 meters
-                (7,729 feet).
+                {copy.intro.runwayDescription}
               </p>
               <div className="airport-meta">
                 <div>
-                  <span>Coordinates</span>
+                  <span>{copy.intro.coordinates}</span>
                   <strong>47.67139 N, 9.51139 E</strong>
                 </div>
                 <div>
-                  <span>Elevation</span>
+                  <span>{copy.intro.elevation}</span>
                   <strong>414 m AMSL</strong>
                 </div>
               </div>
@@ -785,78 +1346,130 @@ function LiveDemoPage({
   activeId,
   activeScenario,
   activeState,
-  analysisMode,
-  apiBaseUrl,
-  apiStatus,
   isAnalyzing,
   isPlaying,
   media,
+  backendScenario,
+  backendFrames,
+  backendFrameIndex,
+  runways,
+  metadata,
+  analysisError,
+  analysisProgress,
   handleMediaFiles,
-  runAnalysis,
-  setAnalysisMode,
-  setAnalysisResult,
+  runBackendInference,
   setActiveId,
   setIsPlaying,
+  selectBackendFrame,
   handleMediaChange,
+  handleMetadataChange,
+  copy,
 }) {
+  const scenarioTabs = (backendScenario ? [backendScenario, ...scenarios] : scenarios).map((scenario) =>
+    translateScenario(scenario, copy),
+  )
+
   return (
     <section className="demo-section">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Live demo</p>
-          <h2>Upload media, run backend or mock inference, and inspect the detected PAPI unit.</h2>
+          <p className="eyebrow">{copy.live.eyebrow}</p>
+          <h2>{copy.live.title}</h2>
         </div>
         <div className="demo-actions">
-          <div className="mode-toggle" role="group" aria-label="Analysis mode">
-            <button
-              className={clsx(analysisMode === 'backend' && 'active')}
-              type="button"
-              onClick={() => setAnalysisMode('backend')}
-            >
-              Backend API
-            </button>
-            <button
-              className={clsx(analysisMode === 'mock' && 'active')}
-              type="button"
-              onClick={() => setAnalysisMode('mock')}
-            >
-              Mock
-            </button>
-          </div>
           <label className="upload-button">
             <Upload size={18} />
-            <span>{media ? media.name : 'Upload media'}</span>
+            <span>{media ? media.name : copy.live.upload}</span>
             <input accept="image/*,video/*" type="file" onChange={handleMediaChange} />
+          </label>
+          <label className="upload-button folder-upload">
+            <FolderOpen size={18} />
+            <span>{copy.live.uploadFolder}</span>
+            <input
+              accept="image/*"
+              type="file"
+              multiple
+              webkitdirectory="true"
+              directory=""
+              onChange={handleMediaChange}
+            />
           </label>
           <button
             className="primary-button"
             type="button"
-            onClick={runAnalysis}
-            disabled={isAnalyzing}
+            onClick={runBackendInference}
+            disabled={!media || isAnalyzing}
           >
             <Zap size={18} />
-            {isAnalyzing
-              ? 'Analyzing'
-              : analysisMode === 'backend'
-                ? 'Run backend model'
-                : 'Run mock model'}
+            {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
           </button>
         </div>
       </div>
 
-      <div className={clsx('api-status', `api-status-${apiStatus.tone}`)}>
-        <span>{analysisMode === 'backend' ? apiBaseUrl : 'Local mock mode'}</span>
-        <strong>{apiStatus.message}</strong>
+      <div className="metadata-panel">
+        <label>
+          <span>{copy.live.runway}</span>
+          <select
+            value={metadata.runwayId}
+            onChange={(event) => handleMetadataChange('runwayId', event.target.value)}
+          >
+            {(runways.length ? runways : [{ id: 'papi_06', label: 'PAPI 06' }]).map((runway) => (
+              <option key={runway.id} value={runway.id}>
+                {runway.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>{copy.live.droneId}</span>
+          <input
+            value={metadata.droneId}
+            onChange={(event) => handleMetadataChange('droneId', event.target.value)}
+            placeholder={copy.live.optional}
+          />
+        </label>
+        <label>
+          <span>{copy.live.latitude}</span>
+          <input
+            inputMode="decimal"
+            value={metadata.droneLatitude}
+            onChange={(event) => handleMetadataChange('droneLatitude', event.target.value)}
+            placeholder={copy.live.metadata}
+          />
+        </label>
+        <label>
+          <span>{copy.live.longitude}</span>
+          <input
+            inputMode="decimal"
+            value={metadata.droneLongitude}
+            onChange={(event) => handleMetadataChange('droneLongitude', event.target.value)}
+            placeholder={copy.live.metadata}
+          />
+        </label>
+        <label>
+          <span>{copy.live.altitude}</span>
+          <input
+            inputMode="decimal"
+            value={metadata.droneAltitudeM}
+            onChange={(event) => handleMetadataChange('droneAltitudeM', event.target.value)}
+            placeholder={copy.live.metadata}
+          />
+        </label>
       </div>
 
-      <div className="scenario-tabs" role="tablist" aria-label="Demo scenarios">
-        {scenarios.map((scenario) => (
+      {(analysisError || analysisProgress) && (
+        <div className={clsx('analysis-status', analysisError && 'error')}>
+          {analysisError || analysisProgress}
+        </div>
+      )}
+
+      <div className="scenario-tabs" role="tablist" aria-label={copy.live.demoScenarios}>
+        {scenarioTabs.map((scenario) => (
           <button
             className={clsx('scenario-tab', scenario.id === activeId && 'active')}
             key={scenario.id}
             type="button"
             onClick={() => {
-              setAnalysisResult(null)
               setActiveId(scenario.id)
               setIsPlaying(false)
             }}
@@ -869,10 +1482,10 @@ function LiveDemoPage({
           className="scenario-tab play-tab"
           type="button"
           onClick={() => setIsPlaying((current) => !current)}
-          aria-label={isPlaying ? 'Pause scenario playback' : 'Play scenario loop'}
+          aria-label={isPlaying ? copy.live.pauseLoop : copy.live.playLoop}
         >
           {isPlaying ? <Pause size={17} /> : <Play size={17} />}
-          <span>{isPlaying ? 'Auto' : 'Paused'}</span>
+          <span>{isPlaying ? copy.live.auto : copy.live.paused}</span>
         </button>
       </div>
 
@@ -888,6 +1501,10 @@ function LiveDemoPage({
             media={media}
             analyzing={isAnalyzing}
             onFilesSelected={handleMediaFiles}
+            backendFrames={backendFrames}
+            backendFrameIndex={backendFrameIndex}
+            onBackendFrameChange={selectBackendFrame}
+            copy={copy}
           />
         </motion.div>
 
@@ -903,29 +1520,40 @@ function LiveDemoPage({
 
           <div className="lamp-list">
             {activeScenario.lamps.map((lamp) => (
-              <LampCard key={lamp.id} lamp={lamp} />
+              <LampCard key={lamp.id} lamp={lamp} copy={copy} />
             ))}
           </div>
 
           <div className="metric-grid">
-            <InlineMetric label="Detection" value={activeScenario.metrics.boxConfidence} suffix="%" />
-            <InlineMetric label="Global state" value={activeScenario.metrics.globalConfidence} suffix="%" />
-            <InlineMetric label="Transitions" value={activeScenario.metrics.transitionRecall} suffix="%" />
-            <InlineMetric label="Edge memory" value={activeScenario.metrics.edgeMemory} suffix="MB" />
+            <InlineMetric label={copy.live.detection} value={activeScenario.metrics.boxConfidence} suffix="%" />
+            <InlineMetric label={copy.live.globalState} value={activeScenario.metrics.globalConfidence} suffix="%" />
+            <InlineMetric label={copy.live.transitions} value={activeScenario.metrics.transitionRecall} suffix="%" />
+            <InlineMetric label={copy.live.edgeMemory} value={activeScenario.metrics.edgeMemory} suffix="MB" />
           </div>
+
+          {activeScenario.angleSummary && (
+            <div className={clsx('angle-readout', !activeScenario.angleSummary.available && 'unavailable')}>
+              <span>{copy.live.droneAngle}</span>
+              <strong>
+                {activeScenario.angleSummary.value}
+                {activeScenario.angleSummary.available && <small>deg</small>}
+              </strong>
+              <p>{activeScenario.angleSummary.source}</p>
+            </div>
+          )}
         </aside>
       </div>
     </section>
   )
 }
 
-function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onDownloadCharts }) {
+function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onDownloadCharts, copy }) {
   return (
     <section className="insights-section">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Insights</p>
-          <h2>Accuracy, transitions, robustness, and speed without boring chart filler.</h2>
+          <p className="eyebrow">{copy.insights.eyebrow}</p>
+          <h2>{copy.insights.title}</h2>
         </div>
         <div className="section-actions">
           <button
@@ -935,30 +1563,17 @@ function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onD
             disabled={isExporting}
           >
             <Download size={18} />
-            {isExporting ? 'Preparing PDF' : 'Download charts (PDF)'}
+            {isExporting ? copy.insights.preparing : copy.insights.download}
           </button>
-          <span className="source-note">Inspired by visual forms from Data Viz Project</span>
+          <span className="source-note">{copy.insights.source}</span>
         </div>
       </div>
 
       <div className="insight-grid" ref={insightsRef}>
-        <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} />
-        <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} />
+        <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} copy={copy} />
+        <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} copy={copy} />
       </div>
     </section>
-  )
-}
-
-function MetricTile({ icon: Icon, label, value, suffix }) {
-  return (
-    <div className="metric-tile">
-      <Icon size={18} />
-      <span>{label}</span>
-      <strong>
-        {value}
-        <small>{suffix}</small>
-      </strong>
-    </div>
   )
 }
 
@@ -974,8 +1589,9 @@ function InlineMetric({ label, value, suffix }) {
   )
 }
 
-function LampCard({ lamp }) {
+function LampCard({ lamp, copy }) {
   const status = statusCopy[lamp.status]
+  const label = copy.status[lamp.status] ?? status.label
 
   return (
     <div className={clsx('lamp-card', `lamp-${status.tone}`)}>
@@ -984,7 +1600,7 @@ function LampCard({ lamp }) {
         <strong>Lamp {lamp.id}</strong>
       </div>
       <div>
-        <p>{status.label}</p>
+        <p>{label}</p>
         <small>{lamp.confidence}% confidence</small>
       </div>
       <div className="transition-meter" aria-label={`${lamp.transition}% transition score`}>
@@ -994,8 +1610,24 @@ function LampCard({ lamp }) {
   )
 }
 
-function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
+function FrameStage({
+  scenario,
+  media,
+  analyzing,
+  onFilesSelected,
+  backendFrames,
+  backendFrameIndex,
+  onBackendFrameChange,
+  copy,
+}) {
   const [isDragActive, setIsDragActive] = useState(false)
+  const displayMedia = scenario.artifactUrl
+    ? { type: scenario.artifactType ?? 'image', url: scenario.artifactUrl }
+    : media?.annotatedUrl
+      ? { type: media.annotatedType ?? 'image', url: media.annotatedUrl }
+      : media
+  const isAnnotatedExport = Boolean(scenario.artifactUrl || media?.annotatedUrl)
+  const canNavigateFrames = backendFrames.length > 1
   const boxStyle = {
     left: `${scenario.box.left}%`,
     top: `${scenario.box.top}%`,
@@ -1023,8 +1655,33 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
   return (
     <div className={clsx('frame-stage', `frame-${scenario.environmentClass}`)}>
       <div className="frame-toolbar">
-        <span>{scenario.frame}</span>
-        <span>{scenario.condition}</span>
+        <div className="frame-title">
+          <span>{scenario.frame}</span>
+          <span>{scenario.condition}</span>
+        </div>
+        {canNavigateFrames && (
+          <div className="frame-nav-controls" aria-label="Backend frame navigation">
+            <button
+              type="button"
+              onClick={() => onBackendFrameChange?.(backendFrameIndex - 1)}
+              disabled={backendFrameIndex === 0}
+              aria-label={copy.live.previousFrame}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <strong>
+              {backendFrameIndex + 1}/{backendFrames.length}
+            </strong>
+            <button
+              type="button"
+              onClick={() => onBackendFrameChange?.(backendFrameIndex + 1)}
+              disabled={backendFrameIndex === backendFrames.length - 1}
+              aria-label={copy.live.nextFrame}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div
@@ -1033,15 +1690,15 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {media?.type === 'video' ? (
-          <video src={media.resultUrl ?? media.url} autoPlay muted loop playsInline controls />
-        ) : media?.type === 'image' ? (
-          <img src={media.resultUrl ?? media.url} alt="Uploaded PAPI test frame" />
+        {displayMedia?.type === 'video' ? (
+          <video src={displayMedia.url} autoPlay muted loop playsInline controls />
+        ) : displayMedia?.type === 'image' ? (
+          <img src={displayMedia.url} alt="Uploaded PAPI test frame" />
         ) : (
-          <DropzonePlaceholder isDragActive={isDragActive} />
+          <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
         )}
 
-        {media && (
+        {displayMedia && !isAnnotatedExport && (
           <>
             <div className="scan-grid" />
             <div className="target-box" style={boxStyle}>
@@ -1051,7 +1708,7 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
                   <span
                     className={clsx('overlay-lamp', `overlay-${lamp.status}`)}
                     key={lamp.id}
-                    title={`Lamp ${lamp.id}: ${statusCopy[lamp.status].label}`}
+                    title={`Lamp ${lamp.id}: ${copy.status[lamp.status] ?? statusCopy[lamp.status].label}`}
                   />
                 ))}
               </div>
@@ -1062,7 +1719,7 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
         {analyzing && (
           <div className="analyzing-layer">
             <Radar size={34} />
-            <span>Inference running</span>
+            <span>{copy.live.backendInference}</span>
           </div>
         )}
       </div>
@@ -1070,23 +1727,25 @@ function FrameStage({ scenario, media, analyzing, onFilesSelected }) {
   )
 }
 
-function DropzonePlaceholder({ isDragActive }) {
+function DropzonePlaceholder({ isDragActive, copy }) {
   return (
     <div className={clsx('dropzone-placeholder', isDragActive && 'active')}>
       <div className="dropzone-card">
         <Upload size={28} />
-        <strong>Drag and drop an image or video</strong>
-        <span>Or use the upload button above</span>
+        <strong>{copy.live.dropTitle}</strong>
+        <span>{copy.live.dropText}</span>
       </div>
     </div>
   )
 }
 
-function GlobalStateDecoder({ scenario, plotTheme }) {
+function GlobalStateDecoder({ scenario, plotTheme, copy }) {
   const [hovered, setHovered] = useState(null)
-  const activeIndex = stateCatalog.findIndex((state) => state.id === scenario.stateId)
+  const activeIndex = legalStateCatalog.findIndex((state) => state.id === scenario.stateId)
   const selectedIndex = hovered ?? activeIndex
-  const selectedState = stateCatalog[selectedIndex]
+  const readoutIndex = selectedIndex >= 0 ? selectedIndex : 2
+  const translatedStates = legalStateCatalog.map((state) => translateState(state, copy))
+  const selectedState = translatedStates[readoutIndex]
   const selectedPattern = stateLampPatterns[selectedState.id]
   const topEvidence = Math.max(...scenario.evidence)
 
@@ -1095,18 +1754,18 @@ function GlobalStateDecoder({ scenario, plotTheme }) {
       <div className="viz-heading">
         <Gauge size={18} />
         <div>
-          <h3>PAPI state decoder</h3>
-          <p>All five legal outputs, their lamp pattern, and model evidence.</p>
+          <h3>{copy.insights.decoderTitle}</h3>
+          <p>{copy.insights.decoderText}</p>
         </div>
       </div>
 
       <div className="decoder-layout">
         <div className="decoder-list" aria-label="PAPI state evidence list">
-          {stateCatalog.map((state, index) => {
+          {translatedStates.map((state, index) => {
             const evidence = scenario.evidence[index]
             const pattern = stateLampPatterns[state.id]
             const isActive = index === activeIndex
-            const isSelected = index === selectedIndex
+            const isSelected = index === readoutIndex
 
             return (
               <button
@@ -1144,8 +1803,10 @@ function GlobalStateDecoder({ scenario, plotTheme }) {
             activeIndex={activeIndex}
             evidence={scenario.evidence}
             plotTheme={plotTheme}
-            selectedIndex={selectedIndex}
+            selectedIndex={readoutIndex}
             setHovered={setHovered}
+            states={translatedStates}
+            copy={copy}
           />
         </div>
       </div>
@@ -1153,7 +1814,7 @@ function GlobalStateDecoder({ scenario, plotTheme }) {
       <div className="decoder-readout" style={{ '--state-color': selectedState.color }}>
         <div>
           <span className="decoder-chip">
-            {selectedIndex === activeIndex ? 'Active decision' : 'Compare state'}
+            {selectedIndex === activeIndex ? copy.insights.activeDecision : copy.insights.compareState}
           </span>
           <strong>{selectedState.label}</strong>
           <p>{selectedState.description}</p>
@@ -1164,12 +1825,12 @@ function GlobalStateDecoder({ scenario, plotTheme }) {
           ))}
         </div>
         <div className="decoder-rule">
-          <span>Evidence</span>
-          <strong>{scenario.evidence[selectedIndex]}%</strong>
+          <span>{copy.insights.evidence}</span>
+          <strong>{scenario.evidence[readoutIndex]}%</strong>
           <small>
-            {scenario.evidence[selectedIndex] === topEvidence
-              ? 'Highest model score in this frame'
-              : `${topEvidence - scenario.evidence[selectedIndex]} points below the selected result`}
+            {scenario.evidence[readoutIndex] === topEvidence
+              ? copy.insights.highestScore
+              : `${topEvidence - scenario.evidence[readoutIndex]} ${copy.insights.pointsBelow}`}
           </small>
         </div>
       </div>
@@ -1193,13 +1854,12 @@ function LazyPlot(props) {
   }, [])
 
   if (!PlotComponent) {
-    return <div className="plot-loading">Loading chart</div>
+    return <div className="plot-loading" aria-hidden />
   }
-
   return <PlotComponent {...props} />
 }
 
-function PapiDecisionPlot({ evidence, activeIndex, selectedIndex, setHovered, plotTheme }) {
+function PapiDecisionPlot({ evidence, activeIndex, selectedIndex, setHovered, plotTheme, states, copy }) {
   return (
     <LazyPlot
       className="plotly-chart"
@@ -1209,23 +1869,23 @@ function PapiDecisionPlot({ evidence, activeIndex, selectedIndex, setHovered, pl
           type: 'bar',
           orientation: 'h',
           x: evidence,
-          y: stateCatalog.map((state) => state.short),
-          customdata: stateCatalog.map((state) => [state.label, state.pattern]),
+          y: states.map((state) => state.short),
+          customdata: states.map((state) => [state.label, state.pattern]),
           marker: {
-            color: stateCatalog.map((state, index) =>
+            color: states.map((state, index) =>
               index === activeIndex ? state.color : 'rgba(145, 161, 154, 0.38)',
             ),
             line: {
-              color: stateCatalog.map((state, index) =>
+              color: states.map((state, index) =>
                 index === selectedIndex ? state.color : 'rgba(0,0,0,0)',
               ),
-              width: stateCatalog.map((_, index) => (index === selectedIndex ? 3 : 0)),
+              width: states.map((_, index) => (index === selectedIndex ? 3 : 0)),
             },
           },
           text: evidence.map((value) => `${value}%`),
           textposition: 'outside',
           hovertemplate:
-            '<b>%{customdata[0]}</b><br>%{customdata[1]}<br>Model evidence: %{x}%<extra></extra>',
+            `<b>%{customdata[0]}</b><br>%{customdata[1]}<br>${copy.insights.evidence}: %{x}%<extra></extra>`,
         },
       ]}
       layout={{
@@ -1257,7 +1917,7 @@ function PapiDecisionPlot({ evidence, activeIndex, selectedIndex, setHovered, pl
   )
 }
 
-function TransitionRibbon({ activeScenario, plotTheme }) {
+function TransitionRibbon({ activeScenario, plotTheme, copy }) {
   const [hovered, setHovered] = useState(2)
   const frame = transitionFrames[hovered]
   const statusToValue = { white: 0, transition: 1, red: 2 }
@@ -1268,8 +1928,8 @@ function TransitionRibbon({ activeScenario, plotTheme }) {
   )
   const hoverText = lampLabels.map((lamp, lampIndex) =>
     transitionFrames.map((frameStates, frameIndex) => {
-      const status = statusCopy[frameStates[lampIndex]].label
-      return `${lamp}<br>Frame ${218 + frameIndex}<br>Status: ${status}`
+      const status = copy.status[frameStates[lampIndex]] ?? statusCopy[frameStates[lampIndex]].label
+      return `${lamp}<br>${copy.insights.frame} ${218 + frameIndex}<br>${copy.insights.status}: ${status}`
     }),
   )
 
@@ -1278,8 +1938,8 @@ function TransitionRibbon({ activeScenario, plotTheme }) {
       <div className="viz-heading">
         <Activity size={18} />
         <div>
-          <h3>Transition ribbon</h3>
-          <p>Each cell is one lamp across consecutive frames.</p>
+          <h3>{copy.insights.transitionTitle}</h3>
+          <p>{copy.insights.transitionText}</p>
         </div>
       </div>
 
@@ -1345,10 +2005,12 @@ function TransitionRibbon({ activeScenario, plotTheme }) {
       </div>
 
       <div className="ribbon-readout">
-        <span>Frame {218 + hovered}</span>
+        <span>
+          {copy.insights.frame} {218 + hovered}
+        </span>
         <strong>
           {frame.filter((status) => status === 'transition').length > 0
-            ? 'Transition detected'
+            ? copy.insights.transitionDetected
             : activeScenario.summary}
         </strong>
       </div>

@@ -50,6 +50,14 @@ class AnalysisPayload(BaseModel):
     detections: list[dict] = Field(default_factory=list)
 
 
+class FrameBatchPayload(BaseModel):
+    """Response shape for `POST /api/analyze-frames` — batch analysis of multiple images
+    (used by the frontend's folder upload feature)."""
+    frame_count: int
+    processing_ms: int
+    results: list[AnalysisPayload]
+
+
 class LogListItem(BaseModel):
     id: str
     media_type: MediaType
