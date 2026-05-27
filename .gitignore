@@ -48,28 +48,37 @@ data/labels/verified/
 data/annotations/
 data/datasets/
 data/runs/
+data/cvat/
+
+# Model binary artifacts — ignored by default everywhere
 runs/
-!models/runs/
-!models/runs/**
 *.pt
 *.onnx
+*.engine
+*.torchscript
+*.safetensors
 models/**/*.pt
 models/**/*.onnx
 models/**/*.engine
 models/**/*.torchscript
 models/**/*.safetensors
 
+# Whitelist: committed model artifacts at their canonical paths
+!models/base/*.pt
+!models/base/*.onnx
+!models/serving/*.pt
+!models/serving/*.onnx
+!models/runs/
+!models/runs/**
+
 # Frontend/backend generated outputs
 apps/frontend/node_modules/
 apps/frontend/dist/
 apps/backend/storage/
-frontend/node_modules/
-frontend/dist/
-backend/storage/
 
 # Generated CVAT/export archives and videos
-data/cvat/
 *.zip
 *.mp4
 *.avi
 !test_videos/*.mp4
+!models/runs/**/*.mp4

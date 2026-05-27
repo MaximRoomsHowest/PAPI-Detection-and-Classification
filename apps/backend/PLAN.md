@@ -29,7 +29,7 @@ If GPS/altitude metadata is missing, the backend returns `angle_available: false
 ## Folder Contents
 
 ```text
-Backend_main/
+apps/backend/
   app/
     main.py                 FastAPI app entrypoint
     config.py               Environment/settings loading
@@ -48,16 +48,20 @@ Backend_main/
     validation/
       analyze.py            Request validation helpers
       schemas.py            API response/request models
-  storage/
-    uploads/                Uploaded files, ignored by Git
-    exports/                Annotated output files, ignored by Git
-    tmp/                    Temporary processing files, ignored by Git
+  storage/                  Runtime-created, ignored by Git
+    uploads/                Uploaded files
+    exports/                Annotated output files
+    tmp/                    Temporary processing files
   tests/                    Unit tests
+  Dockerfile                Container image for the backend
   docker-compose.yml        Local PostgreSQL service for logs
+  pytest.ini                Pytest configuration
   requirements.txt          Python dependencies
   .env.example              Example local environment config
 ../../models/
-  serving/best.pt           Local backend model, ignored by Git
+  serving/best.pt           Backend runtime model (tracked)
+  base/                     Base weights (tracked)
+  runs/                     Training run outputs (tracked)
 ```
 
 ## API Endpoints

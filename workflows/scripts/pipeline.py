@@ -34,7 +34,7 @@ import yaml
 from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "packages" / "papi" / "src"))
 
 from papi.cvat_export import build_ultralytics, zip_bundle  # noqa: E402
 from papi.geometry import horizontal_distance_m, resolve_papi_for_frame  # noqa: E402
