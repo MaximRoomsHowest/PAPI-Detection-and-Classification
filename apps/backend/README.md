@@ -4,25 +4,40 @@ Local-only FastAPI backend trial for immediate PAPI image/video analysis with da
 
 ## Setup
 
+For full-stack local development use the **root** docker-compose, which
+brings up Postgres + this backend + the React frontend together. From
+the repo root:
+
 ```powershell
+cp .env.example .env             # adjust POSTGRES_PASSWORD etc.
+docker compose up -d --build
+```
+
+To iterate on backend code without rebuilding the container on every
+change, run just Postgres in Docker and uvicorn on the host:
+
+```powershell
+docker compose up -d postgres
 cd apps/backend
 ..\..\.venv\Scripts\python.exe -m pip install -r requirements.txt
 copy .env.example .env
-docker compose up -d
-..\..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+..\..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The API will run at `http://127.0.0.1:8000`.
+The API will run at `http://127.0.0.1:8000`. Interactive docs at
+`http://127.0.0.1:8000/docs`.
 
 ## Model
 
-The local model should be available at:
+The serving model lives at:
 
 ```text
 ../../models/serving/best.pt
 ```
 
-This file is intentionally ignored by Git. For local smoke testing, copy a local base weight:
+This file is tracked in Git via Git LFS-like whitelisted patterns in the
+root `.gitignore` (see lines 67-72 there). For local smoke testing without
+a trained model, copy a base weight into the serving slot:
 
 ```powershell
 Copy-Item ..\..\models\base\yolo26n.pt ..\..\models\serving\best.pt -Force

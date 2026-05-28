@@ -14,7 +14,7 @@ The backend lets a user upload an image or video, run the trained PAPI YOLO mode
 - PostgreSQL result logs that store metadata/results, not uploaded image/video bytes.
 - Seeded PAPI runway coordinates for `papi_06` and `papi_24`.
 - YOLO `.pt` inference using `../../models/serving/best.pt` by default.
-- Lamp-level result output: each detected lamp is reported as `white`, `red`, or `unknown`.
+- Lamp-level result output: each detected lamp is reported as `white`, `red`, `transition`, or `unknown`. The transition verdict is computed geometrically from the per-lamp elevation angle vs the set-angle ± transition_half_width band — see `app/services/state.py:normalize_detections` and `packages/papi/src/papi/lamp_state.py`.
 - Global PAPI state output: `far_too_high`, `too_high`, `correct_glidepath`, `too_low`, `far_too_low`, or `unknown`.
 - Annotated image/video export support.
 - Drone elevation angle calculation using the data-analysis notebook formula:
@@ -54,7 +54,6 @@ apps/backend/
     tmp/                    Temporary processing files
   tests/                    Unit tests
   Dockerfile                Container image for the backend
-  docker-compose.yml        Local PostgreSQL service for logs
   pytest.ini                Pytest configuration
   requirements.txt          Python dependencies
   .env.example              Example local environment config
@@ -129,14 +128,14 @@ Current unit test coverage includes:
 
 ## Important Notes
 
-- This is local-first work. Nothing has been pushed.
+- This is the v1.0-released backend. Source is in Git with the `v1.0` tag.
 - The frontend is connected through Backend API mode using `VITE_PAPI_API_URL`.
 - `../../models/serving/best.pt` is intentionally ignored by Git.
 - Uploaded originals are used for processing and deleted after analysis.
 - Annotated exports, temp files, `.env`, and virtual environments are ignored by Git.
 - Docker Desktop must be running before `docker compose up -d` will work.
 - The exact drone angle is only calculated when GPS/altitude metadata is available in the uploaded media or provided manually in the request. For frontend-split frames, metadata should normally be sent as request form fields.
-- Transition/yellow-orange lamp detection is reserved for later unless the model gains a transition class.
+- Transition/yellow-orange lamp detection is computed geometrically (not by a third detector class). The backend takes the per-lamp elevation angle from drone GPS metadata and promotes a lamp's color verdict to "transition" when it sits within transition_half_width_deg of its set-angle. This satisfies the client requirement without needing a third YOLO class. See `services/state.py:_maybe_transition_state`.
 
 ## Suggested Next Steps
 
