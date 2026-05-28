@@ -193,15 +193,117 @@ For a real deployment (not a local demo):
    PAPI_ENV=production
    ```
    The backend will refuse to start without a key when
-   `PAPI_ENV=production` (audit B-CRIT-5).
-2. **Rotate the Postgres password** in `.env`.
+   `PAPI_ENV=production` (audit B-CRIT-5). It will also refuse to
+   start with the default `papi:papi@localhost` database credentials
+   in production mode, so make sure `PAPI_DATABASE_URL` points at a
+   real database with rotated credentials.
+2. **Rotate the Postgres password** in `.env`. Both
+   `POSTGRES_PASSWORD` and `PAPI_DATABASE_URL` must agree on the new
+   value.
 3. **Set `FRONTEND_PAPI_API_URL`** to the public hostname the
    browser will resolve.
-4. **Run behind a reverse proxy** (Caddy, Traefik) that terminates
-   TLS — neither nginx in this repo nor uvicorn is configured for
-   HTTPS by itself.
+4. **Run behind a reverse proxy** that terminates TLS — see
+   §7.1 below for a concrete Caddy recipe. Neither the nginx
+   shipped inside `apps/frontend/Dockerfile` nor uvicorn is
+   configured for HTTPS by itself.
 5. **Restrict the backend port**. Remove the host port mapping
    for backend `:8000` and let only the reverse proxy reach it.
+
+### 7.1 HTTPS termination — Caddy recipe (recommended)
+
+Caddy is the lowest-effort way to get a Let's Encrypt certificate
+in front of the stack. Single binary, automatic HTTPS, automatic
+renewal, no separate certbot cron.
+
+Add a fourth service to `docker-compose.yml` (or a
+`docker-compose.prod.yml` override) and remove the host ports from
+the backend + frontend services so only Caddy can reach them:
+
+```yaml
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: papi-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"      # ACME HTTP-01 challenge + redirect to 443
+      - "443:443"    # the actual TLS endpoint
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data            # certificate + key storage
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  caddy_data:
+  caddy_config:
+```
+
+A minimal `Caddyfile` at the repo root:
+
+```caddyfile
+papi.example.com {
+    # The frontend bundle (Vite/React/Nginx unprivileged container).
+    handle_path /api/* {
+        # Strip the /api prefix and forward to the backend.
+        rewrite * /api{path}
+        reverse_proxy backend:8000
+    }
+    handle_path /media/* {
+        rewrite * /media{path}
+        reverse_proxy backend:8000
+    }
+    # Everything else: the SPA.
+    reverse_proxy frontend:8080
+
+    # Security headers — supplement what the nginx container already
+    # adds. Defence-in-depth, not duplication: Caddy can override or
+    # extend each header before the browser sees the response.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+```
+
+Replace `papi.example.com` with the real hostname; Caddy fetches
+the certificate from Let's Encrypt automatically on first start
+and renews it ~30 days before expiry. No further configuration
+needed.
+
+Verification after bringing up the new stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+curl -fsSI https://papi.example.com/
+# Expected: HTTP/2 200 + Strict-Transport-Security header
+curl -fsS https://papi.example.com/api/runways
+# Expected: 401 (no X-API-Key header), proving the API is gated end-to-end
+```
+
+### 7.2 Alternatives
+
+If your operations team standardises on a different reverse
+proxy, the same shape works:
+
+| Proxy | When it fits | Setup hint |
+|---|---|---|
+| **Traefik** | You already have a Docker Swarm / Kubernetes platform with Traefik in front of everything | Add the same routing rules as labels on the backend + frontend services |
+| **nginx + certbot** | You have a hardened nginx baseline already | Point `proxy_pass` at `backend:8000` and `frontend:8080`; run `certbot --nginx -d papi.example.com` once |
+| **AWS ALB / Cloudflare / Fastly** | The deployment lives in a managed cloud or behind a CDN | Point the load balancer at the host's backend + frontend ports; let the cloud handle TLS |
+
+For any choice, two operational rules hold:
+
+1. **Terminate TLS at the proxy, not at uvicorn.** Uvicorn can serve
+   HTTPS but its certificate handling is bare-bones; managed
+   reverse proxies do auto-renewal, OCSP stapling, and HSTS for you.
+2. **Strip the host-machine port mappings on `backend:8000` and
+   `frontend:8080`.** With Caddy / Traefik as the only ingress
+   path, the analyze endpoints become unreachable from the public
+   internet except via TLS.
 
 ## 8. Verification checklist (for graders / reviewers)
 
