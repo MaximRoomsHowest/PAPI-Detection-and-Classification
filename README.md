@@ -1,9 +1,13 @@
 # PAPI Detection and Classification
 
+[![CI](https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification/actions/workflows/ci.yml/badge.svg)](https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Node 20](https://img.shields.io/badge/node-20-green.svg)](https://nodejs.org/)
+
 Real-time detection of a four-light **PAPI** (Precision Approach Path Indicator)
-installation and per-lamp **white / red** state classification from DJI Matrice
-4E drone imagery. Howest industry project for **Intersoft Electronics Services
-BV**, May-June 2026.
+installation and per-lamp **white / red / transition** state classification from
+DJI Matrice 4E drone imagery. Howest industry project for **Intersoft Electronics
+Services BV**, May–June 2026.
 
 ## Setup
 
