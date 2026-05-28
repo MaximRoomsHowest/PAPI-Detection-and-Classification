@@ -1,6 +1,8 @@
 import csv
+import hmac
 import io
 import logging
+import os
 from datetime import datetime
 from time import perf_counter
 from typing import Annotated
@@ -23,6 +25,7 @@ from app.validation.schemas import (
     LogListItem,
     ModelInfo,
     RunwayResponse,
+    SystemInfo,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,7 +35,9 @@ router = APIRouter(prefix="/api")
 
 def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None) -> None:
     settings = get_settings()
-    if settings.api_key and x_api_key != settings.api_key:
+    # Constant-time comparison so a timing side-channel can't recover the key
+    # character-by-character (audit IMP-BE-9 / IMP-SEC-1).
+    if settings.api_key and not (x_api_key and hmac.compare_digest(x_api_key, settings.api_key)):
         raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 
@@ -214,6 +219,41 @@ def get_runways() -> list[RunwayResponse]:
 @router.get("/model", response_model=ModelInfo)
 def get_model_info(_auth: Annotated[None, Depends(require_api_key)] = None) -> ModelInfo:
     return get_inference_service().model_info()
+
+
+@router.get("/system", response_model=SystemInfo)
+def get_system(_auth: Annotated[None, Depends(require_api_key)] = None) -> SystemInfo:
+    """Host + runtime facts (audit IMP-BE-7) — every value read from the running host."""
+    import platform as platform_module
+    from importlib.metadata import PackageNotFoundError, version
+
+    settings = get_settings()
+    torch_available = cuda_available = False
+    cuda_device_count = 0
+    try:
+        import torch
+
+        torch_available = True
+        cuda_available = bool(torch.cuda.is_available())
+        cuda_device_count = torch.cuda.device_count() if cuda_available else 0
+    except Exception:  # noqa: BLE001 - the torch probe is best-effort
+        pass
+
+    try:
+        app_version = version("papi-detection")
+    except PackageNotFoundError:
+        app_version = "unknown"
+
+    return SystemInfo(
+        platform=platform_module.platform(),
+        python_version=platform_module.python_version(),
+        cpu_count=os.cpu_count(),
+        torch_available=torch_available,
+        cuda_available=cuda_available,
+        cuda_device_count=cuda_device_count,
+        device_configured=settings.device,
+        app_version=app_version,
+    )
 
 
 @router.get("/stats", response_model=InferenceStats)

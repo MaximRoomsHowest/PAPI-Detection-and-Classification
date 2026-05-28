@@ -13,11 +13,13 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.api.routes import require_api_key, router
 from app.config import get_settings
-from app.database import init_db
+from app.database import get_session, init_db
 from app.logging_config import RequestIdMiddleware, configure_logging
 from app.services.inference import get_inference_service
 
@@ -139,3 +141,29 @@ def get_media(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready(db: Annotated[Session, Depends(get_session)] = None) -> JSONResponse:
+    """Deep readiness probe (audit IMP-BE-5).
+
+    Unlike ``/health`` (a pure liveness ping), this checks the dependencies the
+    app needs to actually serve a request: the database is reachable and the
+    model file is present. Returns 503 when not ready so a compose healthcheck or
+    orchestrator can gate traffic instead of routing to a backend that will 500
+    on the first real call.
+    """
+    checks: dict[str, bool] = {}
+    try:
+        db.execute(text("SELECT 1"))
+        checks["database"] = True
+    except Exception:  # noqa: BLE001 - any DB error means not-ready
+        checks["database"] = False
+    checks["model_file_present"] = settings.model_path.exists()
+    checks["model_loaded"] = get_inference_service().is_loaded
+
+    ready = checks["database"] and checks["model_file_present"]
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "checks": checks},
+    )

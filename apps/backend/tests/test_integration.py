@@ -372,3 +372,38 @@ def test_analyze_frames_caps_batch_size(client, monkeypatch):
     finally:
         # Other tests rely on the default cap; restore.
         get_settings.cache_clear()
+
+
+def test_health_ready_reports_dependencies(client):
+    """Deep readiness probe is 200 when the DB is reachable and weights are present."""
+    response = client.get("/health/ready")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["checks"]["database"] is True
+
+
+def test_system_endpoint_returns_runtime_facts(client):
+    response = client.get("/api/system")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["platform"]
+    assert body["python_version"]
+    assert "device_configured" in body
+    assert body["app_version"]
+
+
+def test_analyze_frame_rejects_out_of_range_latitude(client):
+    """Audit IMP-BE-10: out-of-range geo inputs are rejected, not fed to the angle math."""
+    response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={
+            "runway_id": "papi_24",
+            "drone_latitude": "999",
+            "drone_longitude": "9.5",
+            "drone_altitude_m": "470",
+        },
+    )
+    assert response.status_code == 400
+    assert "latitude" in response.json()["detail"].lower()

@@ -147,6 +147,23 @@ class InferenceStats(BaseModel):
     latest_created_at: str | None = None
 
 
+class SystemInfo(BaseModel):
+    """Host / runtime facts for the demo (audit IMP-BE-7).
+
+    Honestly replaces the fabricated "edge memory" card removed in audit F-CRIT-2 —
+    every value here is read from the running host, not invented.
+    """
+
+    platform: str
+    python_version: str
+    cpu_count: int | None = None
+    torch_available: bool = False
+    cuda_available: bool = False
+    cuda_device_count: int = 0
+    device_configured: str
+    app_version: str
+
+
 class RunwayLight(BaseModel):
     point: int
     latitude: float

@@ -36,6 +36,11 @@ class InferenceService:
         raise ValueError(f"Unsupported media type: {media_type}")
 
     @property
+    def is_loaded(self) -> bool:
+        """Whether the YOLO weights are loaded in memory (for the readiness probe)."""
+        return self._model is not None
+
+    @property
     def model(self) -> Any:
         if self._model is None:
             os.environ.setdefault("YOLO_AUTOINSTALL", "False")
