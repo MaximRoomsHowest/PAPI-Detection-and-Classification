@@ -13,6 +13,19 @@ class BoundingBox(BaseModel):
     y2: int
 
 
+class Detection(BaseModel):
+    """A single raw YOLO detection.
+
+    Typed replacement for the previous ``list[dict]`` so the response contract is
+    self-documenting and validated (audit IMP-BE-8). Pydantic coerces the dicts the
+    inference service already builds, so no call site changes.
+    """
+
+    class_id: int
+    confidence: float = Field(ge=0.0, le=1.0)
+    bbox: BoundingBox
+
+
 class LampResult(BaseModel):
     index: int
     state: LampState
@@ -47,7 +60,7 @@ class AnalysisPayload(BaseModel):
     processing_ms: int
     angle: AngleResult
     artifact_url: str | None = None
-    detections: list[dict] = Field(default_factory=list)
+    detections: list[Detection] = Field(default_factory=list)
 
 
 class FrameBatchPayload(BaseModel):
@@ -74,6 +87,23 @@ class LogListItem(BaseModel):
     created_at: str
 
 
+class ValMetrics(BaseModel):
+    """Validation-split metrics for the serving model, read from its model_card.json.
+
+    These are box (B) detection metrics on the val split — not the held-out test
+    regime and not per-class. The ``note`` carries that caveat to the UI so nothing
+    on screen overstates the numbers (project honesty principle).
+    """
+
+    selection: str | None = None
+    epoch: int | None = None
+    precision: float | None = None
+    recall: float | None = None
+    map50: float | None = None
+    map50_95: float | None = None
+    note: str | None = None
+
+
 class ModelInfo(BaseModel):
     model_path: str
     model_filename: str
@@ -84,6 +114,18 @@ class ModelInfo(BaseModel):
     confidence_threshold: float
     device: str
     loaded: bool
+    # Provenance (audit IMP-BE-1 / IMP-SRV-3): SHA-256 of the on-disk weights plus
+    # the training-run lineage + val metrics from models/serving/model_card.json, so
+    # /api/model can answer "which run is serving and how accurate is it?". All
+    # optional — a bare-weights dev checkout (no model_card.json) returns None.
+    sha256: str | None = None
+    classes: dict[int, str] | None = None
+    model_id: str | None = None
+    training_run: str | None = None
+    base_weights: str | None = None
+    dataset_split_evaluated: str | None = None
+    val_metrics: ValMetrics | None = None
+    loaded_at: str | None = None
 
 
 class InferenceStats(BaseModel):

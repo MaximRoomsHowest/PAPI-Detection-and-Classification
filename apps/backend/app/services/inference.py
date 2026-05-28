@@ -1,5 +1,6 @@
 import os
 from collections import Counter, deque
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
@@ -8,14 +9,16 @@ from uuid import uuid4
 
 from app.config import Settings
 from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
+from app.services.model_registry import compute_sha256, load_model_card
 from app.services.state import confidence_from_lamps, global_state_from_lamps, normalize_detections
-from app.validation.schemas import AnalysisPayload, LampResult, ModelInfo
+from app.validation.schemas import AnalysisPayload, LampResult, ModelInfo, ValMetrics
 
 
 class InferenceService:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._model: Any | None = None
+        self._loaded_at: str | None = None
 
     def analyze(
         self,
@@ -43,6 +46,7 @@ class InferenceService:
             if not self.settings.model_path.exists():
                 raise RuntimeError(f"Model file not found: {self.settings.model_path}")
             self._model = YOLO(str(self.settings.model_path))
+            self._loaded_at = datetime.now(timezone.utc).isoformat()
         return self._model
 
     def model_info(self) -> ModelInfo:
@@ -54,6 +58,21 @@ class InferenceService:
         }.get(suffix, f"ultralytics-{suffix}")
         exists = path.exists()
         file_size_mb = round(path.stat().st_size / (1024 * 1024), 2) if exists else None
+
+        # Provenance comes from models/serving/model_card.json (audit IMP-BE-1).
+        # Class names are taken from the live model when loaded (authoritative),
+        # otherwise from the card, otherwise None — so the endpoint stays useful
+        # whether or not the weights are present.
+        card = load_model_card(path) or {}
+        classes: dict[int, str] | None = None
+        if self._model is not None:
+            names = getattr(self._model, "names", None)
+            if isinstance(names, dict):
+                classes = {int(key): str(value) for key, value in names.items()}
+        if classes is None and isinstance(card.get("classes"), dict):
+            classes = {int(key): str(value) for key, value in card["classes"].items()}
+        val_metrics = card.get("val_metrics")
+
         return ModelInfo(
             model_path=str(path),
             model_filename=path.name,
@@ -64,6 +83,14 @@ class InferenceService:
             confidence_threshold=self.settings.confidence_threshold,
             device=self.settings.device,
             loaded=self._model is not None,
+            sha256=compute_sha256(path),
+            classes=classes,
+            model_id=card.get("model_id"),
+            training_run=card.get("training_run"),
+            base_weights=card.get("base_weights"),
+            dataset_split_evaluated=card.get("split_evaluated"),
+            val_metrics=ValMetrics(**val_metrics) if isinstance(val_metrics, dict) else None,
+            loaded_at=self._loaded_at,
         )
 
     def analyze_image(

@@ -1,0 +1,31 @@
+{
+  "model_id": "yolo26n-seq-red-white-safe",
+  "training_run": "yolo26n_sequence_red_white_safe",
+  "base_weights": "yolo26n.pt",
+  "task": "detect",
+  "imgsz": 1280,
+  "batch": 2,
+  "epochs_configured": 100,
+  "epochs_trained": 50,
+  "seed": 42,
+  "deterministic": true,
+  "split_evaluated": "val",
+  "val_metrics": {
+    "selection": "best_fitness_epoch",
+    "epoch": 30,
+    "precision": 0.8613,
+    "recall": 0.8706,
+    "map50": 0.9141,
+    "map50_95": 0.474,
+    "note": "Validation-split box (B) detection metrics from results.csv - not the held-out test regime and not per-class (red/white). Fill per-state F1 from the evaluation notebook (04_*)."
+  },
+  "final_epoch_metrics": {
+    "epoch": 50,
+    "precision": 0.7413,
+    "recall": 0.7741,
+    "map50": 0.8262,
+    "map50_95": 0.3265
+  },
+  "source_results_csv": "models/runs/yolo26n_sequence_red_white_safe/results.csv",
+  "generated_by": "workflows/scripts/populate_model_metrics.py"
+}
