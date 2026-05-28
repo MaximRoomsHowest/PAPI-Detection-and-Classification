@@ -1848,6 +1848,20 @@ html[data-theme='dark'] .brand-logo .logo-light {
     justify-content: center;
     overflow-x: auto;
     padding-bottom: 2px;
+    /* Tighten the gap so the three nav links fit a 390 px (iPhone)
+       viewport without horizontal scroll. At the desktop 22 px gap
+       the INSIGHTS link overflowed by ~8 px and was visually clipped
+       (regression USERTEST-MAJ-3, papi-user-test-2026-05-28). */
+    gap: 10px;
+  }
+
+  .topnav .nav-link {
+    /* Mirror the gap tightening with smaller padding + font + letter
+       spacing so each link still feels touch-friendly while fitting
+       a narrow viewport. */
+    padding: 8px 8px 6px;
+    font-size: 14px;
+    letter-spacing: 0.4px;
   }
 
   .intro-band {

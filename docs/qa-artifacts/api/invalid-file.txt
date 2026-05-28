@@ -1,2 +1,2 @@
-{"detail":"Unknown runway_id: PAPI24"}
+{"detail":"Unsupported media type. Upload an image or video file."}
 400

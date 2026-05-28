@@ -22,9 +22,49 @@ import heroPosterUrl from './assets/hero.png'
 import { analyzeFrame, analyzeFrames, analyzeMedia, fetchRunways, mediaUrl } from './lib/api'
 import { extractFrameImages } from './lib/frameExtraction'
 
-// Plotly is lazy-loaded to keep the initial JS bundle small (saves ~700kB gzipped on first paint).
-// Use `loadPlotlyBundle()` for direct API access (e.g. PDF export) and `<LazyPlot>` in JSX.
+// Plotly is lazy-loaded to keep the initial JS bundle small (saves ~700kB
+// gzipped on first paint).
+// Use `loadPlotlyBundle()` for direct API access (e.g. PDF export) and
+// `<LazyPlot>` in JSX.
+//
+// Module-shape handling note (regression USERTEST-CRIT-2,
+// papi-user-test-2026-05-28): plotly.js@3.x + Rolldown's CJS interop
+// can produce module records where `bundle.default` is sometimes the
+// real export, sometimes a re-wrapped { default: realExport } object.
+// `unwrapDefault` peels at most two layers so it survives either shape,
+// and `requireFunction` throws a clear diagnostic if the shape is so
+// different that we'd otherwise get the cryptic
+// "(e.default ?? e) is not a function" minified error.
 let plotlyBundlePromise
+
+function unwrapDefault(mod) {
+  if (mod == null) return mod
+  if (typeof mod === 'function') return mod
+  const first = mod.default !== undefined ? mod.default : mod
+  if (first == null) return first
+  if (typeof first === 'function') return first
+  if (first.default !== undefined && typeof first.default === 'function') {
+    return first.default
+  }
+  return first
+}
+
+function requireFunction(value, label) {
+  if (typeof value !== 'function') {
+    const keys =
+      value && typeof value === 'object'
+        ? Object.keys(value).slice(0, 6).join(', ')
+        : 'n/a'
+    throw new TypeError(
+      `Plotly bundle: ${label} did not expose a callable export. ` +
+        `Got ${typeof value}; module keys: ${keys}. ` +
+        `This usually means plotly.js or react-plotly.js were upgraded ` +
+        `and the bundler's CJS interop produced an unexpected shape. ` +
+        `Update src/App.jsx loadPlotlyBundle().`
+    )
+  }
+  return value
+}
 
 function loadPlotlyBundle() {
   if (!plotlyBundlePromise) {
@@ -33,15 +73,30 @@ function loadPlotlyBundle() {
       import('plotly.js/lib/core'),
       import('plotly.js/lib/bar'),
       import('plotly.js/lib/heatmap'),
-    ]).then(([factoryModule, plotlyModule, barModule, heatmapModule]) => {
-      const Plotly = plotlyModule.default ?? plotlyModule
-      const bar = barModule.default ?? barModule
-      const heatmap = heatmapModule.default ?? heatmapModule
-      Plotly.register([bar, heatmap])
-      const factory = factoryModule.default ?? factoryModule
-      const Plot = factory(Plotly)
-      return { Plot, Plotly }
-    })
+    ])
+      .then(([factoryModule, plotlyModule, barModule, heatmapModule]) => {
+        const factory = requireFunction(
+          unwrapDefault(factoryModule),
+          'react-plotly.js/factory',
+        )
+        const Plotly = unwrapDefault(plotlyModule)
+        if (!Plotly || typeof Plotly.register !== 'function') {
+          throw new TypeError(
+            `Plotly bundle: plotly.js/lib/core did not expose register(). ` +
+              `Got ${typeof Plotly}.`,
+          )
+        }
+        const bar = unwrapDefault(barModule)
+        const heatmap = unwrapDefault(heatmapModule)
+        Plotly.register([bar, heatmap])
+        const Plot = factory(Plotly)
+        return { Plot, Plotly }
+      })
+      .catch((error) => {
+        // Reset so the next call retries after a transient bundling failure.
+        plotlyBundlePromise = undefined
+        throw error
+      })
   }
   return plotlyBundlePromise
 }
@@ -717,8 +772,53 @@ function scenarioFromBackendResult(result, context) {
   }
 }
 
+// localStorage keys for the small persistence surface. Centralising them
+// here keeps writes/reads in sync and makes them easy to grep.
+const STORAGE_KEYS = {
+  theme: 'papi.theme',
+  language: 'papi.language',
+}
+
+// Read a localStorage key and validate against an allowlist. Falls back to
+// the provided default for any read error (Safari private mode, SSR, etc.).
+function readStoredChoice(key, allowed, fallback) {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const value = window.localStorage.getItem(key)
+    return value && allowed.includes(value) ? value : fallback
+  } catch {
+    return fallback
+  }
+}
+
+// Initial theme: persisted value -> system preference -> light. Computed
+// once via lazy initializer so the App doesn't re-read localStorage on
+// every render.
+function initialTheme() {
+  const stored = readStoredChoice(STORAGE_KEYS.theme, ['light', 'dark'], null)
+  if (stored) return stored
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
+}
+
+// Initial language: persisted -> navigator.language two-letter prefix
+// (when in our supported set) -> 'en'.
+function initialLanguage() {
+  const stored = readStoredChoice(
+    STORAGE_KEYS.language,
+    ['en', 'nl', 'fr'],
+    null,
+  )
+  if (stored) return stored
+  if (typeof navigator === 'undefined') return 'en'
+  const detected = (navigator.language || '').slice(0, 2).toLowerCase()
+  return ['en', 'nl', 'fr'].includes(detected) ? detected : 'en'
+}
+
 function App() {
-  const [theme, setTheme] = useState('light')
+  const [theme, setTheme] = useState(initialTheme)
   const [activeId, setActiveId] = useState('clean')
   // Default OFF so a jury demo presenter controls the carousel manually
   // (audit F-MAJ-3 — auto-cycling every 5.2s was disorienting on stage).
@@ -733,7 +833,7 @@ function App() {
   const [metadata, setMetadata] = useState(defaultMetadata)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
-  const [language, setLanguage] = useState('en')
+  const [language, setLanguage] = useState(initialLanguage)
   const insightsRef = useRef(null)
   const copy = translations[language]
 
@@ -787,7 +887,23 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
+    // Persist so the choice survives a page reload (regression
+    // FE-MOD-CRIT-3 / papi-user-test-2026-05-28). Wrapped in try/catch
+    // because some browsers (Safari private mode) throw on setItem.
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.theme, theme)
+    } catch {
+      /* localStorage not available — accept the loss for this session. */
+    }
   }, [theme])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.language, language)
+    } catch {
+      /* see above */
+    }
+  }, [language])
 
   useEffect(() => {
     let ignore = false
@@ -843,6 +959,20 @@ function App() {
       .sort((first, second) => fileDisplayPath(first).localeCompare(fileDisplayPath(second), undefined, { numeric: true }))
     const isFolderBatch = imageFiles.length > 1
     const file = isFolderBatch ? imageFiles[0] : selectedFiles[0]
+
+    // Client-side validation: the <input accept="..."> attribute is only a
+    // picker hint, not a hard filter. A user can still pick "All files" and
+    // upload anything. Without this guard we'd generate a blob URL for the
+    // wrong content type, briefly render e.g. a text file as if it were an
+    // image, and only fail once the backend returned 400 (regression
+    // USERTEST-MAJ-1, papi-user-test-2026-05-28).
+    if (!isFolderBatch && !isImageFile(file) && !isVideoFile(file)) {
+      setAnalysisError(
+        `Unsupported file: ${file.name}. Upload an image or video file.`,
+      )
+      return
+    }
+
     const url = URL.createObjectURL(file)
 
     setMedia((previous) => {
@@ -1150,68 +1280,24 @@ function App() {
 }
 
 function IntroductionPage({ copy }) {
-  const videoRef = useRef(null)
-  const [videoFailed, setVideoFailed] = useState(false)
-
-  const ensurePlayback = () => {
-    const video = videoRef.current
-    if (!video || !video.paused) {
-      return
-    }
-
-    const playPromise = video.play()
-    if (playPromise?.catch) {
-      playPromise.catch(() => {})
-    }
-  }
-
-  useEffect(() => {
-    ensurePlayback()
-
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        ensurePlayback()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
-
   return (
     <section className="intro-hero">
       {/*
-        Hero background — tries the LFS video first; falls back to the static
-        hero.png poster if the video is unavailable (audit F-CRIT-1).
-        The .gitattributes file declares /public/Background-vid.mp4 for LFS,
-        but the file is currently not committed.
+        Hero background — static hero.png poster. The earlier
+        <video src="/Background-vid.mp4"> + onError -> <img> fallback
+        attempt was removed because the LFS-declared video file was
+        never committed; the wasted 206 fetch + brief flash before the
+        fallback rendered were demo-visible noise (audit F-CRIT-1 /
+        papi-user-test-2026-05-28 finding 3). When (if) the video
+        lands in /public, restore the <video> element with the same
+        onError fallback pattern.
       */}
-      {!videoFailed && (
-        <video
-          ref={videoRef}
-          className="intro-video"
-          src="/Background-vid.mp4"
-          poster={heroPosterUrl}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          onLoadedData={ensurePlayback}
-          onPause={ensurePlayback}
-          onEnded={ensurePlayback}
-          onError={() => setVideoFailed(true)}
-          aria-hidden="true"
-        />
-      )}
-      {videoFailed && (
-        <img
-          className="intro-video"
-          src={heroPosterUrl}
-          alt=""
-          aria-hidden="true"
-        />
-      )}
+      <img
+        className="intro-video"
+        src={heroPosterUrl}
+        alt=""
+        aria-hidden="true"
+      />
       <div className="intro-hero-inner">
         <section className="intro-band">
           <div className="intro-copy">
