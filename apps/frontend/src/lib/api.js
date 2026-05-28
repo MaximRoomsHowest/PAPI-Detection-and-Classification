@@ -115,14 +115,71 @@ export async function fetchStats() {
   return response.json()
 }
 
-export async function fetchLogs() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/logs`, {
+/**
+ * Build the shared querystring for /api/logs and /api/logs/export.csv from a
+ * camelCase options object (audit IMP-BE-3 filters). Empty/absent values are
+ * omitted so `fetchLogs()` with no args still hits a bare `/api/logs`.
+ */
+function buildLogQuery({
+  limit,
+  offset,
+  runwayId,
+  mediaType,
+  globalState,
+  createdAfter,
+  minConfidence,
+} = {}) {
+  const params = new URLSearchParams()
+  if (limit != null) params.set('limit', String(limit))
+  if (offset != null) params.set('offset', String(offset))
+  if (runwayId) params.set('runway_id', runwayId)
+  if (mediaType) params.set('media_type', mediaType)
+  if (globalState) params.set('global_state', globalState)
+  if (createdAfter) params.set('created_after', createdAfter)
+  if (minConfidence != null && minConfidence !== '') params.set('min_confidence', String(minConfidence))
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export async function fetchLogs(options = {}) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/logs${buildLogQuery(options)}`, {
     headers: buildHeaders(),
   })
   if (!response.ok) {
     throw new Error(`Could not load analysis history (${response.status})`)
   }
-  return response.json()
+  const data = await response.json()
+  const items = Array.isArray(data) ? data : []
+  // X-Total-Count lets the History page show "page N of M" (audit IMP-BE-3).
+  // Guard for stubbed responses (tests) that have no headers object.
+  const totalHeader = response.headers?.get?.('X-Total-Count')
+  const total = totalHeader != null && totalHeader !== '' ? Number(totalHeader) : items.length
+  return { items, total }
+}
+
+export function logsCsvUrl(options = {}) {
+  return `${API_BASE_URL}/api/logs/export.csv${buildLogQuery(options)}`
+}
+
+/**
+ * Download the (optionally filtered) analysis log as a CSV file. Uses fetch +
+ * a blob URL rather than a plain <a href> so the X-API-Key header is sent —
+ * a bare link would 401 when an API key is configured (audit IMP-BE-4 / IMP-BE-6).
+ */
+export async function downloadLogsCsv(options = {}, filename = 'papi_analysis_logs.csv') {
+  const response = await fetchWithTimeout(logsCsvUrl(options), { headers: buildHeaders() })
+  if (!response.ok) {
+    throw new Error(`Could not export logs (${response.status})`)
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 export async function fetchLogDetail(logId) {
@@ -133,6 +190,33 @@ export async function fetchLogDetail(logId) {
     throw new Error(`Could not load analysis ${logId} (${response.status})`)
   }
   return response.json()
+}
+
+export async function fetchSystem() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/system`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`Could not load system info (${response.status})`)
+  }
+  return response.json()
+}
+
+/**
+ * Poll the backend readiness probe for a topbar status indicator (audit IMP-FE-17).
+ * Resilient by design — returns ``{ ok: false }`` instead of throwing so a down
+ * backend just shows "offline" rather than crashing the page.
+ */
+export async function fetchReady() {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/health/ready`, {
+      headers: buildHeaders(),
+    })
+    const body = await response.json().catch(() => ({}))
+    return { ok: response.ok, ...body }
+  } catch {
+    return { ok: false, status: 'unreachable' }
+  }
 }
 
 function appendMetadata(formData, metadata) {

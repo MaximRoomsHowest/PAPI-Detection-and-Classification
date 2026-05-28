@@ -26,6 +26,7 @@ import {
   analyzeFrame,
   analyzeFrames,
   analyzeMedia,
+  downloadLogsCsv,
   fetchLogDetail,
   fetchLogs,
   fetchModelInfo,
@@ -307,6 +308,17 @@ const translations = {
       angleNote: 'Angle note',
       close: 'Close',
       unavailable: 'Unavailable',
+      exportCsv: 'Export CSV',
+      trainingRun: 'Training run',
+      accuracy: 'mAP@0.5:0.95',
+      checksum: 'Checksum',
+      confidenceAvg: 'Avg confidence',
+      p50: 'P50 ms',
+      filterRunway: 'All runways',
+      filterState: 'All states',
+      prev: 'Previous',
+      next: 'Next',
+      showing: 'Showing',
     },
     states: {
       'far-high': ['Far too high', 'Aircraft is well above glidepath'],
@@ -433,6 +445,17 @@ const translations = {
       angleNote: 'Hoeknotitie',
       close: 'Sluiten',
       unavailable: 'Niet beschikbaar',
+      exportCsv: 'Exporteer CSV',
+      trainingRun: 'Trainingsrun',
+      accuracy: 'mAP@0.5:0.95',
+      checksum: 'Controlegetal',
+      confidenceAvg: 'Gem. vertrouwen',
+      p50: 'P50 ms',
+      filterRunway: 'Alle banen',
+      filterState: 'Alle statussen',
+      prev: 'Vorige',
+      next: 'Volgende',
+      showing: 'Tonen',
     },
     states: {
       'far-high': ['Veel te hoog', 'Het toestel zit ruim boven het glijpad'],
@@ -559,6 +582,17 @@ const translations = {
       angleNote: 'Note angle',
       close: 'Fermer',
       unavailable: 'Indisponible',
+      exportCsv: 'Exporter CSV',
+      trainingRun: "Run d'entrainement",
+      accuracy: 'mAP@0.5:0.95',
+      checksum: 'Somme de controle',
+      confidenceAvg: 'Confiance moy.',
+      p50: 'P50 ms',
+      filterRunway: 'Toutes les pistes',
+      filterState: 'Tous les etats',
+      prev: 'Precedent',
+      next: 'Suivant',
+      showing: 'Affichage',
     },
     states: {
       'far-high': ['Beaucoup trop haut', 'L’appareil est largement au-dessus du plan'],
@@ -1767,45 +1801,97 @@ function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onD
   )
 }
 
+const HISTORY_PAGE_SIZE = 25
+
 function HistoryPage({ copy }) {
   const [logs, setLogs] = useState([])
+  const [total, setTotal] = useState(0)
   const [modelInfo, setModelInfo] = useState(null)
   const [stats, setStats] = useState(null)
   const [selectedLog, setSelectedLog] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState('')
+  const [runwayFilter, setRunwayFilter] = useState('')
+  const [stateFilter, setStateFilter] = useState('')
+  const [page, setPage] = useState(0)
 
-  const loadHistory = useCallback(async (showRefreshing = true) => {
-    if (showRefreshing) {
-      setError('')
-      setIsRefreshing(true)
-    }
-    try {
-      const [nextLogs, nextStats, nextModel] = await Promise.all([
-        fetchLogs(),
-        fetchStats(),
-        fetchModelInfo(),
-      ])
-      setLogs(nextLogs)
-      setStats(nextStats)
-      setModelInfo(nextModel)
-    } catch (loadError) {
-      setError(loadError.message)
-    } finally {
-      setIsLoading(false)
-      if (showRefreshing) {
-        setIsRefreshing(false)
-      }
+  // Model info changes rarely, so fetch it once on mount rather than on every
+  // refresh or filter change (audit IMP-FE-19). A failure here is non-critical —
+  // the model card just renders "Unavailable".
+  useEffect(() => {
+    let ignore = false
+    fetchModelInfo()
+      .then((info) => {
+        if (!ignore) setModelInfo(info)
+      })
+      .catch(() => {})
+    return () => {
+      ignore = true
     }
   }, [])
 
+  const loadHistory = useCallback(
+    async (showRefreshing = true) => {
+      if (showRefreshing) {
+        setError('')
+        setIsRefreshing(true)
+      }
+      try {
+        const options = {
+          limit: HISTORY_PAGE_SIZE,
+          offset: page * HISTORY_PAGE_SIZE,
+          runwayId: runwayFilter || undefined,
+          globalState: stateFilter || undefined,
+        }
+        const [logsResult, nextStats] = await Promise.all([fetchLogs(options), fetchStats()])
+        setLogs(logsResult.items)
+        setTotal(logsResult.total)
+        setStats(nextStats)
+      } catch (loadError) {
+        setError(loadError.message)
+      } finally {
+        setIsLoading(false)
+        if (showRefreshing) {
+          setIsRefreshing(false)
+        }
+      }
+    },
+    [page, runwayFilter, stateFilter],
+  )
+
+  // Defer the initial fetch by a tick so the effect body doesn't start a
+  // synchronous setState cascade (react-hooks/set-state-in-effect): the first
+  // paint shows the loading state, then the data arrives. Re-runs whenever the
+  // page or a filter changes (loadHistory is memoised on those).
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      loadHistory(false)
-    }, 0)
+    const timer = window.setTimeout(() => loadHistory(false), 0)
     return () => window.clearTimeout(timer)
   }, [loadHistory])
+
+  const handleFilterChange = (setter) => (event) => {
+    setPage(0)
+    setter(event.target.value)
+  }
+
+  const handleExportCsv = async () => {
+    setIsExporting(true)
+    setError('')
+    try {
+      await downloadLogsCsv({
+        runwayId: runwayFilter || undefined,
+        globalState: stateFilter || undefined,
+      })
+    } catch (exportError) {
+      setError(exportError.message)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const pageStart = total === 0 ? 0 : page * HISTORY_PAGE_SIZE + 1
+  const pageEnd = Math.min(total, (page + 1) * HISTORY_PAGE_SIZE)
 
   const openLog = async (logId) => {
     setError('')
@@ -1835,35 +1921,87 @@ function HistoryPage({ copy }) {
         </button>
       </div>
 
-      {error && <div className="analysis-status error">{error}</div>}
+      {error && (
+        <div className="analysis-status error" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="history-summary-grid">
         <div className="history-summary">
           <span>{copy.history.model}</span>
           <strong>{modelInfo?.model_filename ?? copy.history.unavailable}</strong>
-          <small>
-            {modelInfo
-              ? `${modelInfo.backend_type} · ${modelInfo.file_size_mb ?? '—'} MB`
-              : copy.history.unavailable}
-          </small>
+          <small>{`${copy.history.trainingRun}: ${modelInfo?.training_run ?? copy.history.unavailable}`}</small>
+          {modelInfo?.sha256 && (
+            <small className="history-checksum" title={modelInfo.sha256}>
+              {`${copy.history.checksum}: ${modelInfo.sha256.slice(0, 12)}…`}
+            </small>
+          )}
         </div>
+        {modelInfo?.val_metrics?.map50_95 != null && (
+          <div className="history-summary">
+            <span>{copy.history.accuracy}</span>
+            <strong>{`${(modelInfo.val_metrics.map50_95 * 100).toFixed(1)}%`}</strong>
+            <small>{`${modelInfo.dataset_split_evaluated ?? 'val'} split`}</small>
+          </div>
+        )}
         <div className="history-summary">
           <span>{copy.history.sample}</span>
-          <strong>{stats?.sample_size ?? 0}</strong>
+          <strong>{stats?.total_analyses ?? stats?.sample_size ?? 0}</strong>
           <small>
             {stats ? `${stats.image_count} image · ${stats.video_count} video` : copy.history.unavailable}
           </small>
         </div>
         <div className="history-summary">
-          <span>{copy.history.avg}</span>
-          <strong>{stats?.avg_processing_ms ?? '—'}</strong>
-          <small>{copy.history.processing}</small>
+          <span>{copy.history.confidenceAvg}</span>
+          <strong>{stats?.avg_confidence != null ? `${percent(stats.avg_confidence)}%` : '—'}</strong>
+          <small>{copy.history.stats}</small>
         </div>
         <div className="history-summary">
-          <span>{copy.history.p95}</span>
-          <strong>{stats?.p95_processing_ms ?? '—'}</strong>
-          <small>{formatTimestamp(stats?.latest_created_at)}</small>
+          <span>{copy.history.avg}</span>
+          <strong>{stats?.avg_processing_ms ?? '—'}</strong>
+          <small>
+            {`${copy.history.p50} ${stats?.p50_processing_ms ?? '—'} · ${copy.history.p95} ${stats?.p95_processing_ms ?? '—'}`}
+          </small>
         </div>
+      </div>
+
+      <div className="history-controls">
+        <select
+          className="history-filter"
+          value={runwayFilter}
+          onChange={handleFilterChange(setRunwayFilter)}
+          aria-label={copy.history.runway}
+        >
+          <option value="">{copy.history.filterRunway}</option>
+          {Object.keys(stats?.by_runway ?? {}).map((runwayId) => (
+            <option key={runwayId} value={runwayId}>
+              {runwayId}
+            </option>
+          ))}
+        </select>
+        <select
+          className="history-filter"
+          value={stateFilter}
+          onChange={handleFilterChange(setStateFilter)}
+          aria-label={copy.history.state}
+        >
+          <option value="">{copy.history.filterState}</option>
+          {Object.keys(stats?.by_global_state ?? {}).map((stateKey) => (
+            <option key={stateKey} value={stateKey}>
+              {stateKey.replaceAll('_', ' ')}
+            </option>
+          ))}
+        </select>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={handleExportCsv}
+          disabled={isExporting || total === 0}
+        >
+          <Download size={18} />
+          {copy.history.exportCsv}
+        </button>
       </div>
 
       <div className="history-table-wrap">
@@ -1875,15 +2013,15 @@ function HistoryPage({ copy }) {
           <table className="history-table">
             <thead>
               <tr>
-                <th>{copy.history.filename}</th>
-                <th>{copy.history.runway}</th>
-                <th>{copy.history.state}</th>
-                <th>{copy.history.confidence}</th>
-                <th>{copy.history.angle}</th>
-                <th>{copy.history.frames}</th>
-                <th>{copy.history.processing}</th>
-                <th>{copy.history.created}</th>
-                <th>{copy.history.artifact}</th>
+                <th scope="col">{copy.history.filename}</th>
+                <th scope="col">{copy.history.runway}</th>
+                <th scope="col">{copy.history.state}</th>
+                <th scope="col">{copy.history.confidence}</th>
+                <th scope="col">{copy.history.angle}</th>
+                <th scope="col">{copy.history.frames}</th>
+                <th scope="col">{copy.history.processing}</th>
+                <th scope="col">{copy.history.created}</th>
+                <th scope="col">{copy.history.artifact}</th>
               </tr>
             </thead>
             <tbody>
@@ -1920,6 +2058,28 @@ function HistoryPage({ copy }) {
           </table>
         )}
       </div>
+
+      {!isLoading && total > 0 && (
+        <div className="history-pagination">
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={page === 0}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            {copy.history.prev}
+          </button>
+          <span>{`${copy.history.showing} ${pageStart}–${pageEnd} / ${total}`}</span>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={pageEnd >= total}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            {copy.history.next}
+          </button>
+        </div>
+      )}
 
       {selectedLog && (
         <div className="history-modal-backdrop" role="presentation">

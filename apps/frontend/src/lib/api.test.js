@@ -25,8 +25,11 @@ import {
   analyzeMedia,
   fetchLogs,
   fetchModelInfo,
+  fetchReady,
   fetchRunways,
   fetchStats,
+  fetchSystem,
+  logsCsvUrl,
   mediaUrl,
 } from './api.js'
 
@@ -37,6 +40,17 @@ function jsonResponse(body, { ok = true, status = ok ? 200 : 500 } = {}) {
     status,
     statusText: status === 200 ? 'OK' : 'ERR',
     json: async () => body,
+  }
+}
+
+/** Like jsonResponse but with a headers.get() shim (for X-Total-Count). */
+function jsonResponseWithHeaders(body, { ok = true, status = 200, headers = {} } = {}) {
+  return {
+    ok,
+    status,
+    statusText: 'OK',
+    json: async () => body,
+    headers: { get: (key) => headers[key] ?? null },
   }
 }
 
@@ -230,6 +244,68 @@ describe('upload size guard', () => {
       }),
     ).rejects.toThrow(/batch limit|exceeding/i)
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('fetchLogs — filters + total count', () => {
+  it('builds a querystring from camelCase options', async () => {
+    await fetchLogs({ limit: 10, offset: 20, runwayId: 'papi_24', globalState: 'too_low', minConfidence: 0.5 })
+    const [url] = fetch.mock.calls[0]
+    expect(url).toContain('/api/logs?')
+    expect(url).toContain('limit=10')
+    expect(url).toContain('offset=20')
+    expect(url).toContain('runway_id=papi_24')
+    expect(url).toContain('global_state=too_low')
+    expect(url).toContain('min_confidence=0.5')
+  })
+
+  it('returns items + total from the X-Total-Count header', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponseWithHeaders([{ id: 'a' }, { id: 'b' }], { headers: { 'X-Total-Count': '57' } }),
+    )
+    const { items, total } = await fetchLogs()
+    expect(items).toHaveLength(2)
+    expect(total).toBe(57)
+  })
+
+  it('falls back to items.length when the header is absent', async () => {
+    fetch.mockResolvedValueOnce(jsonResponseWithHeaders([{ id: 'a' }]))
+    const { total } = await fetchLogs()
+    expect(total).toBe(1)
+  })
+})
+
+describe('logsCsvUrl + fetchSystem + fetchReady', () => {
+  it('logsCsvUrl points at export.csv and carries filters', () => {
+    const url = logsCsvUrl({ runwayId: 'papi_06' })
+    expect(url).toMatch(/\/api\/logs\/export\.csv\?/)
+    expect(url).toContain('runway_id=papi_06')
+  })
+
+  it('fetchSystem targets /api/system', async () => {
+    await fetchSystem()
+    const [url] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/api\/system$/)
+  })
+
+  it('fetchReady targets /health/ready and reflects ok', async () => {
+    fetch.mockResolvedValueOnce(jsonResponseWithHeaders({ status: 'ready' }, { ok: true }))
+    const result = await fetchReady()
+    const [url] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/health\/ready$/)
+    expect(result.ok).toBe(true)
+    expect(result.status).toBe('ready')
+  })
+
+  it('fetchReady returns ok:false when the backend is unreachable (no throw)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('connection refused')
+      }),
+    )
+    const result = await fetchReady()
+    expect(result.ok).toBe(false)
   })
 })
 
