@@ -82,3 +82,20 @@ apps/backend/storage/
 *.avi
 !test_videos/*.mp4
 !models/runs/**/*.mp4
+
+# --------------------------------------------------------------------------
+# Audit / review artefacts (added 2026-05-27 after the v1.1 audit follow-up).
+# These are regenerated on demand by visual-review and smoke-test workflows;
+# they have no business in the tracked tree.
+# --------------------------------------------------------------------------
+
+# Chrome-MCP screenshots produced when running visual reviews against a
+# local stack (audit SMOKE-MIN-2). Re-created the next time the same flow
+# runs; no commit value.
+audit-screenshots/
+
+# Local docker compose overrides. Convention is that anyone needing a
+# machine-specific tweak drops it here without modifying the canonical
+# docker-compose.yml. The Tier-A CORS workaround that briefly lived here
+# is no longer needed (SMOKE-CRIT-2 is fixed), but the convention stays.
+docker-compose.override.yml
