@@ -28,10 +28,17 @@ runways:
       light_4: { lat: 47.669021, lon: 9.503828, alt: null, set_angle_deg: null }
   '24':
     papi:
-      light_1: { lat: 47.673521, lon: 9.518154, alt: null, set_angle_deg: null }
-      light_2: { lat: 47.673450, lon: 9.518214, alt: null, set_angle_deg: null }
-      light_3: { lat: 47.673380, lon: 9.518274, alt: null, set_angle_deg: null }
-      light_4: { lat: 47.673309, lon: 9.518333, alt: null, set_angle_deg: null }
+      # alt: 461.37 m provided by Intersoft on 26/05/2026 (client meeting).
+      # DATUM UNCONFIRMED — likely WGS84-ellipsoidal but could be AMSL; carry
+      # this risk note until Daoud Uahabi confirms. A mistaken datum biases
+      # every elevation angle on rwy 24 by ~48 m (the EDNY geoid offset).
+      # If the demo result for "Correct glidepath" misses by more than the
+      # transition half-width (0.10 deg) at standard standoff (~500 m), the
+      # most likely cause is the datum here, not the model.
+      light_1: { lat: 47.673521, lon: 9.518154, alt: 461.37, set_angle_deg: null }
+      light_2: { lat: 47.673450, lon: 9.518214, alt: 461.37, set_angle_deg: null }
+      light_3: { lat: 47.673380, lon: 9.518274, alt: 461.37, set_angle_deg: null }
+      light_4: { lat: 47.673309, lon: 9.518333, alt: 461.37, set_angle_deg: null }
 
 # FAA defaults for a 3.0deg glideslope (used when set_angle_deg above is null):
 faa_default_set_angles_deg: [2.50, 2.83, 3.17, 3.50]
