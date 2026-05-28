@@ -1975,3 +1975,64 @@ html[data-theme='dark'] .brand-logo .logo-light {
     grid-column: 2;
   }
 }
+
+/* -------------------------------------------------------------------------
+ * Audit follow-on styles — added by Tier-A fixes
+ * ------------------------------------------------------------------------- */
+
+/* Compact 2-column metric grid (replaces the old 4-column fake-metric grid).
+   Real metrics: detection confidence + processing time. */
+.metric-grid--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* "DEMO" watermark on scenario tabs (audit F-CRIT-2). Makes preset scenarios
+   visually distinct from the live backend tab so jury cannot mistake mock
+   data for real model output. */
+.scenario-tab__preset-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--warn);
+  color: #1d1300;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.scenario-tab--preset {
+  position: relative;
+}
+
+/* Visible error state for LazyPlot when the chart bundle fails to load
+   (audit SMOKE-CRIT-3). Replaces the previously-silent failure mode where
+   the chart area sat blank with `Uncaught (in promise)` in the console. */
+.plot-error {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  justify-items: center;
+  padding: 24px;
+  min-height: 160px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border: 1px dashed color-mix(in srgb, var(--danger) 50%, transparent);
+  color: var(--text-strong);
+}
+
+.plot-error strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.plot-error small {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  max-width: 36ch;
+}

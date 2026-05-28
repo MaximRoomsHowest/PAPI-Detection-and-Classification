@@ -5,22 +5,20 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
-  Cookie,
   Download,
   FolderOpen,
-  Frown,
   Gauge,
   Moon,
   Pause,
   Play,
   Radar,
-  Smile,
   Sun,
   Upload,
   Zap,
 } from 'lucide-react'
 import clsx from 'clsx'
 import './App.css'
+import heroPosterUrl from './assets/hero.png'
 import { analyzeFrame, analyzeFrames, analyzeMedia, fetchRunways, mediaUrl } from './lib/api'
 import { extractFrameImages } from './lib/frameExtraction'
 
@@ -127,7 +125,10 @@ const backendStateId = {
 }
 
 const defaultMetadata = {
-  runwayId: 'papi_06',
+  // Aligned with backend default (audit B-CRIT-2): papi_24's height is
+  // confirmed (467.609 m WGS84); papi_06's installation height is still
+  // open as of 26/05. Users can switch via the dropdown.
+  runwayId: 'papi_24',
   droneId: '',
   droneLatitude: '',
   droneLongitude: '',
@@ -137,8 +138,7 @@ const defaultMetadata = {
 const translations = {
   en: {
     brand: {
-      subtitle: 'AI detection prototype',
-      radar: 'On your radar',
+      subtitle: 'PAPI Detection v1.0',
       company: 'Intersoft Electronics',
     },
     nav: {
@@ -183,10 +183,8 @@ const translations = {
       playLoop: 'Play scenario loop',
       auto: 'Auto',
       paused: 'Paused',
-      detection: 'Detection',
-      globalState: 'Global state',
-      transitions: 'Transitions',
-      edgeMemory: 'Edge memory',
+      detection: 'Detection confidence',
+      latency: 'Processing time',
       droneAngle: 'Drone elevation angle',
       angleUnavailable: 'Angle unavailable',
       missingMetadata: 'missing metadata',
@@ -213,16 +211,6 @@ const translations = {
       frame: 'Frame',
       status: 'Status',
     },
-    cookies: {
-      title: 'Cookies?',
-      text: 'This demo does not save anything; this choice is only visual.',
-      yes: 'Yes',
-      no: 'No',
-      happyTitle: 'Lovely, thanks.',
-      happyText: 'Happy little UI moment unlocked.',
-      sadTitle: 'No worries.',
-      sadText: 'We will keep things plain for now.',
-    },
     states: {
       'far-high': ['Far too high', 'Aircraft is well above glidepath'],
       'too-high': ['Too high', 'Slightly above the ideal angle'],
@@ -247,8 +235,7 @@ const translations = {
   },
   nl: {
     brand: {
-      subtitle: 'AI-detectieprototype',
-      radar: 'Op uw radar',
+      subtitle: 'PAPI-detectie v1.0',
       company: 'Intersoft Electronics',
     },
     nav: {
@@ -293,10 +280,8 @@ const translations = {
       playLoop: 'Scenariolus afspelen',
       auto: 'Auto',
       paused: 'Gepauzeerd',
-      detection: 'Detectie',
-      globalState: 'Globale status',
-      transitions: 'Overgangen',
-      edgeMemory: 'Edge-geheugen',
+      detection: 'Detectievertrouwen',
+      latency: 'Verwerkingstijd',
       droneAngle: 'Elevatiehoek drone',
       angleUnavailable: 'Hoek niet beschikbaar',
       missingMetadata: 'metadata ontbreekt',
@@ -323,16 +308,6 @@ const translations = {
       frame: 'Frame',
       status: 'Status',
     },
-    cookies: {
-      title: 'Cookies?',
-      text: 'Deze demo slaat niets op; deze keuze is alleen visueel.',
-      yes: 'Ja',
-      no: 'Nee',
-      happyTitle: 'Fijn, bedankt.',
-      happyText: 'Vrolijk UI-moment ontgrendeld.',
-      sadTitle: 'Geen probleem.',
-      sadText: 'We houden het eenvoudig.',
-    },
     states: {
       'far-high': ['Veel te hoog', 'Het toestel zit ruim boven het glijpad'],
       'too-high': ['Te hoog', 'Iets boven de ideale hoek'],
@@ -357,8 +332,7 @@ const translations = {
   },
   fr: {
     brand: {
-      subtitle: 'Prototype de detection IA',
-      radar: 'Sur votre radar',
+      subtitle: 'Détection PAPI v1.0',
       company: 'Intersoft Electronics',
     },
     nav: {
@@ -403,10 +377,8 @@ const translations = {
       playLoop: 'Lancer la boucle',
       auto: 'Auto',
       paused: 'Pause',
-      detection: 'Detection',
-      globalState: 'Etat global',
-      transitions: 'Transitions',
-      edgeMemory: 'Memoire edge',
+      detection: 'Confiance de détection',
+      latency: 'Temps de traitement',
       droneAngle: 'Angle d’elevation drone',
       angleUnavailable: 'Angle indisponible',
       missingMetadata: 'metadonnees manquantes',
@@ -432,16 +404,6 @@ const translations = {
       transitionDetected: 'Transition detectee',
       frame: 'Frame',
       status: 'Etat',
-    },
-    cookies: {
-      title: 'Cookies ?',
-      text: 'Cette demo ne sauvegarde rien ; ce choix est uniquement visuel.',
-      yes: 'Oui',
-      no: 'Non',
-      happyTitle: 'Parfait, merci.',
-      happyText: 'Petit moment UI joyeux active.',
-      sadTitle: 'Pas de souci.',
-      sadText: 'Nous restons simples.',
     },
     states: {
       'far-high': ['Beaucoup trop haut', 'L’appareil est largement au-dessus du plan'],
@@ -758,7 +720,9 @@ function scenarioFromBackendResult(result, context) {
 function App() {
   const [theme, setTheme] = useState('light')
   const [activeId, setActiveId] = useState('clean')
-  const [isPlaying, setIsPlaying] = useState(true)
+  // Default OFF so a jury demo presenter controls the carousel manually
+  // (audit F-MAJ-3 — auto-cycling every 5.2s was disorienting on stage).
+  const [isPlaying, setIsPlaying] = useState(false)
   const [media, setMedia] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -769,7 +733,6 @@ function App() {
   const [metadata, setMetadata] = useState(defaultMetadata)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
-  const [cookieMood, setCookieMood] = useState('asking')
   const [language, setLanguage] = useState('en')
   const insightsRef = useRef(null)
   const copy = translations[language]
@@ -1083,10 +1046,7 @@ function App() {
           <span className="brand-text">
             <strong>PAPI Vision</strong>
             <small>{copy.brand.subtitle}</small>
-            <small className="brand-company">
-              {copy.brand.radar}
-              <span>{copy.brand.company}</span>
-            </small>
+            <small className="brand-company">{copy.brand.company}</small>
           </span>
         </Link>
 
@@ -1182,53 +1142,16 @@ function App() {
         />
         <Route path="*" element={<IntroductionPage copy={copy} />} />
       </Routes>
-      <CookieConsent mood={cookieMood} setMood={setCookieMood} copy={copy} />
+      {/* CookieConsent removed per audit F-MAJ-4 — non-functional gimmick that
+          obscured live-demo content (SMOKE-MAJ-1) and read as AI-generated for a
+          B2B aviation safety demo. */}
     </main>
-  )
-}
-
-function CookieConsent({ mood, setMood, copy }) {
-  if (mood === 'hidden') {
-    return null
-  }
-
-  const hasAnswered = mood === 'happy' || mood === 'sad'
-  const handleChoice = (choice) => {
-    setMood(choice)
-    window.setTimeout(() => setMood('hidden'), 1500)
-  }
-
-  return (
-    <div className={clsx('cookie-consent', hasAnswered && `cookie-${mood}`)}>
-      <div className="cookie-face" aria-hidden="true">
-        {mood === 'happy' ? <Smile size={34} /> : mood === 'sad' ? <Frown size={34} /> : <Cookie size={32} />}
-      </div>
-      <div className="cookie-copy">
-        <strong>{hasAnswered ? (mood === 'happy' ? copy.cookies.happyTitle : copy.cookies.sadTitle) : copy.cookies.title}</strong>
-        <span>
-          {hasAnswered
-            ? mood === 'happy'
-              ? copy.cookies.happyText
-              : copy.cookies.sadText
-            : copy.cookies.text}
-        </span>
-      </div>
-      {!hasAnswered && (
-        <div className="cookie-actions">
-          <button type="button" onClick={() => handleChoice('sad')}>
-            {copy.cookies.no}
-          </button>
-          <button type="button" onClick={() => handleChoice('happy')}>
-            {copy.cookies.yes}
-          </button>
-        </div>
-      )}
-    </div>
   )
 }
 
 function IntroductionPage({ copy }) {
   const videoRef = useRef(null)
+  const [videoFailed, setVideoFailed] = useState(false)
 
   const ensurePlayback = () => {
     const video = videoRef.current
@@ -1257,20 +1180,38 @@ function IntroductionPage({ copy }) {
 
   return (
     <section className="intro-hero">
-      <video
-        ref={videoRef}
-        className="intro-video"
-        src="/Background-vid.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        onLoadedData={ensurePlayback}
-        onPause={ensurePlayback}
-        onEnded={ensurePlayback}
-        aria-hidden="true"
-      />
+      {/*
+        Hero background — tries the LFS video first; falls back to the static
+        hero.png poster if the video is unavailable (audit F-CRIT-1).
+        The .gitattributes file declares /public/Background-vid.mp4 for LFS,
+        but the file is currently not committed.
+      */}
+      {!videoFailed && (
+        <video
+          ref={videoRef}
+          className="intro-video"
+          src="/Background-vid.mp4"
+          poster={heroPosterUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          onLoadedData={ensurePlayback}
+          onPause={ensurePlayback}
+          onEnded={ensurePlayback}
+          onError={() => setVideoFailed(true)}
+          aria-hidden="true"
+        />
+      )}
+      {videoFailed && (
+        <img
+          className="intro-video"
+          src={heroPosterUrl}
+          alt=""
+          aria-hidden="true"
+        />
+      )}
       <div className="intro-hero-inner">
         <section className="intro-band">
           <div className="intro-copy">
@@ -1413,7 +1354,7 @@ function LiveDemoPage({
             value={metadata.runwayId}
             onChange={(event) => handleMetadataChange('runwayId', event.target.value)}
           >
-            {(runways.length ? runways : [{ id: 'papi_06', label: 'PAPI 06' }]).map((runway) => (
+            {(runways.length ? runways : [{ id: 'papi_24', label: 'PAPI 24' }]).map((runway) => (
               <option key={runway.id} value={runway.id}>
                 {runway.label}
               </option>
@@ -1466,7 +1407,11 @@ function LiveDemoPage({
       <div className="scenario-tabs" role="tablist" aria-label={copy.live.demoScenarios}>
         {scenarioTabs.map((scenario) => (
           <button
-            className={clsx('scenario-tab', scenario.id === activeId && 'active')}
+            className={clsx(
+              'scenario-tab',
+              scenario.id === activeId && 'active',
+              scenario.id !== 'backend' && 'scenario-tab--preset',
+            )}
             key={scenario.id}
             type="button"
             onClick={() => {
@@ -1476,6 +1421,11 @@ function LiveDemoPage({
           >
             <span>{scenario.label}</span>
             <small>{scenario.badge}</small>
+            {scenario.id !== 'backend' && (
+              <span className="scenario-tab__preset-badge" aria-label="Demo preset">
+                DEMO
+              </span>
+            )}
           </button>
         ))}
         <button
@@ -1524,11 +1474,24 @@ function LiveDemoPage({
             ))}
           </div>
 
-          <div className="metric-grid">
-            <InlineMetric label={copy.live.detection} value={activeScenario.metrics.boxConfidence} suffix="%" />
-            <InlineMetric label={copy.live.globalState} value={activeScenario.metrics.globalConfidence} suffix="%" />
-            <InlineMetric label={copy.live.transitions} value={activeScenario.metrics.transitionRecall} suffix="%" />
-            <InlineMetric label={copy.live.edgeMemory} value={activeScenario.metrics.edgeMemory} suffix="MB" />
+          {/*
+            Real metrics only (audit F-CRIT-2). Detection confidence and
+            processing time come from the live backend payload via
+            scenarioFromBackendResult. For preset scenarios the same fields
+            carry the hardcoded demo values; the "DEMO" watermark on the
+            scenario tab makes the source clear.
+          */}
+          <div className="metric-grid metric-grid--compact">
+            <InlineMetric
+              label={copy.live.detection}
+              value={activeScenario.metrics.boxConfidence}
+              suffix="%"
+            />
+            <InlineMetric
+              label={copy.live.latency}
+              value={activeScenario.metrics.latency}
+              suffix=" ms"
+            />
           </div>
 
           {activeScenario.angleSummary && (
@@ -1840,19 +1803,37 @@ function GlobalStateDecoder({ scenario, plotTheme, copy }) {
 
 function LazyPlot(props) {
   const [PlotComponent, setPlotComponent] = useState(null)
+  const [loadError, setLoadError] = useState(null)
 
   useEffect(() => {
     let isMounted = true
-    loadPlotlyBundle().then(({ Plot }) => {
-      if (isMounted) {
-        setPlotComponent(() => Plot)
-      }
-    })
+    loadPlotlyBundle()
+      .then(({ Plot }) => {
+        if (isMounted) {
+          setPlotComponent(() => Plot)
+        }
+      })
+      .catch((error) => {
+        // Surface the failure instead of swallowing it (audit SMOKE-CRIT-3).
+        // A blank chart with no console error is undebuggable on stage.
+        console.error('Failed to load Plotly bundle:', error)
+        if (isMounted) {
+          setLoadError(error)
+        }
+      })
     return () => {
       isMounted = false
     }
   }, [])
 
+  if (loadError) {
+    return (
+      <div className="plot-loading plot-error" role="alert">
+        <strong>Chart unavailable</strong>
+        <small>{loadError.message || 'Plotly bundle failed to load.'}</small>
+      </div>
+    )
+  }
   if (!PlotComponent) {
     return <div className="plot-loading" aria-hidden />
   }
