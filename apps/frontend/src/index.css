@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+/*
+ * Poppins is loaded via @fontsource/poppins in main.jsx — self-hosted to
+ * avoid the GDPR / cross-origin issue with Google Fonts (audit F-MAJ-14).
+ * The font-family stack below still names "Poppins" first so anything
+ * inheriting these properties picks up the locally-bundled WOFF2 files.
+ */
 
 :root {
   font-family:
