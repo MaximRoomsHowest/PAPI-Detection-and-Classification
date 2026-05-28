@@ -244,6 +244,62 @@ def test_logs_list_and_detail_return_persisted_analysis(client):
     assert body["lamps"][0]["state"] == "white"
 
 
+def _post_frame(client, runway_id="papi_24"):
+    return client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={"runway_id": runway_id},
+    )
+
+
+def test_logs_total_count_header_and_filters(client):
+    _post_frame(client)
+    _post_frame(client)
+
+    all_logs = client.get("/api/logs")
+    assert all_logs.headers.get("X-Total-Count") == "2"
+    assert len(all_logs.json()) == 2
+
+    # A runway with no rows -> empty list + zero total.
+    empty = client.get("/api/logs", params={"runway_id": "papi_06"})
+    assert empty.headers.get("X-Total-Count") == "0"
+    assert empty.json() == []
+
+    # Malformed created_after -> 400 (audit IMP-BE-3 validation).
+    bad = client.get("/api/logs", params={"created_after": "not-a-date"})
+    assert bad.status_code == 400
+
+
+def test_logs_export_csv(client):
+    _post_frame(client)
+
+    response = client.get("/api/logs/export.csv")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers.get("content-disposition", "")
+
+    text = response.text
+    assert "id,created_at,media_type" in text
+    assert "correct_glidepath" in text
+    assert "frame.jpg" in text
+
+
+def test_stats_endpoint_aggregates_whole_table(client):
+    for _ in range(3):
+        _post_frame(client)
+
+    response = client.get("/api/stats")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_analyses"] == 3
+    assert body["sample_size"] == 3
+    assert body["image_count"] == 3
+    assert body["by_runway"].get("papi_24") == 3
+    assert body["by_global_state"].get("correct_glidepath") == 3
+    assert body["by_media_type"].get("image") == 3
+    assert body["avg_confidence"] is not None
+
+
 def test_model_endpoint_returns_active_model_metadata(client):
     response = client.get("/api/model")
 

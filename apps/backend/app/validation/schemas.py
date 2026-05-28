@@ -129,12 +129,21 @@ class ModelInfo(BaseModel):
 
 
 class InferenceStats(BaseModel):
+    # Aggregated over the WHOLE analysis_logs table (audit IMP-BE-2), not just the
+    # most-recent 100 rows as before. ``sample_size`` is kept (== total_analyses) so
+    # existing consumers don't break; the breakdowns are new.
     sample_size: int
+    total_analyses: int
     image_count: int
     video_count: int
     avg_processing_ms: float | None = None
     p50_processing_ms: int | None = None
     p95_processing_ms: int | None = None
+    avg_confidence: float | None = None
+    by_runway: dict[str, int] = Field(default_factory=dict)
+    by_global_state: dict[str, int] = Field(default_factory=dict)
+    by_media_type: dict[str, int] = Field(default_factory=dict)
+    first_analysis_at: str | None = None
     latest_created_at: str | None = None
 
 

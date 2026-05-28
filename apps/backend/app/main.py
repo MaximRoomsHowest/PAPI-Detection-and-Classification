@@ -95,7 +95,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "X-API-Key"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-Total-Count"],
 )
 
 app.include_router(router)

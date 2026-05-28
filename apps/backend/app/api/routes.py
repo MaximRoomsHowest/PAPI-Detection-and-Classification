@@ -1,8 +1,12 @@
+import csv
+import io
 import logging
+from datetime import datetime
 from time import perf_counter
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -214,22 +218,102 @@ def get_model_info(_auth: Annotated[None, Depends(require_api_key)] = None) -> M
 
 @router.get("/stats", response_model=InferenceStats)
 def get_stats(
-    limit: int = 100,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> InferenceStats:
-    return AnalysisLogRepository(db).stats(limit=limit)
+    # Aggregates the whole analysis_logs table now (audit IMP-BE-2), so no limit param.
+    return AnalysisLogRepository(db).stats()
+
+
+def _log_filters(
+    runway_id: str | None,
+    media_type: str | None,
+    global_state: str | None,
+    created_after: str | None,
+    min_confidence: float | None,
+) -> dict:
+    """Validate + normalise the shared log query filters (audit IMP-BE-3)."""
+    parsed_after = None
+    if created_after:
+        try:
+            parsed_after = datetime.fromisoformat(created_after)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="created_after must be ISO 8601, e.g. 2026-05-01 or 2026-05-01T12:00:00.",
+            ) from exc
+    return {
+        "runway_id": runway_id,
+        "media_type": media_type,
+        "global_state": global_state,
+        "created_after": parsed_after,
+        "min_confidence": min_confidence,
+    }
+
+
+_CSV_COLUMNS = [
+    "id", "created_at", "media_type", "runway_id", "global_state", "confidence",
+    "angle_available", "elevation_angle_deg", "frame_count", "processing_ms",
+    "original_filename",
+]
 
 
 @router.get("/logs", response_model=list[LogListItem])
 def list_logs(
+    response: Response,
     limit: int = 50,
     offset: int = 0,
+    runway_id: str | None = None,
+    media_type: str | None = None,
+    global_state: str | None = None,
+    created_after: str | None = None,
+    min_confidence: float | None = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> list[LogListItem]:
+    """Recent analysis logs, newest first.
+
+    Optional filters plus an ``X-Total-Count`` header so the History page can paginate
+    ("page N of M") instead of fetching everything and slicing client-side (audit IMP-BE-3).
+    """
+    filters = _log_filters(runway_id, media_type, global_state, created_after, min_confidence)
     repository = AnalysisLogRepository(db)
-    return [repository.to_list_item(log) for log in repository.list_recent(limit, offset)]
+    response.headers["X-Total-Count"] = str(repository.count(**filters))
+    return [repository.to_list_item(log) for log in repository.list_recent(limit, offset, **filters)]
+
+
+@router.get("/logs/export.csv")
+def export_logs_csv(
+    runway_id: str | None = None,
+    media_type: str | None = None,
+    global_state: str | None = None,
+    created_after: str | None = None,
+    min_confidence: float | None = None,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
+) -> StreamingResponse:
+    """Download the (optionally filtered) analysis log as CSV (audit IMP-BE-6).
+
+    Declared before ``/logs/{log_id}`` so the literal path is not captured as an id.
+    """
+    filters = _log_filters(runway_id, media_type, global_state, created_after, min_confidence)
+    rows = AnalysisLogRepository(db).iter_filtered(**filters)
+
+    def generate():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(_CSV_COLUMNS)
+        for log in rows:
+            created = log.created_at.isoformat() if hasattr(log.created_at, "isoformat") else log.created_at
+            writer.writerow([
+                log.id, created, log.media_type, log.runway_id, log.global_state,
+                log.confidence, log.angle_available, log.elevation_angle_deg,
+                log.frame_count, log.processing_ms, log.original_filename,
+            ])
+        yield buffer.getvalue()
+
+    headers = {"Content-Disposition": "attachment; filename=papi_analysis_logs.csv"}
+    return StreamingResponse(generate(), media_type="text/csv", headers=headers)
 
 
 @router.get("/logs/{log_id}", response_model=AnalysisPayload)
