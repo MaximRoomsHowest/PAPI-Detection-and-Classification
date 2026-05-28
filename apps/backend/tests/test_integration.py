@@ -216,3 +216,37 @@ def test_analyze_frames_rejects_empty_list(client):
     # FastAPI returns 422 (validation) when the field is missing entirely,
     # which is also acceptable -- ``files`` is a required parameter.
     assert response.status_code in (400, 422)
+
+
+def test_analyze_frames_caps_batch_size(client, monkeypatch):
+    """Folder uploads above the configured cap return 413, not 200 after a minutes-long loop.
+
+    Regression guard for audit B-MAJ-5: the analyze-frames endpoint
+    previously iterated whatever was uploaded, with no upper bound — a
+    10,000-image upload would block the worker for minutes. The cap is
+    sourced from PAPI_MAX_BATCH_FRAMES so the demo can raise it for
+    benchmarking; tests pin it low so the assertion runs fast.
+    """
+    from app.config import get_settings
+
+    # Lower the cap to 3 for this test so we don't have to construct 200
+    # fake JPEGs to trigger the limit.
+    get_settings.cache_clear()
+    monkeypatch.setenv("PAPI_MAX_BATCH_FRAMES", "3")
+    try:
+        files = [
+            ("files", (f"frame_{i:03d}.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg"))
+            for i in range(4)
+        ]
+        response = client.post(
+            "/api/analyze-frames",
+            files=files,
+            data={"runway_id": "papi_24"},
+        )
+        assert response.status_code == 413
+        body = response.json()
+        assert "limited to 3 frames" in body["detail"]
+        assert "Got 4" in body["detail"]
+    finally:
+        # Other tests rely on the default cap; restore.
+        get_settings.cache_clear()

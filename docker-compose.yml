@@ -63,6 +63,10 @@ services:
       PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
       PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
       PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-30}
+      # Aggregate cap on /api/analyze-frames batch size (audit B-MAJ-5).
+      # 200 keeps a folder upload of a normal flight under a few minutes
+      # of CPU inference; raise via .env if the demo needs a bigger sweep.
+      PAPI_MAX_BATCH_FRAMES: ${PAPI_MAX_BATCH_FRAMES:-200}
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}

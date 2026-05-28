@@ -49,8 +49,8 @@ Chrome 148 headless was driven through the Chrome DevTools Protocol against the 
 | API key missing in production | B-CRIT-5 | Require key when production env is set | Partially fixed | `PAPI_ENV=production` refuses startup without key; `/media` remains unauthenticated. |
 | Static `/media` public | B-CRIT-5 follow-on | Authenticated media route or unguessable/proxied paths | Not fixed | `main.py` still mounts `StaticFiles` at `/media`. |
 | Transition overlay color | B-MAJ-2 | Amber transition color | Fixed | `_LAMP_COLORS` includes `transition: (0, 165, 255)`. |
-| `/api/analyze-frames` unbounded file count | B-MAJ-5 / 2026-05-27 TODO | Add max frame count and tests | Not fixed | `routes.py` only checks empty list, then loops all files. |
-| ByteTrack state discarded | B-MAJ-1 | Use persistent tracker state per video with reset between requests | Not fixed | `inference.py` still calls `track(... persist=False ...)`. |
+| `/api/analyze-frames` unbounded file count | B-MAJ-5 / 2026-05-27 TODO | Add max frame count and tests | Fixed | `routes.py` returns 413 when `len(files) > settings.max_batch_frames` (default 200, configurable via `PAPI_MAX_BATCH_FRAMES`); `test_analyze_frames_caps_batch_size` exercises the 413 path; live-verified with `PAPI_MAX_BATCH_FRAMES=3` returning 413 for 4 files. |
+| ByteTrack state discarded | B-MAJ-1 | Use persistent tracker state per video with reset between requests | Fixed | `_detect_frame(..., reset_tracker=...)` passes `persist=not reset_tracker` to `model.track`; `analyze_video` resets only on the first frame of each request, so ByteTrack maintains identity across the rest of the video while not bleeding state across requests. Live-verified on the 18-frame daytime smoke video (all 4 lamps tracked end-to-end). |
 | Hero video missing | F-CRIT-1 | Commit video or remove video element | Fixed in current worktree | Intro now uses static `hero.png`; no missing video request needed. |
 | Fake metrics/preset honesty | F-CRIT-2 | Remove or clearly watermark preset data | Partially fixed | Preset tabs have `DEMO` badge and real backend result is separate; presets still exist. |
 | Browser tab title says `frontend` | F-CRIT-4 | Branded title | Fixed | `index.html` title was fixed in audit-follow-up. |
@@ -70,9 +70,15 @@ Chrome 148 headless was driven through the Chrome DevTools Protocol against the 
 ## Remaining Blockers / Follow-ups
 
 - **Blocked externally**: PAPI 06 angle output remains provisional until Intersoft confirms runway 06 installation height, height datum, and commissioned set-angles.
-- **Still important before a public deployment**: protect or proxy `/media`, add `/api/analyze-frames` max file count/aggregate size cap, and decide whether the public frontend should ever receive `VITE_PAPI_API_KEY`.
-- **Still important for video/transition quality**: fix ByteTrack `persist=False` if video tracking is used for temporal transitions.
+- **Still important before a public deployment**: protect or proxy `/media`, add an *aggregate-size* (not just count) cap on `/api/analyze-frames`, and decide whether the public frontend should ever receive `VITE_PAPI_API_KEY`. *Update 2026-05-28: the per-batch file-count cap is now in place (`PAPI_MAX_BATCH_FRAMES`, default 200, returns 413 on overflow). The aggregate-size cap is the remaining safety guard.*
 - **Still important for rubric polish**: fill real edge benchmark results, consider ONNX serving, and add the missing model/stats/history surfaces only if they fit the demo timeline.
+
+## 2026-05-28 follow-up fixes applied
+
+After this verification document was written, two of the "Not fixed" items were addressed in the same worktree:
+
+- **B-MAJ-5 (analyze-frames cap)**: new `PAPI_MAX_BATCH_FRAMES` setting (`config.py`, default 200, `ge=1`), enforced at the top of `analyze_frames` in `routes.py` with a 413 response and a clear message. `docker-compose.yml` now passes the env var through. New integration test `test_analyze_frames_caps_batch_size` (`apps/backend/tests/test_integration.py`) exercises the 413 path. Live-verified end-to-end with `PAPI_MAX_BATCH_FRAMES=3` returning 413 for a 4-file upload and 200 for a 2-file upload. **43/43 backend tests pass; ruff clean.**
+- **B-MAJ-1 (ByteTrack `persist`)**: `_detect_frame` now takes a `reset_tracker: bool` flag and passes `persist=not reset_tracker` to `model.track()`. `analyze_video` calls it with `reset_tracker=(frame_count == 0)` so the first frame of each video request resets ByteTrack's state and subsequent frames maintain identity. Live-verified on the 18-frame daytime smoke video.
 
 ## BigBrain
 

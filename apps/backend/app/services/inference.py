@@ -135,7 +135,14 @@ class InferenceService:
                 if not ok:
                     break
 
-                detections = self._detect_frame(frame, use_tracking=True)
+                # ByteTrack reset on first frame so state from a previous
+                # video request doesn't bleed in (audit B-MAJ-1). Subsequent
+                # frames continue with persist=True for actual tracking.
+                detections = self._detect_frame(
+                    frame,
+                    use_tracking=True,
+                    reset_tracker=(frame_count == 0),
+                )
                 # Pass per_light_angles so per-lamp transition state is
                 # available frame-by-frame (audit B-CRIT-1). For a single
                 # uploaded video the drone metadata is constant across
@@ -213,11 +220,29 @@ class InferenceService:
             )
         return final_lamps
 
-    def _detect_frame(self, frame: Any, use_tracking: bool) -> list[dict]:
+    def _detect_frame(
+        self,
+        frame: Any,
+        use_tracking: bool,
+        reset_tracker: bool = False,
+    ) -> list[dict]:
+        """Run YOLO on a single frame.
+
+        ``use_tracking=True`` routes through Ultralytics' ByteTrack so per-lamp
+        identity is maintained across frames inside a video request. The
+        ``reset_tracker`` flag controls whether the tracker state from a
+        previous video bleeds into this one (audit B-MAJ-1): pass
+        ``reset_tracker=True`` on the FIRST frame of every new video and
+        ``False`` thereafter. Implementation: Ultralytics treats
+        ``persist=False`` as "reinitialise the tracker on this call" and
+        ``persist=True`` as "continue with whatever state the predictor has".
+        Reversing the previous always-False default re-enables ByteTrack's
+        actual job (continuity) while keeping cross-request isolation.
+        """
         if use_tracking:
             results = self.model.track(
                 frame,
-                persist=False,
+                persist=not reset_tracker,
                 tracker="bytetrack.yaml",
                 conf=self.settings.confidence_threshold,
                 verbose=False,

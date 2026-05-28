@@ -102,6 +102,19 @@ async def analyze_frames(
     if not files:
         raise HTTPException(status_code=400, detail="Upload at least one image file.")
 
+    # Bound the batch size so a 10,000-image folder upload can't pin the
+    # worker for minutes (audit B-MAJ-5). Configurable via PAPI_MAX_BATCH_FRAMES.
+    settings = get_settings()
+    if len(files) > settings.max_batch_frames:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Folder uploads are limited to {settings.max_batch_frames} frames per "
+                f"request. Got {len(files)}. Split the folder and retry, or raise "
+                f"PAPI_MAX_BATCH_FRAMES on the server."
+            ),
+        )
+
     start = perf_counter()
     results: list[AnalysisPayload] = []
     for file in files:

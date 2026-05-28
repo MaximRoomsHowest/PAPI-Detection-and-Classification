@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=100, alias="PAPI_MAX_UPLOAD_MB")
     max_video_frames: int = Field(default=600, alias="PAPI_MAX_VIDEO_FRAMES")
     max_video_seconds: int = Field(default=30, alias="PAPI_MAX_VIDEO_SECONDS")
+    # Aggregate upper bound on a single POST /api/analyze-frames call. The
+    # backend processes frames sequentially per request, so an unbounded
+    # list would hold the worker for minutes; per-file size is checked,
+    # count was not. Configurable via env so the demo can raise it for
+    # benchmarking (audit B-MAJ-5).
+    max_batch_frames: int = Field(default=200, ge=1, alias="PAPI_MAX_BATCH_FRAMES")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
