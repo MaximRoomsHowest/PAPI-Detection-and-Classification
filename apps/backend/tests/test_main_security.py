@@ -72,47 +72,57 @@ def _seed_export(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, filename: str 
     return target
 
 
-def test_media_returns_artifact_in_local_mode_without_api_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+@pytest.fixture
+def client():
+    """A TestClient that does NOT fire lifespan startup events.
+
+    The /media route only reads a file and checks the API key — it never
+    touches the database. Using ``TestClient(app)`` WITHOUT the ``with``
+    context manager deliberately skips ``lifespan`` (and thus
+    ``init_db()``), so these tests run in CI with no Postgres available.
+    This mirrors the proven pattern in test_integration.py.
+    """
+    return TestClient(app)
+
+
+def test_media_returns_artifact_in_local_mode_without_api_key(client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """No PAPI_API_KEY configured ⇒ /media serves the file (back-compat with
     the previous public StaticFiles mount in local dev / docker compose)."""
     monkeypatch.setattr(main_module.settings, "api_key", None, raising=True)
     _seed_export(monkeypatch, tmp_path)
 
-    with TestClient(app) as client:
-        response = client.get("/media/annotated.jpg")
+    response = client.get("/media/annotated.jpg")
 
     assert response.status_code == 200
     assert response.content == b"jpeg-bytes-placeholder"
 
 
 def test_media_rejects_request_without_api_key_when_key_is_configured(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     """With PAPI_API_KEY set, /media demands the same X-API-Key header
     the analyze routes already require — closing the audit gap."""
     monkeypatch.setattr(main_module.settings, "api_key", "test-secret", raising=True)
     _seed_export(monkeypatch, tmp_path)
 
-    with TestClient(app) as client:
-        response = client.get("/media/annotated.jpg")
+    response = client.get("/media/annotated.jpg")
 
     assert response.status_code == 401
 
 
 def test_media_serves_artifact_when_correct_api_key_is_supplied(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     monkeypatch.setattr(main_module.settings, "api_key", "test-secret", raising=True)
     _seed_export(monkeypatch, tmp_path)
 
-    with TestClient(app) as client:
-        response = client.get("/media/annotated.jpg", headers={"X-API-Key": "test-secret"})
+    response = client.get("/media/annotated.jpg", headers={"X-API-Key": "test-secret"})
 
     assert response.status_code == 200
     assert response.content == b"jpeg-bytes-placeholder"
 
 
-def test_media_404s_on_path_traversal_attempt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_media_404s_on_path_traversal_attempt(client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """A request crafted to escape exports_dir must 404, never 200 or 403.
 
     A 403 here would leak the existence of files outside the export
@@ -125,22 +135,20 @@ def test_media_404s_on_path_traversal_attempt(monkeypatch: pytest.MonkeyPatch, t
     secret = tmp_path / "secret.txt"
     secret.write_text("nope")
 
-    with TestClient(app) as client:
-        # FastAPI normalises some path segments before routing, so the
-        # path-traversal guard lives inside the route handler (resolve()
-        # then relative_to() check). All variants must 404.
-        for evil in ("subdir/../../secret.txt", "..%2Fsecret.txt"):
-            response = client.get(f"/media/{evil}")
-            assert response.status_code == 404, f"{evil} unexpectedly returned {response.status_code}"
+    # FastAPI normalises some path segments before routing, so the
+    # path-traversal guard lives inside the route handler (resolve()
+    # then relative_to() check). All variants must 404.
+    for evil in ("subdir/../../secret.txt", "..%2Fsecret.txt"):
+        response = client.get(f"/media/{evil}")
+        assert response.status_code == 404, f"{evil} unexpectedly returned {response.status_code}"
 
 
-def test_media_404s_on_missing_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_media_404s_on_missing_file(client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setattr(main_module.settings, "api_key", None, raising=True)
     monkeypatch.setattr(main_module.settings, "storage_dir", tmp_path, raising=True)
     (tmp_path / "exports").mkdir(parents=True, exist_ok=True)
 
-    with TestClient(app) as client:
-        response = client.get("/media/does-not-exist.jpg")
+    response = client.get("/media/does-not-exist.jpg")
 
     assert response.status_code == 404
 
