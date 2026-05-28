@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", alias="PAPI_ENV")
     database_url: str = "postgresql+psycopg://papi:papi@localhost:5434/papi_backend"
     model_path: Path = Field(default=REPO_ROOT / "models" / "serving" / "best.pt", alias="PAPI_MODEL_PATH")
+    device: str = Field(default="cpu", alias="PAPI_DEVICE")
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
     # NoDecode disables pydantic-settings' built-in JSON decode for env values

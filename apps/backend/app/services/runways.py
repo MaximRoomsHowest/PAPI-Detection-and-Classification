@@ -25,7 +25,7 @@ from app.validation.schemas import RunwayResponse
 CONFIG_PATH: Path = REPO_ROOT / "configs" / "papi_edny.yaml"
 
 # Last-resort fallback when configs/papi_edny.yaml is unavailable. Values
-# pinned from the YAML at the time of the 2026-05-27 audit. If you change
+# pinned from the YAML at the time of the 2026-05-28 improvement pass. If you change
 # the YAML, the runtime path picks it up automatically — these stay only
 # for environments where the configs directory is not present.
 _FALLBACK_RUNWAYS: dict[str, dict[str, Any]] = {
@@ -33,10 +33,10 @@ _FALLBACK_RUNWAYS: dict[str, dict[str, Any]] = {
         "id": "papi_06",
         "label": "PAPI 06",
         "lights": [
-            {"point": 1, "longitude": 9.504007, "latitude": 47.668810, "altitude_m": 465.0},
-            {"point": 2, "longitude": 9.503948, "latitude": 47.668881, "altitude_m": 465.0},
-            {"point": 3, "longitude": 9.503888, "latitude": 47.668951, "altitude_m": 465.0},
-            {"point": 4, "longitude": 9.503828, "latitude": 47.669021, "altitude_m": 465.0},
+            {"point": 1, "longitude": 9.504007, "latitude": 47.668810, "altitude_m": 461.37},
+            {"point": 2, "longitude": 9.503948, "latitude": 47.668881, "altitude_m": 461.37},
+            {"point": 3, "longitude": 9.503888, "latitude": 47.668951, "altitude_m": 461.37},
+            {"point": 4, "longitude": 9.503828, "latitude": 47.669021, "altitude_m": 461.37},
         ],
     },
     "papi_24": {

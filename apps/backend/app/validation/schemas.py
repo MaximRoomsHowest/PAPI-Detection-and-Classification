@@ -74,6 +74,28 @@ class LogListItem(BaseModel):
     created_at: str
 
 
+class ModelInfo(BaseModel):
+    model_path: str
+    model_filename: str
+    model_format: str
+    backend_type: str
+    exists: bool
+    file_size_mb: float | None = None
+    confidence_threshold: float
+    device: str
+    loaded: bool
+
+
+class InferenceStats(BaseModel):
+    sample_size: int
+    image_count: int
+    video_count: int
+    avg_processing_ms: float | None = None
+    p50_processing_ms: int | None = None
+    p95_processing_ms: int | None = None
+    latest_created_at: str | None = None
+
+
 class RunwayLight(BaseModel):
     point: int
     latitude: float

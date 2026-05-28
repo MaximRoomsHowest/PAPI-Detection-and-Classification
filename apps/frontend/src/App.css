@@ -577,7 +577,8 @@ html[data-theme='dark'] .brand-logo .logo-light {
 }
 
 .demo-section,
-.insights-section {
+.insights-section,
+.history-section {
   width: min(1180px, calc(100% - 32px));
   margin: 34px auto 0;
   padding: 20px 0 16px;
@@ -1711,6 +1712,252 @@ html[data-theme='dark'] .brand-logo .logo-light {
   font-size: 18px;
 }
 
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.history-summary {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.history-summary span,
+.history-detail-grid span,
+.history-angle-note span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.history-summary strong,
+.history-detail-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.history-summary small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.history-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.history-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 13px;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+.history-table th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.history-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.history-link:hover,
+.history-table a:hover {
+  text-decoration: underline;
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.history-empty {
+  padding: 28px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.history-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.54);
+}
+
+.history-modal {
+  width: min(940px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-strong);
+  padding: 18px;
+}
+
+.history-modal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.history-modal-heading h3 {
+  color: var(--text-strong);
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.history-detail-grid > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--surface-muted);
+}
+
+.history-artifact {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b1521;
+}
+
+.history-artifact img,
+.history-artifact video {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.history-modal-columns {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.history-modal-columns h4 {
+  margin-bottom: 8px;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.history-lamps {
+  display: grid;
+  gap: 8px;
+}
+
+.history-lamp {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-muted);
+  border-radius: 4px;
+  padding: 7px 10px;
+  color: var(--text-strong);
+  background: var(--surface-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.history-lamp-white { border-left-color: #f8fbff; }
+.history-lamp-red { border-left-color: #ff4545; }
+.history-lamp-transition { border-left-color: #ffb11f; }
+
+.history-json {
+  min-height: 150px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0;
+  padding: 10px;
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.history-angle-note {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.history-angle-note svg {
+  color: var(--accent);
+}
+
+.history-angle-note p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -1824,6 +2071,12 @@ html[data-theme='dark'] .brand-logo .logo-light {
     grid-column: span 6;
   }
 
+  .history-summary-grid,
+  .history-detail-grid,
+  .history-modal-columns {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .decoder-layout {
     grid-template-columns: 1fr;
   }
@@ -1852,16 +2105,16 @@ html[data-theme='dark'] .brand-logo .logo-light {
        viewport without horizontal scroll. At the desktop 22 px gap
        the INSIGHTS link overflowed by ~8 px and was visually clipped
        (regression USERTEST-MAJ-3, papi-user-test-2026-05-28). */
-    gap: 10px;
+    gap: 6px;
   }
 
   .topnav .nav-link {
     /* Mirror the gap tightening with smaller padding + font + letter
        spacing so each link still feels touch-friendly while fitting
        a narrow viewport. */
-    padding: 8px 8px 6px;
-    font-size: 14px;
-    letter-spacing: 0.4px;
+    padding: 8px 6px 6px;
+    font-size: 12px;
+    letter-spacing: 0.2px;
   }
 
   .intro-band {
@@ -1933,6 +2186,28 @@ html[data-theme='dark'] .brand-logo .logo-light {
 
   .metadata-panel {
     grid-template-columns: 1fr;
+  }
+
+  .history-summary-grid,
+  .history-detail-grid,
+  .history-modal-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .history-modal-backdrop {
+    padding: 12px;
+  }
+
+  .history-modal {
+    padding: 14px;
+  }
+
+  .history-angle-note {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .history-angle-note p {
+    grid-column: 1 / -1;
   }
 
   .cookie-consent {

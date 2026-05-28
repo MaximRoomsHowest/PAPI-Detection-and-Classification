@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -9,6 +10,22 @@ export default defineConfig({
     // polyfill that in browser builds, so we shim it to globalThis. Without
     // this, `cartesian-*.js` throws ReferenceError at first render.
     global: 'globalThis',
+  },
+  test: {
+    // Vitest config (read directly from vite.config.js — no separate
+    // vitest.config.js needed). jsdom gives us the `window`, `document`,
+    // and `fetch` globals the api.js module touches in production. The
+    // `globals: true` lets us write `describe`/`it`/`expect` without
+    // imports, matching the existing pytest authoring style on the
+    // Python side.
+    globals: true,
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.{js,jsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/lib/**/*.js'],
+    },
   },
   build: {
     // Raise the warning threshold slightly so the legitimate Plotly chunk

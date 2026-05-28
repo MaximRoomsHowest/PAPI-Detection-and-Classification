@@ -31,6 +31,7 @@ from app.validation.schemas import (
     AnalysisPayload,
     AngleResult,
     LampResult,
+    ModelInfo,
 )
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -96,6 +97,17 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         )
 
     fake_service.analyze.side_effect = _fake_analyze
+    fake_service.model_info.return_value = ModelInfo(
+        model_path=str(tmp_path / "models" / "best.pt"),
+        model_filename="best.pt",
+        model_format="pt",
+        backend_type="ultralytics-pytorch",
+        exists=True,
+        file_size_mb=12.5,
+        confidence_threshold=0.4,
+        device="cpu",
+        loaded=False,
+    )
 
     # Override get_session via FastAPI's mechanism (it's a real Depends).
     app.dependency_overrides[get_session] = override_get_session
@@ -208,6 +220,60 @@ def test_analyze_frame_end_to_end_writes_log_row(client):
     assert len(body["lamps"]) == 4
     assert body["log_id"]  # repository wrote a row and the id propagated back
     assert body["processing_ms"] == 42
+
+
+def test_logs_list_and_detail_return_persisted_analysis(client):
+    create_response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={"runway_id": "papi_24"},
+    )
+    log_id = create_response.json()["log_id"]
+
+    list_response = client.get("/api/logs")
+    assert list_response.status_code == 200
+    rows = list_response.json()
+    assert rows[0]["id"] == log_id
+    assert rows[0]["original_filename"] == "frame.jpg"
+    assert rows[0]["global_state"] == "correct_glidepath"
+
+    detail_response = client.get(f"/api/logs/{log_id}")
+    assert detail_response.status_code == 200
+    body = detail_response.json()
+    assert body["log_id"] == log_id
+    assert body["lamps"][0]["state"] == "white"
+
+
+def test_model_endpoint_returns_active_model_metadata(client):
+    response = client.get("/api/model")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_filename"] == "best.pt"
+    assert body["backend_type"] == "ultralytics-pytorch"
+    assert body["confidence_threshold"] == 0.4
+    assert body["device"] == "cpu"
+
+
+def test_stats_endpoint_summarizes_recent_logs(client):
+    for filename in ("first.jpg", "second.jpg"):
+        response = client.post(
+            "/api/analyze-frame",
+            files={"file": (filename, BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+            data={"runway_id": "papi_24"},
+        )
+        assert response.status_code == 200
+
+    stats_response = client.get("/api/stats")
+    assert stats_response.status_code == 200
+    body = stats_response.json()
+    assert body["sample_size"] == 2
+    assert body["image_count"] == 2
+    assert body["video_count"] == 0
+    assert body["avg_processing_ms"] == 42.0
+    assert body["p50_processing_ms"] == 42
+    assert body["p95_processing_ms"] == 42
+    assert body["latest_created_at"]
 
 
 def test_analyze_frames_rejects_empty_list(client):

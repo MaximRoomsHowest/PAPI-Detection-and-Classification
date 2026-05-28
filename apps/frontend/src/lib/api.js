@@ -95,6 +95,46 @@ export async function fetchRunways() {
   return response.json()
 }
 
+export async function fetchModelInfo() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/model`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`Could not load model info (${response.status})`)
+  }
+  return response.json()
+}
+
+export async function fetchStats() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`Could not load inference stats (${response.status})`)
+  }
+  return response.json()
+}
+
+export async function fetchLogs() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/logs`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`Could not load analysis history (${response.status})`)
+  }
+  return response.json()
+}
+
+export async function fetchLogDetail(logId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/logs/${logId}`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`Could not load analysis ${logId} (${response.status})`)
+  }
+  return response.json()
+}
+
 function appendMetadata(formData, metadata) {
   formData.append('runway_id', metadata.runwayId)
 

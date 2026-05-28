@@ -1,3 +1,4 @@
+import os
 from collections import Counter, deque
 from functools import lru_cache
 from pathlib import Path
@@ -8,7 +9,7 @@ from uuid import uuid4
 from app.config import Settings
 from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
 from app.services.state import confidence_from_lamps, global_state_from_lamps, normalize_detections
-from app.validation.schemas import AnalysisPayload, LampResult
+from app.validation.schemas import AnalysisPayload, LampResult, ModelInfo
 
 
 class InferenceService:
@@ -34,6 +35,7 @@ class InferenceService:
     @property
     def model(self) -> Any:
         if self._model is None:
+            os.environ.setdefault("YOLO_AUTOINSTALL", "False")
             try:
                 from ultralytics import YOLO
             except ImportError as exc:
@@ -42,6 +44,27 @@ class InferenceService:
                 raise RuntimeError(f"Model file not found: {self.settings.model_path}")
             self._model = YOLO(str(self.settings.model_path))
         return self._model
+
+    def model_info(self) -> ModelInfo:
+        path = self.settings.model_path
+        suffix = path.suffix.lower().lstrip(".") or "unknown"
+        backend_type = {
+            "onnx": "ultralytics-onnxruntime",
+            "pt": "ultralytics-pytorch",
+        }.get(suffix, f"ultralytics-{suffix}")
+        exists = path.exists()
+        file_size_mb = round(path.stat().st_size / (1024 * 1024), 2) if exists else None
+        return ModelInfo(
+            model_path=str(path),
+            model_filename=path.name,
+            model_format=suffix,
+            backend_type=backend_type,
+            exists=exists,
+            file_size_mb=file_size_mb,
+            confidence_threshold=self.settings.confidence_threshold,
+            device=self.settings.device,
+            loaded=self._model is not None,
+        )
 
     def analyze_image(
         self,
@@ -245,12 +268,14 @@ class InferenceService:
                 persist=not reset_tracker,
                 tracker="bytetrack.yaml",
                 conf=self.settings.confidence_threshold,
+                device=self.settings.device,
                 verbose=False,
             )
         else:
             results = self.model.predict(
                 frame,
                 conf=self.settings.confidence_threshold,
+                device=self.settings.device,
                 verbose=False,
             )
 

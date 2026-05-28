@@ -13,6 +13,12 @@ def test_documented_relative_model_override_resolves_to_repo_models_serving():
     assert settings.model_path == REPO_ROOT / "models" / "serving" / "best.pt"
 
 
+def test_documented_onnx_model_override_resolves_to_repo_models_serving():
+    settings = Settings(PAPI_MODEL_PATH="../../models/serving/best_int8.onnx")
+
+    assert settings.model_path == REPO_ROOT / "models" / "serving" / "best_int8.onnx"
+
+
 def test_cors_origins_accept_comma_separated_env_value():
     settings = Settings(PAPI_CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173")
 

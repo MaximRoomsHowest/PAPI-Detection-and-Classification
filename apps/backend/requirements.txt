@@ -8,5 +8,7 @@ ultralytics==8.3.58
 lap==0.5.13
 opencv-python==4.10.0.84
 exifread==3.0.0
+onnx==1.17.0
+onnxruntime==1.20.1
 pytest==8.3.4
 httpx==0.28.1

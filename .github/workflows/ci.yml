@@ -74,6 +74,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test (vitest)
+        # `vitest run` is single-shot (no watch mode) and exits non-zero
+        # on any failing test, matching the contract of `npm run lint` /
+        # `pytest` above. Coverage is skipped in CI to keep the step
+        # fast; run `npm run test:coverage` locally for the report.
+        run: npm test
+
       - name: Build
         run: npm run build
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -6,20 +6,33 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  History as HistoryIcon,
   FolderOpen,
   Gauge,
   Moon,
   Pause,
   Play,
   Radar,
+  RefreshCw,
   Sun,
   Upload,
+  X,
   Zap,
 } from 'lucide-react'
 import clsx from 'clsx'
 import './App.css'
 import heroPosterUrl from './assets/hero.png'
-import { analyzeFrame, analyzeFrames, analyzeMedia, fetchRunways, mediaUrl } from './lib/api'
+import {
+  analyzeFrame,
+  analyzeFrames,
+  analyzeMedia,
+  fetchLogDetail,
+  fetchLogs,
+  fetchModelInfo,
+  fetchRunways,
+  fetchStats,
+  mediaUrl,
+} from './lib/api'
 import { extractFrameImages } from './lib/frameExtraction'
 
 // Plotly is lazy-loaded to keep the initial JS bundle small (saves ~700kB
@@ -181,8 +194,8 @@ const backendStateId = {
 
 const defaultMetadata = {
   // Aligned with backend default (audit B-CRIT-2): papi_24's height is
-  // confirmed (467.609 m WGS84); papi_06's installation height is still
-  // open as of 26/05. Users can switch via the dropdown.
+  // pinned to the client-provided 461.37 m reference. PAPI 06 also uses
+  // 461.37 provisionally until Intersoft confirms rwy 06 height/datum.
   runwayId: 'papi_24',
   droneId: '',
   droneLatitude: '',
@@ -200,6 +213,7 @@ const translations = {
       introduction: 'Introduction',
       liveDemo: 'Live Demo',
       insights: 'Insights',
+      history: 'History',
     },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
@@ -266,6 +280,34 @@ const translations = {
       frame: 'Frame',
       status: 'Status',
     },
+    history: {
+      eyebrow: 'History',
+      title: 'Recent backend analyses, artifacts, and model runtime status.',
+      refresh: 'Refresh',
+      loading: 'Loading history',
+      empty: 'No backend analyses logged yet.',
+      filename: 'File',
+      runway: 'Runway',
+      state: 'State',
+      confidence: 'Confidence',
+      angle: 'Angle',
+      frames: 'Frames',
+      processing: 'Processing',
+      created: 'Created',
+      artifact: 'Artifact',
+      view: 'View',
+      model: 'Model',
+      stats: 'Stats',
+      sample: 'Recent analyses',
+      avg: 'Avg ms',
+      p95: 'P95 ms',
+      detailTitle: 'Analysis detail',
+      lamps: 'Lamps',
+      detections: 'Detections',
+      angleNote: 'Angle note',
+      close: 'Close',
+      unavailable: 'Unavailable',
+    },
     states: {
       'far-high': ['Far too high', 'Aircraft is well above glidepath'],
       'too-high': ['Too high', 'Slightly above the ideal angle'],
@@ -297,6 +339,7 @@ const translations = {
       introduction: 'Introductie',
       liveDemo: 'Live demo',
       insights: 'Inzichten',
+      history: 'Historiek',
     },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
@@ -363,6 +406,34 @@ const translations = {
       frame: 'Frame',
       status: 'Status',
     },
+    history: {
+      eyebrow: 'Historiek',
+      title: 'Recente backendanalyses, artefacten en modelstatus.',
+      refresh: 'Vernieuwen',
+      loading: 'Historiek laden',
+      empty: 'Nog geen backendanalyses gelogd.',
+      filename: 'Bestand',
+      runway: 'Baan',
+      state: 'Status',
+      confidence: 'Vertrouwen',
+      angle: 'Hoek',
+      frames: 'Frames',
+      processing: 'Verwerking',
+      created: 'Aangemaakt',
+      artifact: 'Artefact',
+      view: 'Bekijken',
+      model: 'Model',
+      stats: 'Stats',
+      sample: 'Recente analyses',
+      avg: 'Gem. ms',
+      p95: 'P95 ms',
+      detailTitle: 'Analyse-detail',
+      lamps: 'Lampen',
+      detections: 'Detecties',
+      angleNote: 'Hoeknotitie',
+      close: 'Sluiten',
+      unavailable: 'Niet beschikbaar',
+    },
     states: {
       'far-high': ['Veel te hoog', 'Het toestel zit ruim boven het glijpad'],
       'too-high': ['Te hoog', 'Iets boven de ideale hoek'],
@@ -394,6 +465,7 @@ const translations = {
       introduction: 'Introduction',
       liveDemo: 'Demo live',
       insights: 'Analyses',
+      history: 'Historique',
     },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
@@ -459,6 +531,34 @@ const translations = {
       transitionDetected: 'Transition detectee',
       frame: 'Frame',
       status: 'Etat',
+    },
+    history: {
+      eyebrow: 'Historique',
+      title: 'Analyses backend recentes, artefacts et statut du modele.',
+      refresh: 'Actualiser',
+      loading: 'Chargement',
+      empty: 'Aucune analyse backend journalisee.',
+      filename: 'Fichier',
+      runway: 'Piste',
+      state: 'Etat',
+      confidence: 'Confiance',
+      angle: 'Angle',
+      frames: 'Frames',
+      processing: 'Traitement',
+      created: 'Cree',
+      artifact: 'Artefact',
+      view: 'Voir',
+      model: 'Modele',
+      stats: 'Stats',
+      sample: 'Analyses recentes',
+      avg: 'Moy. ms',
+      p95: 'P95 ms',
+      detailTitle: 'Detail analyse',
+      lamps: 'Lampes',
+      detections: 'Detections',
+      angleNote: 'Note angle',
+      close: 'Fermer',
+      unavailable: 'Indisponible',
     },
     states: {
       'far-high': ['Beaucoup trop haut', 'L’appareil est largement au-dessus du plan'],
@@ -680,6 +780,22 @@ function isImageFile(file) {
 
 function fileDisplayPath(file) {
   return file.webkitRelativePath || file.name
+}
+
+function formatTimestamp(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString([], {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatAngle(value, fallback = '—') {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(3)}°` : fallback
 }
 
 function boxFromLamps(lamps, frameWidth, frameHeight) {
@@ -1200,6 +1316,12 @@ function App() {
           >
             {copy.nav.insights}
           </NavLink>
+          <NavLink
+            className={({ isActive }) => clsx('nav-link', isActive && 'active')}
+            to="/history"
+          >
+            {copy.nav.history}
+          </NavLink>
         </nav>
 
         <div className="topbar-actions">
@@ -1270,6 +1392,7 @@ function App() {
             />
           }
         />
+        <Route path="/history" element={<HistoryPage copy={copy} />} />
         <Route path="*" element={<IntroductionPage copy={copy} />} />
       </Routes>
       {/* CookieConsent removed per audit F-MAJ-4 — non-functional gimmick that
@@ -1407,12 +1530,20 @@ function LiveDemoPage({
           <label className="upload-button">
             <Upload size={18} />
             <span>{media ? media.name : copy.live.upload}</span>
-            <input accept="image/*,video/*" type="file" onChange={handleMediaChange} />
+            <input
+              id="papi-media-file"
+              name="file"
+              accept="image/*,video/*"
+              type="file"
+              onChange={handleMediaChange}
+            />
           </label>
           <label className="upload-button folder-upload">
             <FolderOpen size={18} />
             <span>{copy.live.uploadFolder}</span>
             <input
+              id="papi-media-folder"
+              name="files"
               accept="image/*"
               type="file"
               multiple
@@ -1437,6 +1568,8 @@ function LiveDemoPage({
         <label>
           <span>{copy.live.runway}</span>
           <select
+            id="runway_id"
+            name="runway_id"
             value={metadata.runwayId}
             onChange={(event) => handleMetadataChange('runwayId', event.target.value)}
           >
@@ -1450,6 +1583,8 @@ function LiveDemoPage({
         <label>
           <span>{copy.live.droneId}</span>
           <input
+            id="drone_id"
+            name="drone_id"
             value={metadata.droneId}
             onChange={(event) => handleMetadataChange('droneId', event.target.value)}
             placeholder={copy.live.optional}
@@ -1458,6 +1593,8 @@ function LiveDemoPage({
         <label>
           <span>{copy.live.latitude}</span>
           <input
+            id="drone_latitude"
+            name="drone_latitude"
             inputMode="decimal"
             value={metadata.droneLatitude}
             onChange={(event) => handleMetadataChange('droneLatitude', event.target.value)}
@@ -1467,6 +1604,8 @@ function LiveDemoPage({
         <label>
           <span>{copy.live.longitude}</span>
           <input
+            id="drone_longitude"
+            name="drone_longitude"
             inputMode="decimal"
             value={metadata.droneLongitude}
             onChange={(event) => handleMetadataChange('droneLongitude', event.target.value)}
@@ -1476,6 +1615,8 @@ function LiveDemoPage({
         <label>
           <span>{copy.live.altitude}</span>
           <input
+            id="drone_altitude_m"
+            name="drone_altitude_m"
             inputMode="decimal"
             value={metadata.droneAltitudeM}
             onChange={(event) => handleMetadataChange('droneAltitudeM', event.target.value)}
@@ -1622,6 +1763,245 @@ function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onD
         <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} copy={copy} />
         <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} copy={copy} />
       </div>
+    </section>
+  )
+}
+
+function HistoryPage({ copy }) {
+  const [logs, setLogs] = useState([])
+  const [modelInfo, setModelInfo] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [selectedLog, setSelectedLog] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState('')
+
+  const loadHistory = useCallback(async (showRefreshing = true) => {
+    if (showRefreshing) {
+      setError('')
+      setIsRefreshing(true)
+    }
+    try {
+      const [nextLogs, nextStats, nextModel] = await Promise.all([
+        fetchLogs(),
+        fetchStats(),
+        fetchModelInfo(),
+      ])
+      setLogs(nextLogs)
+      setStats(nextStats)
+      setModelInfo(nextModel)
+    } catch (loadError) {
+      setError(loadError.message)
+    } finally {
+      setIsLoading(false)
+      if (showRefreshing) {
+        setIsRefreshing(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadHistory(false)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadHistory])
+
+  const openLog = async (logId) => {
+    setError('')
+    try {
+      const detail = await fetchLogDetail(logId)
+      setSelectedLog(detail)
+    } catch (detailError) {
+      setError(detailError.message)
+    }
+  }
+
+  return (
+    <section className="history-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">{copy.history.eyebrow}</p>
+          <h2>{copy.history.title}</h2>
+        </div>
+        <button
+          className="secondary-button"
+          type="button"
+        onClick={() => loadHistory()}
+          disabled={isRefreshing}
+        >
+          <RefreshCw size={18} />
+          {isRefreshing ? copy.history.loading : copy.history.refresh}
+        </button>
+      </div>
+
+      {error && <div className="analysis-status error">{error}</div>}
+
+      <div className="history-summary-grid">
+        <div className="history-summary">
+          <span>{copy.history.model}</span>
+          <strong>{modelInfo?.model_filename ?? copy.history.unavailable}</strong>
+          <small>
+            {modelInfo
+              ? `${modelInfo.backend_type} · ${modelInfo.file_size_mb ?? '—'} MB`
+              : copy.history.unavailable}
+          </small>
+        </div>
+        <div className="history-summary">
+          <span>{copy.history.sample}</span>
+          <strong>{stats?.sample_size ?? 0}</strong>
+          <small>
+            {stats ? `${stats.image_count} image · ${stats.video_count} video` : copy.history.unavailable}
+          </small>
+        </div>
+        <div className="history-summary">
+          <span>{copy.history.avg}</span>
+          <strong>{stats?.avg_processing_ms ?? '—'}</strong>
+          <small>{copy.history.processing}</small>
+        </div>
+        <div className="history-summary">
+          <span>{copy.history.p95}</span>
+          <strong>{stats?.p95_processing_ms ?? '—'}</strong>
+          <small>{formatTimestamp(stats?.latest_created_at)}</small>
+        </div>
+      </div>
+
+      <div className="history-table-wrap">
+        {isLoading ? (
+          <div className="history-empty">{copy.history.loading}</div>
+        ) : logs.length === 0 ? (
+          <div className="history-empty">{copy.history.empty}</div>
+        ) : (
+          <table className="history-table">
+            <thead>
+              <tr>
+                <th>{copy.history.filename}</th>
+                <th>{copy.history.runway}</th>
+                <th>{copy.history.state}</th>
+                <th>{copy.history.confidence}</th>
+                <th>{copy.history.angle}</th>
+                <th>{copy.history.frames}</th>
+                <th>{copy.history.processing}</th>
+                <th>{copy.history.created}</th>
+                <th>{copy.history.artifact}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td>
+                    <button className="history-link" type="button" onClick={() => openLog(log.id)}>
+                      {log.original_filename}
+                    </button>
+                  </td>
+                  <td>{log.runway_id}</td>
+                  <td>
+                    <span className={clsx('state-pill', `state-pill-${log.global_state}`)}>
+                      {log.global_state.replaceAll('_', ' ')}
+                    </span>
+                  </td>
+                  <td>{percent(log.confidence)}%</td>
+                  <td>{formatAngle(log.elevation_angle_deg, copy.history.unavailable)}</td>
+                  <td>{log.frame_count}</td>
+                  <td>{log.processing_ms} ms</td>
+                  <td>{formatTimestamp(log.created_at)}</td>
+                  <td>
+                    {log.artifact_url ? (
+                      <a href={mediaUrl(log.artifact_url)} target="_blank" rel="noreferrer">
+                        {copy.history.view}
+                      </a>
+                    ) : (
+                      copy.history.unavailable
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {selectedLog && (
+        <div className="history-modal-backdrop" role="presentation">
+          <section
+            className="history-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-detail-title"
+          >
+            <div className="history-modal-heading">
+              <div>
+                <p className="eyebrow">{copy.history.detailTitle}</p>
+                <h3 id="history-detail-title">{selectedLog.original_filename}</h3>
+              </div>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => setSelectedLog(null)}
+                aria-label={copy.history.close}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="history-detail-grid">
+              <div>
+                <span>{copy.history.state}</span>
+                <strong>{selectedLog.global_state.replaceAll('_', ' ')}</strong>
+              </div>
+              <div>
+                <span>{copy.history.confidence}</span>
+                <strong>{percent(selectedLog.confidence)}%</strong>
+              </div>
+              <div>
+                <span>{copy.history.angle}</span>
+                <strong>{formatAngle(selectedLog.angle?.elevation_angle_deg, copy.history.unavailable)}</strong>
+              </div>
+              <div>
+                <span>{copy.history.processing}</span>
+                <strong>{selectedLog.processing_ms} ms</strong>
+              </div>
+            </div>
+
+            {selectedLog.artifact_url && (
+              <div className="history-artifact">
+                {selectedLog.media_type === 'video' ? (
+                  <video src={mediaUrl(selectedLog.artifact_url)} controls>
+                    <track kind="captions" />
+                  </video>
+                ) : (
+                  <img src={mediaUrl(selectedLog.artifact_url)} alt={selectedLog.original_filename} />
+                )}
+              </div>
+            )}
+
+            <div className="history-modal-columns">
+              <div>
+                <h4>{copy.history.lamps}</h4>
+                <div className="history-lamps">
+                  {selectedLog.lamps.map((lamp) => (
+                    <span className={clsx('history-lamp', `history-lamp-${lamp.state}`)} key={lamp.index}>
+                      L{lamp.index} · {lamp.state} · {percent(lamp.confidence)}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4>{copy.history.detections}</h4>
+                <pre className="history-json">
+                  {JSON.stringify(selectedLog.detections ?? [], null, 2)}
+                </pre>
+              </div>
+            </div>
+
+            <div className="history-angle-note">
+              <HistoryIcon size={16} />
+              <span>{copy.history.angleNote}</span>
+              <p>{selectedLog.angle?.angle_note ?? copy.history.unavailable}</p>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   )
 }

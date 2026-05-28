@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import AnalysisLog
 from app.services.media import media_url_for_path
-from app.validation.schemas import AnalysisPayload, LogListItem
+from app.validation.schemas import AnalysisPayload, InferenceStats, LogListItem
 
 
 class AnalysisLogRepository:
@@ -52,6 +52,23 @@ class AnalysisLogRepository:
     def get(self, log_id: str) -> AnalysisLog | None:
         return self.db.get(AnalysisLog, log_id)
 
+    def stats(self, limit: int = 100) -> InferenceStats:
+        logs = self.list_recent(limit=limit, offset=0)
+        processing_times = sorted(log.processing_ms for log in logs)
+        image_count = sum(1 for log in logs if log.media_type == "image")
+        video_count = sum(1 for log in logs if log.media_type == "video")
+        return InferenceStats(
+            sample_size=len(logs),
+            image_count=image_count,
+            video_count=video_count,
+            avg_processing_ms=round(sum(processing_times) / len(processing_times), 2)
+            if processing_times
+            else None,
+            p50_processing_ms=_percentile_nearest_rank(processing_times, 0.50),
+            p95_processing_ms=_percentile_nearest_rank(processing_times, 0.95),
+            latest_created_at=logs[0].created_at.isoformat() if logs else None,
+        )
+
     def to_list_item(self, log: AnalysisLog) -> LogListItem:
         return LogListItem(
             id=log.id,
@@ -68,4 +85,11 @@ class AnalysisLogRepository:
             artifact_url=media_url_for_path(log.artifact_path, get_settings()),
             created_at=log.created_at.isoformat(),
         )
+
+
+def _percentile_nearest_rank(values: list[int], percentile: float) -> int | None:
+    if not values:
+        return None
+    index = max(0, min(len(values) - 1, round((len(values) - 1) * percentile)))
+    return values[index]
 

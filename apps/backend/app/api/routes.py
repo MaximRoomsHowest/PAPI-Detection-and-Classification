@@ -12,7 +12,14 @@ from app.services.inference import get_inference_service
 from app.services.media import detect_media_type, save_upload
 from app.services.runways import get_runway, list_runways
 from app.validation.analyze import parse_manual_drone_metadata
-from app.validation.schemas import AnalysisPayload, FrameBatchPayload, LogListItem, RunwayResponse
+from app.validation.schemas import (
+    AnalysisPayload,
+    FrameBatchPayload,
+    InferenceStats,
+    LogListItem,
+    ModelInfo,
+    RunwayResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +35,7 @@ def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] 
 @router.post("/analyze", response_model=AnalysisPayload)
 async def analyze_media(
     file: Annotated[UploadFile, File()],
-    # Default to papi_24 (confirmed lamp altitude 467.609 m) rather than
+    # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
     # papi_06 whose installation height is still unconfirmed by Intersoft
     # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
     # still lets the user pick papi_06 explicitly.
@@ -55,7 +62,7 @@ async def analyze_media(
 @router.post("/analyze-frame", response_model=AnalysisPayload)
 async def analyze_frame(
     file: Annotated[UploadFile, File()],
-    # Default to papi_24 (confirmed lamp altitude 467.609 m) rather than
+    # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
     # papi_06 whose installation height is still unconfirmed by Intersoft
     # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
     # still lets the user pick papi_06 explicitly.
@@ -82,7 +89,7 @@ async def analyze_frame(
 @router.post("/analyze-frames", response_model=FrameBatchPayload)
 async def analyze_frames(
     files: Annotated[list[UploadFile], File()],
-    # Default to papi_24 (confirmed lamp altitude 467.609 m) rather than
+    # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
     # papi_06 whose installation height is still unconfirmed by Intersoft
     # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
     # still lets the user pick papi_06 explicitly.
@@ -198,6 +205,20 @@ async def _analyze_upload(
 @router.get("/runways", response_model=list[RunwayResponse])
 def get_runways() -> list[RunwayResponse]:
     return list_runways()
+
+
+@router.get("/model", response_model=ModelInfo)
+def get_model_info(_auth: Annotated[None, Depends(require_api_key)] = None) -> ModelInfo:
+    return get_inference_service().model_info()
+
+
+@router.get("/stats", response_model=InferenceStats)
+def get_stats(
+    limit: int = 100,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
+) -> InferenceStats:
+    return AnalysisLogRepository(db).stats(limit=limit)
 
 
 @router.get("/logs", response_model=list[LogListItem])

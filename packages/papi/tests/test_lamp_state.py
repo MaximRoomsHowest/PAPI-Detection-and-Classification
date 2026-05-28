@@ -29,7 +29,7 @@ def _camera_at_angle(papi_cfg: dict, light_no: int, elev_deg: float, dist_m: flo
     light = papi_cfg["light_" + str(light_no)]
     lat = float(light["lat"])
     lon = float(light["lon"])
-    lamp_alt = float(papi_cfg["default_alt_wgs84_m"])
+    lamp_alt = float(light["alt"] if light.get("alt") is not None else papi_cfg["default_alt_wgs84_m"])
 
     # Place camera `dist_m` due east of the lamp and altitude_diff above it.
     dlon_deg = dist_m / (111_320.0 * math.cos(math.radians(lat)))

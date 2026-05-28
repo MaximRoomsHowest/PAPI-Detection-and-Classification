@@ -6,11 +6,11 @@
 # The dataset contains flights targeting BOTH runways (originally documented as rwy-06 only —
 # the assumption was wrong; day2 flights target rwy 24, see docs/pipeline.md).
 #
-# TODO (confirm with Intersoft / Daoud Yousef):
+# TODO (confirm with Intersoft / Daoud Uahabi):
 #   1. set_angle_deg per light per runway: currently FAA-standard defaults for a 3.0deg glideslope.
 #      Real EDNY commissioned set-angles may differ.
-#   2. alt per light: surveyed XLSX has lat/lon but no altitude per lamp. We fall back to
-#      default_alt_wgs84_m (field-elevation estimate, ~465 m WGS84).
+#   2. alt per light: 461.37 m is client-provided for rwy 24 and PROVISIONALLY
+#      reused for rwy 06 until Intersoft confirms the rwy 06 height and datum.
 #   3. ZoomCamera calibrated_focal_px: absent from XMP. Sprint-1 pipeline skips zoom bbox
 #      autolabel; sprint 2 needs either a separate calibration or a EXIF-derived approximation.
 #
@@ -22,10 +22,14 @@ airport: EDNY
 runways:
   '06':
     papi:
-      light_1: { lat: 47.668810, lon: 9.504007, alt: null, set_angle_deg: null }
-      light_2: { lat: 47.668881, lon: 9.503948, alt: null, set_angle_deg: null }
-      light_3: { lat: 47.668951, lon: 9.503888, alt: null, set_angle_deg: null }
-      light_4: { lat: 47.669021, lon: 9.503828, alt: null, set_angle_deg: null }
+      # alt: 461.37 m is PROVISIONAL for PAPI 06. Intersoft has not yet
+      # confirmed rwy 06 installation height, height datum, or commissioned
+      # set-angles. This value is used so angle behavior matches the current
+      # notebook reference until the client supplies the authoritative survey.
+      light_1: { lat: 47.668810, lon: 9.504007, alt: 461.37, set_angle_deg: null }
+      light_2: { lat: 47.668881, lon: 9.503948, alt: 461.37, set_angle_deg: null }
+      light_3: { lat: 47.668951, lon: 9.503888, alt: 461.37, set_angle_deg: null }
+      light_4: { lat: 47.669021, lon: 9.503828, alt: 461.37, set_angle_deg: null }
   '24':
     papi:
       # alt: 461.37 m provided by Intersoft on 26/05/2026 (client meeting).
