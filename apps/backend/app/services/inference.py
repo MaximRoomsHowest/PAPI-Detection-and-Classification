@@ -58,10 +58,12 @@ class InferenceService:
             raise ValueError("Could not read uploaded image.")
 
         detections = self._detect_frame(frame, use_tracking=False)
-        lamps = normalize_detections(detections)
+        # Compute angles FIRST so normalize_detections can derive the
+        # transition state from per-lamp elevation angles (audit B-CRIT-1).
+        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
+        lamps = normalize_detections(detections, per_light_angles=angle.per_light_angles)
         global_state = global_state_from_lamps(lamps)
         confidence = confidence_from_lamps(lamps)
-        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
 
         annotated = self._draw_overlay(frame, lamps, global_state, confidence, angle.elevation_angle_deg)
         artifact_path = self.settings.exports_dir / f"{uuid4()}_annotated.jpg"
@@ -134,7 +136,13 @@ class InferenceService:
                     break
 
                 detections = self._detect_frame(frame, use_tracking=True)
-                lamps = normalize_detections(detections)
+                # Pass per_light_angles so per-lamp transition state is
+                # available frame-by-frame (audit B-CRIT-1). For a single
+                # uploaded video the drone metadata is constant across
+                # frames, so reusing the precomputed `angle` is correct.
+                lamps = normalize_detections(
+                    detections, per_light_angles=angle.per_light_angles
+                )
                 frame_state = global_state_from_lamps(lamps)
                 frame_confidence = confidence_from_lamps(lamps)
 
@@ -257,6 +265,17 @@ class InferenceService:
         latitude, longitude, altitude = metadata
         return compute_elevation_angles(latitude, longitude, altitude, runway_id, angle_source=angle_source)
 
+    # BGR color map: cv2 stores images as BGR not RGB, so amber/orange for
+    # transition is (0, 165, 255) and white is near-white grey. Once
+    # B-CRIT-1 routes transition through to lamp.state, this map ensures
+    # transitions visibly stand out instead of looking identical to red.
+    _LAMP_COLORS: dict[str, tuple[int, int, int]] = {
+        "white": (245, 245, 245),
+        "red": (0, 0, 255),
+        "transition": (0, 165, 255),
+        "unknown": (128, 128, 128),
+    }
+
     def _draw_overlay(
         self,
         frame: Any,
@@ -269,7 +288,7 @@ class InferenceService:
         for lamp in lamps:
             if lamp.bbox is None:
                 continue
-            color = (245, 245, 245) if lamp.state == "white" else (0, 0, 255)
+            color = self._LAMP_COLORS.get(lamp.state, self._LAMP_COLORS["unknown"])
             cv2.rectangle(frame, (lamp.bbox.x1, lamp.bbox.y1), (lamp.bbox.x2, lamp.bbox.y2), color, 2)
             cv2.putText(
                 frame,

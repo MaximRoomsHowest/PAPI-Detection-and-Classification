@@ -1,3 +1,4 @@
+import logging
 from time import perf_counter
 from typing import Annotated
 
@@ -13,6 +14,8 @@ from app.services.runways import get_runway, list_runways
 from app.validation.analyze import parse_manual_drone_metadata
 from app.validation.schemas import AnalysisPayload, FrameBatchPayload, LogListItem, RunwayResponse
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api")
 
 
@@ -25,7 +28,11 @@ def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] 
 @router.post("/analyze", response_model=AnalysisPayload)
 async def analyze_media(
     file: Annotated[UploadFile, File()],
-    runway_id: Annotated[str, Form()] = "papi_06",
+    # Default to papi_24 (confirmed lamp altitude 467.609 m) rather than
+    # papi_06 whose installation height is still unconfirmed by Intersoft
+    # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
+    # still lets the user pick papi_06 explicitly.
+    runway_id: Annotated[str, Form()] = "papi_24",
     drone_id: Annotated[str | None, Form()] = None,
     drone_latitude: Annotated[float | None, Form()] = None,
     drone_longitude: Annotated[float | None, Form()] = None,
@@ -48,7 +55,11 @@ async def analyze_media(
 @router.post("/analyze-frame", response_model=AnalysisPayload)
 async def analyze_frame(
     file: Annotated[UploadFile, File()],
-    runway_id: Annotated[str, Form()] = "papi_06",
+    # Default to papi_24 (confirmed lamp altitude 467.609 m) rather than
+    # papi_06 whose installation height is still unconfirmed by Intersoft
+    # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
+    # still lets the user pick papi_06 explicitly.
+    runway_id: Annotated[str, Form()] = "papi_24",
     drone_id: Annotated[str | None, Form()] = None,
     drone_latitude: Annotated[float | None, Form()] = None,
     drone_longitude: Annotated[float | None, Form()] = None,
@@ -71,7 +82,11 @@ async def analyze_frame(
 @router.post("/analyze-frames", response_model=FrameBatchPayload)
 async def analyze_frames(
     files: Annotated[list[UploadFile], File()],
-    runway_id: Annotated[str, Form()] = "papi_06",
+    # Default to papi_24 (confirmed lamp altitude 467.609 m) rather than
+    # papi_06 whose installation height is still unconfirmed by Intersoft
+    # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
+    # still lets the user pick papi_06 explicitly.
+    runway_id: Annotated[str, Form()] = "papi_24",
     drone_id: Annotated[str | None, Form()] = None,
     drone_latitude: Annotated[float | None, Form()] = None,
     drone_longitude: Annotated[float | None, Form()] = None,
@@ -143,10 +158,25 @@ async def _analyze_upload(
         )
         log = AnalysisLogRepository(db).create_from_payload(payload)
         payload.log_id = log.id
+        # Structured success log — pairs with the request_id from middleware
+        # so a single analysis can be traced end-to-end (audit B-IMP-4).
+        logger.info(
+            "analysis.success",
+            extra={
+                "media_type": media_type,
+                "runway_id": runway_id,
+                "global_state": payload.global_state,
+                "confidence": payload.confidence,
+                "processing_ms": payload.processing_ms,
+                "log_id": log.id,
+            },
+        )
         return payload
     except RuntimeError as exc:
+        logger.exception("analysis.runtime_error", extra={"runway_id": runway_id})
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
+        logger.warning("analysis.value_error", extra={"runway_id": runway_id, "detail": str(exc)})
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         saved_path.unlink(missing_ok=True)
