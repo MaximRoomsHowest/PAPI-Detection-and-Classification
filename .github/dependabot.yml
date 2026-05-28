@@ -1,0 +1,32 @@
+version: 2
+# Weekly dependency-update PRs across the three ecosystems in this repo
+# (audit IMP-INF-3). Grouped so a week's bumps arrive as one PR per ecosystem.
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: "pip"
+    directory: "/apps/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      backend:
+        patterns: ["*"]
+
+  - package-ecosystem: "npm"
+    directory: "/apps/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend:
+        patterns: ["*"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
