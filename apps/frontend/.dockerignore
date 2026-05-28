@@ -25,4 +25,6 @@ Thumbs.db
 README.md
 Dockerfile
 .dockerignore
-nginx.conf
+# NOTE: nginx.conf MUST stay in the build context — the multi-stage Dockerfile
+# copies it into /etc/nginx/conf.d/default.conf in the `serve` stage. Excluding
+# it breaks `docker compose up --build` (see audit SMOKE-CRIT-1).

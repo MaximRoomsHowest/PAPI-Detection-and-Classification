@@ -29,9 +29,19 @@ RUN pip install -r requirements.txt
 COPY app ./app
 COPY pytest.ini ./
 
+# Create a non-root runtime user and hand it ownership of the app + storage
+# paths (audit DCK-MAJ-3). System ultralytics weights are downloaded into the
+# user's home directory on first use, so the home must exist and be writable.
+RUN groupadd --system papi \
+ && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \
+ && mkdir -p /storage /models \
+ && chown -R papi:papi /app /storage /models /home/papi
+
 ENV PAPI_MODEL_PATH=/models/serving/best.pt \
     PAPI_STORAGE_DIR=/storage \
     DATABASE_URL=postgresql+psycopg://papi:papi@postgres:5432/papi_backend
+
+USER papi
 
 EXPOSE 8000
 

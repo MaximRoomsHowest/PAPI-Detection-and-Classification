@@ -4,14 +4,16 @@
 # bundle. The backend model is bind-mounted from ./models so the image stays
 # code-only and you can swap weights without rebuilding.
 #
-# Quick start:
+# Quick start (local):
+#   cp .env.example .env       # adjust values, especially POSTGRES_PASSWORD
 #   docker compose up -d --build
 #   open http://localhost:5173
 #
-# The browser will call the backend at http://localhost:8000 — that's the
-# URL Vite bakes into the frontend bundle by default. Override with
-#   FRONTEND_PAPI_API_URL=https://your-host docker compose build frontend
-# if you publish behind a different hostname.
+# For a real deployment, override at least:
+#   POSTGRES_PASSWORD          (strong random secret)
+#   PAPI_API_KEY               (required when PAPI_ENV=production)
+#   PAPI_ENV=production        (flips the security floor — see backend main.py)
+#   FRONTEND_PAPI_API_URL      (public hostname the browser reaches the API at)
 
 services:
   postgres:
@@ -19,18 +21,28 @@ services:
     container_name: papi-postgres
     environment:
       POSTGRES_DB: papi_backend
-      POSTGRES_USER: papi
-      POSTGRES_PASSWORD: papi
+      # ${VAR:?msg} fails fast if the variable is missing from .env (audit
+      # DCK-MAJ-1: no more hardcoded papi:papi credentials in compose).
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "5434:5432"
+      # Bind to loopback only (audit DCK-CRIT-1: never expose dev postgres
+      # on the LAN with default credentials). The backend container reaches
+      # postgres via the compose network, not the host port.
+      - "127.0.0.1:5434:5432"
     volumes:
       - papi_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U papi -d papi_backend"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d papi_backend"]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   backend:
     build:
@@ -40,15 +52,20 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://papi:papi@postgres:5432/papi_backend
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/papi_backend
       PAPI_MODEL_PATH: /models/serving/best.pt
       PAPI_STORAGE_DIR: /storage
-      PAPI_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
-      PAPI_CONFIDENCE_THRESHOLD: "0.4"
-      PAPI_VIDEO_HISTORY_SIZE: "5"
-      PAPI_MAX_UPLOAD_MB: "100"
-      PAPI_MAX_VIDEO_FRAMES: "600"
-      PAPI_MAX_VIDEO_SECONDS: "30"
+      # JSON-list form: avoids the pydantic-settings CSV-parse issue that
+      # crashed the container in earlier builds (audit SMOKE-CRIT-2).
+      PAPI_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+      PAPI_CONFIDENCE_THRESHOLD: ${PAPI_CONFIDENCE_THRESHOLD:-0.4}
+      PAPI_VIDEO_HISTORY_SIZE: ${PAPI_VIDEO_HISTORY_SIZE:-5}
+      PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
+      PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
+      PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-30}
+      # Security floor: ``production`` makes the API key mandatory at startup.
+      PAPI_ENV: ${PAPI_ENV:-local}
+      PAPI_API_KEY: ${PAPI_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
@@ -60,6 +77,11 @@ services:
       # restarts in a named volume.
       - papi_backend_storage:/storage
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   frontend:
     build:
@@ -72,8 +94,15 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:80"
+      # Container listens on 8080 (unprivileged nginx image — audit DCK-MAJ-3).
+      # Host port 5173 keeps frontend reachable at the same URL as before.
+      - "5173:8080"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   papi_postgres_data:
