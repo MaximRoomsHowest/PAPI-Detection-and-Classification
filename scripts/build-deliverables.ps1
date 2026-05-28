@@ -49,10 +49,22 @@
 param (
     [string]$Source,
     [string]$Engine = 'xelatex',
-    [switch]$WarnOnTeamPlaceholders = $true
+    [switch]$WarnOnTeamPlaceholders = $true,
+    # Scan for unfilled markers only — no pandoc/LaTeX needed. For CI / pre-submit.
+    [switch]$CheckOnly,
+    # Exit non-zero if any unfilled marker is found. Pair with -CheckOnly in CI so a
+    # deliverable with blank <!-- TEAM -->, [TODO] or TBD markers can't be shipped
+    # (audit IMP-DOC-12).
+    [switch]$Strict
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Every unfilled-marker form, not just `TEAM:` with a colon. The old check matched
+# only `TEAM:` and missed bare `<!-- TEAM -->` (the majority), `[TODO]` cells, and
+# `TBD` — under-reporting blanks ~10x (audit IMP-DOC-12).
+$MarkerPattern = '<!--\s*TEAM|\[TODO\]|\bTBD\b'
+$totalPlaceholders = 0
 
 # Resolve the deliverables source relative to the script location
 # so the script works regardless of the caller's cwd.
@@ -64,6 +76,26 @@ if (-not $Source) {
 if (-not (Test-Path $Source)) {
     Write-Error "Source folder not found: $Source"
     exit 1
+}
+
+# --- Marker-only mode (CI / pre-submit) -----------------------------------
+# Lightweight scan with no pandoc/LaTeX dependency so a CI job can gate on
+# unfilled markers without installing a TeX toolchain (audit IMP-DOC-12 / IMP-INF-2).
+if ($CheckOnly) {
+    $mdFiles = Get-ChildItem -Path $Source -Filter '*.md' -Recurse |
+        Where-Object { $_.Name -notmatch '^_' }
+    foreach ($md in $mdFiles) {
+        $markers = Select-String -Path $md.FullName -Pattern $MarkerPattern
+        if ($markers) {
+            $totalPlaceholders += $markers.Count
+            $rel = Resolve-Path -Relative -Path $md.FullName
+            Write-Warning "$rel : $($markers.Count) unfilled marker(s)"
+        }
+    }
+    Write-Host ""
+    Write-Host "$totalPlaceholders unfilled marker(s) across $($mdFiles.Count) deliverable(s)."
+    if ($Strict -and $totalPlaceholders -gt 0) { exit 1 }
+    exit 0
 }
 
 # --- Sanity checks --------------------------------------------------------
@@ -116,9 +148,10 @@ foreach ($md in $markdownFiles) {
     # Detect un-filled team placeholders early so the team doesn't
     # accidentally upload a PDF with `<!-- TEAM -->` left in it.
     if ($WarnOnTeamPlaceholders) {
-        $placeholders = Select-String -Path $md.FullName -Pattern 'TEAM:' -SimpleMatch
+        $placeholders = Select-String -Path $md.FullName -Pattern $MarkerPattern
         if ($placeholders) {
-            Write-Warning "  $($placeholders.Count) <!-- TEAM: ... --> marker(s) still present. Fill them before submission."
+            $totalPlaceholders += $placeholders.Count
+            Write-Warning "  $($placeholders.Count) unfilled marker(s) (TEAM / TODO / TBD) still present. Fill them before submission."
         }
     }
 
@@ -171,8 +204,17 @@ if ($failed) {
     Write-Host ""
     Write-Host "$($failed.Count) file(s) failed to render." -ForegroundColor Red
     exit 1
-} else {
-    Write-Host ""
-    Write-Host "All $($results.Count) deliverable(s) rendered successfully." -ForegroundColor Green
-    exit 0
 }
+
+Write-Host ""
+Write-Host "All $($results.Count) deliverable(s) rendered successfully." -ForegroundColor Green
+
+if ($totalPlaceholders -gt 0) {
+    Write-Host "$totalPlaceholders unfilled marker(s) (TEAM / TODO / TBD) across the deliverables." -ForegroundColor Yellow
+    if ($Strict) {
+        Write-Host "Failing because -Strict is set." -ForegroundColor Red
+        exit 1
+    }
+}
+
+exit 0
