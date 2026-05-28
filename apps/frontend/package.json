@@ -32,5 +32,11 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "vite": "^8.0.12"
+  },
+  "//overrides-note": "eslint-plugin-jsx-a11y@6.10.2 (Oct 2024, latest) declares peer eslint@^3..^9 because it predates eslint@10 (May 2026). Its rule APIs are stable across 9->10 so this is safe. Remove this override once jsx-a11y publishes a release with a bumped peer range.",
+  "overrides": {
+    "eslint-plugin-jsx-a11y": {
+      "eslint": "$eslint"
+    }
   }
 }

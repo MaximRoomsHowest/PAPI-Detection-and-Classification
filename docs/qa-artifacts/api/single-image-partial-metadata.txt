@@ -1,0 +1,2 @@
+{"detail":"Provide drone_latitude, drone_longitude, and drone_altitude_m together."}
+400
