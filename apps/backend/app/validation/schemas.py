@@ -4,6 +4,18 @@ from pydantic import BaseModel, Field
 
 LampState = Literal["white", "red", "transition", "unknown"]
 MediaType = Literal["image", "video"]
+# The five glidepath verdicts plus the geometry-derived "transition" and the
+# "unknown" fallback (audit B-MAJ-10). Matches global_state_from_lamps + the papi
+# package's decoder, so the response contract is self-documenting and validated.
+GlobalState = Literal[
+    "far_too_high",
+    "too_high",
+    "correct_glidepath",
+    "too_low",
+    "far_too_low",
+    "transition",
+    "unknown",
+]
 
 
 class BoundingBox(BaseModel):
@@ -53,7 +65,7 @@ class AnalysisPayload(BaseModel):
     original_filename: str
     runway_id: str
     drone_id: str | None = None
-    global_state: str
+    global_state: GlobalState
     lamps: list[LampResult]
     confidence: float
     frame_count: int
@@ -77,7 +89,7 @@ class LogListItem(BaseModel):
     runway_id: str
     drone_id: str | None
     original_filename: str
-    global_state: str
+    global_state: GlobalState
     confidence: float
     angle_available: bool
     elevation_angle_deg: float | None

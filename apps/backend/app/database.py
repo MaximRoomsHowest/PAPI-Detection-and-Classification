@@ -1,6 +1,7 @@
 from collections.abc import Generator
+from functools import lru_cache
 
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -10,19 +11,30 @@ class Base(DeclarativeBase):
     pass
 
 
-settings = get_settings()
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+@lru_cache(maxsize=1)
+def get_engine() -> Engine:
+    """Lazily construct the SQLAlchemy engine on first use (audit B-MAJ-7).
+
+    Building it at import time made engine creation + ``get_settings()`` an import
+    side-effect; deferring it keeps ``import app.database`` cheap and lets tests and
+    tooling import the app without a database configured.
+    """
+    return create_engine(get_settings().database_url, pool_pre_ping=True)
+
+
+@lru_cache(maxsize=1)
+def get_sessionmaker() -> sessionmaker:
+    return sessionmaker(bind=get_engine(), autoflush=False, autocommit=False, expire_on_commit=False)
 
 
 def init_db() -> None:
     from app import models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=get_engine())
 
 
 def get_session() -> Generator[Session, None, None]:
-    db = SessionLocal()
+    db = get_sessionmaker()()
     try:
         yield db
     finally:
