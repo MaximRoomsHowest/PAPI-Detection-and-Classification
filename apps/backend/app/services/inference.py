@@ -19,6 +19,7 @@ class InferenceService:
         self.settings = settings
         self._model: Any | None = None
         self._loaded_at: str | None = None
+        self._resolved_device: str | None = None
 
     def analyze(
         self,
@@ -39,6 +40,39 @@ class InferenceService:
     def is_loaded(self) -> bool:
         """Whether the YOLO weights are loaded in memory (for the readiness probe)."""
         return self._model is not None
+
+    @property
+    def device(self) -> str:
+        """The device passed to YOLO, expanding ``PAPI_DEVICE=auto`` to cuda when a
+        GPU is available else cpu (audit IMP-SRV-2). Cached so torch is probed once;
+        an explicit ``cpu``/``cuda``/``0`` setting is used verbatim and never imports torch."""
+        if self._resolved_device is None:
+            configured = (self.settings.device or "cpu").strip().lower()
+            self._resolved_device = self._detect_device() if configured == "auto" else configured
+        return self._resolved_device
+
+    @staticmethod
+    def _detect_device() -> str:
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                return "cuda"
+        except Exception:  # noqa: BLE001 - torch import/probe is best-effort
+            pass
+        return "cpu"
+
+    @staticmethod
+    def _open_video_writer(cv2: Any, path: Path, fps: float, width: int, height: int) -> Any | None:
+        """Open the annotated-video writer, preferring browser-playable H.264 (avc1)
+        and falling back to mp4v when this OpenCV build lacks the H.264 encoder
+        (audit IMP-SRV-6). Returns None if neither codec can open a writer."""
+        for codec in ("avc1", "mp4v"):
+            writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
+            if writer.isOpened():
+                return writer
+            writer.release()
+        return None
 
     @property
     def model(self) -> Any:
@@ -86,7 +120,7 @@ class InferenceService:
             exists=exists,
             file_size_mb=file_size_mb,
             confidence_threshold=self.settings.confidence_threshold,
-            device=self.settings.device,
+            device=self.device,
             loaded=self._model is not None,
             sha256=compute_sha256(path),
             classes=classes,
@@ -97,6 +131,14 @@ class InferenceService:
             val_metrics=ValMetrics(**val_metrics) if isinstance(val_metrics, dict) else None,
             loaded_at=self._loaded_at,
         )
+
+    def warmup(self) -> None:
+        """Run one dummy inference so a broken checkpoint surfaces at startup rather
+        than on the first real request in front of the jury (audit IMP-SRV-9).
+        Best-effort — the caller logs failures and never aborts startup."""
+        import numpy as np
+
+        self._detect_frame(np.zeros((64, 64, 3), dtype=np.uint8), use_tracking=False)
 
     def analyze_image(
         self,
@@ -167,9 +209,8 @@ class InferenceService:
                 f"or {self.settings.max_video_seconds} seconds."
             )
         artifact_path = self.settings.exports_dir / f"{uuid4()}_annotated.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(artifact_path), fourcc, fps, (frame_width, frame_height))
-        if not writer.isOpened():
+        writer = self._open_video_writer(cv2, artifact_path, fps, frame_width, frame_height)
+        if writer is None:
             cap.release()
             raise RuntimeError("Could not write annotated video artifact.")
 
@@ -300,14 +341,14 @@ class InferenceService:
                 persist=not reset_tracker,
                 tracker="bytetrack.yaml",
                 conf=self.settings.confidence_threshold,
-                device=self.settings.device,
+                device=self.device,
                 verbose=False,
             )
         else:
             results = self.model.predict(
                 frame,
                 conf=self.settings.confidence_threshold,
-                device=self.settings.device,
+                device=self.device,
                 verbose=False,
             )
 

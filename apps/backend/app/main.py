@@ -72,11 +72,16 @@ async def lifespan(_app: FastAPI):
     init_db()
     try:
         # Touching .model triggers the lazy YOLO load inside InferenceService.
-        # Assigning to `_` makes the side-effect intent explicit (ruff B018).
-        _ = get_inference_service().model
-        logger.info("YOLO model pre-warmed at startup.")
+        service = get_inference_service()
+        _ = service.model
+        # Run one dummy inference so a broken checkpoint fails here, not in front
+        # of the jury on the first real request (audit IMP-SRV-9).
+        service.warmup()
+        logger.info("YOLO model pre-warmed and smoke-tested at startup.")
     except RuntimeError as exc:
         logger.warning("Could not pre-warm YOLO model: %s", exc)
+    except Exception as exc:  # noqa: BLE001 - warmup is best-effort; never abort startup
+        logger.warning("YOLO warmup inference failed: %s", exc)
     yield
     # Nothing to clean up on shutdown for now; placeholder for future use.
 

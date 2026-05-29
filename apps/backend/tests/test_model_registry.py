@@ -85,3 +85,15 @@ def test_model_info_without_card_returns_none_provenance(tmp_path):
     assert info.val_metrics is None
     # sha256 is still computed from the on-disk file
     assert info.sha256 == hashlib.sha256(b"fake-weights").hexdigest()
+
+
+def test_device_explicit_value_is_used_verbatim(tmp_path):
+    settings = Settings(storage_dir=tmp_path / "s", model_path=tmp_path / "best.pt", device="cpu")
+    # An explicit device is returned as-is and never imports torch (audit IMP-SRV-2).
+    assert InferenceService(settings).device == "cpu"
+
+
+def test_device_auto_resolves_to_a_real_device(tmp_path):
+    settings = Settings(storage_dir=tmp_path / "s", model_path=tmp_path / "best.pt", device="auto")
+    # 'auto' must resolve to a concrete device (cpu in CI; cuda only if a GPU exists).
+    assert InferenceService(settings).device in {"cpu", "cuda"}
