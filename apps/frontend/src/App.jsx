@@ -207,6 +207,15 @@ const defaultMetadata = {
 
 const translations = {
   en: {
+    footer: {
+      project: 'PAPI Vision student project',
+      description:
+        'Developed by Howest University students for Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Educational prototype. Not certified for operational airport use.',
+      copyright: 'Copyright © 2026 PAPI Vision student project.',
+    },
     brand: {
       subtitle: 'PAPI Detection v1.0',
       company: 'Intersoft Electronics',
@@ -352,6 +361,15 @@ const translations = {
     },
   },
   de: {
+    footer: {
+      project: 'PAPI Vision Studentenprojekt',
+      description:
+        'Entwickelt von Studierenden der Howest University für Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Bildungsprototyp. Nicht für den operativen Flughafenbetrieb zertifiziert.',
+      copyright: 'Copyright © 2026 PAPI Vision Studentenprojekt.',
+    },
     brand: {
       subtitle: 'PAPI-Erkennung v1.0',
       company: 'Intersoft Electronics',
@@ -497,6 +515,15 @@ const translations = {
     },
   },
   nl: {
+    footer: {
+      project: 'PAPI Vision studentenproject',
+      description:
+        'Ontwikkeld door studenten van Howest University voor Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Educatief prototype. Niet gecertificeerd voor operationeel luchthavengebruik.',
+      copyright: 'Copyright © 2026 PAPI Vision studentenproject.',
+    },
     brand: {
       subtitle: 'PAPI-detectie v1.0',
       company: 'Intersoft Electronics',
@@ -642,6 +669,15 @@ const translations = {
     },
   },
   fr: {
+    footer: {
+      project: 'Projet etudiant PAPI Vision',
+      description:
+        'Developpe par des etudiants de Howest University pour Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Prototype educatif. Non certifie pour une utilisation aeroportuaire operationnelle.',
+      copyright: 'Copyright © 2026 projet etudiant PAPI Vision.',
+    },
     brand: {
       subtitle: 'Détection PAPI v1.0',
       company: 'Intersoft Electronics',
@@ -1586,9 +1622,7 @@ function App() {
         <Route path="/history" element={<HistoryPage copy={copy} />} />
         <Route path="*" element={<IntroductionPage copy={copy} />} />
       </Routes>
-      {/* CookieConsent removed per audit F-MAJ-4 — non-functional gimmick that
-          obscured live-demo content (SMOKE-MAJ-1) and read as AI-generated for a
-          B2B aviation safety demo. */}
+      <AppFooter copy={copy} />
     </main>
   )
 }
@@ -1680,6 +1714,31 @@ function IntroductionPage({ copy }) {
         </section>
       </div>
     </section>
+  )
+}
+
+function AppFooter({ copy }) {
+  return (
+    <footer className="site-footer">
+      <div className="footer-main">
+        <div className="footer-brand">
+          <img src="/intersoft-electronics-logo-white-inverse.svg" alt="Intersoft Electronics" />
+          <p>{copy.footer.description}</p>
+        </div>
+        <div className="footer-column">
+          <h2>{copy.footer.project}</h2>
+          <p>{copy.footer.notice}</p>
+        </div>
+        <div className="footer-column footer-partners">
+          <span>{copy.footer.academic}</span>
+          <span>{copy.footer.partner}</span>
+        </div>
+      </div>
+      <div className="footer-legal">
+        <span>{copy.footer.copyright}</span>
+        <span>Howest University × Intersoft Electronics Services BV</span>
+      </div>
+    </footer>
   )
 }
 

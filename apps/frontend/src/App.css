@@ -659,6 +659,107 @@ html[data-theme='dark'] .brand-logo .logo-light {
   font-size: 13px;
 }
 
+/* Site footer (ported from New_frontend; uses the merged palette tokens). */
+.site-footer {
+  margin-top: 48px;
+  color: #ffffff;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--footer-bg-deep) 94%, #000000) 0%,
+    var(--footer-bg) 54%,
+    color-mix(in srgb, var(--accent) 70%, var(--footer-bg)) 100%
+  );
+}
+
+.footer-main {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(220px, 0.9fr) minmax(260px, 1fr);
+  gap: 48px;
+  align-items: start;
+  padding: 48px 0 42px;
+}
+
+.footer-brand {
+  display: grid;
+  gap: 18px;
+}
+
+.footer-brand img {
+  width: 250px;
+  max-width: 100%;
+  height: auto;
+}
+
+.footer-brand p,
+.footer-column p,
+.footer-partners span,
+.footer-legal {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.footer-brand p,
+.footer-column p {
+  max-width: 430px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.footer-column {
+  display: grid;
+  gap: 14px;
+}
+
+.footer-column h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.footer-partners {
+  align-content: start;
+}
+
+.footer-partners span {
+  display: block;
+  padding-left: 18px;
+  border-left: 3px solid var(--accent-cyan);
+  font-weight: 600;
+}
+
+.footer-partners span + span {
+  margin-top: 12px;
+}
+
+.footer-legal {
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--footer-bg-deep) 82%, #000000);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 17px max(16px, calc((100vw - 1180px) / 2));
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .footer-main {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 36px 0 30px;
+  }
+
+  .footer-brand img {
+    width: 210px;
+  }
+
+  .footer-legal {
+    flex-direction: column;
+  }
+}
+
 .secondary-button {
   min-height: 40px;
   display: inline-flex;
