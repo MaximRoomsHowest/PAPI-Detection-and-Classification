@@ -29,6 +29,21 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.5",
 ]
+# Deps the notebooks import but that aren't needed for the core library/pipeline
+# (audit IMP-WF-7). Without these a clean `pip install -e .` cannot run notebooks
+# 06/07/08. Install with `pip install -e .[notebooks]`.
+notebooks = [
+    "onnxruntime>=1.20",
+    "opencv-python>=4.10",
+    "albumentations>=1.4",
+    "matplotlib>=3.8",
+    "jupyter>=1.0",
+]
+# Optional dependency used by workflows/scripts/edge_benchmark.py for RSS memory
+# sampling; it degrades gracefully to None when absent (audit IMP-WF-7).
+bench = [
+    "psutil>=5.9",
+]
 
 [tool.setuptools.packages.find]
 where = ["packages/papi/src"]

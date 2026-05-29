@@ -80,6 +80,14 @@ services:
       # Uploaded originals + annotated exports persist across container
       # restarts in a named volume.
       - papi_backend_storage:/storage
+    healthcheck:
+      # Liveness via the stdlib (no curl in the slim image). start_period covers
+      # the model pre-warm + smoke inference at startup.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     restart: unless-stopped
     logging:
       driver: json-file
@@ -96,7 +104,8 @@ services:
         VITE_PAPI_API_URL: ${FRONTEND_PAPI_API_URL:-http://localhost:8000}
     container_name: papi-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       # Container listens on 8080 (unprivileged nginx image — audit DCK-MAJ-3).
       # Host port 5173 keeps frontend reachable at the same URL as before.
