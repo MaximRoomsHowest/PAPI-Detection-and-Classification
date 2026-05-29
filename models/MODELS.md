@@ -137,34 +137,33 @@ Run config: imgsz 1280, batch 2, seed 42, deterministic; early-stopped at epoch 
 
 ### 3.4 `data_analysis` runs (merged 2026-05-28)
 
-> Brought in from the `data_analysis` branch (MaximRoomsHowest). These
-> are committed **in-repo** under `data/runs/detect/` (binary weights +
-> training images), unlike the `models/runs/` convention above — kept
-> as-is per the integration decision. The lineage below is recovered
-> from that branch's README stub; only train-6 and train-7 artifacts
-> were actually committed.
+> Brought in from the `data_analysis` branch (MaximRoomsHowest). The
+> canonical run artifacts — `results.csv`, `args.yaml`, weights and the
+> training/validation plots — are committed under `models/runs/detect/`
+> (the registry convention above). The duplicate copies that the branch
+> had committed under the gitignored `data/runs/detect/` were dropped from
+> Git in the 2026-05-29 cleanup; local working copies are unaffected.
 
 | Run | Arch | Dataset / imgsz | Artifacts in repo | Notes |
 | --- | --- | --- | --- | --- |
-| train-2 | yolo26n | baseline | — (referenced only) | Lineage reference; weights not committed |
-| train-3 | yolo26s | baseline | — (referenced only) | Lineage reference; weights not committed |
-| train-5 | yolo26s | augmented dataset | — (referenced only) | Lineage reference; weights not committed |
-| **train-6** | **yolo26s** | **full dataset, 640×640** | `data/runs/detect/train-6/weights/{best,last}.pt` | Full-dataset train + validation (commit 181860e) |
-| **train-7** | **yolo26s** | **full dataset, 1280×1280** | `data/runs/detect/train-7/weights/{best,last}.pt` | Higher-resolution model (commit d2b8b8f); `epochs=100, batch=4` |
-| val-4, val-5 | yolo26s | validation passes | `data/runs/detect/val-{4,5}/` | PR/F1 curves + confusion matrices, no weights |
+| train-2 | yolo26n | baseline | `models/runs/detect/train-2/` (`weights/{best,last}.pt`, `best.onnx`, `results.csv`, plots) | Early baseline |
+| train-3 | yolo26s | baseline | `models/runs/detect/train-3/` (`weights/{best,last}.pt`, `results.csv`, plots) | Baseline yolo26s |
+| train-5 | yolo26s | augmented dataset | `models/runs/detect/train-5/` (`weights/{best,last}.pt`, `results.csv`, plots) | Augmented dataset |
+| **train-6** | **yolo26s** | **full dataset, 640×640** | `models/runs/detect/train-6/` (`weights/{best,last}.pt`, `results.csv`, plots) | Full-dataset train + validation |
+| **train-7** | **yolo26s** | **full dataset, 1280×1280** | — (local only; the `data/runs/` copy was untracked in cleanup) | Higher-resolution experiment, `epochs=100`. Re-add under `models/runs/` to publish its metrics |
+| val-2 … val-4 | yolo26s | validation passes | `models/runs/detect/val-*/` | PR/F1 curves + confusion matrices, no weights |
 
 The PAPI-24 reference-height angle work (commit 11973a7) lives in the
 analysis notebooks (`workflows/notebooks/07_model_performance.ipynb`,
 `08_model_training_optimization.ipynb`), not in `apps/` or `packages/`.
 
-**Reconciliation note:** these yolo26s runs are the empirical input for
-the alternative-model comparison in §3.2 and
-`docs/deliverables/06-model-comparison.md` — the comparison is no longer
-purely TEAM-todo, train-6/train-7 metrics can be read from
-`data/runs/detect/train-{6,7}/results.csv`. Two storage conventions now
-coexist (`models/runs/` vs `data/runs/detect/`); unifying them is a
-follow-up cleanup, not done here to avoid rewriting the colleague's
-committed paths.
+**Reconciliation note:** these runs are the empirical input for the
+alternative-model comparison in §3.2 and
+`docs/deliverables/06-model-comparison.md`. The val-split metrics are read
+straight from the committed `models/runs/detect/train-{2,3,5,6}/results.csv`
+(train-2 = yolo26n, train-3/5/6 = yolo26s). The 1280px train-7 run is a
+local-only experiment; re-commit it under `models/runs/` if its numbers are
+needed in the comparison.
 
 ## 4. Deprecated / archived runs
 

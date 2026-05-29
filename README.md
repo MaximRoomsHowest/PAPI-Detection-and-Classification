@@ -59,24 +59,25 @@ tracking each individual lamp over time.
 
 ## Run The Integrated App
 
-Local model binaries live outside Git under `models/`.
+The serving weights (`models/serving/best.pt`) ship in the repo; seed the slot
+from a base weight only if it is missing:
+
+```powershell
+# from the repo root, only if models/serving/best.pt is absent
+Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
+```
+
+**Full stack with Docker (recommended)** — Postgres + backend + frontend in one go:
 
 ```powershell
 # from the repo root
-Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
-
-# terminal 1: backend
-cd apps\backend
-copy .env.example .env
-docker compose up -d
-..\..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-
-# terminal 2: frontend
-cd apps\frontend
-copy .env.example .env
-npm install
-npm run dev -- --host 127.0.0.1 --port 5173
+Copy-Item .env.example .env   # set POSTGRES_PASSWORD etc. before any real deploy
+docker compose up -d --build
 ```
+
+For native development (Postgres in Docker, backend + frontend run locally),
+follow the step-by-step path in
+[`docs/installation-manual.md`](docs/installation-manual.md).
 
 Open `http://127.0.0.1:5173/live-demo`, keep **Backend API** selected, and pick
 one of three upload paths:
@@ -132,8 +133,9 @@ Start here when looking for a part of the project:
 - **Deliverables board** (submission tracker): [`docs/deliverables/README.md`](docs/deliverables/README.md)
 - **Security policy**: [`SECURITY.md`](SECURITY.md) · **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-Licensing is to be confirmed with Intersoft; note the Ultralytics **AGPL-3.0**
-dependency (see [`SECURITY.md`](SECURITY.md)).
+**License**: see [`LICENSE`](LICENSE) — terms are pending confirmation with
+Intersoft, and the file records the Ultralytics **AGPL-3.0** dependency
+obligation (see also [`SECURITY.md`](SECURITY.md)).
 
 ## Verification
 
