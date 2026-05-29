@@ -253,7 +253,7 @@ reward "we know what's left" over "we're done already."
 ```
 PAPI Vision — Interim review
 
-✔  Real-time-capable PAPI detection + classification
+✔  PAPI detection + classification pipeline (edge real-time target in progress)
 ✔  Geometry-driven transition state (one source of truth)
 ✔  Dual-runway, dual-camera, dual-regime dataset
 ✔  Hardened Docker stack with CI + automated tests

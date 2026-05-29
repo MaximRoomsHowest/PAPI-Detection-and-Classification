@@ -178,9 +178,9 @@ endpoint with a "Try it out" panel that mirrors the frontend flow.
 - The system is tuned for **Friedrichshafen (EDNY)** specifically.
   Generalisation to other airports requires retraining + a new
   geometry config.
-- Real-time inference target was ≥ 10 fps. On CPU the current
-  build achieves ~ 2 fps (≈ 500 ms / frame). GPU is not yet
-  configured.
+- Real-time inference target was ≥ 10 fps. On a laptop CPU the
+  current build measures ~ 0.4 fps (≈ 2,700 ms / frame; see
+  `docs/edge-benchmark.md`). GPU is not yet configured.
 - Daytime PAPI footage has lens-flare cases where a red lamp can
   visually saturate to white. These edge cases are documented in
   `docs/label_spec.md` under "Failure modes".

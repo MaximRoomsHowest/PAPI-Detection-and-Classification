@@ -108,7 +108,7 @@ input:
 
 - **R1 (resolved if D1–D3 close):** PAPI 06 angles were provisional.
   After this meeting they become bound.
-- **R2 (open):** real-time inference target is still ~2 fps on CPU;
+- **R2 (open):** real-time inference target is still ~0.4 fps on a laptop CPU;
   edge benchmark on Raspberry Pi 5 / Jetson Orin Nano scheduled
   for sprint 4. Reported in the interim as honest in-flight.
 

@@ -294,10 +294,10 @@ client" requirement; doubles as a closing punctuation mark.
 ```
 PAPI Vision — Delivered
 
-✔  Drone → web app → traceable verdict in ~ 2 s per frame
+✔  Drone → web app → traceable verdict in ~ 2-3 s per frame (CPU)
 ✔  Two-class detector + geometric transition (one source of truth)
 ✔  Dual runway, dual camera, dual regime — flight-level eval
-✔  Real-time on Jetson Orin Nano (INT8)
+✔  Edge deployment path (Jetson Orin Nano INT8) — benchmark pending hardware
 ✔  Three-year TCO ≈ <!-- TEAM --> EUR per airport
 ✔  Hardened Docker stack with CI + tests + audit-tracked issues
 ✔  Two user-testing rounds with same-day iteration

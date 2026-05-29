@@ -238,7 +238,7 @@ API client lives in `src/lib/api.js` — three functions
 | ZoomCamera auto-labelling | Skipped sprint 1 | `configs/papi_edny.yaml:55` (focal_px = null) |
 | EDNY commissioned set-angles | FAA defaults used | `configs/papi_edny.yaml` (TODO comments) |
 | Multi-airport generalisation | Out of scope for v1.0 | One YAML per airport; geometry library already supports it |
-| Real-time inference (>10 fps) | ~2 fps on CPU | INT8 ONNX exists; GPU not configured |
+| Real-time inference (>10 fps) | ~0.4 fps on a laptop CPU | INT8 ONNX exists; GPU not configured |
 | Edge-device deployment | Not yet measured | `docs/edge-benchmark.md` template ready for the team |
 
 ## 9. Sources of truth

@@ -90,7 +90,7 @@ Five things worth flagging:
      Nano with INT8 ONNX OR Intel NUC + FP32 -->, achieving
      <!-- TEAM: N --> fps at p50 (full numbers in §5 of the edge
      benchmark report). The web demo on localhost is CPU-bound
-     and runs at ~ 2 fps — that's expected.
+     and runs at ~ 0.4 fps — that's expected.
 
   4. Production deployment requires PAPI_ENV=production and a
      PAPI_API_KEY set in .env. The installation manual covers
