@@ -102,44 +102,113 @@ html[data-theme='dark'] .brand-logo .logo-light {
 }
 
 .language-switch {
-  display: inline-grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--surface);
-  overflow: hidden;
+  position: relative;
 }
 
-.language-switch button {
-  min-width: 40px;
-  height: 40px;
-  border: 0;
-  border-right: 1px solid var(--border);
+.language-trigger {
+  min-width: 70px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.language-trigger:hover,
+.language-trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-cyan) 12%, var(--surface));
+  color: var(--text-strong);
+}
+
+.language-trigger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.language-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 35;
+  display: grid;
+  gap: 5px;
+  min-width: 184px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 6px;
+  animation: language-menu-enter 160ms ease-out;
+}
+
+@keyframes language-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.language-menu button {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 9px;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 5px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  text-align: left;
+}
+
+.language-menu button span {
+  color: var(--text-strong);
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.6px;
-  transition:
-    background 160ms ease,
-    color 160ms ease;
 }
 
-.language-switch button:last-child {
-  border-right: 0;
+.language-menu button small {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
-.language-switch button:hover,
-.language-switch button.active {
-  background: var(--accent);
-  color: #ffffff;
+.language-menu button:hover {
+  border-color: color-mix(in srgb, var(--accent-cyan) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
 }
 
-.language-switch button:focus-visible {
+.language-menu button.active {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+}
+
+.language-menu button.active small {
+  color: var(--accent);
+}
+
+.language-menu button:focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
 .topnav .nav-link {

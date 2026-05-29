@@ -9,6 +9,7 @@ import {
   History as HistoryIcon,
   FolderOpen,
   Gauge,
+  Globe,
   Moon,
   Pause,
   Play,
@@ -204,6 +205,8 @@ const defaultMetadata = {
   droneLongitude: '',
   droneAltitudeM: '',
 }
+
+const LANGUAGE_LABELS = { en: 'English', de: 'Deutsch', nl: 'Nederlands', fr: 'Français' }
 
 const translations = {
   en: {
@@ -1179,6 +1182,19 @@ function App() {
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
   const [language, setLanguage] = useState(initialLanguage)
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
+  const languageMenuRef = useRef(null)
+
+  useEffect(() => {
+    if (!languageMenuOpen) return undefined
+    const closeLanguageMenu = (event) => {
+      if (!languageMenuRef.current?.contains(event.target)) {
+        setLanguageMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', closeLanguageMenu)
+    return () => document.removeEventListener('pointerdown', closeLanguageMenu)
+  }, [languageMenuOpen])
   const insightsRef = useRef(null)
   const copy = translations[language]
 
@@ -1560,18 +1576,38 @@ function App() {
         </nav>
 
         <div className="topbar-actions">
-          <div className="language-switch" aria-label="Language">
-            {['en', 'de', 'nl', 'fr'].map((option) => (
-              <button
-                className={clsx(option === language && 'active')}
-                key={option}
-                type="button"
-                onClick={() => setLanguage(option)}
-                aria-pressed={option === language}
-              >
-                {option.toUpperCase()}
-              </button>
-            ))}
+          <div className="language-switch" ref={languageMenuRef}>
+            <button
+              className="language-trigger"
+              type="button"
+              onClick={() => setLanguageMenuOpen((current) => !current)}
+              aria-expanded={languageMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Choose language"
+            >
+              <Globe size={18} />
+              <span>{language.toUpperCase()}</span>
+            </button>
+            {languageMenuOpen && (
+              <div className="language-menu" role="menu" aria-label="Language">
+                {['en', 'de', 'nl', 'fr'].map((option) => (
+                  <button
+                    className={clsx(option === language && 'active')}
+                    key={option}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={option === language}
+                    onClick={() => {
+                      setLanguage(option)
+                      setLanguageMenuOpen(false)
+                    }}
+                  >
+                    <span>{option.toUpperCase()}</span>
+                    <small>{LANGUAGE_LABELS[option]}</small>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             className="icon-button"
