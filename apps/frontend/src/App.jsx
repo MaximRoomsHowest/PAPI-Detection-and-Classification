@@ -343,6 +343,143 @@ const translations = {
       backend: ['Backend result', 'live'],
     },
   },
+  de: {
+    brand: {
+      subtitle: 'PAPI-Erkennung v1.0',
+      company: 'Intersoft Electronics',
+    },
+    nav: {
+      introduction: 'Einführung',
+      liveDemo: 'Live-Demo',
+      insights: 'Einblicke',
+      history: 'Verlauf',
+    },
+    intro: {
+      eyebrow: 'Intersoft Electronics Services BV',
+      title: 'Echtzeit-PAPI-Erkennung und Gleitwegklassifizierung.',
+      description:
+        'Ein Frontend-Prototyp zum Testen der Modellausgabe, zur Erklärung von Lampenübergängen und zur übersichtlichen Darstellung von Genauigkeit, Geschwindigkeit und Robustheit.',
+      cta: 'Ausprobieren',
+      scroll: 'Flughafendetails',
+      airportEyebrow: 'Flughafenkontext',
+      airportTitle: 'Pistenübersicht des Bodensee-Airports Friedrichshafen.',
+      runwayNote: 'Piste 06/24, Asphalt, 2.356 m (7.729 ft)',
+      runwayDetails: 'Pistendetails',
+      runwayDescription:
+        'Das Projekt konzentriert sich auf die einzige Piste des Bodensee-Airports Friedrichshafen. Die Pistenbezeichnung ist 06/24 mit Asphaltbelag und einer Länge von 2.356 Metern (7.729 Fuß).',
+      coordinates: 'Koordinaten',
+      elevation: 'Höhe',
+    },
+    live: {
+      eyebrow: 'Live-Demo',
+      title: 'Medien hochladen, Backend-Inferenz ausführen und die erkannte PAPI-Einheit prüfen.',
+      upload: 'Medien hochladen',
+      uploadFolder: 'Ordner hochladen',
+      analyzing: 'Analysiere',
+      runModel: 'Backend-Modell starten',
+      previousFrame: 'Vorheriges Bild',
+      nextFrame: 'Nächstes Bild',
+      runway: 'Piste',
+      droneId: 'Drohnen-ID',
+      latitude: 'Breitengrad',
+      longitude: 'Längengrad',
+      altitude: 'Höhe m',
+      optional: 'optional',
+      metadata: 'Metadaten',
+      demoScenarios: 'Demo-Szenarien',
+      pauseLoop: 'Szenario-Wiedergabe pausieren',
+      playLoop: 'Szenario-Schleife abspielen',
+      auto: 'Auto',
+      paused: 'Pausiert',
+      detection: 'Erkennungssicherheit',
+      latency: 'Verarbeitungszeit',
+      droneAngle: 'Drohnen-Elevationswinkel',
+      angleUnavailable: 'Winkel nicht verfügbar',
+      missingMetadata: 'fehlende Metadaten',
+      backendInference: 'Backend-Inferenz läuft',
+      dropTitle: 'Bild oder Video hierher ziehen',
+      dropText: 'Oder die Schaltfläche oben verwenden',
+    },
+    insights: {
+      eyebrow: 'Einblicke',
+      title: 'Genauigkeit, Übergänge, Robustheit und Geschwindigkeit – ohne langweilige Diagrammfüller.',
+      preparing: 'PDF wird vorbereitet',
+      download: 'Diagramme herunterladen (PDF)',
+      source: 'Inspiriert von visuellen Formen des Data Viz Project',
+      decoderTitle: 'PAPI-Zustandsdecoder',
+      decoderText: 'Alle fünf zulässigen Ausgaben, ihr Lampenmuster und die Modellbelege.',
+      activeDecision: 'Aktive Entscheidung',
+      compareState: 'Zustand vergleichen',
+      evidence: 'Belege',
+      highestScore: 'Höchster Modellwert in diesem Bild',
+      pointsBelow: 'Punkte unter dem ausgewählten Ergebnis',
+      transitionTitle: 'Übergangsband',
+      transitionText: 'Jede Zelle ist eine Lampe über aufeinanderfolgende Bilder.',
+      transitionDetected: 'Übergang erkannt',
+      frame: 'Bild',
+      status: 'Status',
+    },
+    history: {
+      eyebrow: 'Verlauf',
+      title: 'Aktuelle Backend-Analysen, Artefakte und Modellstatus.',
+      refresh: 'Aktualisieren',
+      loading: 'Verlauf wird geladen',
+      empty: 'Noch keine Backend-Analysen protokolliert.',
+      filename: 'Datei',
+      runway: 'Piste',
+      state: 'Zustand',
+      confidence: 'Sicherheit',
+      angle: 'Winkel',
+      frames: 'Bilder',
+      processing: 'Verarbeitung',
+      created: 'Erstellt',
+      artifact: 'Artefakt',
+      view: 'Ansehen',
+      model: 'Modell',
+      stats: 'Statistik',
+      sample: 'Aktuelle Analysen',
+      avg: 'Ø ms',
+      p95: 'P95 ms',
+      detailTitle: 'Analysedetail',
+      lamps: 'Lampen',
+      detections: 'Erkennungen',
+      angleNote: 'Winkelhinweis',
+      close: 'Schließen',
+      unavailable: 'Nicht verfügbar',
+      exportCsv: 'CSV exportieren',
+      trainingRun: 'Trainingslauf',
+      accuracy: 'mAP@0.5:0.95',
+      checksum: 'Prüfsumme',
+      confidenceAvg: 'Ø Sicherheit',
+      p50: 'P50 ms',
+      filterRunway: 'Alle Pisten',
+      filterState: 'Alle Zustände',
+      prev: 'Zurück',
+      next: 'Weiter',
+      showing: 'Zeige',
+    },
+    states: {
+      'far-high': ['Viel zu hoch', 'Flugzeug deutlich über dem Gleitweg'],
+      'too-high': ['Zu hoch', 'Etwas über dem idealen Winkel'],
+      correct: ['Korrekter Gleitweg', 'Stabiler 3-Grad-Anflug'],
+      'too-low': ['Zu niedrig', 'Unter dem gewünschten Anflugpfad'],
+      'far-low': ['Viel zu niedrig', 'Sofortige Korrektur erforderlich'],
+      unknown: ['Unbekannt', 'Nicht genügend Lampen für einen zuverlässigen PAPI-Zustand erkannt'],
+    },
+    status: {
+      white: 'Weiß',
+      red: 'Rot',
+      transition: 'Übergang',
+      occluded: 'Verdeckt',
+    },
+    scenarios: {
+      clean: ['Sauberes Beispiel', 'Referenz', '2 weiß + 2 rot = korrekter Gleitweg', 'Klarer Abend, ruhige Kamera'],
+      transition: ['Übergangspause', 'gelb/orange', '2 weiß + 2 rot = korrekter Gleitweg', 'Lampe 2 wechselt von Weiß zu Rot'],
+      'hard-case': ['Schwieriger Fall', 'Wetter + Verdeckung', '1 weiß + 3 rot = zu niedrig', 'Regen, flacher Winkel, teilweise Verdeckung'],
+      edge: ['Edge-Gerät', 'begrenzte Hardware', '4 rot = viel zu niedrig', 'Wenig Licht, komprimierter Stream'],
+      backend: ['Backend-Ergebnis', 'live'],
+    },
+  },
   nl: {
     brand: {
       subtitle: 'PAPI-detectie v1.0',
@@ -939,13 +1076,13 @@ function initialTheme() {
 function initialLanguage() {
   const stored = readStoredChoice(
     STORAGE_KEYS.language,
-    ['en', 'nl', 'fr'],
+    ['en', 'de', 'nl', 'fr'],
     null,
   )
   if (stored) return stored
   if (typeof navigator === 'undefined') return 'en'
   const detected = (navigator.language || '').slice(0, 2).toLowerCase()
-  return ['en', 'nl', 'fr'].includes(detected) ? detected : 'en'
+  return ['en', 'de', 'nl', 'fr'].includes(detected) ? detected : 'en'
 }
 
 function App() {
@@ -1341,7 +1478,7 @@ function App() {
 
         <div className="topbar-actions">
           <div className="language-switch" aria-label="Language">
-            {['en', 'nl', 'fr'].map((option) => (
+            {['en', 'de', 'nl', 'fr'].map((option) => (
               <button
                 className={clsx(option === language && 'active')}
                 key={option}
