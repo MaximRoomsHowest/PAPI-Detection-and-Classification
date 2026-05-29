@@ -15,3 +15,22 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-merge-conflict
+
+  # Keep notebook outputs out of the tree (audit IMP-WF-8) so committed
+  # notebooks never leak machine paths or balloon with execution logs.
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+        files: ^workflows/notebooks/.*\.ipynb$
+
+  # Lint the frontend with the project's own eslint config/version (no
+  # duplicated dependency pins). Requires npm on PATH.
+  - repo: local
+    hooks:
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: npm --prefix apps/frontend run lint
+        language: system
+        files: ^apps/frontend/src/.*\.(jsx?|tsx?)$
+        pass_filenames: false

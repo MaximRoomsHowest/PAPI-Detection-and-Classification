@@ -15,6 +15,7 @@ install:
 	pip install -e .[dev]
 	pip install -r apps/backend/requirements.txt
 	cd apps/frontend && npm install
+	pre-commit install
 
 lint:
 	ruff check apps/backend packages/papi workflows/scripts

@@ -22,10 +22,17 @@ GitHub. Please do not file public issues for security problems.
   containers run as a non-root user with log rotation enabled.
 - See `docs/architecture-overview.md` for the full request flow.
 
+## Dependency scanning
+
+CI runs `pip-audit` against the backend requirements and `npm audit
+--audit-level=high` against the frontend on every push (see the `security` job
+in `.github/workflows/ci.yml`). The steps are advisory today and are flipped to
+blocking before final hand-off, once the initial findings are triaged.
+
 ## Known gaps (tracked, not yet implemented)
 
-Rate limiting, dependency-vulnerability scanning in CI, secret scanning, and a
-formal threat model are tracked improvements in the project audit notes.
+Rate limiting, secret scanning, and a formal threat model are tracked
+improvements in the project audit notes.
 
 ## Third-party licensing
 

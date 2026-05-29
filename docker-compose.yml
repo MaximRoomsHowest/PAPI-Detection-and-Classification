@@ -58,6 +58,9 @@ services:
       # JSON-list form: avoids the pydantic-settings CSV-parse issue that
       # crashed the container in earlier builds (audit SMOKE-CRIT-2).
       PAPI_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+      # cpu | cuda | 0 | auto (cuda-if-available). Default cpu; set PAPI_DEVICE=auto
+      # in .env to use a GPU when the host and container runtime expose one.
+      PAPI_DEVICE: ${PAPI_DEVICE:-cpu}
       PAPI_CONFIDENCE_THRESHOLD: ${PAPI_CONFIDENCE_THRESHOLD:-0.4}
       PAPI_VIDEO_HISTORY_SIZE: ${PAPI_VIDEO_HISTORY_SIZE:-5}
       PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
