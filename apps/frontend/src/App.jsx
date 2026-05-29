@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -2028,6 +2028,7 @@ function HistoryPage({ copy }) {
   const [runwayFilter, setRunwayFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [page, setPage] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Model info changes rarely, so fetch it once on mount rather than on every
   // refresh or filter change (audit IMP-FE-19). A failure here is non-critical —
@@ -2044,43 +2045,46 @@ function HistoryPage({ copy }) {
     }
   }, [])
 
-  const loadHistory = useCallback(
-    async (showRefreshing = true) => {
-      if (showRefreshing) {
-        setError('')
-        setIsRefreshing(true)
-      }
-      try {
-        const options = {
-          limit: HISTORY_PAGE_SIZE,
-          offset: page * HISTORY_PAGE_SIZE,
-          runwayId: runwayFilter || undefined,
-          globalState: stateFilter || undefined,
-        }
-        const [logsResult, nextStats] = await Promise.all([fetchLogs(options), fetchStats()])
+  // Fetch logs + stats whenever the page, a filter, or the manual refresh key
+  // changes. Every setState runs in an async callback after the awaited fetch
+  // (never synchronously in the effect body), so there is no set-state cascade
+  // and the previous setTimeout(0) workaround is no longer needed.
+  useEffect(() => {
+    let ignore = false
+    const options = {
+      limit: HISTORY_PAGE_SIZE,
+      offset: page * HISTORY_PAGE_SIZE,
+      runwayId: runwayFilter || undefined,
+      globalState: stateFilter || undefined,
+    }
+    Promise.all([fetchLogs(options), fetchStats()])
+      .then(([logsResult, nextStats]) => {
+        if (ignore) return
         setLogs(logsResult.items)
         setTotal(logsResult.total)
         setStats(nextStats)
-      } catch (loadError) {
-        setError(loadError.message)
-      } finally {
+      })
+      .catch((loadError) => {
+        if (!ignore) setError(loadError.message)
+      })
+      .finally(() => {
+        if (ignore) return
         setIsLoading(false)
-        if (showRefreshing) {
-          setIsRefreshing(false)
-        }
-      }
-    },
-    [page, runwayFilter, stateFilter],
-  )
+        setIsRefreshing(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [page, runwayFilter, stateFilter, refreshKey])
 
-  // Defer the initial fetch by a tick so the effect body doesn't start a
-  // synchronous setState cascade (react-hooks/set-state-in-effect): the first
-  // paint shows the loading state, then the data arrives. Re-runs whenever the
-  // page or a filter changes (loadHistory is memoised on those).
-  useEffect(() => {
-    const timer = window.setTimeout(() => loadHistory(false), 0)
-    return () => window.clearTimeout(timer)
-  }, [loadHistory])
+  // Refresh jumps back to page 1 so freshly-logged analyses (newest first) are
+  // visible, and forces a refetch via refreshKey even when already on page 1.
+  const handleRefresh = () => {
+    setError('')
+    setIsRefreshing(true)
+    setPage(0)
+    setRefreshKey((key) => key + 1)
+  }
 
   const handleFilterChange = (setter) => (event) => {
     setPage(0)
@@ -2165,7 +2169,7 @@ function HistoryPage({ copy }) {
         <button
           className="secondary-button"
           type="button"
-        onClick={() => loadHistory()}
+          onClick={handleRefresh}
           disabled={isRefreshing}
         >
           <RefreshCw size={18} />
@@ -2316,7 +2320,7 @@ function HistoryPage({ copy }) {
           <button
             className="secondary-button"
             type="button"
-            disabled={page === 0}
+            disabled={page === 0 || isRefreshing}
             onClick={() => setPage((current) => Math.max(0, current - 1))}
           >
             {copy.history.prev}
@@ -2325,7 +2329,7 @@ function HistoryPage({ copy }) {
           <button
             className="secondary-button"
             type="button"
-            disabled={pageEnd >= total}
+            disabled={pageEnd >= total || isRefreshing}
             onClick={() => setPage((current) => current + 1)}
           >
             {copy.history.next}
