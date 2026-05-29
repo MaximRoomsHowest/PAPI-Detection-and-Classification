@@ -255,6 +255,8 @@ const translations = {
       transitionsHeading: 'Transitions (red / white)',
       lamp: 'Lamp',
       examplesHint: 'Canned examples (DEMO) for reference. Your uploaded analysis appears as the "Backend result" tab.',
+      viewAnnotated: 'Annotated',
+      viewOriginal: 'Original',
       previousFrame: 'Previous frame',
       nextFrame: 'Next frame',
       runway: 'Runway',
@@ -409,6 +411,8 @@ const translations = {
       transitionsHeading: 'Übergänge (rot / weiß)',
       lamp: 'Lampe',
       examplesHint: 'Vorgefertigte Beispiele (DEMO) als Referenz. Ihre hochgeladene Analyse erscheint als Tab "Backend result".',
+      viewAnnotated: 'Annotiert',
+      viewOriginal: 'Original',
       previousFrame: 'Vorheriges Bild',
       nextFrame: 'Nächstes Bild',
       runway: 'Piste',
@@ -563,6 +567,8 @@ const translations = {
       transitionsHeading: 'Overgangen (rood / wit)',
       lamp: 'Lamp',
       examplesHint: 'Kant-en-klare voorbeelden (DEMO) ter referentie. Je geuploade analyse verschijnt als tab "Backend result".',
+      viewAnnotated: 'Geannoteerd',
+      viewOriginal: 'Origineel',
       previousFrame: 'Vorig frame',
       nextFrame: 'Volgend frame',
       runway: 'Baan',
@@ -717,6 +723,8 @@ const translations = {
       transitionsHeading: 'Transitions (rouge / blanc)',
       lamp: 'Lampe',
       examplesHint: 'Exemples predefinis (DEMO) pour reference. Votre analyse telechargee apparait dans l onglet "Backend result".',
+      viewAnnotated: 'Annote',
+      viewOriginal: 'Original',
       previousFrame: 'Frame precedent',
       nextFrame: 'Frame suivant',
       runway: 'Piste',
@@ -2533,11 +2541,20 @@ function FrameStage({
   copy,
 }) {
   const [isDragActive, setIsDragActive] = useState(false)
-  const displayMedia = scenario.artifactUrl
+  const [viewerMode, setViewerMode] = useState('annotated')
+  const annotatedSource = scenario.artifactUrl
     ? { type: scenario.artifactType ?? 'image', url: scenario.artifactUrl }
     : media?.annotatedUrl
       ? { type: media.annotatedType ?? 'image', url: media.annotatedUrl }
-      : media
+      : null
+  const originalSource =
+    media?.url && media.type !== 'folder' ? { type: media.type, url: media.url } : null
+  // Only offer the toggle when both an original upload and an annotated export exist.
+  const canToggleView = Boolean(annotatedSource && originalSource)
+  const displayMedia =
+    canToggleView && viewerMode === 'original'
+      ? originalSource
+      : annotatedSource ?? originalSource ?? media
   const isAnnotatedExport = Boolean(scenario.artifactUrl || media?.annotatedUrl)
   const canNavigateFrames = backendFrames.length > 1
   const boxStyle = {
@@ -2571,6 +2588,26 @@ function FrameStage({
           <span>{scenario.frame}</span>
           <span>{scenario.condition}</span>
         </div>
+        {canToggleView && (
+          <div className="frame-view-toggle">
+            <button
+              type="button"
+              className={clsx(viewerMode === 'annotated' && 'active')}
+              aria-pressed={viewerMode === 'annotated'}
+              onClick={() => setViewerMode('annotated')}
+            >
+              {copy.live.viewAnnotated}
+            </button>
+            <button
+              type="button"
+              className={clsx(viewerMode === 'original' && 'active')}
+              aria-pressed={viewerMode === 'original'}
+              onClick={() => setViewerMode('original')}
+            >
+              {copy.live.viewOriginal}
+            </button>
+          </div>
+        )}
         {canNavigateFrames && (
           <div className="frame-nav-controls" aria-label="Backend frame navigation">
             <button

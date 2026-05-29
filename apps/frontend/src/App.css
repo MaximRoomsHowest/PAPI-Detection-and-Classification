@@ -1053,6 +1053,39 @@ html[data-theme='dark'] .brand-logo .logo-light {
   font-weight: 800;
 }
 
+/* Original <-> annotated view toggle (ported from New_frontend). */
+.frame-view-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.frame-view-toggle button {
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.frame-view-toggle button.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.frame-view-toggle button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .video-surface {
   position: relative;
   aspect-ratio: 16 / 9;
