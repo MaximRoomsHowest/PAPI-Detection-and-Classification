@@ -76,6 +76,11 @@ apps/frontend/node_modules/
 apps/frontend/dist/
 apps/backend/storage/
 
+# Local trial folders created outside the canonical apps/* workspace.
+# Keep source changes in apps/frontend and apps/backend instead.
+/frontend/
+/backend/
+
 # Generated CVAT/export archives and videos
 *.zip
 *.mp4

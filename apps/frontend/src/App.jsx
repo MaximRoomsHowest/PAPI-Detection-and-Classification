@@ -3,15 +3,18 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Activity,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Cookie,
   Download,
+  Frown,
   FolderOpen,
   Gauge,
+  Globe,
   Moon,
-  Pause,
-  Play,
   Radar,
+  Smile,
   Sun,
   Upload,
   Zap,
@@ -201,6 +204,23 @@ const translations = {
       liveDemo: 'Live Demo',
       insights: 'Insights',
     },
+    footer: {
+      project: 'PAPI Vision student project',
+      description:
+        'Developed by Howest University students for Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Educational prototype. Not certified for operational airport use.',
+      copyright: 'Copyright © 2026 PAPI Vision student project.',
+    },
+    cookie: {
+      title: 'Cookie preference',
+      text: 'This demo only remembers your UI choice on this device.',
+      accept: 'Allow',
+      decline: 'No thanks',
+      accepted: 'Preference saved',
+      declined: 'No tracking enabled',
+    },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
       title: 'Real-time PAPI detection and glidepath classification.',
@@ -226,6 +246,14 @@ const translations = {
       runModel: 'Run backend model',
       previousFrame: 'Previous frame',
       nextFrame: 'Next frame',
+      historyTitle: 'Detection history',
+      historySubtitle: 'Lamp state and angle per analyzed frame',
+      historyEmpty: 'Run backend inference to populate the frame history.',
+      frameHistory: 'Frame history',
+      angle: 'Angle',
+      analyzedFrames: 'Analyzed frames',
+      selectedFrame: 'Selected frame',
+      scrollForAnalysis: 'Scroll for analysis',
       runway: 'Runway',
       droneId: 'Drone ID',
       latitude: 'Latitude',
@@ -298,6 +326,23 @@ const translations = {
       liveDemo: 'Live demo',
       insights: 'Inzichten',
     },
+    footer: {
+      project: 'PAPI Vision studentenproject',
+      description:
+        'Ontwikkeld door studenten van Howest University voor Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Educatief prototype. Niet gecertificeerd voor operationeel luchthavengebruik.',
+      copyright: 'Copyright © 2026 PAPI Vision studentenproject.',
+    },
+    cookie: {
+      title: 'Cookievoorkeur',
+      text: 'Deze demo onthoudt alleen je UI-keuze op dit apparaat.',
+      accept: 'Toestaan',
+      decline: 'Nee bedankt',
+      accepted: 'Voorkeur opgeslagen',
+      declined: 'Geen tracking actief',
+    },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
       title: 'Realtime PAPI-detectie en glidepath-classificatie.',
@@ -323,6 +368,14 @@ const translations = {
       runModel: 'Backendmodel starten',
       previousFrame: 'Vorig frame',
       nextFrame: 'Volgend frame',
+      historyTitle: 'Detectiegeschiedenis',
+      historySubtitle: 'Lampstatus en hoek per geanalyseerd frame',
+      historyEmpty: 'Start backend-inferentie om de framegeschiedenis te vullen.',
+      frameHistory: 'Framegeschiedenis',
+      angle: 'Hoek',
+      analyzedFrames: 'Geanalyseerde frames',
+      selectedFrame: 'Geselecteerd frame',
+      scrollForAnalysis: 'Scroll voor analyse',
       runway: 'Baan',
       droneId: 'Drone-ID',
       latitude: 'Breedtegraad',
@@ -395,6 +448,23 @@ const translations = {
       liveDemo: 'Demo live',
       insights: 'Analyses',
     },
+    footer: {
+      project: 'Projet etudiant PAPI Vision',
+      description:
+        'Developpe par des etudiants de Howest University pour Intersoft Electronics Services BV.',
+      academic: 'Howest University of Applied Sciences',
+      partner: 'Intersoft Electronics Services BV',
+      notice: 'Prototype educatif. Non certifie pour une utilisation aeroportuaire operationnelle.',
+      copyright: 'Copyright © 2026 projet etudiant PAPI Vision.',
+    },
+    cookie: {
+      title: 'Preference cookies',
+      text: 'Cette demo retient uniquement votre choix UI sur cet appareil.',
+      accept: 'Autoriser',
+      decline: 'Non merci',
+      accepted: 'Preference enregistree',
+      declined: 'Aucun suivi active',
+    },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
       title: 'Detection PAPI en temps reel et classification du plan de descente.',
@@ -420,6 +490,14 @@ const translations = {
       runModel: 'Lancer le modele backend',
       previousFrame: 'Frame precedent',
       nextFrame: 'Frame suivant',
+      historyTitle: 'Historique de detection',
+      historySubtitle: 'Etat des lampes et angle par frame analyse',
+      historyEmpty: 'Lancez l’inference backend pour remplir l’historique.',
+      frameHistory: 'Historique des frames',
+      angle: 'Angle',
+      analyzedFrames: 'Frames analyses',
+      selectedFrame: 'Frame selectionne',
+      scrollForAnalysis: 'Faire defiler pour l’analyse',
       runway: 'Piste',
       droneId: 'ID drone',
       latitude: 'Latitude',
@@ -670,6 +748,30 @@ function lampPattern(lamps) {
   return labels.join(' + ')
 }
 
+function countLampStates(lamps) {
+  return lamps.reduce(
+    (counts, lamp) => {
+      const state = lamp.status ?? lamp.state
+      if (state === 'white') counts.white += 1
+      else if (state === 'red') counts.red += 1
+      else if (state === 'transition') counts.transition += 1
+      else counts.unknown += 1
+      return counts
+    },
+    { white: 0, red: 0, transition: 0, unknown: 0 },
+  )
+}
+
+function formatLampCounts(lamps, copy) {
+  const counts = countLampStates(lamps)
+  const parts = []
+  if (counts.white) parts.push(`${counts.white} ${copy.status.white.toLowerCase()}`)
+  if (counts.red) parts.push(`${counts.red} ${copy.status.red.toLowerCase()}`)
+  if (counts.transition) parts.push(`${counts.transition} ${copy.status.transition.toLowerCase()}`)
+  if (counts.unknown) parts.push(`${counts.unknown} ${copy.status.occluded.toLowerCase()}`)
+  return parts.length ? parts.join(' + ') : copy.status.occluded
+}
+
 function isVideoFile(file) {
   return file.type.startsWith('video') || /\.(avi|mov|mp4|mkv|webm)$/i.test(file.name)
 }
@@ -777,6 +879,7 @@ function scenarioFromBackendResult(result, context) {
 const STORAGE_KEYS = {
   theme: 'papi.theme',
   language: 'papi.language',
+  cookieConsent: 'papi.cookieConsent',
 }
 
 // Read a localStorage key and validate against an allowlist. Falls back to
@@ -791,16 +894,13 @@ function readStoredChoice(key, allowed, fallback) {
   }
 }
 
-// Initial theme: persisted value -> system preference -> light. Computed
+// Initial theme: persisted value -> dark. Computed
 // once via lazy initializer so the App doesn't re-read localStorage on
 // every render.
 function initialTheme() {
   const stored = readStoredChoice(STORAGE_KEYS.theme, ['light', 'dark'], null)
   if (stored) return stored
-  if (typeof window === 'undefined') return 'light'
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light'
+  return 'dark'
 }
 
 // Initial language: persisted -> navigator.language two-letter prefix
@@ -815,6 +915,10 @@ function initialLanguage() {
   if (typeof navigator === 'undefined') return 'en'
   const detected = (navigator.language || '').slice(0, 2).toLowerCase()
   return ['en', 'nl', 'fr'].includes(detected) ? detected : 'en'
+}
+
+function initialCookieConsent() {
+  return readStoredChoice(STORAGE_KEYS.cookieConsent, ['accepted', 'declined'], 'pending')
 }
 
 function App() {
@@ -834,6 +938,9 @@ function App() {
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
   const [language, setLanguage] = useState(initialLanguage)
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
+  const [cookieConsent, setCookieConsent] = useState(initialCookieConsent)
+  const languageMenuRef = useRef(null)
   const insightsRef = useRef(null)
   const copy = translations[language]
 
@@ -904,6 +1011,34 @@ function App() {
       /* see above */
     }
   }, [language])
+
+  useEffect(() => {
+    if (!languageMenuOpen) return undefined
+
+    const closeLanguageMenu = (event) => {
+      if (!languageMenuRef.current?.contains(event.target)) {
+        setLanguageMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', closeLanguageMenu)
+    return () => document.removeEventListener('pointerdown', closeLanguageMenu)
+  }, [languageMenuOpen])
+
+  const handleCookieChoice = (choice) => {
+    setCookieConsent(choice)
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEYS.cookieConsent,
+        choice === 'accepting' ? 'accepted' : 'declined',
+      )
+    } catch {
+      /* This banner is only a UI preference, so failing to persist is fine. */
+    }
+    window.setTimeout(() => {
+      setCookieConsent('hidden')
+    }, 980)
+  }
 
   useEffect(() => {
     let ignore = false
@@ -1111,6 +1246,15 @@ function App() {
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
           totalFrames: 1,
         })
+        setAnalysisProgress('Sampling video frames for history')
+        const frames = await extractFrameImages(media.file, 9)
+        const batch = await analyzeFrames(frames.map((frame) => frame.file), metadata)
+        nextBackendFrames = batch.results.map((frameResult, index) =>
+          scenarioFromBackendResult(frameResult, {
+            frameLabel: frames[index]?.label ?? `Frame ${index + 1}`,
+            totalFrames: batch.results.length,
+          }),
+        )
       } else {
         setAnalysisProgress('Extracting frames')
         const frames = await extractFrameImages(media.file)
@@ -1128,6 +1272,7 @@ function App() {
             bestScore = score
             bestScenario = scenario
           }
+          nextBackendFrames.push(scenario)
         }
       }
 
@@ -1203,18 +1348,38 @@ function App() {
         </nav>
 
         <div className="topbar-actions">
-          <div className="language-switch" aria-label="Language">
-            {['en', 'nl', 'fr'].map((option) => (
-              <button
-                className={clsx(option === language && 'active')}
-                key={option}
-                type="button"
-                onClick={() => setLanguage(option)}
-                aria-pressed={option === language}
-              >
-                {option.toUpperCase()}
-              </button>
-            ))}
+          <div className="language-switch" ref={languageMenuRef}>
+            <button
+              className="language-trigger"
+              type="button"
+              onClick={() => setLanguageMenuOpen((current) => !current)}
+              aria-expanded={languageMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Choose language"
+            >
+              <Globe size={18} />
+              <span>{language.toUpperCase()}</span>
+            </button>
+            {languageMenuOpen && (
+              <div className="language-menu" role="menu" aria-label="Language">
+                {['en', 'nl', 'fr'].map((option) => (
+                  <button
+                    className={clsx(option === language && 'active')}
+                    key={option}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={option === language}
+                    onClick={() => {
+                      setLanguage(option)
+                      setLanguageMenuOpen(false)
+                    }}
+                  >
+                    <span>{option.toUpperCase()}</span>
+                    <small>{option === 'en' ? 'English' : option === 'nl' ? 'Nederlands' : 'Français'}</small>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             className="icon-button"
@@ -1233,13 +1398,10 @@ function App() {
           path="/live-demo"
           element={
             <LiveDemoPage
-              activeId={activeId}
               activeScenario={activeScenario}
               activeState={activeState}
               isAnalyzing={isAnalyzing}
-              isPlaying={isPlaying}
               media={media}
-              backendScenario={backendScenario}
               backendFrames={backendFrames}
               backendFrameIndex={backendFrameIndex}
               runways={runways}
@@ -1248,8 +1410,6 @@ function App() {
               analysisProgress={analysisProgress}
               handleMediaFiles={handleMediaFiles}
               runBackendInference={runBackendInference}
-              setActiveId={setActiveId}
-              setIsPlaying={setIsPlaying}
               selectBackendFrame={selectBackendFrame}
               handleMediaChange={handleMediaChange}
               handleMetadataChange={handleMetadataChange}
@@ -1272,32 +1432,104 @@ function App() {
         />
         <Route path="*" element={<IntroductionPage copy={copy} />} />
       </Routes>
-      {/* CookieConsent removed per audit F-MAJ-4 — non-functional gimmick that
-          obscured live-demo content (SMOKE-MAJ-1) and read as AI-generated for a
-          B2B aviation safety demo. */}
+      <CookieConsent status={cookieConsent} onChoose={handleCookieChoice} copy={copy} />
+      <AppFooter copy={copy} />
     </main>
   )
 }
 
+function CookieConsent({ status, onChoose, copy }) {
+  if (status === 'hidden' || status === 'accepted' || status === 'declined') {
+    return null
+  }
+
+  const hasChoice = status === 'accepting' || status === 'declining'
+  const isAccepting = status === 'accepting'
+
+  return (
+    <aside
+      className={clsx(
+        'cookie-consent',
+        isAccepting && 'cookie-happy',
+        status === 'declining' && 'cookie-sad',
+      )}
+      aria-live="polite"
+      aria-label={copy.cookie.title}
+    >
+      <div className="cookie-face" aria-hidden="true">
+        {isAccepting ? <Smile size={27} /> : status === 'declining' ? <Frown size={27} /> : <Cookie size={27} />}
+      </div>
+      <div className="cookie-copy">
+        <strong>{hasChoice ? (isAccepting ? copy.cookie.accepted : copy.cookie.declined) : copy.cookie.title}</strong>
+        <span>{copy.cookie.text}</span>
+      </div>
+      {!hasChoice && (
+        <div className="cookie-actions">
+          <button type="button" onClick={() => onChoose('declining')}>
+            {copy.cookie.decline}
+          </button>
+          <button type="button" onClick={() => onChoose('accepting')}>
+            {copy.cookie.accept}
+          </button>
+        </div>
+      )}
+    </aside>
+  )
+}
+
+function AppFooter({ copy }) {
+  return (
+    <footer className="site-footer">
+      <div className="footer-main">
+        <div className="footer-brand">
+          <img src="/intersoft-electronics-logo-white-inverse.svg" alt="Intersoft Electronics" />
+          <p>{copy.footer.description}</p>
+        </div>
+
+        <div className="footer-column">
+          <h2>{copy.footer.project}</h2>
+          <p>{copy.footer.notice}</p>
+        </div>
+
+        <div className="footer-column footer-partners">
+          <span>{copy.footer.academic}</span>
+          <span>{copy.footer.partner}</span>
+        </div>
+      </div>
+      <div className="footer-legal">
+        <span>{copy.footer.copyright}</span>
+        <span>Howest University × Intersoft Electronics Services BV</span>
+      </div>
+    </footer>
+  )
+}
+
 function IntroductionPage({ copy }) {
+  const [heroVideoFailed, setHeroVideoFailed] = useState(false)
+
   return (
     <section className="intro-hero">
-      {/*
-        Hero background — static hero.png poster. The earlier
-        <video src="/Background-vid.mp4"> + onError -> <img> fallback
-        attempt was removed because the LFS-declared video file was
-        never committed; the wasted 206 fetch + brief flash before the
-        fallback rendered were demo-visible noise (audit F-CRIT-1 /
-        papi-user-test-2026-05-28 finding 3). When (if) the video
-        lands in /public, restore the <video> element with the same
-        onError fallback pattern.
-      */}
-      <img
-        className="intro-video"
-        src={heroPosterUrl}
-        alt=""
-        aria-hidden="true"
-      />
+      {heroVideoFailed ? (
+        <img
+          className="intro-video"
+          src={heroPosterUrl}
+          alt=""
+          aria-hidden="true"
+        />
+      ) : (
+        <video
+          className="intro-video"
+          src="/Background-vid.mp4"
+          poster={heroPosterUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          onError={() => setHeroVideoFailed(true)}
+        />
+      )}
       <div className="intro-hero-inner">
         <section className="intro-band">
           <div className="intro-copy">
@@ -1370,13 +1602,10 @@ function IntroductionPage({ copy }) {
 }
 
 function LiveDemoPage({
-  activeId,
   activeScenario,
   activeState,
   isAnalyzing,
-  isPlaying,
   media,
-  backendScenario,
   backendFrames,
   backendFrameIndex,
   runways,
@@ -1385,17 +1614,11 @@ function LiveDemoPage({
   analysisProgress,
   handleMediaFiles,
   runBackendInference,
-  setActiveId,
-  setIsPlaying,
   selectBackendFrame,
   handleMediaChange,
   handleMetadataChange,
   copy,
 }) {
-  const scenarioTabs = (backendScenario ? [backendScenario, ...scenarios] : scenarios).map((scenario) =>
-    translateScenario(scenario, copy),
-  )
-
   return (
     <section className="demo-section">
       <div className="section-heading">
@@ -1490,41 +1713,6 @@ function LiveDemoPage({
         </div>
       )}
 
-      <div className="scenario-tabs" role="tablist" aria-label={copy.live.demoScenarios}>
-        {scenarioTabs.map((scenario) => (
-          <button
-            className={clsx(
-              'scenario-tab',
-              scenario.id === activeId && 'active',
-              scenario.id !== 'backend' && 'scenario-tab--preset',
-            )}
-            key={scenario.id}
-            type="button"
-            onClick={() => {
-              setActiveId(scenario.id)
-              setIsPlaying(false)
-            }}
-          >
-            <span>{scenario.label}</span>
-            <small>{scenario.badge}</small>
-            {scenario.id !== 'backend' && (
-              <span className="scenario-tab__preset-badge" aria-label="Demo preset">
-                DEMO
-              </span>
-            )}
-          </button>
-        ))}
-        <button
-          className="scenario-tab play-tab"
-          type="button"
-          onClick={() => setIsPlaying((current) => !current)}
-          aria-label={isPlaying ? copy.live.pauseLoop : copy.live.playLoop}
-        >
-          {isPlaying ? <Pause size={17} /> : <Play size={17} />}
-          <span>{isPlaying ? copy.live.auto : copy.live.paused}</span>
-        </button>
-      </div>
-
       <div className="live-grid">
         <motion.div
           className="frame-tool"
@@ -1540,6 +1728,13 @@ function LiveDemoPage({
             backendFrames={backendFrames}
             backendFrameIndex={backendFrameIndex}
             onBackendFrameChange={selectBackendFrame}
+            copy={copy}
+          />
+          <AnalysisHistoryPanel
+            activeScenario={activeScenario}
+            backendFrames={backendFrames}
+            backendFrameIndex={backendFrameIndex}
+            onSelectFrame={selectBackendFrame}
             copy={copy}
           />
         </motion.div>
@@ -1560,36 +1755,36 @@ function LiveDemoPage({
             ))}
           </div>
 
-          {/*
-            Real metrics only (audit F-CRIT-2). Detection confidence and
-            processing time come from the live backend payload via
-            scenarioFromBackendResult. For preset scenarios the same fields
-            carry the hardcoded demo values; the "DEMO" watermark on the
-            scenario tab makes the source clear.
-          */}
-          <div className="metric-grid metric-grid--compact">
-            <InlineMetric
-              label={copy.live.detection}
-              value={activeScenario.metrics.boxConfidence}
-              suffix="%"
-            />
-            <InlineMetric
-              label={copy.live.latency}
-              value={activeScenario.metrics.latency}
-              suffix=" ms"
-            />
-          </div>
-
-          {activeScenario.angleSummary && (
-            <div className={clsx('angle-readout', !activeScenario.angleSummary.available && 'unavailable')}>
-              <span>{copy.live.droneAngle}</span>
-              <strong>
-                {activeScenario.angleSummary.value}
-                {activeScenario.angleSummary.available && <small>deg</small>}
-              </strong>
-              <p>{activeScenario.angleSummary.source}</p>
+          <div className="metrics-column">
+            {/*
+              Real metrics only (audit F-CRIT-2). Detection confidence and
+              processing time come from the live backend payload via
+              scenarioFromBackendResult.
+            */}
+            <div className="metric-grid metric-grid--compact">
+              <InlineMetric
+                label={copy.live.detection}
+                value={activeScenario.metrics.boxConfidence}
+                suffix="%"
+              />
+              <InlineMetric
+                label={copy.live.latency}
+                value={activeScenario.metrics.latency}
+                suffix=" ms"
+              />
             </div>
-          )}
+
+            {activeScenario.angleSummary && (
+              <div className={clsx('angle-readout', !activeScenario.angleSummary.available && 'unavailable')}>
+                <span>{copy.live.droneAngle}</span>
+                <strong>
+                  {activeScenario.angleSummary.value}
+                  {activeScenario.angleSummary.available && <small>deg</small>}
+                </strong>
+                <p>{activeScenario.angleSummary.source}</p>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
     </section>
@@ -1638,6 +1833,75 @@ function InlineMetric({ label, value, suffix }) {
   )
 }
 
+function AnalysisHistoryPanel({ activeScenario, backendFrames, backendFrameIndex, onSelectFrame, copy }) {
+  const history = backendFrames.length ? backendFrames : []
+  const selected = history[backendFrameIndex] ?? activeScenario
+  const lampCounts = countLampStates(selected.lamps)
+  const selectedAngle = selected.angleSummary?.available
+    ? `${selected.angleSummary.value} deg`
+    : copy.live.angleUnavailable
+
+  return (
+    <section className="history-panel" id="analysis-history" aria-label={copy.live.frameHistory}>
+      <div className="history-heading">
+        <div>
+          <h3>{copy.live.historyTitle}</h3>
+          <p>{copy.live.historySubtitle}</p>
+        </div>
+        <span>{history.length ? `${history.length} ${copy.live.analyzedFrames.toLowerCase()}` : copy.live.historyEmpty}</span>
+      </div>
+
+      <div className="history-stat-grid">
+        <div className="history-stat">
+          <span>{copy.live.selectedFrame}</span>
+          <strong>{selected.frame}</strong>
+        </div>
+        <div className="history-stat history-stat--white">
+          <span>{copy.status.white}</span>
+          <strong>{lampCounts.white}</strong>
+        </div>
+        <div className="history-stat history-stat--red">
+          <span>{copy.status.red}</span>
+          <strong>{lampCounts.red}</strong>
+        </div>
+        <div className="history-stat">
+          <span>{copy.live.angle}</span>
+          <strong>{selectedAngle}</strong>
+        </div>
+      </div>
+
+      {history.length > 0 && (
+        <div className="history-list" role="list" aria-label={copy.live.frameHistory}>
+          {history.map((frame, index) => {
+            const state = translateState(
+              stateCatalog.find((item) => item.id === frame.stateId) ?? stateCatalog[stateCatalog.length - 1],
+              copy,
+            )
+            const angle = frame.angleSummary?.available
+              ? `${frame.angleSummary.value} deg`
+              : copy.live.angleUnavailable
+
+            return (
+              <button
+                className={clsx('history-row', index === backendFrameIndex && 'active')}
+                key={`${frame.logId ?? frame.frame}-${index}`}
+                type="button"
+                onClick={() => onSelectFrame(index)}
+              >
+                <span className="history-frame">{frame.frame}</span>
+                <span className="history-pattern">{formatLampCounts(frame.lamps, copy)}</span>
+                <span className="history-state">{state.label}</span>
+                <span className="history-angle">{angle}</span>
+                <span className="history-confidence">{frame.metrics.boxConfidence}%</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function LampCard({ lamp, copy }) {
   const status = statusCopy[lamp.status]
   const label = copy.status[lamp.status] ?? status.label
@@ -1675,14 +1939,7 @@ function FrameStage({
     : media?.annotatedUrl
       ? { type: media.annotatedType ?? 'image', url: media.annotatedUrl }
       : media
-  const isAnnotatedExport = Boolean(scenario.artifactUrl || media?.annotatedUrl)
   const canNavigateFrames = backendFrames.length > 1
-  const boxStyle = {
-    left: `${scenario.box.left}%`,
-    top: `${scenario.box.top}%`,
-    width: `${scenario.box.width}%`,
-    height: `${scenario.box.height}%`,
-  }
 
   const handleDrop = (event) => {
     event.preventDefault()
@@ -1747,29 +2004,17 @@ function FrameStage({
           <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
         )}
 
-        {displayMedia && !isAnnotatedExport && (
-          <>
-            <div className="scan-grid" />
-            <div className="target-box" style={boxStyle}>
-              <span className="box-label">PAPI {scenario.metrics.boxConfidence}%</span>
-              <div className="lamp-overlay">
-                {scenario.lamps.map((lamp) => (
-                  <span
-                    className={clsx('overlay-lamp', `overlay-${lamp.status}`)}
-                    key={lamp.id}
-                    title={`Lamp ${lamp.id}: ${copy.status[lamp.status] ?? statusCopy[lamp.status].label}`}
-                  />
-                ))}
-              </div>
-            </div>
-            {scenario.environmentClass === 'storm' && <div className="weather-layer" />}
-          </>
-        )}
         {analyzing && (
           <div className="analyzing-layer">
             <Radar size={34} />
             <span>{copy.live.backendInference}</span>
           </div>
+        )}
+        {displayMedia && (
+          <a className="frame-scroll-cue" href="#analysis-history">
+            <ChevronDown size={18} />
+            <span>{copy.live.scrollForAnalysis}</span>
+          </a>
         )}
       </div>
     </div>
