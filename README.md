@@ -122,6 +122,19 @@ Start here when looking for a part of the project:
 | `configs/` | PAPI coordinates, split config, and projection config. |
 | `docs/` | Annotation conventions and pipeline documentation. |
 
+## Documentation
+
+- **Architecture**: [`docs/architecture-overview.md`](docs/architecture-overview.md)
+- **User manual**: [`docs/user-manual.md`](docs/user-manual.md) · **Install manual**: [`docs/installation-manual.md`](docs/installation-manual.md)
+- **Pipeline**: [`docs/pipeline.md`](docs/pipeline.md) · **Label spec**: [`docs/label_spec.md`](docs/label_spec.md)
+- **Model card**: [`docs/model-card.md`](docs/model-card.md) · **Data card**: [`docs/data-card.md`](docs/data-card.md)
+- **Model registry**: [`models/MODELS.md`](models/MODELS.md) · **Edge benchmark**: [`docs/edge-benchmark.md`](docs/edge-benchmark.md)
+- **Deliverables board** (submission tracker): [`docs/deliverables/README.md`](docs/deliverables/README.md)
+- **Security policy**: [`SECURITY.md`](SECURITY.md) · **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+
+Licensing is to be confirmed with Intersoft; note the Ultralytics **AGPL-3.0**
+dependency (see [`SECURITY.md`](SECURITY.md)).
+
 ## Verification
 
 Recommended checks before committing:
