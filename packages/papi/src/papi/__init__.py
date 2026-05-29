@@ -24,6 +24,7 @@ from .io import (
     write_yolo_labels,
 )
 from .lamp_state import compute_lamp_state
+from .tracking import detect_transitions, summarize_tracking
 
 __version__ = "0.1.0"
 __author__ = "Howest Industry-Project Team"
@@ -48,4 +49,7 @@ __all__ = [
     "LAMP_STATE_CLASS_IDS",
     "write_yolo_label",
     "write_yolo_labels",
+    # per-lamp tracking + transition extraction
+    "detect_transitions",
+    "summarize_tracking",
 ]

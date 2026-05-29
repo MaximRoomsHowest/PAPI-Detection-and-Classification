@@ -3,6 +3,10 @@
   "training_run": "yolo26n_sequence_red_white_safe",
   "base_weights": "yolo26n.pt",
   "task": "detect",
+  "classes": {
+    "0": "papi_light_red",
+    "1": "papi_light_white"
+  },
   "imgsz": 1280,
   "batch": 2,
   "epochs_configured": 100,

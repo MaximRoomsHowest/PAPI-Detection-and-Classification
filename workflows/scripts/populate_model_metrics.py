@@ -118,7 +118,9 @@ def _round_metrics(metrics: dict[str, float | None]) -> dict[str, float | None]:
     return {name: (round(value, 4) if value is not None else None) for name, value in metrics.items()}
 
 
-def build_model_card(run_dir: Path, model_id: str | None = None) -> dict[str, Any]:
+def build_model_card(
+    run_dir: Path, model_id: str | None = None, classes: dict[int, str] | None = None
+) -> dict[str, Any]:
     results_csv = run_dir / "results.csv"
     if not results_csv.is_file():
         raise FileNotFoundError(f"results.csv not found in {run_dir}")
@@ -127,7 +129,7 @@ def build_model_card(run_dir: Path, model_id: str | None = None) -> dict[str, An
     best, final = select_epochs(rows)
     args = read_args(run_dir)
 
-    return {
+    card: dict[str, Any] = {
         "model_id": model_id or run_dir.name,
         "training_run": run_dir.name,
         "base_weights": Path(str(args.get("model", ""))).name or None,
@@ -152,6 +154,27 @@ def build_model_card(run_dir: Path, model_id: str | None = None) -> dict[str, An
         "source_results_csv": results_csv.as_posix(),
         "generated_by": "workflows/scripts/populate_model_metrics.py",
     }
+    if classes:
+        card["classes"] = {str(class_id): str(name) for class_id, name in classes.items()}
+    return card
+
+
+def _read_class_names(run_dir: Path) -> dict[int, str] | None:
+    """Best-effort read of the trained model's class names from weights/best.pt.
+
+    Returns None when ultralytics or the weights are unavailable, so the card simply
+    omits ``classes`` rather than this otherwise stdlib-only script hard-failing.
+    """
+    weights = run_dir / "weights" / "best.pt"
+    if not weights.is_file():
+        return None
+    try:
+        from ultralytics import YOLO
+
+        names = YOLO(str(weights)).names
+    except Exception:  # noqa: BLE001 - any load failure just means "no classes"
+        return None
+    return {int(k): str(v) for k, v in names.items()} if isinstance(names, dict) else None
 
 
 def _fmt(value: float | None) -> str:
@@ -197,7 +220,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    card = build_model_card(args.run_dir, model_id=args.model_id)
+    classes = _read_class_names(args.run_dir)
+    card = build_model_card(args.run_dir, model_id=args.model_id, classes=classes)
 
     if args.write_model_card is not None:
         args.write_model_card.parent.mkdir(parents=True, exist_ok=True)
