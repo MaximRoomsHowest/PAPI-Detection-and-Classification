@@ -1753,6 +1753,32 @@ html[data-theme='dark'] .brand-logo .logo-light {
   color: var(--text-muted);
 }
 
+.field-error {
+  color: var(--danger, #d23b3b);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The dialog takes programmatic focus on open (tabIndex=-1); it doesn't need a
+   focus ring of its own — the focusable controls inside it still show theirs. */
+.history-modal:focus {
+  outline: none;
+}
+
+/* Respect the OS "reduce motion" preference (audit IMP-FE-9, WCAG 2.3.3):
+   neutralise the infinite spin / pulse / scroll-cue animations and long
+   transitions for users who opt out. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .history-summary {
   min-width: 0;
   display: grid;

@@ -35,6 +35,7 @@ import {
   mediaUrl,
 } from './lib/api'
 import { extractFrameImages } from './lib/frameExtraction'
+import { validateDroneMetadata } from './lib/validation'
 
 // Plotly is lazy-loaded to keep the initial JS bundle small (saves ~700kB
 // gzipped on first paint).
@@ -1553,6 +1554,8 @@ function LiveDemoPage({
     translateScenario(scenario, copy),
   )
 
+  const metadataErrors = validateDroneMetadata(metadata)
+
   return (
     <section className="demo-section">
       <div className="section-heading">
@@ -1590,7 +1593,7 @@ function LiveDemoPage({
             className="primary-button"
             type="button"
             onClick={runBackendInference}
-            disabled={!media || isAnalyzing}
+            disabled={!media || isAnalyzing || !metadataErrors.valid}
           >
             <Zap size={18} />
             {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
@@ -1604,6 +1607,7 @@ function LiveDemoPage({
           <select
             id="runway_id"
             name="runway_id"
+            aria-label={copy.live.runway}
             value={metadata.runwayId}
             onChange={(event) => handleMetadataChange('runwayId', event.target.value)}
           >
@@ -1619,6 +1623,7 @@ function LiveDemoPage({
           <input
             id="drone_id"
             name="drone_id"
+            aria-label={copy.live.droneId}
             value={metadata.droneId}
             onChange={(event) => handleMetadataChange('droneId', event.target.value)}
             placeholder={copy.live.optional}
@@ -1629,38 +1634,69 @@ function LiveDemoPage({
           <input
             id="drone_latitude"
             name="drone_latitude"
+            type="number"
             inputMode="decimal"
+            step="any"
+            min={-90}
+            max={90}
+            aria-label={copy.live.latitude}
+            aria-invalid={Boolean(metadataErrors.errors.droneLatitude)}
             value={metadata.droneLatitude}
             onChange={(event) => handleMetadataChange('droneLatitude', event.target.value)}
             placeholder={copy.live.metadata}
           />
+          {metadataErrors.errors.droneLatitude && (
+            <small className="field-error" role="alert">{metadataErrors.errors.droneLatitude}</small>
+          )}
         </label>
         <label>
           <span>{copy.live.longitude}</span>
           <input
             id="drone_longitude"
             name="drone_longitude"
+            type="number"
             inputMode="decimal"
+            step="any"
+            min={-180}
+            max={180}
+            aria-label={copy.live.longitude}
+            aria-invalid={Boolean(metadataErrors.errors.droneLongitude)}
             value={metadata.droneLongitude}
             onChange={(event) => handleMetadataChange('droneLongitude', event.target.value)}
             placeholder={copy.live.metadata}
           />
+          {metadataErrors.errors.droneLongitude && (
+            <small className="field-error" role="alert">{metadataErrors.errors.droneLongitude}</small>
+          )}
         </label>
         <label>
           <span>{copy.live.altitude}</span>
           <input
             id="drone_altitude_m"
             name="drone_altitude_m"
+            type="number"
             inputMode="decimal"
+            step="any"
+            min={-500}
+            max={20000}
+            aria-label={copy.live.altitude}
+            aria-invalid={Boolean(metadataErrors.errors.droneAltitudeM)}
             value={metadata.droneAltitudeM}
             onChange={(event) => handleMetadataChange('droneAltitudeM', event.target.value)}
             placeholder={copy.live.metadata}
           />
+          {metadataErrors.errors.droneAltitudeM && (
+            <small className="field-error" role="alert">{metadataErrors.errors.droneAltitudeM}</small>
+          )}
         </label>
       </div>
 
       {(analysisError || analysisProgress) && (
-        <div className={clsx('analysis-status', analysisError && 'error')}>
+        <div
+          className={clsx('analysis-status', analysisError && 'error')}
+          role={analysisError ? 'alert' : 'status'}
+          aria-live={analysisError ? 'assertive' : 'polite'}
+        >
           {analysisError || analysisProgress}
         </div>
       )}
@@ -1903,6 +1939,24 @@ function HistoryPage({ copy }) {
     }
   }
 
+  const modalRef = useRef(null)
+
+  // Modal a11y/UX (audit IMP-FE-11): close on Escape, move focus into the dialog
+  // on open, and restore focus to the trigger on close.
+  useEffect(() => {
+    if (!selectedLog) return undefined
+    const previouslyFocused = document.activeElement
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedLog(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    modalRef.current?.focus()
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus()
+    }
+  }, [selectedLog])
+
   return (
     <section className="history-section">
       <div className="section-heading">
@@ -2088,6 +2142,8 @@ function HistoryPage({ copy }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="history-detail-title"
+            ref={modalRef}
+            tabIndex={-1}
           >
             <div className="history-modal-heading">
               <div>
