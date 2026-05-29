@@ -7,7 +7,17 @@ from datetime import datetime
 from time import perf_counter
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -202,8 +212,13 @@ async def _analyze_upload(
         )
         return payload
     except RuntimeError as exc:
+        # Log the real error server-side; return a generic message so internal paths
+        # or library internals are not disclosed to the client (rubric LR1D).
         logger.exception("analysis.runtime_error", extra={"runway_id": runway_id})
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail="Inference service is temporarily unavailable. Check the server logs.",
+        ) from exc
     except ValueError as exc:
         logger.warning("analysis.value_error", extra={"runway_id": runway_id, "detail": str(exc)})
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -301,8 +316,8 @@ _CSV_COLUMNS = [
 @router.get("/logs", response_model=list[LogListItem])
 def list_logs(
     response: Response,
-    limit: int = 50,
-    offset: int = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
     runway_id: str | None = None,
     media_type: str | None = None,
     global_state: str | None = None,

@@ -154,7 +154,7 @@ def health_ready(db: Annotated[Session, Depends(get_session)] = None) -> JSONRes
 
     Unlike ``/health`` (a pure liveness ping), this checks the dependencies the
     app needs to actually serve a request: the database is reachable and the
-    model file is present. Returns 503 when not ready so a compose healthcheck or
+    model is loaded in memory. Returns 503 when not ready so a compose healthcheck or
     orchestrator can gate traffic instead of routing to a backend that will 500
     on the first real call.
     """
@@ -167,7 +167,9 @@ def health_ready(db: Annotated[Session, Depends(get_session)] = None) -> JSONRes
     checks["model_file_present"] = settings.model_path.exists()
     checks["model_loaded"] = get_inference_service().is_loaded
 
-    ready = checks["database"] and checks["model_file_present"]
+    # A backend whose weights failed to load (broken checkpoint, OOM) is NOT ready:
+    # the file existing on disk is necessary but not sufficient to serve a request.
+    ready = checks["database"] and checks["model_file_present"] and checks["model_loaded"]
     return JSONResponse(
         status_code=200 if ready else 503,
         content={"status": "ready" if ready else "not_ready", "checks": checks},

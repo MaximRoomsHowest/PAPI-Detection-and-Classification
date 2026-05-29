@@ -97,6 +97,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         )
 
     fake_service.analyze.side_effect = _fake_analyze
+    # Readiness gates on the model being loaded; the stub reports loaded by default
+    # (test_health_ready_returns_503_when_model_not_loaded flips this).
+    fake_service.is_loaded = True
     fake_service.model_info.return_value = ModelInfo(
         model_path=str(tmp_path / "models" / "best.pt"),
         model_filename="best.pt",
@@ -118,6 +121,12 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # this monkeypatch.
     monkeypatch.setattr(
         "app.api.routes.get_inference_service",
+        lambda: fake_service,
+    )
+    # health_ready lives in app.main and reads get_inference_service() from its own
+    # module namespace, so patch it there too (readiness now gates on is_loaded).
+    monkeypatch.setattr(
+        "app.main.get_inference_service",
         lambda: fake_service,
     )
 
@@ -270,6 +279,14 @@ def test_logs_total_count_header_and_filters(client):
     assert bad.status_code == 400
 
 
+def test_logs_limit_out_of_range_returns_422(client):
+    """Page size is validated at the route (Query ge=1, le=100), not silently clamped."""
+    assert client.get("/api/logs", params={"limit": 101}).status_code == 422
+    assert client.get("/api/logs", params={"limit": 0}).status_code == 422
+    assert client.get("/api/logs", params={"offset": -1}).status_code == 422
+    assert client.get("/api/logs", params={"limit": 50}).status_code == 200
+
+
 def test_logs_export_csv(client):
     _post_frame(client)
 
@@ -375,12 +392,30 @@ def test_analyze_frames_caps_batch_size(client, monkeypatch):
 
 
 def test_health_ready_reports_dependencies(client):
-    """Deep readiness probe is 200 when the DB is reachable and weights are present."""
+    """Deep readiness probe is 200 when the DB is reachable and the model is loaded."""
     response = client.get("/health/ready")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ready"
     assert body["checks"]["database"] is True
+    assert body["checks"]["model_loaded"] is True
+
+
+def test_health_ready_returns_503_when_model_not_loaded(client, monkeypatch):
+    """A backend whose weights failed to load must report not-ready (503), not 200.
+
+    Regression guard: readiness previously checked only DB + model-file-present, so a
+    broken/unloaded checkpoint still returned 200 and traffic was routed to an instance
+    that 503s on the first real inference.
+    """
+    from types import SimpleNamespace
+
+    monkeypatch.setattr("app.main.get_inference_service", lambda: SimpleNamespace(is_loaded=False))
+    response = client.get("/health/ready")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["checks"]["model_loaded"] is False
 
 
 def test_system_endpoint_returns_runtime_facts(client):
