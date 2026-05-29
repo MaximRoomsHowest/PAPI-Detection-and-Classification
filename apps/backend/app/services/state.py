@@ -1,17 +1,18 @@
 """Per-lamp + global state derivation for the backend API.
 
-Detection-class IDs from the YOLO model are 0=red, 1=white. The client brief
-also requires a third per-lamp label, "transition", when a lamp is in the
-narrow angular blend zone (~set_angle ± transition_half_width). That third
-state is geometry-derived rather than learned by YOLO -- it lives in
-``packages/papi/src/papi/lamp_state.py``. This module wires the geometric
-verdict back into per-lamp results so the API actually emits "transition"
-when conditions are met (audit B-CRIT-1).
+Detection-class IDs from the YOLO model are 0=red, 1=white, so a lamp's
+per-frame state is only ever red / white / unknown. The third label,
+"transition", is NOT a per-frame verdict: per the project design
+(docs/label_spec.md, "transition handling moved to the temporal tracking
+layer") it is a *temporal* red<->white change observed by tracking a lamp
+across consecutive frames. ``detect_lamp_transitions`` produces those events
+from ByteTrack-tracked detections; the drone-metadata elevation angle is
+associated with each event (it annotates the transition, it does not decide it).
 """
 
 from collections import Counter
 
-from app.validation.schemas import AnglePerLight, BoundingBox, LampResult
+from app.validation.schemas import BoundingBox, LampResult, TransitionEvent
 
 DETECTION_CLASS_TO_STATE = {
     0: "red",
@@ -28,44 +29,13 @@ GLOBAL_STATE_LABELS = {
     "unknown": "Unknown",
 }
 
-# FAA defaults (deg). Matches configs/papi_edny.yaml when the YAML has nulls.
-# Innermost (lamp 1) -> outermost (lamp 4); the innermost has the lowest
-# set-angle and turns red first when the pilot sinks below the path.
-FAA_DEFAULT_SET_ANGLES_DEG: tuple[float, float, float, float] = (2.50, 2.83, 3.17, 3.50)
-DEFAULT_TRANSITION_HALF_WIDTH_DEG: float = 0.10
 
+def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
+    """Build per-lamp results (red/white) sorted left-to-right.
 
-def _maybe_transition_state(
-    color_state: str,
-    elevation_deg: float | None,
-    set_angle_deg: float,
-    half_width_deg: float,
-) -> str:
-    """Promote 'red'/'white' to 'transition' when |elevation - set_angle| <= half_width.
-
-    If the elevation angle isn't available (e.g., no drone GPS metadata),
-    leave the YOLO-derived color state unchanged.
-    """
-    if elevation_deg is None:
-        return color_state
-    if abs(elevation_deg - set_angle_deg) <= half_width_deg:
-        return "transition"
-    return color_state
-
-
-def normalize_detections(
-    raw_detections: list[dict],
-    per_light_angles: list[AnglePerLight] | None = None,
-    set_angles_deg: tuple[float, float, float, float] = FAA_DEFAULT_SET_ANGLES_DEG,
-    transition_half_width_deg: float = DEFAULT_TRANSITION_HALF_WIDTH_DEG,
-) -> list[LampResult]:
-    """Build per-lamp results sorted left-to-right.
-
-    When ``per_light_angles`` is provided (i.e., the request supplied drone
-    GPS/altitude or the EXIF contained it), each lamp's color verdict is
-    promoted to 'transition' if its elevation angle sits inside the
-    set_angle +/- half_width band. This satisfies the client requirement
-    "label each lamp white / red / transition" (audit B-CRIT-1).
+    Transition is deliberately NOT decided here: a single frame can only show a
+    lamp as red, white, or unknown. A "transition" is a red<->white switch
+    observed over time -- see ``detect_lamp_transitions``.
     """
     candidates = []
     for detection in raw_detections:
@@ -80,26 +50,12 @@ def normalize_detections(
     candidates = sorted(candidates, key=lambda item: item[1], reverse=True)[:4]
     candidates = sorted(candidates, key=lambda item: item[0])
 
-    # Look-up table: lamp index (1..4) -> elevation angle in deg (or None).
-    angle_by_lamp: dict[int, float | None] = {}
-    if per_light_angles:
-        for entry in per_light_angles:
-            angle_by_lamp[int(entry.runway_lamp)] = float(entry.elevation_angle_deg)
-
     lamps: list[LampResult] = []
     for index, (_, confidence, state, bbox) in enumerate(candidates, start=1):
-        # Lamp's set-angle indexed 0..3 even though point numbers are 1..4.
-        set_angle = set_angles_deg[index - 1]
-        promoted = _maybe_transition_state(
-            color_state=state,
-            elevation_deg=angle_by_lamp.get(index),
-            set_angle_deg=set_angle,
-            half_width_deg=transition_half_width_deg,
-        )
         lamps.append(
             LampResult(
                 index=index,
-                state=promoted,
+                state=state,
                 confidence=confidence,
                 bbox=BoundingBox(**bbox),
             )
@@ -109,6 +65,52 @@ def normalize_detections(
         lamps.append(LampResult(index=len(lamps) + 1, state="unknown", confidence=0.0))
 
     return lamps
+
+
+def detect_lamp_transitions(
+    track_observations: dict[int, list[tuple[int, str, float]]],
+    elevation_angle_deg: float | None = None,
+) -> list[TransitionEvent]:
+    """Temporal red<->white transitions per ByteTrack-tracked lamp.
+
+    ``track_observations`` maps a ByteTrack track id to its observed
+    ``(frame_index, color_state, center_x)`` tuples across a video. A transition
+    is a red<->white change between two *consecutive* frames of the same track
+    (mirrors the offline ``papi.tracking.detect_transitions`` so the live API and
+    the dataset pipeline agree). Tracks are numbered 1..4 left-to-right by their
+    average horizontal position; ``elevation_angle_deg`` (one value per uploaded
+    video) is attached to each event.
+    """
+    tracks = {
+        tid: obs
+        for tid, obs in track_observations.items()
+        if tid is not None and len(obs) >= 2
+    }
+    ranked = sorted(tracks.items(), key=lambda kv: sum(o[2] for o in kv[1]) / len(kv[1]))
+    lamp_index_by_track = {tid: rank for rank, (tid, _) in enumerate(ranked[:4], start=1)}
+
+    events: list[TransitionEvent] = []
+    for tid, obs in tracks.items():
+        lamp_index = lamp_index_by_track.get(tid)
+        if lamp_index is None:
+            continue
+        ordered = sorted(obs, key=lambda item: item[0])
+        for (frame_a, state_a, _), (frame_b, state_b, _) in zip(ordered, ordered[1:], strict=False):
+            if frame_b != frame_a + 1:
+                continue
+            if state_a == state_b or {state_a, state_b} != {"red", "white"}:
+                continue
+            events.append(
+                TransitionEvent(
+                    lamp_index=lamp_index,
+                    from_state=state_a,
+                    to_state=state_b,
+                    frame_index=frame_b,
+                    elevation_angle_deg=elevation_angle_deg,
+                )
+            )
+    events.sort(key=lambda event: (event.frame_index, event.lamp_index))
+    return events
 
 
 def global_state_from_lamps(lamps: list[LampResult]) -> str:

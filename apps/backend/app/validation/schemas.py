@@ -36,6 +36,10 @@ class Detection(BaseModel):
     class_id: int
     confidence: float = Field(ge=0.0, le=1.0)
     bbox: BoundingBox
+    # ByteTrack track id when the frame was analysed with tracking (video path);
+    # None for single-image predictions. Used to detect temporal red<->white
+    # transitions per lamp across frames.
+    track_id: int | None = None
 
 
 class LampResult(BaseModel):
@@ -59,6 +63,23 @@ class AngleResult(BaseModel):
     angle_note: str
 
 
+class TransitionEvent(BaseModel):
+    """A temporal red<->white change on one tracked PAPI lamp.
+
+    Per the project design (docs/label_spec.md), a "transition" is an event
+    observed by tracking a lamp across consecutive video frames -- not a
+    per-frame geometric verdict. ``elevation_angle_deg`` is the viewing angle
+    associated with the event (one value per uploaded video; None when no drone
+    telemetry was supplied).
+    """
+
+    lamp_index: int
+    from_state: Literal["red", "white"]
+    to_state: Literal["red", "white"]
+    frame_index: int
+    elevation_angle_deg: float | None = None
+
+
 class AnalysisPayload(BaseModel):
     log_id: str | None = None
     media_type: MediaType
@@ -73,6 +94,10 @@ class AnalysisPayload(BaseModel):
     angle: AngleResult
     artifact_url: str | None = None
     detections: list[Detection] = Field(default_factory=list)
+    # Temporal red<->white transitions detected across video frames (empty for
+    # single images, which can't show a switch). Each carries the associated
+    # viewing angle when drone telemetry was supplied.
+    transitions: list[TransitionEvent] = Field(default_factory=list)
 
 
 class FrameBatchPayload(BaseModel):

@@ -1,5 +1,10 @@
-from app.services.state import confidence_from_lamps, global_state_from_lamps, normalize_detections
-from app.validation.schemas import AnglePerLight
+from app.services.state import (
+    confidence_from_lamps,
+    detect_lamp_transitions,
+    global_state_from_lamps,
+    normalize_detections,
+)
+from app.validation.schemas import LampResult
 
 
 def test_normalize_detections_sorts_lamps_left_to_right():
@@ -37,6 +42,34 @@ def test_confidence_ignores_unknown_lamps():
     assert confidence_from_lamps(lamps) == 0.7
 
 
+def test_single_frame_states_are_colour_only():
+    """A single frame is never 'transition' -- only red / white / unknown.
+    A transition is a temporal red<->white event detected across frames."""
+    detections = [
+        {"class_id": 1, "confidence": 0.95, "bbox": {"x1": 100, "y1": 20, "x2": 130, "y2": 50}},
+        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 200, "y1": 20, "x2": 230, "y2": 50}},
+        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 300, "y1": 20, "x2": 330, "y2": 50}},
+        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 400, "y1": 20, "x2": 430, "y2": 50}},
+    ]
+    lamps = normalize_detections(detections)
+
+    assert [lamp.state for lamp in lamps] == ["white", "red", "red", "red"]
+    assert global_state_from_lamps(lamps) == "too_low"
+    assert all(lamp.state != "transition" for lamp in lamps)
+
+
+def test_global_state_is_transition_when_a_lamp_is_transition():
+    """global_state_from_lamps still shadows the five verdicts when a lamp is in
+    transition (kept for schema/aggregate compatibility)."""
+    lamps = [
+        LampResult(index=1, state="white", confidence=0.9),
+        LampResult(index=2, state="transition", confidence=0.9),
+        LampResult(index=3, state="red", confidence=0.9),
+        LampResult(index=4, state="red", confidence=0.9),
+    ]
+    assert global_state_from_lamps(lamps) == "transition"
+
+
 def _state_for_classes(classes):
     detections = [
         {
@@ -49,66 +82,29 @@ def _state_for_classes(classes):
     return global_state_from_lamps(normalize_detections(detections))
 
 
-def test_per_lamp_transition_promoted_when_elevation_near_set_angle():
-    """Audit B-CRIT-1: when |elevation - set_angle| <= half_width, the
-    YOLO color verdict is overridden to "transition". This is how the
-    backend satisfies the client requirement "label each lamp white,
-    red, or transition" without needing a third detector class."""
-    # YOLO sees four white lamps; geometry says lamp 1 is in its transition band.
-    detections = [
-        {"class_id": 1, "confidence": 0.95, "bbox": {"x1": 100, "y1": 20, "x2": 130, "y2": 50}},
-        {"class_id": 1, "confidence": 0.94, "bbox": {"x1": 200, "y1": 20, "x2": 230, "y2": 50}},
-        {"class_id": 1, "confidence": 0.93, "bbox": {"x1": 300, "y1": 20, "x2": 330, "y2": 50}},
-        {"class_id": 1, "confidence": 0.92, "bbox": {"x1": 400, "y1": 20, "x2": 430, "y2": 50}},
-    ]
-    # Lamp 1's FAA default set-angle is 2.50 deg; place the drone exactly there
-    # so |elev - set| = 0 < 0.10 half-width -> transition.
-    per_light_angles = [
-        AnglePerLight(runway_lamp=1, distance_m=500.0, elevation_angle_deg=2.50),
-        AnglePerLight(runway_lamp=2, distance_m=500.0, elevation_angle_deg=3.00),
-        AnglePerLight(runway_lamp=3, distance_m=500.0, elevation_angle_deg=3.50),
-        AnglePerLight(runway_lamp=4, distance_m=500.0, elevation_angle_deg=4.00),
-    ]
-    lamps = normalize_detections(detections, per_light_angles=per_light_angles)
+def test_detect_lamp_transitions_finds_consecutive_red_to_white():
+    """A tracked lamp that switches red->white between consecutive frames emits one
+    event, numbered by left-to-right position and carrying the associated angle."""
+    track_observations = {
+        7: [(0, "red", 100.0), (1, "red", 100.0), (2, "white", 100.0)],  # leftmost
+        9: [(0, "white", 300.0), (1, "white", 300.0), (2, "white", 300.0)],
+    }
+    events = detect_lamp_transitions(track_observations, elevation_angle_deg=3.05)
 
-    assert lamps[0].state == "transition"
-    assert lamps[1].state == "white"  # far above its set-angle
-    assert lamps[2].state == "white"  # at its set-angle is also fine
-    assert lamps[3].state == "white"
+    assert len(events) == 1
+    event = events[0]
+    assert event.lamp_index == 1
+    assert (event.from_state, event.to_state) == ("red", "white")
+    assert event.frame_index == 2
+    assert event.elevation_angle_deg == 3.05
 
 
-def test_global_state_becomes_transition_when_any_lamp_in_transition():
-    """Audit B-CRIT-1 follow-on: any lamp in transition shadows the
-    five nominal global states. Matches papi.global_state semantics."""
-    detections = [
-        {"class_id": 1, "confidence": 0.9, "bbox": {"x1": 100, "y1": 20, "x2": 130, "y2": 50}},
-        {"class_id": 1, "confidence": 0.9, "bbox": {"x1": 200, "y1": 20, "x2": 230, "y2": 50}},
-        {"class_id": 0, "confidence": 0.9, "bbox": {"x1": 300, "y1": 20, "x2": 330, "y2": 50}},
-        {"class_id": 0, "confidence": 0.9, "bbox": {"x1": 400, "y1": 20, "x2": 430, "y2": 50}},
-    ]
-    # Lamp 2 in its transition band; others outside.
-    per_light_angles = [
-        AnglePerLight(runway_lamp=1, distance_m=500.0, elevation_angle_deg=4.00),
-        AnglePerLight(runway_lamp=2, distance_m=500.0, elevation_angle_deg=2.83),  # set-angle
-        AnglePerLight(runway_lamp=3, distance_m=500.0, elevation_angle_deg=2.50),
-        AnglePerLight(runway_lamp=4, distance_m=500.0, elevation_angle_deg=2.50),
-    ]
-    lamps = normalize_detections(detections, per_light_angles=per_light_angles)
-
-    assert lamps[1].state == "transition"
-    assert global_state_from_lamps(lamps) == "transition"
+def test_detect_lamp_transitions_ignores_non_consecutive():
+    """A switch across a frame gap is not counted (mirrors the offline pipeline)."""
+    track_observations = {3: [(0, "red", 50.0), (5, "white", 50.0)]}
+    assert detect_lamp_transitions(track_observations) == []
 
 
-def test_without_angles_state_falls_back_to_color_only():
-    """No drone metadata? The system still works -- we just lose the
-    transition signal and report white/red as before."""
-    detections = [
-        {"class_id": 1, "confidence": 0.95, "bbox": {"x1": 100, "y1": 20, "x2": 130, "y2": 50}},
-        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 200, "y1": 20, "x2": 230, "y2": 50}},
-        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 300, "y1": 20, "x2": 330, "y2": 50}},
-        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 400, "y1": 20, "x2": 430, "y2": 50}},
-    ]
-    lamps = normalize_detections(detections)  # no per_light_angles
-
-    assert [lamp.state for lamp in lamps] == ["white", "red", "red", "red"]
-    assert global_state_from_lamps(lamps) == "too_low"
+def test_detect_lamp_transitions_empty_without_a_switch():
+    assert detect_lamp_transitions({}) == []
+    assert detect_lamp_transitions({1: [(0, "red", 10.0)]}) == []  # single observation

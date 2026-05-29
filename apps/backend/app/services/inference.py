@@ -10,7 +10,13 @@ from uuid import uuid4
 from app.config import Settings
 from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
 from app.services.model_registry import compute_sha256, load_model_card
-from app.services.state import confidence_from_lamps, global_state_from_lamps, normalize_detections
+from app.services.state import (
+    DETECTION_CLASS_TO_STATE,
+    confidence_from_lamps,
+    detect_lamp_transitions,
+    global_state_from_lamps,
+    normalize_detections,
+)
 from app.validation.schemas import AnalysisPayload, LampResult, ModelInfo, ValMetrics
 
 
@@ -155,10 +161,11 @@ class InferenceService:
             raise ValueError("Could not read uploaded image.")
 
         detections = self._detect_frame(frame, use_tracking=False)
-        # Compute angles FIRST so normalize_detections can derive the
-        # transition state from per-lamp elevation angles (audit B-CRIT-1).
+        # A single image yields red/white per lamp; a "transition" requires a
+        # red<->white switch across frames, so there are none here. The angle is
+        # still computed for display / transition association.
         angle = self._angle_for_media(media_path, runway_id, drone_metadata)
-        lamps = normalize_detections(detections, per_light_angles=angle.per_light_angles)
+        lamps = normalize_detections(detections)
         global_state = global_state_from_lamps(lamps)
         confidence = confidence_from_lamps(lamps)
 
@@ -216,6 +223,9 @@ class InferenceService:
 
         history = deque(maxlen=self.settings.video_history_size)
         lamp_history: dict[int, list[LampResult]] = {1: [], 2: [], 3: [], 4: []}
+        # ByteTrack id -> [(frame_index, color_state, center_x)] for temporal
+        # red<->white transition detection after the loop (project design).
+        track_observations: dict[int, list[tuple[int, str, float]]] = {}
         frame_count = 0
         angle = self._angle_for_media(media_path, runway_id, drone_metadata)
         last_detections: list[dict] = []
@@ -239,13 +249,20 @@ class InferenceService:
                     use_tracking=True,
                     reset_tracker=(frame_count == 0),
                 )
-                # Pass per_light_angles so per-lamp transition state is
-                # available frame-by-frame (audit B-CRIT-1). For a single
-                # uploaded video the drone metadata is constant across
-                # frames, so reusing the precomputed `angle` is correct.
-                lamps = normalize_detections(
-                    detections, per_light_angles=angle.per_light_angles
-                )
+                lamps = normalize_detections(detections)
+                # Record each tracked lamp's colour over time so red<->white
+                # switches can be detected after the loop (transition is temporal,
+                # not a per-frame geometric verdict).
+                for det in detections:
+                    track_id = det.get("track_id")
+                    color = DETECTION_CLASS_TO_STATE.get(int(det.get("class_id", -1)))
+                    bbox = det.get("bbox")
+                    if track_id is None or color is None or not bbox:
+                        continue
+                    center_x = (bbox["x1"] + bbox["x2"]) / 2
+                    track_observations.setdefault(int(track_id), []).append(
+                        (frame_count, color, center_x)
+                    )
                 frame_state = global_state_from_lamps(lamps)
                 frame_confidence = confidence_from_lamps(lamps)
 
@@ -275,6 +292,7 @@ class InferenceService:
         final_lamps = self._aggregate_video_lamps(lamp_history)
         global_state = global_state_from_lamps(final_lamps)
         confidence = confidence_from_lamps(final_lamps)
+        transitions = detect_lamp_transitions(track_observations, angle.elevation_angle_deg)
         processing_ms = int((perf_counter() - start) * 1000)
 
         return AnalysisPayload(
@@ -290,6 +308,7 @@ class InferenceService:
             angle=angle,
             artifact_url=f"/media/{artifact_path.name}",
             detections=last_detections,
+            transitions=transitions,
         )
 
     @staticmethod
@@ -368,6 +387,8 @@ class InferenceService:
                     "class_id": int(box.cls[0]),
                     "confidence": round(float(box.conf[0]), 4),
                     "bbox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
+                    # ByteTrack id on the video/tracking path; None for single-image predict.
+                    "track_id": int(box.id[0]) if getattr(box, "id", None) is not None else None,
                 }
             )
         return detections
