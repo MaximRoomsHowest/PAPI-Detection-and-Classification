@@ -682,17 +682,51 @@ html[data-theme='dark'] .brand-logo .logo-light {
 }
 
 /* Live Demo clarity (telemetry framing, examples-vs-live hint, transition list) */
-.telemetry-heading {
+.telemetry-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   margin: 6px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
-.telemetry-heading strong {
-  display: block;
+.telemetry-toggle:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.telemetry-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.telemetry-toggle svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+  transition: transform 160ms ease;
+}
+
+.telemetry-toggle.open svg {
+  transform: rotate(180deg);
+}
+
+.telemetry-toggle-text {
+  display: grid;
+  gap: 2px;
+}
+
+.telemetry-toggle-text strong {
   color: var(--text-strong);
   font-size: 13px;
 }
 
-.telemetry-heading small {
+.telemetry-toggle-text small {
   color: var(--text-muted);
   font-size: 12px;
 }

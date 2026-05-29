@@ -3,6 +3,7 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Activity,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -1809,6 +1810,7 @@ function LiveDemoPage({
   handleMetadataChange,
   copy,
 }) {
+  const [telemetryOpen, setTelemetryOpen] = useState(false)
   const scenarioTabs = (backendScenario ? [backendScenario, ...scenarios] : scenarios).map((scenario) =>
     translateScenario(scenario, copy),
   )
@@ -1860,10 +1862,19 @@ function LiveDemoPage({
         </div>
       </div>
 
-      <div className="telemetry-heading">
-        <strong>{copy.live.telemetryHeading}</strong>
-        <small>{copy.live.telemetryHint}</small>
-      </div>
+      <button
+        type="button"
+        className={clsx('telemetry-toggle', telemetryOpen && 'open')}
+        onClick={() => setTelemetryOpen((open) => !open)}
+        aria-expanded={telemetryOpen}
+      >
+        <ChevronDown size={16} />
+        <span className="telemetry-toggle-text">
+          <strong>{copy.live.telemetryHeading}</strong>
+          <small>{copy.live.telemetryHint}</small>
+        </span>
+      </button>
+      {telemetryOpen && (
       <div className="metadata-panel">
         <label>
           <span>{copy.live.runway}</span>
@@ -1953,6 +1964,7 @@ function LiveDemoPage({
           )}
         </label>
       </div>
+      )}
 
       {(analysisError || analysisProgress) && (
         <div
