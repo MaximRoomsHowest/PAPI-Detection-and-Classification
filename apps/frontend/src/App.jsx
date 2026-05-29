@@ -281,6 +281,8 @@ const translations = {
       transitionDetected: 'Transition detected',
       frame: 'Frame',
       status: 'Status',
+      demoData: 'Demo data',
+      evidenceApprox: 'Approximated from detection confidence - not a full model probability distribution.',
     },
     history: {
       eyebrow: 'History',
@@ -418,6 +420,8 @@ const translations = {
       transitionDetected: 'Übergang erkannt',
       frame: 'Bild',
       status: 'Status',
+      demoData: 'Demodaten',
+      evidenceApprox: 'Aus der Erkennungskonfidenz angenähert - keine vollständige Wahrscheinlichkeitsverteilung des Modells.',
     },
     history: {
       eyebrow: 'Verlauf',
@@ -555,6 +559,8 @@ const translations = {
       transitionDetected: 'Overgang gedetecteerd',
       frame: 'Frame',
       status: 'Status',
+      demoData: 'Demodata',
+      evidenceApprox: 'Benaderd op basis van detectievertrouwen - geen volledige kansverdeling van het model.',
     },
     history: {
       eyebrow: 'Historiek',
@@ -692,6 +698,8 @@ const translations = {
       transitionDetected: 'Transition detectee',
       frame: 'Frame',
       status: 'Etat',
+      demoData: 'Donnees demo',
+      evidenceApprox: 'Approxime a partir de la confiance de detection - pas une distribution de probabilite complete du modele.',
     },
     history: {
       eyebrow: 'Historique',
@@ -2063,13 +2071,35 @@ function HistoryPage({ copy }) {
   useEffect(() => {
     if (!selectedLog) return undefined
     const previouslyFocused = document.activeElement
+    const focusableSelector =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') setSelectedLog(null)
+      if (event.key === 'Escape') {
+        setSelectedLog(null)
+        return
+      }
+      // Trap focus inside the dialog (WCAG 2.4.3) so Tab can't reach the page behind it.
+      if (event.key !== 'Tab') return
+      const focusable = modalRef.current?.querySelectorAll(focusableSelector)
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKeyDown)
+    // Lock background scroll while the dialog is open, restoring it on close.
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     modalRef.current?.focus()
     return () => {
       document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus()
     }
   }, [selectedLog])
@@ -2253,7 +2283,13 @@ function HistoryPage({ copy }) {
       )}
 
       {selectedLog && (
-        <div className="history-modal-backdrop" role="presentation">
+        <div
+          className="history-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSelectedLog(null)
+          }}
+        >
           <section
             className="history-modal"
             role="dialog"
@@ -2596,6 +2632,7 @@ function GlobalStateDecoder({ scenario, plotTheme, copy }) {
           </small>
         </div>
       </div>
+      <p className="viz-footnote">{copy.insights.evidenceApprox}</p>
     </article>
   )
 }
@@ -2721,6 +2758,7 @@ function TransitionRibbon({ activeScenario, plotTheme, copy }) {
           <h3>{copy.insights.transitionTitle}</h3>
           <p>{copy.insights.transitionText}</p>
         </div>
+        <span className="demo-tag">{copy.insights.demoData}</span>
       </div>
 
       <div className="plotly-panel">
