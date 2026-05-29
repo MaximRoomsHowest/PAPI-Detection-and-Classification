@@ -12,12 +12,16 @@ import {
   FolderOpen,
   Gauge,
   Globe,
+  Image as ImageIcon,
   Moon,
+  Pause,
+  Play,
   Radar,
+  RotateCcw,
   Smile,
+  Tags,
   Sun,
   Upload,
-  Zap,
 } from 'lucide-react'
 import clsx from 'clsx'
 import './App.css'
@@ -214,12 +218,12 @@ const translations = {
       copyright: 'Copyright © 2026 PAPI Vision student project.',
     },
     cookie: {
-      title: 'Cookie preference',
-      text: 'This demo only remembers your UI choice on this device.',
-      accept: 'Allow',
+      title: 'Would you like a cookie?',
+      text: '',
+      accept: 'Yes, please',
       decline: 'No thanks',
-      accepted: 'Preference saved',
-      declined: 'No tracking enabled',
+      accepted: 'Enjoy the cookie',
+      declined: 'Maybe next time',
     },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
@@ -254,6 +258,13 @@ const translations = {
       analyzedFrames: 'Analyzed frames',
       selectedFrame: 'Selected frame',
       scrollForAnalysis: 'Scroll for analysis',
+      original: 'Original',
+      labeled: 'Labeled',
+      showOriginal: 'Show original media',
+      showLabeled: 'Show labeled media',
+      playMedia: 'Play video',
+      pauseMedia: 'Pause video',
+      restartViewer: 'Restart analysis',
       runway: 'Runway',
       droneId: 'Drone ID',
       latitude: 'Latitude',
@@ -336,12 +347,12 @@ const translations = {
       copyright: 'Copyright © 2026 PAPI Vision studentenproject.',
     },
     cookie: {
-      title: 'Cookievoorkeur',
-      text: 'Deze demo onthoudt alleen je UI-keuze op dit apparaat.',
-      accept: 'Toestaan',
+      title: 'Wil je een cookie?',
+      text: '',
+      accept: 'Ja, graag',
       decline: 'Nee bedankt',
-      accepted: 'Voorkeur opgeslagen',
-      declined: 'Geen tracking actief',
+      accepted: 'Geniet van de cookie',
+      declined: 'Misschien later',
     },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
@@ -376,6 +387,13 @@ const translations = {
       analyzedFrames: 'Geanalyseerde frames',
       selectedFrame: 'Geselecteerd frame',
       scrollForAnalysis: 'Scroll voor analyse',
+      original: 'Origineel',
+      labeled: 'Gelabeld',
+      showOriginal: 'Originele media tonen',
+      showLabeled: 'Gelabelde media tonen',
+      playMedia: 'Video afspelen',
+      pauseMedia: 'Video pauzeren',
+      restartViewer: 'Analyse herstarten',
       runway: 'Baan',
       droneId: 'Drone-ID',
       latitude: 'Breedtegraad',
@@ -458,12 +476,12 @@ const translations = {
       copyright: 'Copyright © 2026 projet etudiant PAPI Vision.',
     },
     cookie: {
-      title: 'Preference cookies',
-      text: 'Cette demo retient uniquement votre choix UI sur cet appareil.',
-      accept: 'Autoriser',
+      title: 'Voulez-vous un cookie ?',
+      text: '',
+      accept: 'Oui, merci',
       decline: 'Non merci',
-      accepted: 'Preference enregistree',
-      declined: 'Aucun suivi active',
+      accepted: 'Bonne degustation',
+      declined: 'Peut-etre plus tard',
     },
     intro: {
       eyebrow: 'Intersoft Electronics Services BV',
@@ -498,6 +516,13 @@ const translations = {
       analyzedFrames: 'Frames analyses',
       selectedFrame: 'Frame selectionne',
       scrollForAnalysis: 'Faire defiler pour l’analyse',
+      original: 'Original',
+      labeled: 'Labellise',
+      showOriginal: 'Afficher le media original',
+      showLabeled: 'Afficher le media labellise',
+      playMedia: 'Lire la video',
+      pauseMedia: 'Mettre la video en pause',
+      restartViewer: 'Relancer l’analyse',
       runway: 'Piste',
       droneId: 'ID drone',
       latitude: 'Latitude',
@@ -784,6 +809,14 @@ function fileDisplayPath(file) {
   return file.webkitRelativePath || file.name
 }
 
+function mediaAnalysisKey(media) {
+  if (!media?.file) return ''
+  const files = media.files?.length ? media.files : [media.file]
+  return `${media.type}:${files
+    .map((file) => `${fileDisplayPath(file)}:${file.size}:${file.lastModified}`)
+    .join('|')}`
+}
+
 function boxFromLamps(lamps, frameWidth, frameHeight) {
   const boxes = lamps.map((lamp) => lamp.bbox).filter(Boolean)
   if (!boxes.length || !frameWidth || !frameHeight) {
@@ -879,7 +912,6 @@ function scenarioFromBackendResult(result, context) {
 const STORAGE_KEYS = {
   theme: 'papi.theme',
   language: 'papi.language',
-  cookieConsent: 'papi.cookieConsent',
 }
 
 // Read a localStorage key and validate against an allowlist. Falls back to
@@ -917,10 +949,6 @@ function initialLanguage() {
   return ['en', 'nl', 'fr'].includes(detected) ? detected : 'en'
 }
 
-function initialCookieConsent() {
-  return readStoredChoice(STORAGE_KEYS.cookieConsent, ['accepted', 'declined'], 'pending')
-}
-
 function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [activeId, setActiveId] = useState('clean')
@@ -928,6 +956,8 @@ function App() {
   // (audit F-MAJ-3 — auto-cycling every 5.2s was disorienting on stage).
   const [isPlaying, setIsPlaying] = useState(false)
   const [media, setMedia] = useState(null)
+  const [viewerMode, setViewerMode] = useState('labeled')
+  const [viewerResetToken, setViewerResetToken] = useState(0)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [backendScenario, setBackendScenario] = useState(null)
@@ -939,7 +969,8 @@ function App() {
   const [analysisProgress, setAnalysisProgress] = useState('')
   const [language, setLanguage] = useState(initialLanguage)
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
-  const [cookieConsent, setCookieConsent] = useState(initialCookieConsent)
+  const [cookieConsent, setCookieConsent] = useState('pending')
+  const autoAnalysisKeyRef = useRef('')
   const languageMenuRef = useRef(null)
   const insightsRef = useRef(null)
   const copy = translations[language]
@@ -1027,14 +1058,6 @@ function App() {
 
   const handleCookieChoice = (choice) => {
     setCookieConsent(choice)
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEYS.cookieConsent,
-        choice === 'accepting' ? 'accepted' : 'declined',
-      )
-    } catch {
-      /* This banner is only a UI preference, so failing to persist is fine. */
-    }
     window.setTimeout(() => {
       setCookieConsent('hidden')
     }, 980)
@@ -1080,8 +1103,9 @@ function App() {
       if (media?.url) {
         URL.revokeObjectURL(media.url)
       }
+      media?.originalUrls?.forEach((url) => URL.revokeObjectURL(url))
     }
-  }, [media?.url])
+  }, [media?.url, media?.originalUrls])
 
   function handleMediaFiles(files) {
     const selectedFiles = Array.from(files ?? [])
@@ -1108,16 +1132,22 @@ function App() {
       return
     }
 
-    const url = URL.createObjectURL(file)
+    const originalUrls = isFolderBatch
+      ? imageFiles.map((imageFile) => URL.createObjectURL(imageFile))
+      : null
+    const url = isFolderBatch ? originalUrls[0] : URL.createObjectURL(file)
+    autoAnalysisKeyRef.current = ''
 
     setMedia((previous) => {
       if (previous?.url) {
         URL.revokeObjectURL(previous.url)
       }
+      previous?.originalUrls?.forEach((previousUrl) => URL.revokeObjectURL(previousUrl))
 
       return {
         file,
         files: isFolderBatch ? imageFiles : null,
+        originalUrls,
         name: isFolderBatch
           ? `${fileDisplayPath(imageFiles[0]).split('/')[0]} (${imageFiles.length} images)`
           : file.name,
@@ -1127,6 +1157,8 @@ function App() {
       }
     })
     setIsPlaying(false)
+    setViewerMode('labeled')
+    setViewerResetToken((current) => current + 1)
     setBackendScenario(null)
     setBackendFrames([])
     setBackendFrameIndex(0)
@@ -1302,6 +1334,28 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    const key = mediaAnalysisKey(media)
+    if (!key || autoAnalysisKeyRef.current === key) {
+      return
+    }
+    autoAnalysisKeyRef.current = key
+    runBackendInference()
+  }, [media])
+
+  function resetViewer() {
+    setBackendFrameIndex(0)
+    if (backendFrames.length) {
+      setBackendScenario(backendFrames[0])
+      setActiveId('backend')
+    }
+    setViewerResetToken((current) => current + 1)
+    if (media?.file && !isAnalyzing) {
+      autoAnalysisKeyRef.current = ''
+      runBackendInference()
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -1404,13 +1458,16 @@ function App() {
               media={media}
               backendFrames={backendFrames}
               backendFrameIndex={backendFrameIndex}
+              viewerMode={viewerMode}
+              viewerResetToken={viewerResetToken}
               runways={runways}
               metadata={metadata}
               analysisError={analysisError}
               analysisProgress={analysisProgress}
               handleMediaFiles={handleMediaFiles}
-              runBackendInference={runBackendInference}
               selectBackendFrame={selectBackendFrame}
+              resetViewer={resetViewer}
+              setViewerMode={setViewerMode}
               handleMediaChange={handleMediaChange}
               handleMetadataChange={handleMetadataChange}
               copy={copy}
@@ -1461,7 +1518,7 @@ function CookieConsent({ status, onChoose, copy }) {
       </div>
       <div className="cookie-copy">
         <strong>{hasChoice ? (isAccepting ? copy.cookie.accepted : copy.cookie.declined) : copy.cookie.title}</strong>
-        <span>{copy.cookie.text}</span>
+        {copy.cookie.text && <span>{copy.cookie.text}</span>}
       </div>
       {!hasChoice && (
         <div className="cookie-actions">
@@ -1608,13 +1665,16 @@ function LiveDemoPage({
   media,
   backendFrames,
   backendFrameIndex,
+  viewerMode,
+  viewerResetToken,
   runways,
   metadata,
   analysisError,
   analysisProgress,
   handleMediaFiles,
-  runBackendInference,
   selectBackendFrame,
+  resetViewer,
+  setViewerMode,
   handleMediaChange,
   handleMetadataChange,
   copy,
@@ -1644,15 +1704,6 @@ function LiveDemoPage({
               onChange={handleMediaChange}
             />
           </label>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={runBackendInference}
-            disabled={!media || isAnalyzing}
-          >
-            <Zap size={18} />
-            {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
-          </button>
         </div>
       </div>
 
@@ -1728,6 +1779,10 @@ function LiveDemoPage({
             backendFrames={backendFrames}
             backendFrameIndex={backendFrameIndex}
             onBackendFrameChange={selectBackendFrame}
+            viewerMode={viewerMode}
+            onViewerModeChange={setViewerMode}
+            onResetViewer={resetViewer}
+            resetSignal={viewerResetToken}
             copy={copy}
           />
           <AnalysisHistoryPanel
@@ -1931,15 +1986,61 @@ function FrameStage({
   backendFrames,
   backendFrameIndex,
   onBackendFrameChange,
+  viewerMode,
+  onViewerModeChange,
+  onResetViewer,
+  resetSignal,
   copy,
 }) {
   const [isDragActive, setIsDragActive] = useState(false)
-  const displayMedia = scenario.artifactUrl
+  const videoRef = useRef(null)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
+  const originalMedia = (() => {
+    if (!media) return null
+    if (media.type === 'folder') {
+      return {
+        type: 'image',
+        url: media.originalUrls?.[backendFrameIndex] ?? media.url,
+      }
+    }
+    if (media.type === 'video') {
+      return { type: 'video', url: media.url }
+    }
+    return { type: 'image', url: media.url }
+  })()
+  const labeledMedia = scenario.artifactUrl
     ? { type: scenario.artifactType ?? 'image', url: scenario.artifactUrl }
     : media?.annotatedUrl
       ? { type: media.annotatedType ?? 'image', url: media.annotatedUrl }
-      : media
+      : originalMedia
+  const displayMedia = viewerMode === 'original' ? originalMedia : labeledMedia
   const canNavigateFrames = backendFrames.length > 1
+  const canToggleView = Boolean(originalMedia && labeledMedia?.url)
+  const isVideoVisible = displayMedia?.type === 'video'
+
+  useEffect(() => {
+    if (!videoRef.current) {
+      setIsVideoPlaying(false)
+      return
+    }
+
+    videoRef.current.pause()
+    videoRef.current.currentTime = 0
+    setIsVideoPlaying(false)
+  }, [displayMedia?.url, resetSignal])
+
+  const toggleVideoPlayback = () => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.paused) {
+      video.play().catch(() => {
+        setIsVideoPlaying(false)
+      })
+    } else {
+      video.pause()
+    }
+  }
 
   const handleDrop = (event) => {
     event.preventDefault()
@@ -1965,29 +2066,62 @@ function FrameStage({
           <span>{scenario.frame}</span>
           <span>{scenario.condition}</span>
         </div>
-        {canNavigateFrames && (
-          <div className="frame-nav-controls" aria-label="Backend frame navigation">
+        <div className="frame-controls" aria-label="Media viewer controls">
+          {canToggleView && (
             <button
+              className={clsx('frame-control-button', viewerMode === 'original' && 'active')}
               type="button"
-              onClick={() => onBackendFrameChange?.(backendFrameIndex - 1)}
-              disabled={backendFrameIndex === 0}
-              aria-label={copy.live.previousFrame}
+              onClick={() => onViewerModeChange?.(viewerMode === 'original' ? 'labeled' : 'original')}
+              aria-label={viewerMode === 'original' ? copy.live.showLabeled : copy.live.showOriginal}
             >
-              <ChevronLeft size={16} />
+              {viewerMode === 'original' ? <Tags size={16} /> : <ImageIcon size={16} />}
+              <span>{viewerMode === 'original' ? copy.live.labeled : copy.live.original}</span>
             </button>
-            <strong>
-              {backendFrameIndex + 1}/{backendFrames.length}
-            </strong>
+          )}
+          {isVideoVisible && (
             <button
+              className="frame-control-button"
               type="button"
-              onClick={() => onBackendFrameChange?.(backendFrameIndex + 1)}
-              disabled={backendFrameIndex === backendFrames.length - 1}
-              aria-label={copy.live.nextFrame}
+              onClick={toggleVideoPlayback}
+              aria-label={isVideoPlaying ? copy.live.pauseMedia : copy.live.playMedia}
             >
-              <ChevronRight size={16} />
+              {isVideoPlaying ? <Pause size={16} /> : <Play size={16} />}
             </button>
-          </div>
-        )}
+          )}
+          {displayMedia && (
+            <button
+              className="frame-control-button"
+              type="button"
+              onClick={onResetViewer}
+              aria-label={copy.live.restartViewer}
+            >
+              <RotateCcw size={16} />
+            </button>
+          )}
+          {canNavigateFrames && (
+            <div className="frame-nav-controls" aria-label="Backend frame navigation">
+              <button
+                type="button"
+                onClick={() => onBackendFrameChange?.(backendFrameIndex - 1)}
+                disabled={backendFrameIndex === 0}
+                aria-label={copy.live.previousFrame}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <strong>
+                {backendFrameIndex + 1}/{backendFrames.length}
+              </strong>
+              <button
+                type="button"
+                onClick={() => onBackendFrameChange?.(backendFrameIndex + 1)}
+                disabled={backendFrameIndex === backendFrames.length - 1}
+                aria-label={copy.live.nextFrame}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div
@@ -1997,11 +2131,23 @@ function FrameStage({
         onDrop={handleDrop}
       >
         {displayMedia?.type === 'video' ? (
-          <video src={displayMedia.url} autoPlay muted loop playsInline controls />
+          <video
+            ref={videoRef}
+            src={displayMedia.url}
+            muted
+            loop
+            playsInline
+            onPlay={() => setIsVideoPlaying(true)}
+            onPause={() => setIsVideoPlaying(false)}
+          />
         ) : displayMedia?.type === 'image' ? (
           <img src={displayMedia.url} alt="Uploaded PAPI test frame" />
         ) : (
-          <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
+          <DropzonePlaceholder
+            isDragActive={isDragActive}
+            onFilesSelected={onFilesSelected}
+            copy={copy}
+          />
         )}
 
         {analyzing && (
@@ -2021,15 +2167,24 @@ function FrameStage({
   )
 }
 
-function DropzonePlaceholder({ isDragActive, copy }) {
+function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
   return (
-    <div className={clsx('dropzone-placeholder', isDragActive && 'active')}>
+    <label className={clsx('dropzone-placeholder', isDragActive && 'active')}>
+      <input
+        className="dropzone-input"
+        accept="image/*,video/*"
+        type="file"
+        onChange={(event) => {
+          onFilesSelected?.(event.target.files)
+          event.target.value = ''
+        }}
+      />
       <div className="dropzone-card">
         <Upload size={28} />
         <strong>{copy.live.dropTitle}</strong>
         <span>{copy.live.dropText}</span>
       </div>
-    </div>
+    </label>
   )
 }
 

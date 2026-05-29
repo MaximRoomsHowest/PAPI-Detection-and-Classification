@@ -808,7 +808,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
 
 .demo-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   align-items: stretch;
   justify-content: end;
@@ -845,6 +845,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
   border: 1px solid var(--border);
   background: var(--surface);
   overflow: hidden;
+  cursor: pointer;
 }
 
 .upload-button span {
@@ -998,6 +999,16 @@ html[data-theme='dark'] .brand-logo .logo-light {
   gap: 8px;
 }
 
+.frame-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.frame-control-button,
 .frame-nav-controls button {
   width: 30px;
   height: 30px;
@@ -1008,6 +1019,24 @@ html[data-theme='dark'] .brand-logo .logo-light {
   background: var(--surface);
   color: var(--accent);
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.frame-control-button {
+  width: auto;
+  grid-auto-flow: column;
+  gap: 7px;
+  padding: 0 10px;
+  color: var(--text-strong);
+  font-weight: 800;
+}
+
+.frame-control-button span {
+  font-size: 12px;
 }
 
 .frame-nav-controls button:disabled {
@@ -1015,8 +1044,23 @@ html[data-theme='dark'] .brand-logo .logo-light {
   cursor: not-allowed;
 }
 
+.frame-control-button:hover,
+.frame-control-button.active,
 .frame-nav-controls button:not(:disabled):hover {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+  color: var(--accent-strong);
+}
+
+.frame-control-button:hover,
+.frame-nav-controls button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.frame-control-button:focus-visible,
+.frame-nav-controls button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .frame-nav-controls strong {
@@ -1051,6 +1095,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
   background: rgba(9, 17, 27, 0.72);
   border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
   color: #ffffff;
+  cursor: pointer;
   z-index: 1;
   transition:
     background 160ms ease,
@@ -1058,16 +1103,37 @@ html[data-theme='dark'] .brand-logo .logo-light {
     transform 160ms ease;
 }
 
+.dropzone-placeholder:hover,
 .dropzone-placeholder.active {
   background: rgba(0, 66, 110, 0.5);
   border-color: var(--accent);
   transform: scale(0.99);
 }
 
+.dropzone-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
 .dropzone-card {
+  position: relative;
+  z-index: 1;
   text-align: center;
   display: grid;
   gap: 10px;
+  pointer-events: none;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.dropzone-placeholder:hover .dropzone-card,
+.dropzone-placeholder.active .dropzone-card {
+  transform: translateY(-2px);
+  color: var(--accent-cyan);
 }
 
 .dropzone-card strong {
