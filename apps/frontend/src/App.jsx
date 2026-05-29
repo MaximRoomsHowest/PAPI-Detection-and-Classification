@@ -240,6 +240,12 @@ const translations = {
       uploadFolder: 'Upload folder',
       analyzing: 'Analyzing',
       runModel: 'Run backend model',
+      telemetryHeading: 'Drone telemetry (optional)',
+      telemetryHint: 'Detection and classification need nothing here. Add the drone position to compute the viewing angle and tag detected transitions with it.',
+      telemetryInvalid: 'Fix or clear the highlighted telemetry fields to run.',
+      transitionsHeading: 'Transitions (red / white)',
+      lamp: 'Lamp',
+      examplesHint: 'Canned examples (DEMO) for reference. Your uploaded analysis appears as the "Backend result" tab.',
       previousFrame: 'Previous frame',
       nextFrame: 'Next frame',
       runway: 'Runway',
@@ -379,6 +385,12 @@ const translations = {
       uploadFolder: 'Ordner hochladen',
       analyzing: 'Analysiere',
       runModel: 'Backend-Modell starten',
+      telemetryHeading: 'Drohnen-Telemetrie (optional)',
+      telemetryHint: 'Erkennung und Klassifizierung brauchen hier nichts. Drohnenposition angeben, um den Blickwinkel zu berechnen und erkannte Übergänge damit zu kennzeichnen.',
+      telemetryInvalid: 'Markierte Telemetriefelder korrigieren oder leeren, um zu starten.',
+      transitionsHeading: 'Übergänge (rot / weiß)',
+      lamp: 'Lampe',
+      examplesHint: 'Vorgefertigte Beispiele (DEMO) als Referenz. Ihre hochgeladene Analyse erscheint als Tab "Backend result".',
       previousFrame: 'Vorheriges Bild',
       nextFrame: 'Nächstes Bild',
       runway: 'Piste',
@@ -518,6 +530,12 @@ const translations = {
       uploadFolder: 'Map uploaden',
       analyzing: 'Analyseren',
       runModel: 'Backendmodel starten',
+      telemetryHeading: 'Drone-telemetrie (optioneel)',
+      telemetryHint: 'Detectie en classificatie hebben hier niets nodig. Voeg de dronepositie toe om de kijkhoek te berekenen en gedetecteerde overgangen ermee te markeren.',
+      telemetryInvalid: 'Corrigeer of wis de gemarkeerde telemetrievelden om te starten.',
+      transitionsHeading: 'Overgangen (rood / wit)',
+      lamp: 'Lamp',
+      examplesHint: 'Kant-en-klare voorbeelden (DEMO) ter referentie. Je geuploade analyse verschijnt als tab "Backend result".',
       previousFrame: 'Vorig frame',
       nextFrame: 'Volgend frame',
       runway: 'Baan',
@@ -657,6 +675,12 @@ const translations = {
       uploadFolder: 'Importer dossier',
       analyzing: 'Analyse',
       runModel: 'Lancer le modele backend',
+      telemetryHeading: 'Telemetrie du drone (optionnel)',
+      telemetryHint: 'La detection et la classification n ont besoin de rien ici. Ajoutez la position du drone pour calculer l angle de vue et y associer les transitions detectees.',
+      telemetryInvalid: 'Corrigez ou videz les champs de telemetrie en surbrillance pour lancer.',
+      transitionsHeading: 'Transitions (rouge / blanc)',
+      lamp: 'Lampe',
+      examplesHint: 'Exemples predefinis (DEMO) pour reference. Votre analyse telechargee apparait dans l onglet "Backend result".',
       previousFrame: 'Frame precedent',
       nextFrame: 'Frame suivant',
       runway: 'Piste',
@@ -1044,6 +1068,7 @@ function scenarioFromBackendResult(result, context) {
     artifactType: result.media_type,
     logId: result.log_id,
     angle: result.angle,
+    transitions: result.transitions ?? [],
     angleSummary,
   }
 }
@@ -1354,6 +1379,12 @@ function App() {
 
   async function runBackendInference() {
     if (!media?.file || isAnalyzing) {
+      return
+    }
+    // Telemetry is optional, but if the user typed an out-of-range value, say so
+    // here rather than leaving the Run button mysteriously disabled.
+    if (!validateDroneMetadata(metadata).valid) {
+      setAnalysisError(copy.live.telemetryInvalid)
       return
     }
 
@@ -1718,7 +1749,7 @@ function LiveDemoPage({
             className="primary-button"
             type="button"
             onClick={runBackendInference}
-            disabled={!media || isAnalyzing || !metadataErrors.valid}
+            disabled={!media || isAnalyzing}
           >
             <Zap size={18} />
             {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
@@ -1726,6 +1757,10 @@ function LiveDemoPage({
         </div>
       </div>
 
+      <div className="telemetry-heading">
+        <strong>{copy.live.telemetryHeading}</strong>
+        <small>{copy.live.telemetryHint}</small>
+      </div>
       <div className="metadata-panel">
         <label>
           <span>{copy.live.runway}</span>
@@ -1826,6 +1861,7 @@ function LiveDemoPage({
         </div>
       )}
 
+      <p className="scenarios-hint">{copy.live.examplesHint}</p>
       <div className="scenario-tabs" role="tablist" aria-label={copy.live.demoScenarios}>
         {scenarioTabs.map((scenario) => (
           <button
@@ -1924,6 +1960,21 @@ function LiveDemoPage({
                 {activeScenario.angleSummary.available && <small>deg</small>}
               </strong>
               <p>{activeScenario.angleSummary.source}</p>
+            </div>
+          )}
+
+          {activeScenario.transitions?.length > 0 && (
+            <div className="transition-readout">
+              <span>{copy.live.transitionsHeading}</span>
+              <ul>
+                {activeScenario.transitions.map((event, index) => (
+                  <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
+                    {`${copy.live.lamp} ${event.lamp_index}: `}
+                    {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
+                    {event.elevation_angle_deg != null && ` @ ${event.elevation_angle_deg.toFixed(2)}°`}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </aside>

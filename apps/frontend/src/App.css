@@ -612,6 +612,53 @@ html[data-theme='dark'] .brand-logo .logo-light {
   white-space: nowrap;
 }
 
+/* Live Demo clarity (telemetry framing, examples-vs-live hint, transition list) */
+.telemetry-heading {
+  margin: 6px 0 10px;
+}
+
+.telemetry-heading strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.telemetry-heading small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.scenarios-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 4px 0 8px;
+}
+
+.transition-readout {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.transition-readout > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.transition-readout ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.transition-readout li {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
 .secondary-button {
   min-height: 40px;
   display: inline-flex;
