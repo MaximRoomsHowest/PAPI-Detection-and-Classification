@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { LazyMotion, domAnimation } from 'motion/react'
 
 // Self-hosted Poppins — replaces the Google Fonts @import that was in
 // index.css. GDPR concern for the German client: loading fonts from
@@ -27,7 +28,12 @@ import App from './App.jsx'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      <App />
+      {/* LazyMotion + domAnimation loads only the DOM animation features (~15kB)
+          instead of the full Motion bundle; `strict` enforces the lightweight
+          `m` components so no component can pull in the heavy `motion.*` API. */}
+      <LazyMotion features={domAnimation} strict>
+        <App />
+      </LazyMotion>
     </BrowserRouter>
   </StrictMode>,
 )

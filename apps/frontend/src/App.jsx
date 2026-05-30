@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { Globe, Moon, Sun } from 'lucide-react'
+import { Toaster, toast } from 'sonner'
 import clsx from 'clsx'
 import './App.css'
 import {
@@ -69,6 +70,10 @@ function App() {
   const [exportError, setExportError] = useState('')
   const [backendScenario, setBackendScenario] = useState(null)
   const [backendFrames, setBackendFrames] = useState([])
+  // Raw AnalysisPayload[] kept in parallel with backendFrames so result-driven
+  // views (crop/zoom, angle-vs-state, transition charts) read bbox/per-light
+  // angles/transitions straight from the backend instead of the display scenario.
+  const [backendResults, setBackendResults] = useState([])
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
@@ -280,9 +285,31 @@ function App() {
     })
     setBackendScenario(null)
     setBackendFrames([])
+    setBackendResults([])
     setBackendFrameIndex(0)
     setAnalysisError('')
     setAnalysisProgress('')
+
+    // Read the intrinsic pixel size of a single image up front so the
+    // crop/zoom verification view can map the backend's bbox coordinates
+    // (original-image pixels) to the rendered crop without a second load. The
+    // url-equality guard prevents a slow decode from patching a newer upload.
+    if (!isFolderBatch && isImageFile(file)) {
+      const probe = new window.Image()
+      probe.onload = () => {
+        setMedia((current) =>
+          current && current.url === url
+            ? { ...current, naturalWidth: probe.naturalWidth, naturalHeight: probe.naturalHeight }
+            : current,
+        )
+      }
+      // Release the decode buffer / let the element be GC'd if the blob fails to
+      // load; without this the probe leaks and the crop view never gets its dims.
+      probe.onerror = () => {
+        probe.src = ''
+      }
+      probe.src = url
+    }
   }
 
   function handleMediaChange(event) {
@@ -354,9 +381,11 @@ function App() {
         pdf.addImage(image.dataUrl, 'PNG', 0, 0, image.width, image.height)
       })
       pdf.save('papi-vision-insights.pdf')
+      toast.success(copy.insights.downloadReady)
     } catch (error) {
       console.error('PDF export failed', error)
       setExportError(copy.insights.downloadFailed)
+      toast.error(copy.insights.downloadFailed)
     } finally {
       setIsExporting(false)
     }
@@ -373,6 +402,10 @@ function App() {
     try {
       let bestScenario = null
       let nextBackendFrames = []
+      // Raw payloads retained for the result-driven charts. For a folder every
+      // image's payload is kept (one angle/state point per image); for a single
+      // image or video it is the one aggregated payload.
+      let rawResults = []
 
       if (media.type === 'folder') {
         const folderImages = media.files ?? []
@@ -382,6 +415,7 @@ function App() {
 
         setAnalysisProgress(`Uploading ${folderImages.length} folder images to backend analysis`)
         const batch = await analyzeFrames(folderImages)
+        rawResults = batch.results
         nextBackendFrames = batch.results.map((result, index) =>
           scenarioFromBackendResult(result, {
             frameLabel: `Frame ${index + 1}`,
@@ -392,6 +426,7 @@ function App() {
       } else if (media.type === 'video') {
         setAnalysisProgress('Uploading video to backend video analysis')
         const result = await analyzeMedia(media.file)
+        rawResults = [result]
         bestScenario = scenarioFromBackendResult(result, {
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
           totalFrames: 1,
@@ -404,6 +439,7 @@ function App() {
         for (const [index, frame] of frames.entries()) {
           setAnalysisProgress(`Analyzing frame ${index + 1}/${frames.length}`)
           const result = await analyzeFrame(frame.file)
+          rawResults.push(result)
           const scenario = scenarioFromBackendResult(result, {
             frameLabel: frame.label,
             totalFrames: frames.length,
@@ -421,6 +457,7 @@ function App() {
       }
 
       setBackendFrames(nextBackendFrames)
+      setBackendResults(rawResults)
       setBackendFrameIndex(0)
       setBackendScenario(bestScenario)
       setActiveId('backend')
@@ -437,9 +474,13 @@ function App() {
       // A lingering "Analysis complete" message would persist under the heading
       // with nothing left to report; the rendered result is the success signal.
       setAnalysisProgress('')
+      // Non-blocking confirmation — the inline result panel is the primary
+      // signal, the toast just confirms it from any scroll position / route.
+      toast.success(copy.live.analysisComplete)
     } catch (error) {
       setAnalysisError(error.message)
       setAnalysisProgress('')
+      toast.error(error.message)
     } finally {
       setIsAnalyzing(false)
     }
@@ -597,6 +638,7 @@ function App() {
           element={
             <InsightsPage
               activeScenario={activeScenario}
+              backendResults={backendResults}
               plotTheme={plotTheme}
               insightsRef={insightsRef}
               isExporting={isExporting}
@@ -613,6 +655,15 @@ function App() {
       </main>
 
       <AppFooter copy={copy} />
+
+      {/* Toasts supplement — never replace — the inline status/error banners,
+          so a critical failure is still visible in page context. Theme tracks
+          the app theme so light/dark stay consistent. */}
+      <Toaster
+        theme={theme}
+        position="bottom-right"
+        toastOptions={{ className: 'papi-toast' }}
+      />
     </div>
   )
 }

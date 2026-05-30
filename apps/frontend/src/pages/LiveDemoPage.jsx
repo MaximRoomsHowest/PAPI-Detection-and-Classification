@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { FrameStage } from '../components/FrameStage'
 import { LampCard } from '../components/LampCard'
 import { InlineMetric } from '../components/InlineMetric'
+import { LampCropZoom } from '../components/LampCropZoom'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
 
 export function LiveDemoPage({
@@ -132,7 +133,7 @@ export function LiveDemoPage({
                   <ul>
                     {activeScenario.transitions.map((event, index) => (
                       <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
-                        {`${copy.live.lamp} ${event.lamp_index}: `}
+                        {`${copy.live.light} ${event.lamp_index}: `}
                         {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
                       </li>
                     ))}
@@ -148,6 +149,20 @@ export function LiveDemoPage({
           )}
         </aside>
       </div>
+
+      {/* PAPI close-up: high-res frames hide the lamp states, so reframe to the
+          detected boxes for visual verification. Image uploads only — folder
+          frames and videos use their backend-annotated artifact + the
+          transition/angle charts on Insights. */}
+      {hasResult && media?.type === 'image' && (
+        <LampCropZoom
+          imageUrl={media.url}
+          naturalWidth={media.naturalWidth}
+          naturalHeight={media.naturalHeight}
+          lamps={activeScenario.lamps}
+          copy={copy}
+        />
+      )}
     </section>
   )
 }

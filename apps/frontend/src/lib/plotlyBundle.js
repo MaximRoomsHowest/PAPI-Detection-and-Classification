@@ -53,8 +53,10 @@ export function loadPlotlyBundle() {
       import('plotly.js/lib/core'),
       import('plotly.js/lib/bar'),
       import('plotly.js/lib/heatmap'),
+      import('plotly.js/lib/histogram'),
+      import('plotly.js/lib/scatter'),
     ])
-      .then(([factoryModule, plotlyModule, barModule, heatmapModule]) => {
+      .then(([factoryModule, plotlyModule, barModule, heatmapModule, histogramModule, scatterModule]) => {
         const factory = requireFunction(
           unwrapDefault(factoryModule),
           'react-plotly.js/factory',
@@ -68,7 +70,12 @@ export function loadPlotlyBundle() {
         }
         const bar = unwrapDefault(barModule)
         const heatmap = unwrapDefault(heatmapModule)
-        Plotly.register([bar, heatmap])
+        const histogram = unwrapDefault(histogramModule)
+        const scatter = unwrapDefault(scatterModule)
+        // scatter is needed explicitly for the angle-vs-state + transition
+        // timeline charts; histogram for the confidence distribution. bar and
+        // heatmap remain for the state-distribution and (legacy) ribbon.
+        Plotly.register([bar, heatmap, histogram, scatter])
         const Plot = factory(Plotly)
         return { Plot, Plotly }
       })

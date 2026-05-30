@@ -5,6 +5,18 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Dev-only reverse proxy so the Vite dev server (whatever port it runs on)
+    // can call the backend without tripping its CORS allow-list. Set
+    // VITE_PAPI_API_URL='' (e.g. in .env.development.local) so the app issues
+    // same-origin /api, /health and /media requests that Vite forwards here.
+    // No effect on the production build.
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/health': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/media': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+    },
+  },
   define: {
     // Plotly references the bare identifier `global`. Vite (esbuild) does not
     // polyfill that in browser builds, so we shim it to globalThis. Without

@@ -115,7 +115,7 @@ export function FrameStage({
         )}
 
         {analyzing && (
-          <div className="analyzing-layer">
+          <div className="analyzing-layer" role="status" aria-live="polite">
             <Radar size={34} />
             <span>{copy.live.backendInference}</span>
           </div>

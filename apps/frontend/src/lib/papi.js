@@ -1,4 +1,4 @@
-import { backendStateId, legalStateCatalog, stateCatalog } from '../catalog/stateCatalog'
+import { backendStateId, stateCatalog } from '../catalog/stateCatalog'
 import { percent } from './format'
 import { mediaUrl } from './api'
 
@@ -18,19 +18,6 @@ export function lampPattern(lamps) {
   return labels.join(' + ')
 }
 
-export function evidenceForState(stateId, confidence) {
-  const selectedIndex = Math.max(
-    0,
-    legalStateCatalog.findIndex((state) => state.id === stateId),
-  )
-  return legalStateCatalog.map((_, index) => {
-    if (stateId === 'unknown') {
-      return index === 2 ? 20 : 10
-    }
-    return index === selectedIndex ? percent(confidence) : Math.max(1, 18 - Math.abs(index - selectedIndex) * 5)
-  })
-}
-
 export function scenarioFromBackendResult(result, context) {
   const stateId = backendStateId[result.global_state] ?? 'unknown'
   const activeState = stateCatalog.find((state) => state.id === stateId) ?? stateCatalog[stateCatalog.length - 1]
@@ -38,13 +25,15 @@ export function scenarioFromBackendResult(result, context) {
     id: lamp.index,
     status: lamp.state === 'unknown' ? 'occluded' : lamp.state,
     confidence: percent(lamp.confidence),
-    transition: lamp.state === 'transition' ? percent(lamp.confidence) : Math.max(3, 100 - percent(lamp.confidence)),
     bbox: lamp.bbox,
   }))
-  const angle = result.angle?.angle_available
+  // angle_available can be true while elevation_angle_deg is null (GPS present
+  // but the angle solve failed), so guard the toFixed calls against null.
+  const hasAngle = result.angle?.angle_available && result.angle.elevation_angle_deg != null
+  const angle = hasAngle
     ? `${result.angle.elevation_angle_deg.toFixed(3)} deg`
     : 'Angle unavailable'
-  const angleSummary = result.angle?.angle_available
+  const angleSummary = hasAngle
     ? {
         available: true,
         value: result.angle.elevation_angle_deg.toFixed(3),
@@ -72,7 +61,6 @@ export function scenarioFromBackendResult(result, context) {
       latency,
       boxConfidence: percent(result.confidence),
     },
-    evidence: evidenceForState(stateId, result.confidence),
     environmentClass: 'clear',
     artifactUrl: mediaUrl(result.artifact_url),
     artifactType: result.media_type,
@@ -80,5 +68,9 @@ export function scenarioFromBackendResult(result, context) {
     angle: result.angle,
     transitions: result.transitions ?? [],
     angleSummary,
+    // Keep the raw AnalysisPayload so result-driven views (crop/zoom overlays,
+    // angle-vs-state charts) can read bbox/per-light angles without re-deriving
+    // them from the display-shaped scenario fields above.
+    rawResult: result,
   }
 }

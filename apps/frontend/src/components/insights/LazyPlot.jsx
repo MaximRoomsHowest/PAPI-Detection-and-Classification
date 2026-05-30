@@ -35,7 +35,7 @@ export function LazyPlot(props) {
     )
   }
   if (!PlotComponent) {
-    return <div className="plot-loading" aria-hidden />
+    return <div className="plot-loading" role="status" aria-label="Loading chart" />
   }
   return <PlotComponent {...props} />
 }

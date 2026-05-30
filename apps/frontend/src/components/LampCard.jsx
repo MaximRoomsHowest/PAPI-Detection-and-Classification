@@ -9,14 +9,15 @@ export function LampCard({ lamp, copy }) {
     <div className={clsx('lamp-card', `lamp-${status.tone}`)}>
       <div className="lamp-preview">
         <span />
-        <strong>Lamp {lamp.id}</strong>
+        <strong>
+          {copy.live.light} {lamp.id}
+        </strong>
       </div>
       <div>
         <p>{label}</p>
-        <small>{lamp.confidence}% confidence</small>
-      </div>
-      <div className="transition-meter" aria-label={`${lamp.transition}% transition score`}>
-        <span style={{ width: `${lamp.transition}%` }} />
+        <small>
+          {lamp.confidence}% {copy.live.confidenceLabel}
+        </small>
       </div>
     </div>
   )
