@@ -44,7 +44,6 @@ export default defineConfig({
           if (id.includes('plotly.js') || id.includes('react-plotly.js')) return 'plotly'
           if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf-export'
           if (id.includes('react-router')) return 'router'
-          if (id.includes('framer-motion')) return 'motion'
           if (id.includes('lucide-react')) return 'icons'
           return 'vendor'
         },

@@ -237,10 +237,33 @@ async function parseAnalysisResponse(response) {
   return response.json()
 }
 
-export async function analyzeFrame(file) {
+/**
+ * Append optional drone-telemetry metadata to an analyze request. The backend
+ * reads snake_case form fields and treats every one as optional (runway_id
+ * falls back to its own 'papi_24' default); empty strings are omitted so an
+ * untouched field never overrides a backend default or a real EXIF GPS read.
+ * The api.test.js "optional metadata" case pins this contract.
+ */
+function appendMetadata(formData, metadata = {}) {
+  const fields = {
+    runway_id: metadata.runwayId,
+    drone_id: metadata.droneId,
+    drone_latitude: metadata.droneLatitude,
+    drone_longitude: metadata.droneLongitude,
+    drone_altitude_m: metadata.droneAltitudeM,
+  }
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined && value !== null && value !== '') {
+      formData.append(key, value)
+    }
+  }
+}
+
+export async function analyzeFrame(file, metadata) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
+  appendMetadata(formData, metadata)
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze-frame`, {
     method: 'POST',
@@ -251,12 +274,13 @@ export async function analyzeFrame(file) {
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeFrames(files) {
+export async function analyzeFrames(files, metadata) {
   checkUploadSize(files)
   const formData = new FormData()
   files.forEach((file) => {
     formData.append('files', file, file.webkitRelativePath || file.name)
   })
+  appendMetadata(formData, metadata)
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze-frames`, {
     method: 'POST',
@@ -267,10 +291,11 @@ export async function analyzeFrames(files) {
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeMedia(file) {
+export async function analyzeMedia(file, metadata) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
+  appendMetadata(formData, metadata)
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze`, {
     method: 'POST',

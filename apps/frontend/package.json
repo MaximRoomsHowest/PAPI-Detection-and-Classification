@@ -13,9 +13,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/poppins": "^5.2.7",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.39.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.16.0",
     "plotly.js": "^3.5.1",
