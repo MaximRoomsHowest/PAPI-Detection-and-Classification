@@ -59,7 +59,10 @@ async function fetchWithTimeout(input, init = {}) {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    return await fetch(input, { ...init, signal: controller.signal })
+    // no-store: API responses (logs, stats, model) must never be served from
+    // the browser HTTP cache, or the History "Refresh" button could re-render
+    // stale rows after a new analysis was logged.
+    return await fetch(input, { ...init, cache: 'no-store', signal: controller.signal })
   } catch (error) {
     if (error?.name === 'AbortError') {
       // Attach the original AbortError as the cause so devtools / Sentry
@@ -219,23 +222,6 @@ export async function fetchReady() {
   }
 }
 
-function appendMetadata(formData, metadata) {
-  formData.append('runway_id', metadata.runwayId)
-
-  if (metadata.droneId) {
-    formData.append('drone_id', metadata.droneId)
-  }
-  if (metadata.droneLatitude !== '') {
-    formData.append('drone_latitude', metadata.droneLatitude)
-  }
-  if (metadata.droneLongitude !== '') {
-    formData.append('drone_longitude', metadata.droneLongitude)
-  }
-  if (metadata.droneAltitudeM !== '') {
-    formData.append('drone_altitude_m', metadata.droneAltitudeM)
-  }
-}
-
 async function parseAnalysisResponse(response) {
   if (!response.ok) {
     let detail = `Analysis failed (${response.status})`
@@ -251,11 +237,10 @@ async function parseAnalysisResponse(response) {
   return response.json()
 }
 
-export async function analyzeFrame(file, metadata) {
+export async function analyzeFrame(file) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
-  appendMetadata(formData, metadata)
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze-frame`, {
     method: 'POST',
@@ -266,13 +251,12 @@ export async function analyzeFrame(file, metadata) {
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeFrames(files, metadata) {
+export async function analyzeFrames(files) {
   checkUploadSize(files)
   const formData = new FormData()
   files.forEach((file) => {
     formData.append('files', file, file.webkitRelativePath || file.name)
   })
-  appendMetadata(formData, metadata)
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze-frames`, {
     method: 'POST',
@@ -283,11 +267,10 @@ export async function analyzeFrames(files, metadata) {
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeMedia(file, metadata) {
+export async function analyzeMedia(file) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
-  appendMetadata(formData, metadata)
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze`, {
     method: 'POST',

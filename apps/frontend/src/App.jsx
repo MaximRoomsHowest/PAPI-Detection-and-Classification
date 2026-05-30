@@ -3,7 +3,6 @@ import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Activity,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -12,8 +11,6 @@ import {
   Gauge,
   Globe,
   Moon,
-  Pause,
-  Play,
   Radar,
   RefreshCw,
   Sun,
@@ -32,12 +29,10 @@ import {
   fetchLogDetail,
   fetchLogs,
   fetchModelInfo,
-  fetchRunways,
   fetchStats,
   mediaUrl,
 } from './lib/api'
 import { extractFrameImages } from './lib/frameExtraction'
-import { validateDroneMetadata } from './lib/validation'
 
 // Plotly is lazy-loaded to keep the initial JS bundle small (saves ~700kB
 // gzipped on first paint).
@@ -196,15 +191,15 @@ const backendStateId = {
   unknown: 'unknown',
 }
 
-const defaultMetadata = {
-  // Aligned with backend default (audit B-CRIT-2): papi_24's height is
-  // pinned to the client-provided 461.37 m reference. PAPI 06 also uses
-  // 461.37 provisionally until Intersoft confirms rwy 06 height/datum.
-  runwayId: 'papi_24',
-  droneId: '',
-  droneLatitude: '',
-  droneLongitude: '',
-  droneAltitudeM: '',
+// Neutral placeholder the Live Demo shows before a real backend result exists.
+// Once the synthetic preset overlay is gone, FrameStage only needs these few
+// fields — it renders the dropzone / uploaded media, never fabricated boxes.
+const IDLE_SCENARIO = {
+  frame: '',
+  condition: '',
+  environmentClass: 'clear',
+  artifactUrl: null,
+  artifactType: null,
 }
 
 const LANGUAGE_LABELS = { en: 'English', de: 'Deutsch', nl: 'Nederlands', fr: 'Français' }
@@ -257,6 +252,7 @@ const translations = {
       telemetryHint: 'Detection and classification need nothing here. Add the drone position to compute the viewing angle and tag detected transitions with it.',
       telemetryInvalid: 'Fix or clear the highlighted telemetry fields to run.',
       transitionsHeading: 'Transitions (red / white)',
+      emptyState: 'Upload an image, video, or frame folder and run the model to detect each PAPI lamp, classify it red or white, and flag red↔white transitions.',
       lamp: 'Lamp',
       examplesHint: 'Canned examples (DEMO) for reference. Your uploaded analysis appears as the "Backend result" tab.',
       viewAnnotated: 'Annotated',
@@ -413,6 +409,7 @@ const translations = {
       telemetryHint: 'Erkennung und Klassifizierung brauchen hier nichts. Drohnenposition angeben, um den Blickwinkel zu berechnen und erkannte Übergänge damit zu kennzeichnen.',
       telemetryInvalid: 'Markierte Telemetriefelder korrigieren oder leeren, um zu starten.',
       transitionsHeading: 'Übergänge (rot / weiß)',
+      emptyState: 'Laden Sie ein Bild, Video oder einen Bildordner hoch und starten Sie das Modell, um jede PAPI-Leuchte zu erkennen, als Rot oder Weiß zu klassifizieren und Rot-Weiß-Übergänge zu markieren.',
       lamp: 'Lampe',
       examplesHint: 'Vorgefertigte Beispiele (DEMO) als Referenz. Ihre hochgeladene Analyse erscheint als Tab "Backend result".',
       viewAnnotated: 'Annotiert',
@@ -569,6 +566,7 @@ const translations = {
       telemetryHint: 'Detectie en classificatie hebben hier niets nodig. Voeg de dronepositie toe om de kijkhoek te berekenen en gedetecteerde overgangen ermee te markeren.',
       telemetryInvalid: 'Corrigeer of wis de gemarkeerde telemetrievelden om te starten.',
       transitionsHeading: 'Overgangen (rood / wit)',
+      emptyState: 'Upload een afbeelding, video of map met frames en start het model om elke PAPI-lamp te detecteren, als rood of wit te classificeren en rood↔wit-overgangen te markeren.',
       lamp: 'Lamp',
       examplesHint: 'Kant-en-klare voorbeelden (DEMO) ter referentie. Je geuploade analyse verschijnt als tab "Backend result".',
       viewAnnotated: 'Geannoteerd',
@@ -725,6 +723,7 @@ const translations = {
       telemetryHint: 'La detection et la classification n ont besoin de rien ici. Ajoutez la position du drone pour calculer l angle de vue et y associer les transitions detectees.',
       telemetryInvalid: 'Corrigez ou videz les champs de telemetrie en surbrillance pour lancer.',
       transitionsHeading: 'Transitions (rouge / blanc)',
+      emptyState: 'Importez une image, une vidéo ou un dossier d’images et lancez le modèle pour détecter chaque feu PAPI, le classer en rouge ou blanc et signaler les transitions rouge↔blanc.',
       lamp: 'Lampe',
       examplesHint: 'Exemples predefinis (DEMO) pour reference. Votre analyse telechargee apparait dans l onglet "Backend result".',
       viewAnnotated: 'Annote',
@@ -1169,17 +1168,12 @@ function initialLanguage() {
 function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [activeId, setActiveId] = useState('clean')
-  // Default OFF so a jury demo presenter controls the carousel manually
-  // (audit F-MAJ-3 — auto-cycling every 5.2s was disorienting on stage).
-  const [isPlaying, setIsPlaying] = useState(false)
   const [media, setMedia] = useState(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [backendScenario, setBackendScenario] = useState(null)
   const [backendFrames, setBackendFrames] = useState([])
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
-  const [runways, setRunways] = useState([])
-  const [metadata, setMetadata] = useState(defaultMetadata)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
   const [language, setLanguage] = useState(initialLanguage)
@@ -1268,41 +1262,6 @@ function App() {
   }, [language])
 
   useEffect(() => {
-    let ignore = false
-
-    fetchRunways()
-      .then((items) => {
-        if (!ignore) {
-          setRunways(items)
-        }
-      })
-      .catch((error) => {
-        if (!ignore) {
-          setAnalysisError(error.message)
-        }
-      })
-
-    return () => {
-      ignore = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!isPlaying) {
-      return undefined
-    }
-
-    const interval = window.setInterval(() => {
-      setActiveId((currentId) => {
-        const index = scenarios.findIndex((scenario) => scenario.id === currentId)
-        return scenarios[(index + 1) % scenarios.length].id
-      })
-    }, 5200)
-
-    return () => window.clearInterval(interval)
-  }, [isPlaying])
-
-  useEffect(() => {
     return () => {
       if (media?.url) {
         URL.revokeObjectURL(media.url)
@@ -1353,7 +1312,6 @@ function App() {
         annotatedUrl: null,
       }
     })
-    setIsPlaying(false)
     setBackendScenario(null)
     setBackendFrames([])
     setBackendFrameIndex(0)
@@ -1375,7 +1333,6 @@ function App() {
     setBackendFrameIndex(nextIndex)
     setBackendScenario(backendFrames[nextIndex])
     setActiveId('backend')
-    setIsPlaying(false)
   }
 
   async function handleDownloadCharts() {
@@ -1434,23 +1391,12 @@ function App() {
     }
   }
 
-  function handleMetadataChange(field, value) {
-    setMetadata((current) => ({ ...current, [field]: value }))
-  }
-
   async function runBackendInference() {
     if (!media?.file || isAnalyzing) {
       return
     }
-    // Telemetry is optional, but if the user typed an out-of-range value, say so
-    // here rather than leaving the Run button mysteriously disabled.
-    if (!validateDroneMetadata(metadata).valid) {
-      setAnalysisError(copy.live.telemetryInvalid)
-      return
-    }
 
     setIsAnalyzing(true)
-    setIsPlaying(false)
     setAnalysisError('')
 
     try {
@@ -1464,7 +1410,7 @@ function App() {
         }
 
         setAnalysisProgress(`Uploading ${folderImages.length} folder images to backend analysis`)
-        const batch = await analyzeFrames(folderImages, metadata)
+        const batch = await analyzeFrames(folderImages)
         nextBackendFrames = batch.results.map((result, index) =>
           scenarioFromBackendResult(result, {
             frameLabel: `Frame ${index + 1}`,
@@ -1474,7 +1420,7 @@ function App() {
         bestScenario = nextBackendFrames[0]
       } else if (media.type === 'video') {
         setAnalysisProgress('Uploading video to backend video analysis')
-        const result = await analyzeMedia(media.file, metadata)
+        const result = await analyzeMedia(media.file)
         bestScenario = scenarioFromBackendResult(result, {
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
           totalFrames: 1,
@@ -1486,7 +1432,7 @@ function App() {
 
         for (const [index, frame] of frames.entries()) {
           setAnalysisProgress(`Analyzing frame ${index + 1}/${frames.length}`)
-          const result = await analyzeFrame(frame.file, metadata)
+          const result = await analyzeFrame(frame.file)
           const scenario = scenarioFromBackendResult(result, {
             frameLabel: frame.label,
             totalFrames: frames.length,
@@ -1627,26 +1573,19 @@ function App() {
           path="/live-demo"
           element={
             <LiveDemoPage
-              activeId={activeId}
               activeScenario={activeScenario}
               activeState={activeState}
               isAnalyzing={isAnalyzing}
-              isPlaying={isPlaying}
               media={media}
               backendScenario={backendScenario}
               backendFrames={backendFrames}
               backendFrameIndex={backendFrameIndex}
-              runways={runways}
-              metadata={metadata}
               analysisError={analysisError}
               analysisProgress={analysisProgress}
               handleMediaFiles={handleMediaFiles}
               runBackendInference={runBackendInference}
-              setActiveId={setActiveId}
-              setIsPlaying={setIsPlaying}
               selectBackendFrame={selectBackendFrame}
               handleMediaChange={handleMediaChange}
-              handleMetadataChange={handleMetadataChange}
               copy={copy}
             />
           }
@@ -1788,34 +1727,24 @@ function AppFooter({ copy }) {
 }
 
 function LiveDemoPage({
-  activeId,
   activeScenario,
   activeState,
   isAnalyzing,
-  isPlaying,
   media,
   backendScenario,
   backendFrames,
   backendFrameIndex,
-  runways,
-  metadata,
   analysisError,
   analysisProgress,
   handleMediaFiles,
   runBackendInference,
-  setActiveId,
-  setIsPlaying,
   selectBackendFrame,
   handleMediaChange,
-  handleMetadataChange,
   copy,
 }) {
-  const [telemetryOpen, setTelemetryOpen] = useState(false)
-  const scenarioTabs = (backendScenario ? [backendScenario, ...scenarios] : scenarios).map((scenario) =>
-    translateScenario(scenario, copy),
-  )
-
-  const metadataErrors = validateDroneMetadata(metadata)
+  // The Live Demo shows real backend output only. Until an analysis has run the
+  // result panel stays empty rather than displaying a canned "demo" preset.
+  const hasResult = Boolean(backendScenario)
 
   return (
     <section className="demo-section">
@@ -1862,110 +1791,6 @@ function LiveDemoPage({
         </div>
       </div>
 
-      <button
-        type="button"
-        className={clsx('telemetry-toggle', telemetryOpen && 'open')}
-        onClick={() => setTelemetryOpen((open) => !open)}
-        aria-expanded={telemetryOpen}
-      >
-        <ChevronDown size={16} />
-        <span className="telemetry-toggle-text">
-          <strong>{copy.live.telemetryHeading}</strong>
-          <small>{copy.live.telemetryHint}</small>
-        </span>
-      </button>
-      {telemetryOpen && (
-      <div className="metadata-panel">
-        <label>
-          <span>{copy.live.runway}</span>
-          <select
-            id="runway_id"
-            name="runway_id"
-            aria-label={copy.live.runway}
-            value={metadata.runwayId}
-            onChange={(event) => handleMetadataChange('runwayId', event.target.value)}
-          >
-            {(runways.length ? runways : [{ id: 'papi_24', label: 'PAPI 24' }]).map((runway) => (
-              <option key={runway.id} value={runway.id}>
-                {runway.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>{copy.live.droneId}</span>
-          <input
-            id="drone_id"
-            name="drone_id"
-            aria-label={copy.live.droneId}
-            value={metadata.droneId}
-            onChange={(event) => handleMetadataChange('droneId', event.target.value)}
-            placeholder={copy.live.optional}
-          />
-        </label>
-        <label>
-          <span>{copy.live.latitude}</span>
-          <input
-            id="drone_latitude"
-            name="drone_latitude"
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min={-90}
-            max={90}
-            aria-label={copy.live.latitude}
-            aria-invalid={Boolean(metadataErrors.errors.droneLatitude)}
-            value={metadata.droneLatitude}
-            onChange={(event) => handleMetadataChange('droneLatitude', event.target.value)}
-            placeholder={copy.live.metadata}
-          />
-          {metadataErrors.errors.droneLatitude && (
-            <small className="field-error" role="alert">{metadataErrors.errors.droneLatitude}</small>
-          )}
-        </label>
-        <label>
-          <span>{copy.live.longitude}</span>
-          <input
-            id="drone_longitude"
-            name="drone_longitude"
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min={-180}
-            max={180}
-            aria-label={copy.live.longitude}
-            aria-invalid={Boolean(metadataErrors.errors.droneLongitude)}
-            value={metadata.droneLongitude}
-            onChange={(event) => handleMetadataChange('droneLongitude', event.target.value)}
-            placeholder={copy.live.metadata}
-          />
-          {metadataErrors.errors.droneLongitude && (
-            <small className="field-error" role="alert">{metadataErrors.errors.droneLongitude}</small>
-          )}
-        </label>
-        <label>
-          <span>{copy.live.altitude}</span>
-          <input
-            id="drone_altitude_m"
-            name="drone_altitude_m"
-            type="number"
-            inputMode="decimal"
-            step="any"
-            min={-500}
-            max={20000}
-            aria-label={copy.live.altitude}
-            aria-invalid={Boolean(metadataErrors.errors.droneAltitudeM)}
-            value={metadata.droneAltitudeM}
-            onChange={(event) => handleMetadataChange('droneAltitudeM', event.target.value)}
-            placeholder={copy.live.metadata}
-          />
-          {metadataErrors.errors.droneAltitudeM && (
-            <small className="field-error" role="alert">{metadataErrors.errors.droneAltitudeM}</small>
-          )}
-        </label>
-      </div>
-      )}
-
       {(analysisError || analysisProgress) && (
         <div
           className={clsx('analysis-status', analysisError && 'error')}
@@ -1976,42 +1801,6 @@ function LiveDemoPage({
         </div>
       )}
 
-      <p className="scenarios-hint">{copy.live.examplesHint}</p>
-      <div className="scenario-tabs" role="tablist" aria-label={copy.live.demoScenarios}>
-        {scenarioTabs.map((scenario) => (
-          <button
-            className={clsx(
-              'scenario-tab',
-              scenario.id === activeId && 'active',
-              scenario.id !== 'backend' && 'scenario-tab--preset',
-            )}
-            key={scenario.id}
-            type="button"
-            onClick={() => {
-              setActiveId(scenario.id)
-              setIsPlaying(false)
-            }}
-          >
-            <span>{scenario.label}</span>
-            <small>{scenario.badge}</small>
-            {scenario.id !== 'backend' && (
-              <span className="scenario-tab__preset-badge" aria-label="Demo preset">
-                DEMO
-              </span>
-            )}
-          </button>
-        ))}
-        <button
-          className="scenario-tab play-tab"
-          type="button"
-          onClick={() => setIsPlaying((current) => !current)}
-          aria-label={isPlaying ? copy.live.pauseLoop : copy.live.playLoop}
-        >
-          {isPlaying ? <Pause size={17} /> : <Play size={17} />}
-          <span>{isPlaying ? copy.live.auto : copy.live.paused}</span>
-        </button>
-      </div>
-
       <div className="live-grid">
         <motion.div
           className="frame-tool"
@@ -2020,7 +1809,7 @@ function LiveDemoPage({
           transition={{ duration: 0.45 }}
         >
           <FrameStage
-            scenario={activeScenario}
+            scenario={hasResult ? activeScenario : IDLE_SCENARIO}
             media={media}
             analyzing={isAnalyzing}
             onFilesSelected={handleMediaFiles}
@@ -2032,64 +1821,55 @@ function LiveDemoPage({
         </motion.div>
 
         <aside className="analysis-panel">
-          <div className="state-summary">
-            <span className="status-dot" style={{ '--dot-color': activeState.color }} />
-            <div>
-              <p>{activeScenario.summary}</p>
-              <h3>{activeState.label}</h3>
-              <small>{activeState.description}</small>
-            </div>
-          </div>
+          {hasResult ? (
+            <>
+              <div className="state-summary">
+                <span className="status-dot" style={{ '--dot-color': activeState.color }} />
+                <div>
+                  <p>{activeScenario.summary}</p>
+                  <h3>{activeState.label}</h3>
+                  <small>{activeState.description}</small>
+                </div>
+              </div>
 
-          <div className="lamp-list">
-            {activeScenario.lamps.map((lamp) => (
-              <LampCard key={lamp.id} lamp={lamp} copy={copy} />
-            ))}
-          </div>
-
-          {/*
-            Real metrics only (audit F-CRIT-2). Detection confidence and
-            processing time come from the live backend payload via
-            scenarioFromBackendResult. For preset scenarios the same fields
-            carry the hardcoded demo values; the "DEMO" watermark on the
-            scenario tab makes the source clear.
-          */}
-          <div className="metric-grid metric-grid--compact">
-            <InlineMetric
-              label={copy.live.detection}
-              value={activeScenario.metrics.boxConfidence}
-              suffix="%"
-            />
-            <InlineMetric
-              label={copy.live.latency}
-              value={activeScenario.metrics.latency}
-              suffix=" ms"
-            />
-          </div>
-
-          {activeScenario.angleSummary && (
-            <div className={clsx('angle-readout', !activeScenario.angleSummary.available && 'unavailable')}>
-              <span>{copy.live.droneAngle}</span>
-              <strong>
-                {activeScenario.angleSummary.value}
-                {activeScenario.angleSummary.available && <small>deg</small>}
-              </strong>
-              <p>{activeScenario.angleSummary.source}</p>
-            </div>
-          )}
-
-          {activeScenario.transitions?.length > 0 && (
-            <div className="transition-readout">
-              <span>{copy.live.transitionsHeading}</span>
-              <ul>
-                {activeScenario.transitions.map((event, index) => (
-                  <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
-                    {`${copy.live.lamp} ${event.lamp_index}: `}
-                    {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
-                    {event.elevation_angle_deg != null && ` @ ${event.elevation_angle_deg.toFixed(2)}°`}
-                  </li>
+              <div className="lamp-list">
+                {activeScenario.lamps.map((lamp) => (
+                  <LampCard key={lamp.id} lamp={lamp} copy={copy} />
                 ))}
-              </ul>
+              </div>
+
+              {/* Real backend metrics only — detection confidence + processing time. */}
+              <div className="metric-grid metric-grid--compact">
+                <InlineMetric
+                  label={copy.live.detection}
+                  value={activeScenario.metrics.boxConfidence}
+                  suffix="%"
+                />
+                <InlineMetric
+                  label={copy.live.latency}
+                  value={activeScenario.metrics.latency}
+                  suffix=" ms"
+                />
+              </div>
+
+              {activeScenario.transitions?.length > 0 && (
+                <div className="transition-readout">
+                  <span>{copy.live.transitionsHeading}</span>
+                  <ul>
+                    {activeScenario.transitions.map((event, index) => (
+                      <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
+                        {`${copy.live.lamp} ${event.lamp_index}: `}
+                        {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="analysis-empty">
+              <Radar size={28} />
+              <p>{copy.live.emptyState}</p>
             </div>
           )}
         </aside>
@@ -2603,14 +2383,7 @@ function FrameStage({
     canToggleView && viewerMode === 'original'
       ? originalSource
       : annotatedSource ?? originalSource ?? media
-  const isAnnotatedExport = Boolean(scenario.artifactUrl || media?.annotatedUrl)
   const canNavigateFrames = backendFrames.length > 1
-  const boxStyle = {
-    left: `${scenario.box.left}%`,
-    top: `${scenario.box.top}%`,
-    width: `${scenario.box.width}%`,
-    height: `${scenario.box.height}%`,
-  }
 
   const handleDrop = (event) => {
     event.preventDefault()
@@ -2632,10 +2405,12 @@ function FrameStage({
   return (
     <div className={clsx('frame-stage', `frame-${scenario.environmentClass}`)}>
       <div className="frame-toolbar">
-        <div className="frame-title">
-          <span>{scenario.frame}</span>
-          <span>{scenario.condition}</span>
-        </div>
+        {(scenario.frame || scenario.condition) && (
+          <div className="frame-title">
+            <span>{scenario.frame}</span>
+            <span>{scenario.condition}</span>
+          </div>
+        )}
         {canToggleView && (
           <div className="frame-view-toggle">
             <button
@@ -2695,24 +2470,6 @@ function FrameStage({
           <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
         )}
 
-        {displayMedia && !isAnnotatedExport && (
-          <>
-            <div className="scan-grid" />
-            <div className="target-box" style={boxStyle}>
-              <span className="box-label">PAPI {scenario.metrics.boxConfidence}%</span>
-              <div className="lamp-overlay">
-                {scenario.lamps.map((lamp) => (
-                  <span
-                    className={clsx('overlay-lamp', `overlay-${lamp.status}`)}
-                    key={lamp.id}
-                    title={`Lamp ${lamp.id}: ${copy.status[lamp.status] ?? statusCopy[lamp.status].label}`}
-                  />
-                ))}
-              </div>
-            </div>
-            {scenario.environmentClass === 'storm' && <div className="weather-layer" />}
-          </>
-        )}
         {analyzing && (
           <div className="analyzing-layer">
             <Radar size={34} />
