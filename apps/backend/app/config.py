@@ -3,7 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +24,14 @@ class Settings(BaseSettings):
     # (audit B-CRIT-5). Use "production" only at real deploy time; local
     # docker-compose, dev, and CI should stay on the default ("local").
     environment: str = Field(default="local", alias="PAPI_ENV")
-    database_url: str = "postgresql+psycopg://papi:papi@localhost:5434/papi_backend"
+    # Read from DATABASE_URL (docker-compose + .env.example) OR PAPI_DATABASE_URL
+    # (matches every other setting's PAPI_ prefix and the production startup error
+    # message). Previously only the bare field name was matched, so a
+    # PAPI_DATABASE_URL override was silently ignored (audit backend-tests).
+    database_url: str = Field(
+        default="postgresql+psycopg://papi:papi@localhost:5434/papi_backend",
+        validation_alias=AliasChoices("DATABASE_URL", "PAPI_DATABASE_URL"),
+    )
     model_path: Path = Field(default=REPO_ROOT / "models" / "serving" / "best.pt", alias="PAPI_MODEL_PATH")
     device: str = Field(default="cpu", alias="PAPI_DEVICE")
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")

@@ -158,11 +158,15 @@ def _grouped_counts(db: Session, column: ColumnElement) -> dict[str, int]:
     return {str(key): int(value) for key, value in rows}
 
 
-def _iso(value: object) -> str | None:
-    """created_at may come back as a datetime (Postgres) or an ISO string (SQLite)."""
+def _iso(value: datetime | str | None) -> str | None:
+    """created_at comes back as a datetime (Postgres) or an ISO string (SQLite).
+
+    The isinstance check narrows the str case, leaving datetime for .isoformat()
+    so no `type: ignore` is needed.
+    """
     if value is None:
         return None
     if isinstance(value, str):
         return value
-    return value.isoformat()  # type: ignore[attr-defined]
+    return value.isoformat()
 

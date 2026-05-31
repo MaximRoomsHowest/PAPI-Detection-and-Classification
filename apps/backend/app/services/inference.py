@@ -17,7 +17,7 @@ from app.services.state import (
     global_state_from_lamps,
     normalize_detections,
 )
-from app.validation.schemas import AnalysisPayload, LampResult, ModelInfo, ValMetrics
+from app.validation.schemas import AnalysisPayload, AngleResult, LampResult, ModelInfo, ValMetrics
 
 
 class InferenceService:
@@ -398,7 +398,7 @@ class InferenceService:
         media_path: Path,
         runway_id: str,
         drone_metadata: tuple[float, float, float] | None,
-    ):
+    ) -> AngleResult:
         angle_source = "request_metadata" if drone_metadata else "file_metadata"
         metadata = drone_metadata or extract_gps_metadata(media_path)
         if metadata is None:
@@ -423,7 +423,7 @@ class InferenceService:
     def _draw_overlay(
         self,
         frame: Any,
-        lamps: list,
+        lamps: list[LampResult],
         global_state: str,
         confidence: float,
         elevation_angle_deg: float | None,
