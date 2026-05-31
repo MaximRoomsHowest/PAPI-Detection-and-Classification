@@ -64,6 +64,11 @@ function App() {
   const [language, setLanguage] = useState(initialLanguage)
   const [backendStatus, setBackendStatus] = useState('checking')
   const insightsRef = useRef(null)
+  // Monotonic analysis run id: bumped whenever new media is selected and captured
+  // at the start of each run, so a slow in-flight analysis whose media was replaced
+  // mid-flight discards its (now stale) result instead of painting it onto the new
+  // upload (audit frontend-bugs: mid-analysis file swap).
+  const runIdRef = useRef(0)
   const copy = translations[language]
 
   const activeScenarioRaw = useMemo(
@@ -206,6 +211,9 @@ function App() {
         annotatedUrl: null,
       }
     })
+    // Invalidate any in-flight analysis so its result is not applied to this
+    // newly selected media.
+    runIdRef.current += 1
     setBackendScenario(null)
     setBackendFrames([])
     setBackendResults([])
@@ -319,6 +327,7 @@ function App() {
       return
     }
 
+    const runId = ++runIdRef.current
     setIsAnalyzing(true)
     setAnalysisError('')
 
@@ -379,6 +388,12 @@ function App() {
         throw new Error('No media was analyzed.')
       }
 
+      // A newer upload replaced the media while this run was in flight — discard
+      // this now-stale result rather than applying it to the new media.
+      if (runIdRef.current !== runId) {
+        return
+      }
+
       setBackendFrames(nextBackendFrames)
       setBackendResults(rawResults)
       setBackendFrameIndex(0)
@@ -401,6 +416,11 @@ function App() {
       // signal, the toast just confirms it from any scroll position / route.
       toast.success(copy.live.analysisComplete)
     } catch (error) {
+      // Ignore a superseded run's error so a stale failure can't overwrite the
+      // state for the media the user has selected now.
+      if (runIdRef.current !== runId) {
+        return
+      }
       setAnalysisError(error.message)
       setAnalysisProgress('')
       toast.error(error.message)
