@@ -14,7 +14,7 @@ The backend lets a user upload an image or video, run the trained PAPI YOLO mode
 - PostgreSQL result logs that store metadata/results, not uploaded image/video bytes.
 - Seeded PAPI runway coordinates for `papi_06` and `papi_24`.
 - YOLO `.pt` inference using `../../models/serving/best.pt` by default.
-- Lamp-level result output: each detected lamp is reported as `white`, `red`, `transition`, or `unknown`. The transition verdict is computed geometrically from the per-lamp elevation angle vs the set-angle ± transition_half_width band — see `app/services/state.py:normalize_detections` and `packages/papi/src/papi/lamp_state.py`.
+- Lamp-level result output: each detected lamp is reported per frame as `white`, `red`, or `unknown` (the YOLO detector is two-class: 0=red, 1=white — see `app/services/state.py:normalize_detections`). A lamp's white↔red `transition` is recognised **temporally** — a colour switch across video frames of the same tracked lamp — by `detect_lamp_transitions`, NOT as a per-frame class. (The geometric set-angle transition band in `packages/papi/src/papi/lamp_state.py` is used only by the offline dataset-labelling pipeline, never at runtime.)
 - Global PAPI state output: `far_too_high`, `too_high`, `correct_glidepath`, `too_low`, `far_too_low`, or `unknown`.
 - Annotated image/video export support.
 - Drone elevation angle calculation using the data-analysis notebook formula:
@@ -135,7 +135,7 @@ Current unit test coverage includes:
 - Annotated exports, temp files, `.env`, and virtual environments are ignored by Git.
 - Docker Desktop must be running before `docker compose up -d` will work.
 - The exact drone angle is only calculated when GPS/altitude metadata is available in the uploaded media or provided manually in the request. For frontend-split frames, metadata should normally be sent as request form fields.
-- Transition/yellow-orange lamp detection is computed geometrically (not by a third detector class). The backend takes the per-lamp elevation angle from drone GPS metadata and promotes a lamp's color verdict to "transition" when it sits within transition_half_width_deg of its set-angle. This satisfies the client requirement without needing a third YOLO class. See `services/state.py:_maybe_transition_state`.
+- Transition recognition is **temporal**, not a third detector class: `services/state.py:detect_lamp_transitions` reports a white↔red switch when a ByteTrack-tracked lamp changes colour between video frames (tolerating a small `TRANSITION_MAX_FRAME_GAP` so a brief dropout doesn't drop a real switch). It is fully independent of runway/angle — the elevation angle is only *attached* to each event as an annotation. The geometric set-angle band (`packages/papi/src/papi/lamp_state.py`) is an offline dataset-labelling tool only. NOTE: there is no per-frame yellow/orange lamp classifier at runtime, so a single still image shows lamps as red/white/unknown and per-lamp transitions are reported across video frames.
 
 ## Suggested Next Steps
 

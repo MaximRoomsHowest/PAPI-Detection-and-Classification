@@ -15,6 +15,7 @@ from app.services.state import (
     confidence_from_lamps,
     detect_lamp_transitions,
     global_state_from_lamps,
+    lamp_index_by_track,
     normalize_detections,
 )
 from app.validation.schemas import AnalysisPayload, AngleResult, LampResult, ModelInfo, ValMetrics
@@ -222,10 +223,10 @@ class InferenceService:
             raise RuntimeError("Could not write annotated video artifact.")
 
         history = deque(maxlen=self.settings.video_history_size)
-        lamp_history: dict[int, list[LampResult]] = {1: [], 2: [], 3: [], 4: []}
-        # ByteTrack id -> [(frame_index, color_state, center_x)] for temporal
-        # red<->white transition detection after the loop (project design).
-        track_observations: dict[int, list[tuple[int, str, float]]] = {}
+        # ByteTrack id -> [(frame_index, color_state, center_x, confidence)].
+        # Drives BOTH temporal transition detection AND the final per-lamp verdict,
+        # so both reference the same stable track identity (not per-frame rank).
+        track_observations: dict[int, list[tuple]] = {}
         frame_count = 0
         angle = self._angle_for_media(media_path, runway_id, drone_metadata)
         last_detections: list[dict] = []
@@ -261,7 +262,7 @@ class InferenceService:
                         continue
                     center_x = (bbox["x1"] + bbox["x2"]) / 2
                     track_observations.setdefault(int(track_id), []).append(
-                        (frame_count, color, center_x)
+                        (frame_count, color, center_x, float(det.get("confidence", 0.0)))
                     )
                 frame_state = global_state_from_lamps(lamps)
                 frame_confidence = confidence_from_lamps(lamps)
@@ -277,8 +278,6 @@ class InferenceService:
                 )
                 writer.write(annotated)
 
-                for lamp in lamps:
-                    lamp_history[lamp.index].append(lamp)
                 last_detections = detections
                 frame_count += 1
         finally:
@@ -289,7 +288,7 @@ class InferenceService:
             artifact_path.unlink(missing_ok=True)
             raise ValueError("Uploaded video did not contain readable frames.")
 
-        final_lamps = self._aggregate_video_lamps(lamp_history)
+        final_lamps = self._aggregate_video_lamps(track_observations)
         global_state = global_state_from_lamps(final_lamps)
         confidence = confidence_from_lamps(final_lamps)
         transitions = detect_lamp_transitions(track_observations, angle.elevation_angle_deg)
@@ -312,27 +311,34 @@ class InferenceService:
         )
 
     @staticmethod
-    def _aggregate_video_lamps(lamp_history: dict[int, list[LampResult]]) -> list[LampResult]:
+    def _aggregate_video_lamps(
+        track_observations: dict[int, list[tuple]],
+    ) -> list[LampResult]:
+        """Final per-lamp video verdict, aggregated by STABLE ByteTrack identity.
+
+        Each lamp's colour is a majority vote over the frames its track was seen;
+        tracks map to lamp 1..4 left-to-right via ``lamp_index_by_track`` (the same
+        identity the transition detector uses). Keying off track id rather than the
+        per-frame left-to-right rank prevents a dropped/re-ordered frame from mixing
+        observations of different physical lamps. Tuples: (frame, color, center_x, conf).
+        """
+        index_by_track = lamp_index_by_track(track_observations)
+        obs_by_index: dict[int, list[tuple]] = {}
+        for tid, obs in track_observations.items():
+            index = index_by_track.get(tid)
+            if index is not None:
+                obs_by_index[index] = obs
+
         final_lamps: list[LampResult] = []
         for index in range(1, 5):
-            history = lamp_history.get(index, [])
-            known = [lamp for lamp in history if lamp.state != "unknown"]
-            if not known:
+            obs = obs_by_index.get(index, [])
+            if not obs:
                 final_lamps.append(LampResult(index=index, state="unknown", confidence=0.0))
                 continue
-
-            state = Counter(lamp.state for lamp in known).most_common(1)[0][0]
-            matching = [lamp for lamp in known if lamp.state == state]
-            confidence = round(sum(lamp.confidence for lamp in matching) / len(matching), 4)
-            bbox = next((lamp.bbox for lamp in reversed(matching) if lamp.bbox is not None), None)
-            final_lamps.append(
-                LampResult(
-                    index=index,
-                    state=state,
-                    confidence=confidence,
-                    bbox=bbox,
-                )
-            )
+            state = Counter(o[1] for o in obs).most_common(1)[0][0]
+            matching = [o for o in obs if o[1] == state]
+            confidence = round(sum(o[3] for o in matching) / len(matching), 4)
+            final_lamps.append(LampResult(index=index, state=state, confidence=confidence))
         return final_lamps
 
     def _detect_frame(
@@ -409,10 +415,11 @@ class InferenceService:
         latitude, longitude, altitude = metadata
         return compute_elevation_angles(latitude, longitude, altitude, runway_id, angle_source=angle_source)
 
-    # BGR color map: cv2 stores images as BGR not RGB, so amber/orange for
-    # transition is (0, 165, 255) and white is near-white grey. Once
-    # B-CRIT-1 routes transition through to lamp.state, this map ensures
-    # transitions visibly stand out instead of looking identical to red.
+    # BGR color map (cv2 stores BGR, not RGB). At runtime a lamp's per-frame state
+    # is only red/white/unknown (the detector is two-class), so the overlay draws
+    # those; white<->red transitions are reported as temporal events
+    # (detect_lamp_transitions), not per-frame. The amber 'transition' entry is
+    # retained so the overlay is ready should a per-frame transition state be added.
     _LAMP_COLORS: dict[str, tuple[int, int, int]] = {
         "white": (245, 245, 245),
         "red": (0, 0, 255),

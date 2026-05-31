@@ -67,36 +67,54 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
     return lamps
 
 
+# Tolerate this many frames between two observations of the same lamp when
+# looking for a red<->white switch. >1 so a brief detector dropout / occlusion
+# (routine at runtime, unlike the offline pipeline) can't silently drop a real
+# transition.
+TRANSITION_MAX_FRAME_GAP = 2
+
+
+def lamp_index_by_track(track_observations: dict[int, list[tuple]]) -> dict[int, int]:
+    """Map ByteTrack ids to lamp index 1..4 (left-to-right).
+
+    The four real PAPI lamps are the most persistently tracked across a video; a
+    transient false-positive track has few observations. So pick the four tracks
+    with the most observations, then order them left-to-right by mean horizontal
+    centre. SHARED by transition detection and the final video aggregation so both
+    reference the same stable physical-lamp identity (a per-frame left-to-right
+    rank scrambles the moment one frame drops or re-orders a lamp).
+    """
+    tracks = [(tid, obs) for tid, obs in track_observations.items() if tid is not None and obs]
+    persistent = sorted(tracks, key=lambda kv: len(kv[1]), reverse=True)[:4]
+    ordered = sorted(persistent, key=lambda kv: sum(o[2] for o in kv[1]) / len(kv[1]))
+    return {tid: rank for rank, (tid, _) in enumerate(ordered, start=1)}
+
+
 def detect_lamp_transitions(
-    track_observations: dict[int, list[tuple[int, str, float]]],
+    track_observations: dict[int, list[tuple]],
     elevation_angle_deg: float | None = None,
 ) -> list[TransitionEvent]:
     """Temporal red<->white transitions per ByteTrack-tracked lamp.
 
     ``track_observations`` maps a ByteTrack track id to its observed
-    ``(frame_index, color_state, center_x)`` tuples across a video. A transition
-    is a red<->white change between two *consecutive* frames of the same track
-    (mirrors the offline ``papi.tracking.detect_transitions`` so the live API and
-    the dataset pipeline agree). Tracks are numbered 1..4 left-to-right by their
-    average horizontal position; ``elevation_angle_deg`` (one value per uploaded
-    video) is attached to each event.
+    ``(frame_index, color_state, center_x, ...)`` tuples across a video. A
+    transition is a red<->white change between two observations of the same lamp
+    at most ``TRANSITION_MAX_FRAME_GAP`` frames apart. Lamps are numbered 1..4
+    left-to-right via ``lamp_index_by_track`` (the same identity the final
+    aggregation uses); ``elevation_angle_deg`` (one value per uploaded video) is
+    attached to each event.
     """
-    tracks = {
-        tid: obs
-        for tid, obs in track_observations.items()
-        if tid is not None and len(obs) >= 2
-    }
-    ranked = sorted(tracks.items(), key=lambda kv: sum(o[2] for o in kv[1]) / len(kv[1]))
-    lamp_index_by_track = {tid: rank for rank, (tid, _) in enumerate(ranked[:4], start=1)}
+    index_by_track = lamp_index_by_track(track_observations)
 
     events: list[TransitionEvent] = []
-    for tid, obs in tracks.items():
-        lamp_index = lamp_index_by_track.get(tid)
+    for tid, obs in track_observations.items():
+        lamp_index = index_by_track.get(tid)
         if lamp_index is None:
             continue
         ordered = sorted(obs, key=lambda item: item[0])
-        for (frame_a, state_a, _), (frame_b, state_b, _) in zip(ordered, ordered[1:], strict=False):
-            if frame_b != frame_a + 1:
+        for (frame_a, state_a, *_), (frame_b, state_b, *_) in zip(ordered, ordered[1:], strict=False):
+            gap = frame_b - frame_a
+            if gap <= 0 or gap > TRANSITION_MAX_FRAME_GAP:
                 continue
             if state_a == state_b or {state_a, state_b} != {"red", "white"}:
                 continue
@@ -113,32 +131,35 @@ def detect_lamp_transitions(
     return events
 
 
+# Exact white-lamp count -> glidepath state for a complete 4-lamp PAPI unit.
+# The five states are defined purely by how many lamps are white vs red, so this
+# is an exact lookup, not a ratio. Mirrors the offline decoder
+# (packages/papi/src/papi/global_state.py:derive_global_state) by construction.
+_WHITE_COUNT_TO_STATE = {
+    4: "far_too_high",       # 4 white
+    3: "too_high",           # 3 white + 1 red
+    2: "correct_glidepath",  # 2 white + 2 red
+    1: "too_low",            # 1 white + 3 red
+    0: "far_too_low",        # 4 red
+}
+
+
 def global_state_from_lamps(lamps: list[LampResult]) -> str:
     """Derive the 5-state global glidepath label (plus 'transition' / 'unknown').
 
-    A lamp in transition shadows the five nominal states: if *any* lamp is in
-    transition, the global state is "transition". Matches
-    ``packages/papi/src/papi/global_state.py:derive_global_state``.
+    If any lamp is mid-transition the global state is 'transition'. Otherwise it
+    is an exact white-count lookup over the four lamps; if fewer than four are
+    confidently classified as white/red the state is 'unknown' rather than a guess
+    from partial data (the previous ratio form silently invented a verdict for
+    3-lamp inputs). Same outputs as the offline ``derive_global_state``.
     """
     if any(lamp.state == "transition" for lamp in lamps):
         return "transition"
 
     counts = Counter(lamp.state for lamp in lamps)
-    known_count = counts["white"] + counts["red"]
-
-    if known_count < 4:
+    if counts["white"] + counts["red"] != 4:
         return "unknown"
-
-    white_ratio = counts["white"] / known_count
-    if white_ratio >= 0.85:
-        return "far_too_high"
-    if 0.60 <= white_ratio < 0.85:
-        return "too_high"
-    if 0.40 <= white_ratio < 0.60:
-        return "correct_glidepath"
-    if 0.15 <= white_ratio < 0.40:
-        return "too_low"
-    return "far_too_low"
+    return _WHITE_COUNT_TO_STATE.get(counts["white"], "unknown")
 
 
 def confidence_from_lamps(lamps: list[LampResult]) -> float:
