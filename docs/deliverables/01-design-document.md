@@ -490,4 +490,3 @@ Honest list of what's missing or wrong, for the next iteration:
   [user-manual.md](../user-manual.md), [installation-manual.md](../installation-manual.md)
 - User-testing reports: [user-testing-papi-vision-2026-05-28.md](../user-testing-papi-vision-2026-05-28.md),
   [user-testing-papi-vision-rerun-2026-05-28.md](../user-testing-papi-vision-rerun-2026-05-28.md)
-- Audit: [audit-fix-verification-2026-05-28.md](../audit-fix-verification-2026-05-28.md)
