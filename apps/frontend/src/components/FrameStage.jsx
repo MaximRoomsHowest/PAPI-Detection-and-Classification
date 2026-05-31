@@ -76,7 +76,7 @@ export function FrameStage({
           </div>
         )}
         {canNavigateFrames && (
-          <div className="frame-nav-controls" aria-label="Backend frame navigation">
+          <div className="frame-nav-controls" aria-label={copy.live.frameNav}>
             <button
               type="button"
               onClick={() => onBackendFrameChange?.(backendFrameIndex - 1)}

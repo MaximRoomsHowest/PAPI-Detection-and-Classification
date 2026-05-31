@@ -187,9 +187,7 @@ function App() {
     // image, and only fail once the backend returned 400 (regression
     // USERTEST-MAJ-1, papi-user-test-2026-05-28).
     if (!isFolderBatch && !isImageFile(file) && !isVideoFile(file)) {
-      setAnalysisError(
-        `Unsupported file: ${file.name}. Upload an image or video file.`,
-      )
+      setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
     }
 
@@ -342,10 +340,10 @@ function App() {
       if (media.type === 'folder') {
         const folderImages = media.files ?? []
         if (!folderImages.length) {
-          throw new Error('No images were found in the selected folder.')
+          throw new Error(copy.live.noFolderImages)
         }
 
-        setAnalysisProgress(`Uploading ${folderImages.length} folder images to backend analysis`)
+        setAnalysisProgress(copy.live.uploadingFolder.replace('{count}', folderImages.length))
         const batch = await analyzeFrames(folderImages)
         rawResults = batch.results
         nextBackendFrames = batch.results.map((result, index) =>
@@ -356,7 +354,7 @@ function App() {
         )
         bestScenario = nextBackendFrames[0]
       } else if (media.type === 'video') {
-        setAnalysisProgress('Uploading video to backend video analysis')
+        setAnalysisProgress(copy.live.uploadingVideo)
         const result = await analyzeMedia(media.file)
         rawResults = [result]
         bestScenario = scenarioFromBackendResult(result, {
@@ -364,12 +362,12 @@ function App() {
           totalFrames: 1,
         })
       } else {
-        setAnalysisProgress('Extracting frames')
+        setAnalysisProgress(copy.live.extractingFrames)
         const frames = await extractFrameImages(media.file)
         let bestScore = -1
 
         for (const [index, frame] of frames.entries()) {
-          setAnalysisProgress(`Analyzing frame ${index + 1}/${frames.length}`)
+          setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
           const result = await analyzeFrame(frame.file)
           rawResults.push(result)
           const scenario = scenarioFromBackendResult(result, {
@@ -385,7 +383,7 @@ function App() {
       }
 
       if (!bestScenario) {
-        throw new Error('No media was analyzed.')
+        throw new Error(copy.live.noMediaAnalyzed)
       }
 
       // A newer upload replaced the media while this run was in flight — discard
