@@ -3,6 +3,7 @@ import hmac
 import io
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from time import perf_counter
 from typing import Annotated
@@ -51,72 +52,60 @@ def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] 
         raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 
-@router.post("/analyze", response_model=AnalysisPayload)
-async def analyze_media(
-    file: Annotated[UploadFile, File()],
+@dataclass(frozen=True)
+class AnalyzeParams:
+    """Form fields shared by the three analyze endpoints.
+
+    Kept in one dependency so the endpoint signatures stay in sync — each of
+    /analyze, /analyze-frame and /analyze-frames previously repeated the same
+    five-field block verbatim.
+    """
+
+    runway_id: str
+    drone_id: str | None
+    drone_latitude: float | None
+    drone_longitude: float | None
+    drone_altitude_m: float | None
+
+
+def analyze_params(
     # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
     # papi_06 whose installation height is still unconfirmed by Intersoft
-    # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
+    # (audit B-CRIT-2 + open question carried forward). The frontend dropdown
     # still lets the user pick papi_06 explicitly.
     runway_id: Annotated[str, Form()] = "papi_24",
     drone_id: Annotated[str | None, Form()] = None,
     drone_latitude: Annotated[float | None, Form()] = None,
     drone_longitude: Annotated[float | None, Form()] = None,
     drone_altitude_m: Annotated[float | None, Form()] = None,
+) -> AnalyzeParams:
+    return AnalyzeParams(runway_id, drone_id, drone_latitude, drone_longitude, drone_altitude_m)
+
+
+@router.post("/analyze", response_model=AnalysisPayload)
+async def analyze_media(
+    file: Annotated[UploadFile, File()],
+    params: Annotated[AnalyzeParams, Depends(analyze_params)],
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> AnalysisPayload:
-    return await _analyze_upload(
-        file=file,
-        runway_id=runway_id,
-        drone_id=drone_id,
-        drone_latitude=drone_latitude,
-        drone_longitude=drone_longitude,
-        drone_altitude_m=drone_altitude_m,
-        db=db,
-        image_only=False,
-    )
+    return await _analyze_upload(file=file, params=params, db=db, image_only=False)
 
 
 @router.post("/analyze-frame", response_model=AnalysisPayload)
 async def analyze_frame(
     file: Annotated[UploadFile, File()],
-    # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
-    # papi_06 whose installation height is still unconfirmed by Intersoft
-    # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
-    # still lets the user pick papi_06 explicitly.
-    runway_id: Annotated[str, Form()] = "papi_24",
-    drone_id: Annotated[str | None, Form()] = None,
-    drone_latitude: Annotated[float | None, Form()] = None,
-    drone_longitude: Annotated[float | None, Form()] = None,
-    drone_altitude_m: Annotated[float | None, Form()] = None,
+    params: Annotated[AnalyzeParams, Depends(analyze_params)],
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> AnalysisPayload:
-    return await _analyze_upload(
-        file=file,
-        runway_id=runway_id,
-        drone_id=drone_id,
-        drone_latitude=drone_latitude,
-        drone_longitude=drone_longitude,
-        drone_altitude_m=drone_altitude_m,
-        db=db,
-        image_only=True,
-    )
+    return await _analyze_upload(file=file, params=params, db=db, image_only=True)
 
 
 @router.post("/analyze-frames", response_model=FrameBatchPayload)
 async def analyze_frames(
     files: Annotated[list[UploadFile], File()],
-    # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
-    # papi_06 whose installation height is still unconfirmed by Intersoft
-    # (audit B-CRIT-2 + open question carried forward). Frontend dropdown
-    # still lets the user pick papi_06 explicitly.
-    runway_id: Annotated[str, Form()] = "papi_24",
-    drone_id: Annotated[str | None, Form()] = None,
-    drone_latitude: Annotated[float | None, Form()] = None,
-    drone_longitude: Annotated[float | None, Form()] = None,
-    drone_altitude_m: Annotated[float | None, Form()] = None,
+    params: Annotated[AnalyzeParams, Depends(analyze_params)],
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> FrameBatchPayload:
@@ -144,16 +133,7 @@ async def analyze_frames(
     start = perf_counter()
     results: list[AnalysisPayload] = []
     for file in files:
-        payload = await _analyze_upload(
-            file=file,
-            runway_id=runway_id,
-            drone_id=drone_id,
-            drone_latitude=drone_latitude,
-            drone_longitude=drone_longitude,
-            drone_altitude_m=drone_altitude_m,
-            db=db,
-            image_only=True,
-        )
+        payload = await _analyze_upload(file=file, params=params, db=db, image_only=True)
         results.append(payload)
 
     processing_ms = int((perf_counter() - start) * 1000)
@@ -166,33 +146,34 @@ async def analyze_frames(
 
 async def _analyze_upload(
     file: UploadFile,
-    runway_id: str,
-    drone_id: str | None,
-    drone_latitude: float | None,
-    drone_longitude: float | None,
-    drone_altitude_m: float | None,
+    params: AnalyzeParams,
     db: Session,
     image_only: bool,
 ) -> AnalysisPayload:
     settings = get_settings()
     try:
-        get_runway(runway_id)
+        get_runway(params.runway_id)
         media_type = detect_media_type(file.filename or "", file.content_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if image_only and media_type != "image":
         raise HTTPException(status_code=400, detail="Use /api/analyze-frame with image files only.")
 
+    # Validate drone metadata BEFORE writing the upload to disk: parse_manual_drone_metadata
+    # raises on invalid input, and if that happened after save_upload the just-saved file
+    # leaked (it was created outside the try/finally that unlinks it). (audit backend-bugs)
+    manual_metadata = parse_manual_drone_metadata(
+        params.drone_latitude, params.drone_longitude, params.drone_altitude_m
+    )
     saved_path = await save_upload(file, settings)
-    manual_metadata = parse_manual_drone_metadata(drone_latitude, drone_longitude, drone_altitude_m)
 
     try:
         payload = get_inference_service().analyze(
             media_path=saved_path,
             media_type=media_type,
-            runway_id=runway_id,
+            runway_id=params.runway_id,
             original_filename=file.filename or saved_path.name,
-            drone_id=drone_id,
+            drone_id=params.drone_id,
             drone_metadata=manual_metadata,
         )
         log = AnalysisLogRepository(db).create_from_payload(payload)
@@ -203,7 +184,7 @@ async def _analyze_upload(
             "analysis.success",
             extra={
                 "media_type": media_type,
-                "runway_id": runway_id,
+                "runway_id": params.runway_id,
                 "global_state": payload.global_state,
                 "confidence": payload.confidence,
                 "processing_ms": payload.processing_ms,
@@ -211,17 +192,22 @@ async def _analyze_upload(
             },
         )
         return payload
-    except RuntimeError as exc:
-        # Log the real error server-side; return a generic message so internal paths
-        # or library internals are not disclosed to the client (rubric LR1D).
-        logger.exception("analysis.runtime_error", extra={"runway_id": runway_id})
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.warning("analysis.value_error", extra={"runway_id": params.runway_id, "detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        # Any other failure — RuntimeError (missing model/OpenCV), cv2.error, or a
+        # SQLAlchemyError on commit — is logged server-side and returned as a generic
+        # 503 so internal paths/library internals are never disclosed (rubric LR1D).
+        # Previously only RuntimeError was caught, so cv2/DB errors surfaced as an
+        # opaque 500 with no structured log (audit backend-bugs).
+        logger.exception("analysis.error", extra={"runway_id": params.runway_id})
         raise HTTPException(
             status_code=503,
             detail="Inference service is temporarily unavailable. Check the server logs.",
         ) from exc
-    except ValueError as exc:
-        logger.warning("analysis.value_error", extra={"runway_id": runway_id, "detail": str(exc)})
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         saved_path.unlink(missing_ok=True)
 
