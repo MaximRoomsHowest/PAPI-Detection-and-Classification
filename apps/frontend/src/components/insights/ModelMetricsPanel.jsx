@@ -94,6 +94,13 @@ function ModelMetrics({ model, copy }) {
         <InlineMetric label={copy.insights.metricRecall} value={fmt(metrics.recall)} />
         <InlineMetric label={copy.insights.metricMap50} value={fmt(metrics.map50)} />
         <InlineMetric label={copy.insights.metricMap5095} value={fmt(metrics.map50_95)} />
+        {/* The operating confidence threshold — surfaced so the "unknown" verdict
+            on a faint lamp reads as a deliberate, tunable gate rather than a miss. */}
+        <InlineMetric
+          label={copy.insights.metricThreshold}
+          value={Number.isFinite(model.confidence_threshold) ? Math.round(model.confidence_threshold * 100) : '—'}
+          suffix={Number.isFinite(model.confidence_threshold) ? '%' : ''}
+        />
       </div>
       {/* The card subtitle already carries the "box detection, not per-class"
           disclaimer; here we surface only the backend's own val_metrics note. */}
