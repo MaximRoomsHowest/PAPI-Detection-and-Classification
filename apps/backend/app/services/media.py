@@ -36,13 +36,20 @@ def safe_upload_name(filename: str) -> str:
     return f"{uuid4()}{suffix}"
 
 
-async def save_upload(upload: UploadFile, settings: Settings) -> Path:
+def save_upload(upload: UploadFile, settings: Settings) -> Path:
+    """Stream the upload to disk in chunks, enforcing the size cap.
+
+    Synchronous on purpose: the analyze endpoints are plain ``def`` so FastAPI
+    runs them in its threadpool, where blocking reads/writes are fine and do not
+    stall the event loop. Reads ``upload.file`` (the underlying SpooledTemporaryFile)
+    directly instead of the async ``await upload.read``.
+    """
     target = settings.uploads_dir / safe_upload_name(upload.filename or "upload")
     max_bytes = settings.max_upload_mb * 1024 * 1024
     bytes_written = 0
     try:
         with target.open("wb") as output:
-            while chunk := await upload.read(1024 * 1024):
+            while chunk := upload.file.read(1024 * 1024):
                 bytes_written += len(chunk)
                 if bytes_written > max_bytes:
                     raise ValueError(f"Upload exceeds the {settings.max_upload_mb} MB limit.")

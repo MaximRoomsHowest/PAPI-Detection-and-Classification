@@ -83,27 +83,27 @@ def analyze_params(
 
 
 @router.post("/analyze", response_model=AnalysisPayload)
-async def analyze_media(
+def analyze_media(
     file: Annotated[UploadFile, File()],
     params: Annotated[AnalyzeParams, Depends(analyze_params)],
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> AnalysisPayload:
-    return await _analyze_upload(file=file, params=params, db=db, image_only=False)
+    return _analyze_upload(file=file, params=params, db=db, image_only=False)
 
 
 @router.post("/analyze-frame", response_model=AnalysisPayload)
-async def analyze_frame(
+def analyze_frame(
     file: Annotated[UploadFile, File()],
     params: Annotated[AnalyzeParams, Depends(analyze_params)],
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> AnalysisPayload:
-    return await _analyze_upload(file=file, params=params, db=db, image_only=True)
+    return _analyze_upload(file=file, params=params, db=db, image_only=True)
 
 
 @router.post("/analyze-frames", response_model=FrameBatchPayload)
-async def analyze_frames(
+def analyze_frames(
     files: Annotated[list[UploadFile], File()],
     params: Annotated[AnalyzeParams, Depends(analyze_params)],
     db: Annotated[Session, Depends(get_session)] = None,
@@ -133,7 +133,7 @@ async def analyze_frames(
     start = perf_counter()
     results: list[AnalysisPayload] = []
     for file in files:
-        payload = await _analyze_upload(file=file, params=params, db=db, image_only=True)
+        payload = _analyze_upload(file=file, params=params, db=db, image_only=True)
         results.append(payload)
 
     processing_ms = int((perf_counter() - start) * 1000)
@@ -144,7 +144,7 @@ async def analyze_frames(
     )
 
 
-async def _analyze_upload(
+def _analyze_upload(
     file: UploadFile,
     params: AnalyzeParams,
     db: Session,
@@ -165,7 +165,7 @@ async def _analyze_upload(
     manual_metadata = parse_manual_drone_metadata(
         params.drone_latitude, params.drone_longitude, params.drone_altitude_m
     )
-    saved_path = await save_upload(file, settings)
+    saved_path = save_upload(file, settings)
 
     try:
         payload = get_inference_service().analyze(

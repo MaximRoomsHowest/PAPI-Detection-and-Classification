@@ -1,4 +1,3 @@
-import asyncio
 from io import BytesIO
 
 import pytest
@@ -32,7 +31,7 @@ def test_save_upload_enforces_size_limit(tmp_path):
     upload = UploadFile(filename="large.jpg", file=BytesIO(b"x" * (1024 * 1024 + 1)))
 
     with pytest.raises(ValueError, match="Upload exceeds"):
-        asyncio.run(save_upload(upload, settings))
+        save_upload(upload, settings)
 
     assert list(settings.uploads_dir.iterdir()) == []
 
