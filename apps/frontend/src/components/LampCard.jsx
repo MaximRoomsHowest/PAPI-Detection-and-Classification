@@ -2,7 +2,9 @@ import clsx from 'clsx'
 import { statusCopy } from '../catalog/statusCatalog'
 
 export function LampCard({ lamp, copy }) {
-  const status = statusCopy[lamp.status]
+  // Fall back to the "occluded" tone for any unexpected backend state so a new
+  // lamp status can never crash the card (mirrors the guard in LampCropZoom).
+  const status = statusCopy[lamp.status] ?? statusCopy.occluded
   const label = copy.status[lamp.status] ?? status.label
   // Flag a shaky verdict — a real detection under 50% confidence — with a
   // language-neutral ⚠ cue and amber styling rather than showing it as certain.
