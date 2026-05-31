@@ -57,6 +57,31 @@ describe('computeCropRect', () => {
     expect(light1.x).toBe(400 - (400 - 77))
   })
 
+  it('expands a too-tight crop of tiny detections to a minimum (bounds the zoom)', () => {
+    // Four ~4px detections clustered near the centre of a 960x720 frame — the real
+    // case that previously zoomed ~12x into a blurry sliver excluding the lamp glow.
+    const rect = computeCropRect(
+      [
+        lamp(1, 468, 352, 472, 356),
+        lamp(2, 477, 352, 481, 356),
+        lamp(3, 486, 352, 489, 356),
+        lamp(4, 494, 352, 498, 356),
+      ],
+      960,
+      720,
+    )
+    // Minimum crop = max(200, 0.15*960) x max(132, 0.15*720) = 200 x 132.
+    expect(rect.width).toBe(200)
+    expect(rect.height).toBe(132)
+    // Still centred on the detection cluster, clamped inside the image.
+    expect(rect.x).toBe(383) // centre 483 - 100
+    expect(rect.y).toBe(288) // centre 354 - 66
+    // Boxes keep their true size + offset relative to the (expanded) crop origin.
+    const b1 = rect.boxes.find((box) => box.id === 1)
+    expect(b1.x).toBe(468 - 383)
+    expect(b1.width).toBe(4)
+  })
+
   it('ignores lamps without a bbox but keeps the rest', () => {
     const rect = computeCropRect(
       [lamp(1, 100, 100, 140, 140), { id: 2, status: 'red', bbox: null }],

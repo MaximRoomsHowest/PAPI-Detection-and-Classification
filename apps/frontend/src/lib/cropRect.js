@@ -8,9 +8,27 @@
 
 const DEFAULT_PAD_RATIO = 0.35
 const MIN_PAD_PX = 24
+// Floor on the crop size so a cluster of tiny, distant PAPI detections (often only
+// a few pixels each) isn't zoomed ~10-15x into a blurry sliver that excludes the
+// lamp glow and the surrounding scene. Framing at least this much keeps the lamps
+// legible and in context; on a real high-resolution drone frame the crop still
+// frames in tight (the ratio dominates the absolute floor there).
+const MIN_CROP_PX = 200
+const MIN_CROP_RATIO = 0.15
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
+}
+
+// Expand a 1-D [start, size] span to at least `min` (never exceeding `total`),
+// keeping it centred on its original midpoint and inside [0, total].
+function expandSpan(start, size, min, total) {
+  const target = Math.min(total, Math.max(size, min))
+  if (target === size) {
+    return [start, size]
+  }
+  const center = start + size / 2
+  return [clamp(center - target / 2, 0, total - target), target]
 }
 
 /**
@@ -54,10 +72,17 @@ export function computeCropRect(lamps, naturalWidth, naturalHeight, options = {}
   const padX = Math.max(MIN_PAD_PX, (unionX2 - unionX1) * padRatio)
   const padY = Math.max(MIN_PAD_PX, (unionY2 - unionY1) * padRatio)
 
-  const x = clamp(unionX1 - padX, 0, naturalWidth)
-  const y = clamp(unionY1 - padY, 0, naturalHeight)
-  const width = clamp(unionX2 + padX, x, naturalWidth) - x
-  const height = clamp(unionY2 + padY, y, naturalHeight) - y
+  let x = clamp(unionX1 - padX, 0, naturalWidth)
+  let y = clamp(unionY1 - padY, 0, naturalHeight)
+  let width = clamp(unionX2 + padX, x, naturalWidth) - x
+  let height = clamp(unionY2 + padY, y, naturalHeight) - y
+
+  // Bound the zoom: expand a too-tight crop (tiny detections) to a sensible
+  // minimum so the lamps render in context instead of an over-zoomed blur.
+  const minW = Math.max(MIN_CROP_PX, naturalWidth * MIN_CROP_RATIO)
+  const minH = Math.max(MIN_CROP_PX * 0.66, naturalHeight * MIN_CROP_RATIO)
+  ;[x, width] = expandSpan(x, width, minW, naturalWidth)
+  ;[y, height] = expandSpan(y, height, minH, naturalHeight)
 
   return {
     x,
