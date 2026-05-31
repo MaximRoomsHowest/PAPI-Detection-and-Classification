@@ -124,7 +124,13 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
         latitude = -latitude
     if lon_ref and getattr(lon_ref, "values", "E") != "E":
         longitude = -longitude
-    if alt_ref and getattr(alt_ref, "values", 0) == 1:
+    # GPSAltitudeRef comes back from exifread as a single-element list (e.g. [1]
+    # = below sea level), so read element 0 — comparing the list itself (`[1] == 1`)
+    # is always False, so the below-sea-level sign was never applied (audit backend-bugs).
+    alt_ref_value = getattr(alt_ref, "values", None) if alt_ref else None
+    if isinstance(alt_ref_value, (list, tuple)) and alt_ref_value:
+        alt_ref_value = alt_ref_value[0]
+    if alt_ref_value == 1:
         altitude = -altitude
 
     return latitude, longitude, altitude

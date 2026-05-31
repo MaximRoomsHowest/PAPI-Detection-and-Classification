@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, Float, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -23,13 +23,25 @@ def utcnow_aware() -> datetime:
 class AnalysisLog(Base):
     __tablename__ = "analysis_logs"
 
+    # Composite indexes for the History / GET /api/logs access pattern: filter by
+    # global_state or media_type, ordered by created_at DESC. A (col, created_at)
+    # b-tree also serves a lookup on `col` alone (leftmost prefix) and Postgres can
+    # scan it backward for the DESC sort, so these replace the standalone
+    # global_state / media_type indexes. Note: create_all only adds indexes to a
+    # FRESH table; an existing deployment needs a manual CREATE INDEX (no migration
+    # tool yet) (audit backend-perf).
+    __table_args__ = (
+        Index("ix_logs_state_created", "global_state", "created_at"),
+        Index("ix_logs_media_created", "media_type", "created_at"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    media_type: Mapped[str] = mapped_column(String(24), index=True)
+    media_type: Mapped[str] = mapped_column(String(24))
     runway_id: Mapped[str] = mapped_column(String(32), default="papi_24", index=True)
     drone_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     original_filename: Mapped[str] = mapped_column(String(512))
     artifact_path: Mapped[str | None] = mapped_column(Text, nullable=True)
-    global_state: Mapped[str] = mapped_column(String(64), index=True)
+    global_state: Mapped[str] = mapped_column(String(64))
     lamp_1_state: Mapped[str] = mapped_column(String(32), default="unknown")
     lamp_2_state: Mapped[str] = mapped_column(String(32), default="unknown")
     lamp_3_state: Mapped[str] = mapped_column(String(32), default="unknown")

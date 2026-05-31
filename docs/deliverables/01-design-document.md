@@ -399,16 +399,14 @@ laptop (1440 px), 27-inch desktop (2560 px).
 
 ## 9. Internationalisation
 
-Three locales: English (default), Nederlands, Français. Strings live
-in `apps/frontend/src/i18n/{en,nl,fr}.json` and are loaded by a
-custom hook `useT()` to avoid pulling in a full i18n library for ~80
-strings.
+Four locales: English (default), Deutsch, Nederlands, Français. Strings
+live in `apps/frontend/src/i18n/translations.js` (a single keyed object,
+so no full i18n library is pulled in for ~80 strings); the active language
+selects a `copy` object threaded from the app root.
 
-**Why three locales?** The jury and the client both have native
-Dutch and French speakers. English is the engineering lingua
-franca. German is a known gap (the client and the airport are in
-Germany) — flagged in `docs/audit-fix-verification-2026-05-28.md`
-as a future polish.
+**Why these locales?** The client and the airport are in Germany, so
+German is included; the jury and the client also have native Dutch and
+French speakers; English is the engineering lingua franca.
 
 **Persistence**: locale + theme are stored in `localStorage` and
 restored on next visit. Locale persistence specifically was caught
@@ -468,19 +466,22 @@ documented before/after.
 
 Honest list of what's missing or wrong, for the next iteration:
 
-1. **Form validation** — `drone_latitude`, `drone_longitude`, `altitude_m`
-   accept any input. Should validate before backend submission to give
-   immediate feedback. (LR1A 16+ "proper input validation" — open.)
-2. **Single large component file** — `apps/frontend/src/App.jsx` is
-   ~2 469 lines. Routes should be split into `src/pages/*.jsx` with
-   page-specific hooks extracted into `src/hooks/`.
-3. **No frontend unit tests yet** — Vitest + React Testing Library
-   configured but no test files. Slated for the next polish pass.
-4. **German locale missing** — see §9.
-5. **No first-time-user tutorial overlay** — intentional for the
+1. **Drone-metadata form validation** — the manual drone lat/lon/alt
+   inputs were removed from the Live Demo; the backend still range-checks
+   any drone metadata sent via the API (`parse_manual_drone_metadata`).
+   Re-introducing the inputs would mean restoring client-side validation.
+2. **App.jsx modularised** — the former ~2 469-line `App.jsx` is now a
+   thin route shell (~480 lines): pages in `src/pages/*.jsx`, the header
+   in `src/components/Topbar.jsx`, shared logic in `src/lib/` + `src/hooks/`.
+   Remaining: extract a `useAnalysis` hook for the upload/inference state
+   still held in `App.jsx`.
+3. **Frontend unit tests** — Vitest covers `src/lib/` (api, cropRect,
+   insightsTransforms, papi) with 54 tests; component-level tests
+   (React Testing Library) are the next coverage step.
+4. **No first-time-user tutorial overlay** — intentional for the
    jury demo (would surprise the presenter), but useful for drone
    operators in the field. Planned for v1.1.
-6. **Form-control `id`/`name`** — see §10.
+5. **Form-control `id`/`name`** — see §10.
 
 ## Sources
 

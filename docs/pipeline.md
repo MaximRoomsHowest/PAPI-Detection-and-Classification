@@ -5,7 +5,7 @@
 - Python 3.10+ in a venv with `pip install -e .[dev]` done.
 - `data/raw/` resolves to the archived raw artifact folder. From the repo root on Windows:
   `cmd /c mklink /J data\raw ..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI`.
-- `configs/papi_edny_rwy06.yaml` and `configs/split.yaml` present (committed).
+- `configs/papi_edny.yaml` and `configs/split.yaml` present (committed).
 
 ## Pipeline entrypoint
 

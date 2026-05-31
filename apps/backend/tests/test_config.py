@@ -80,3 +80,19 @@ def test_environment_can_be_set_to_production_via_env(monkeypatch):
     monkeypatch.setenv("PAPI_ENV", "production")
     settings = Settings()
     assert settings.environment.lower() == "production"
+
+
+def test_database_url_honors_papi_prefixed_env_var(monkeypatch):
+    """PAPI_DATABASE_URL — the convention every other setting uses and the name the
+    production startup error references — must be honored via the real env path, not
+    silently ignored (audit backend-tests)."""
+    monkeypatch.setenv("PAPI_DATABASE_URL", "postgresql+psycopg://u:p@db:5432/papi_x")
+    settings = Settings()
+    assert settings.database_url == "postgresql+psycopg://u:p@db:5432/papi_x"
+
+
+def test_database_url_honors_unprefixed_env_var(monkeypatch):
+    """DATABASE_URL (used by docker-compose and .env.example) must keep working."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/papi_y")
+    settings = Settings()
+    assert settings.database_url == "postgresql+psycopg://u:p@db:5432/papi_y"

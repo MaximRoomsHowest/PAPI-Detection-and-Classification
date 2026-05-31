@@ -1,4 +1,6 @@
-export function clamp(value, min, max) {
+// Internal helper for percent(); not exported because nothing else imports it
+// (cropRect.js has its own local clamp).
+function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 

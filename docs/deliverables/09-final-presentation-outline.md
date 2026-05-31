@@ -178,7 +178,7 @@ Bullets:
   Nginx + React frontend.
 - Three containers run as non-root, secrets via `.env`, healthchecks
   on every service, end-to-end `X-Request-ID` tracing.
-- CI runs ruff + 43 backend tests + 15 papi tests + 6 frontend
+- CI runs ruff + 90 backend tests + 41 papi tests + 54 frontend
   tests + npm lint/build + Docker build on every push.
 - HTTPS termination via Caddy in production (one-line `docker
   compose` swap — see `docs/installation-manual.md §Production`).
