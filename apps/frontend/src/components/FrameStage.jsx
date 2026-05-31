@@ -109,7 +109,7 @@ export function FrameStage({
         {displayMedia?.type === 'video' ? (
           <video src={displayMedia.url} autoPlay muted loop playsInline controls />
         ) : displayMedia?.type === 'image' ? (
-          <img src={displayMedia.url} alt="Uploaded PAPI test frame" />
+          <img src={displayMedia.url} alt={copy.live.frameAlt} />
         ) : (
           <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
         )}

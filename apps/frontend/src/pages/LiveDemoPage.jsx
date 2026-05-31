@@ -105,6 +105,22 @@ export function LiveDemoPage({
                   <p>{activeScenario.summary}</p>
                   <h3>{activeState.label}</h3>
                   <small>{activeState.description}</small>
+                  {/* On an "unknown" verdict, show how many of the 4 lamps were
+                      actually detected so the result reads as "found 3, one was
+                      too faint" rather than a total miss (the yolo26s model is
+                      precise but conservative on dim/distant lamps). */}
+                  {activeScenario.stateId === 'unknown' && (
+                    <small className="state-summary__count">
+                      {copy.live.lampsDetected
+                        .replace(
+                          '{n}',
+                          activeScenario.lamps.filter(
+                            (lamp) => lamp.status === 'red' || lamp.status === 'white',
+                          ).length,
+                        )
+                        .replace('{total}', activeScenario.lamps.length)}
+                    </small>
+                  )}
                 </div>
               </div>
 
