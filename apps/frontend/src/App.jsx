@@ -13,6 +13,7 @@ import {
   Gauge,
   Globe,
   Image as ImageIcon,
+  MapPin,
   Moon,
   Pause,
   Play,
@@ -197,6 +198,19 @@ const defaultMetadata = {
   droneAltitudeM: '',
 }
 
+const defaultRunwayForm = {
+  id: '',
+  label: '',
+  airport: '',
+  designation: '',
+  latitude: '',
+  longitude: '',
+  altitudeM: '',
+  length: '',
+  surface: '',
+  notes: '',
+}
+
 const translations = {
   en: {
     brand: {
@@ -207,6 +221,7 @@ const translations = {
       introduction: 'Introduction',
       liveDemo: 'Live Demo',
       insights: 'Insights',
+      runways: 'Runways',
     },
     footer: {
       project: 'PAPI Vision student project',
@@ -231,7 +246,7 @@ const translations = {
       description:
         'A front-end prototype for testing model output, explaining lamp transitions, and presenting accuracy, speed, and robustness in one polished flow.',
       cta: 'Try It Out',
-      scroll: 'Airport details',
+      scroll: 'Runway setup',
       airportEyebrow: 'Airport context',
       airportTitle: 'Bodensee-Airport Friedrichshafen runway snapshot.',
       runwayNote: 'Runway 06/24, asphalt, 2,356 m (7,729 ft)',
@@ -266,6 +281,7 @@ const translations = {
       pauseMedia: 'Pause video',
       restartViewer: 'Restart analysis',
       runway: 'Runway',
+      selectedRunway: 'Selected runway',
       droneId: 'Drone ID',
       latitude: 'Latitude',
       longitude: 'Longitude',
@@ -286,12 +302,60 @@ const translations = {
       dropTitle: 'Drag and drop an image or video',
       dropText: 'Or use the upload button above',
     },
+    runways: {
+      eyebrow: 'Runway database',
+      title: 'Manage PAPI runway reference data.',
+      description: 'Add runway and PAPI installation details locally, then choose which runway the live backend analysis should use.',
+      existing: 'Existing runways',
+      addTitle: 'Add new runway',
+      active: 'Active',
+      useForAnalysis: 'Use for analysis',
+      id: 'Runway ID',
+      label: 'Display name',
+      airport: 'Airport',
+      designation: 'Designation',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      altitude: 'Altitude m',
+      length: 'Length',
+      surface: 'Surface',
+      notes: 'Notes',
+      add: 'Add runway',
+      localOnly: 'Local session only',
+      backendSeed: 'Backend seed',
+      noRunways: 'No runways loaded yet.',
+    },
     insights: {
       eyebrow: 'Insights',
-      title: 'Accuracy, transitions, robustness, and speed without boring chart filler.',
+      title: 'Session statistics for uploaded PAPI media.',
       preparing: 'Preparing PDF',
-      download: 'Download charts (PDF)',
-      source: 'Inspired by visual forms from Data Viz Project',
+      download: 'Download report (PDF)',
+      source: 'Built from the current browser session',
+      runwayFilter: 'Runway statistics',
+      allRunways: 'All runways',
+      sessionSummary: 'Session summary',
+      uploadedMedia: 'Uploaded media',
+      analyzedFrames: 'Analyzed frames',
+      stateChanges: 'State changes',
+      avgConfidence: 'Avg confidence',
+      noSessionTitle: 'No session data yet',
+      noSessionText: 'Upload an image, video, or image folder in Live Demo to populate this report.',
+      mediaHistoryTitle: 'Uploaded media in this session',
+      mediaHistoryText: 'Each completed backend analysis is kept locally until the page is refreshed.',
+      lampTrendTitle: 'Horizontal PAPI detection by angle',
+      lampTrendText: 'Lamp confidence across the analyzed frames. Dashed vertical markers show where the detected PAPI state changed.',
+      lampAverageTitle: 'Average score for each lamp',
+      lampAverageText: 'Mean confidence per lamp across the selected runway/session.',
+      angleStateTitle: 'Angle and state timeline',
+      angleStateText: 'Shows which glidepath state was detected at each available drone elevation angle.',
+      selectedRunway: 'Selected runway',
+      mediaType: 'Media type',
+      angleAxis: 'Angle',
+      frameAxis: 'Frame',
+      scoreAxis: 'Confidence',
+      threshold: 'reference threshold',
+      changeMarker: 'state change',
+      noAngles: 'Angles unavailable for this media',
       decoderTitle: 'PAPI state decoder',
       decoderText: 'All five legal outputs, their lamp pattern, and model evidence.',
       activeDecision: 'Active decision',
@@ -336,6 +400,7 @@ const translations = {
       introduction: 'Introductie',
       liveDemo: 'Live demo',
       insights: 'Inzichten',
+      runways: 'Banen',
     },
     footer: {
       project: 'PAPI Vision studentenproject',
@@ -360,7 +425,7 @@ const translations = {
       description:
         'Een frontendprototype om modeloutput te testen, lampovergangen uit te leggen en nauwkeurigheid, snelheid en robuustheid helder te presenteren.',
       cta: 'Probeer het',
-      scroll: 'Luchthavendetails',
+      scroll: 'Baaninstelling',
       airportEyebrow: 'Luchthavencontext',
       airportTitle: 'Overzicht van de baan van Bodensee-Airport Friedrichshafen.',
       runwayNote: 'Baan 06/24, asfalt, 2.356 m (7.729 ft)',
@@ -395,6 +460,7 @@ const translations = {
       pauseMedia: 'Video pauzeren',
       restartViewer: 'Analyse herstarten',
       runway: 'Baan',
+      selectedRunway: 'Geselecteerde baan',
       droneId: 'Drone-ID',
       latitude: 'Breedtegraad',
       longitude: 'Lengtegraad',
@@ -415,12 +481,60 @@ const translations = {
       dropTitle: 'Sleep een afbeelding of video hierheen',
       dropText: 'Of gebruik de uploadknop hierboven',
     },
+    runways: {
+      eyebrow: 'Baandatabase',
+      title: 'Beheer PAPI-baanreferenties.',
+      description: 'Voeg lokaal baan- en PAPI-installatiegegevens toe en kies welke baan de live backendanalyse gebruikt.',
+      existing: 'Bestaande banen',
+      addTitle: 'Nieuwe baan toevoegen',
+      active: 'Actief',
+      useForAnalysis: 'Gebruiken voor analyse',
+      id: 'Baan-ID',
+      label: 'Weergavenaam',
+      airport: 'Luchthaven',
+      designation: 'Aanduiding',
+      latitude: 'Breedtegraad',
+      longitude: 'Lengtegraad',
+      altitude: 'Hoogte m',
+      length: 'Lengte',
+      surface: 'Oppervlak',
+      notes: 'Notities',
+      add: 'Baan toevoegen',
+      localOnly: 'Alleen lokale sessie',
+      backendSeed: 'Backend seed',
+      noRunways: 'Nog geen banen geladen.',
+    },
     insights: {
       eyebrow: 'Inzichten',
-      title: 'Nauwkeurigheid, overgangen, robuustheid en snelheid in duidelijke grafieken.',
+      title: 'Sessiestatistieken voor geuploade PAPI-media.',
       preparing: 'PDF voorbereiden',
-      download: 'Grafieken downloaden (PDF)',
-      source: 'Geinspireerd door vormen van Data Viz Project',
+      download: 'Rapport downloaden (PDF)',
+      source: 'Gebouwd vanuit de huidige browsersessie',
+      runwayFilter: 'Baanstatistieken',
+      allRunways: 'Alle banen',
+      sessionSummary: 'Sessiesamenvatting',
+      uploadedMedia: 'Geuploade media',
+      analyzedFrames: 'Geanalyseerde frames',
+      stateChanges: 'Statuswijzigingen',
+      avgConfidence: 'Gem. vertrouwen',
+      noSessionTitle: 'Nog geen sessiedata',
+      noSessionText: 'Upload een afbeelding, video of map met afbeeldingen in Live Demo om dit rapport te vullen.',
+      mediaHistoryTitle: 'Geuploade media in deze sessie',
+      mediaHistoryText: 'Elke afgeronde backendanalyse blijft lokaal bewaard tot de pagina wordt vernieuwd.',
+      lampTrendTitle: 'Horizontale PAPI-detectie per hoek',
+      lampTrendText: 'Lampvertrouwen over de geanalyseerde frames. Gestreepte verticale markeringen tonen waar de gedetecteerde PAPI-status veranderde.',
+      lampAverageTitle: 'Gemiddelde score per lamp',
+      lampAverageText: 'Gemiddeld vertrouwen per lamp voor de geselecteerde baan/sessie.',
+      angleStateTitle: 'Hoek- en statustijdlijn',
+      angleStateText: 'Toont welke glidepathstatus werd gedetecteerd bij elke beschikbare drone-elevatiehoek.',
+      selectedRunway: 'Geselecteerde baan',
+      mediaType: 'Mediatype',
+      angleAxis: 'Hoek',
+      frameAxis: 'Frame',
+      scoreAxis: 'Vertrouwen',
+      threshold: 'referentiedrempel',
+      changeMarker: 'statuswijziging',
+      noAngles: 'Hoeken niet beschikbaar voor deze media',
       decoderTitle: 'PAPI-statusdecoder',
       decoderText: 'Alle vijf geldige outputs, hun lamppatroon en modelbewijs.',
       activeDecision: 'Actieve beslissing',
@@ -465,6 +579,7 @@ const translations = {
       introduction: 'Introduction',
       liveDemo: 'Demo live',
       insights: 'Analyses',
+      runways: 'Pistes',
     },
     footer: {
       project: 'Projet etudiant PAPI Vision',
@@ -489,7 +604,7 @@ const translations = {
       description:
         'Un prototype frontend pour tester la sortie du modele, expliquer les transitions des lampes et presenter precision, vitesse et robustesse clairement.',
       cta: 'Essayer',
-      scroll: 'Details aeroport',
+      scroll: 'Configuration piste',
       airportEyebrow: 'Contexte aeroport',
       airportTitle: 'Apercu de la piste de Bodensee-Airport Friedrichshafen.',
       runwayNote: 'Piste 06/24, asphalte, 2 356 m (7 729 ft)',
@@ -524,6 +639,7 @@ const translations = {
       pauseMedia: 'Mettre la video en pause',
       restartViewer: 'Relancer l’analyse',
       runway: 'Piste',
+      selectedRunway: 'Piste selectionnee',
       droneId: 'ID drone',
       latitude: 'Latitude',
       longitude: 'Longitude',
@@ -544,12 +660,60 @@ const translations = {
       dropTitle: 'Glissez une image ou une video',
       dropText: 'Ou utilisez le bouton d’import ci-dessus',
     },
+    runways: {
+      eyebrow: 'Base de pistes',
+      title: 'Gerer les donnees de reference PAPI.',
+      description: 'Ajoutez localement les details piste et installation PAPI, puis choisissez celle utilisee par l’analyse backend live.',
+      existing: 'Pistes existantes',
+      addTitle: 'Ajouter une piste',
+      active: 'Active',
+      useForAnalysis: 'Utiliser pour analyse',
+      id: 'ID piste',
+      label: 'Nom affiche',
+      airport: 'Aeroport',
+      designation: 'Designation',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      altitude: 'Altitude m',
+      length: 'Longueur',
+      surface: 'Surface',
+      notes: 'Notes',
+      add: 'Ajouter piste',
+      localOnly: 'Session locale seulement',
+      backendSeed: 'Seed backend',
+      noRunways: 'Aucune piste chargee.',
+    },
     insights: {
       eyebrow: 'Analyses',
-      title: 'Precision, transitions, robustesse et vitesse dans des graphiques clairs.',
+      title: 'Statistiques de session pour les medias PAPI importes.',
       preparing: 'Preparation du PDF',
-      download: 'Telecharger les graphiques (PDF)',
-      source: 'Inspire des formes du Data Viz Project',
+      download: 'Telecharger le rapport (PDF)',
+      source: 'Construit depuis la session actuelle du navigateur',
+      runwayFilter: 'Statistiques piste',
+      allRunways: 'Toutes les pistes',
+      sessionSummary: 'Resume de session',
+      uploadedMedia: 'Medias importes',
+      analyzedFrames: 'Frames analysees',
+      stateChanges: 'Changements d’etat',
+      avgConfidence: 'Confiance moyenne',
+      noSessionTitle: 'Pas encore de donnees de session',
+      noSessionText: 'Importez une image, une video ou un dossier d’images dans Live Demo pour remplir ce rapport.',
+      mediaHistoryTitle: 'Medias importes dans cette session',
+      mediaHistoryText: 'Chaque analyse backend terminee reste en local jusqu’au rafraichissement de la page.',
+      lampTrendTitle: 'Detection PAPI horizontale par angle',
+      lampTrendText: 'Confiance des lampes sur les frames analysees. Les marqueurs verticaux pointilles indiquent les changements d’etat PAPI detectes.',
+      lampAverageTitle: 'Score moyen par lampe',
+      lampAverageText: 'Confiance moyenne par lampe pour la piste/session selectionnee.',
+      angleStateTitle: 'Chronologie angle et etat',
+      angleStateText: 'Montre l’etat glidepath detecte pour chaque angle d’elevation drone disponible.',
+      selectedRunway: 'Piste selectionnee',
+      mediaType: 'Type media',
+      angleAxis: 'Angle',
+      frameAxis: 'Frame',
+      scoreAxis: 'Confiance',
+      threshold: 'seuil reference',
+      changeMarker: 'changement d’etat',
+      noAngles: 'Angles indisponibles pour ce media',
       decoderTitle: 'Decodeur d’etat PAPI',
       decoderText: 'Les cinq sorties valides, leur schema de lampes et la preuve du modele.',
       activeDecision: 'Decision active',
@@ -907,6 +1071,116 @@ function scenarioFromBackendResult(result, context) {
   }
 }
 
+function runwayLabel(runwayId, runways) {
+  return runways.find((runway) => runway.id === runwayId)?.label ?? runwayId.replace(/_/g, ' ').toUpperCase()
+}
+
+function normalizeRunway(runway) {
+  const firstLight = runway.lights?.[0]
+  return {
+    ...runway,
+    airport: runway.airport ?? 'Bodensee-Airport Friedrichshafen',
+    designation: runway.designation ?? runway.label?.replace(/^PAPI\s+/i, '') ?? runway.id,
+    latitude: runway.latitude ?? firstLight?.latitude ?? '',
+    longitude: runway.longitude ?? firstLight?.longitude ?? '',
+    altitudeM: runway.altitudeM ?? firstLight?.altitude_m ?? '',
+    length: runway.length ?? '2,356 m',
+    surface: runway.surface ?? 'Asphalt',
+    notes: runway.notes ?? '',
+    source: runway.source ?? 'backend',
+  }
+}
+
+function runwayFromForm(form) {
+  const id =
+    form.id.trim() ||
+    `local_${form.designation || form.label || Date.now()}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+  const label = form.label.trim() || `PAPI ${form.designation.trim() || id.replace(/^local_/, '').toUpperCase()}`
+  const latitude = Number(form.latitude)
+  const longitude = Number(form.longitude)
+  const altitude = Number(form.altitudeM)
+
+  return normalizeRunway({
+    id,
+    label,
+    airport: form.airport.trim(),
+    designation: form.designation.trim(),
+    latitude: Number.isFinite(latitude) ? latitude : form.latitude,
+    longitude: Number.isFinite(longitude) ? longitude : form.longitude,
+    altitudeM: Number.isFinite(altitude) ? altitude : form.altitudeM,
+    length: form.length.trim(),
+    surface: form.surface.trim(),
+    notes: form.notes.trim(),
+    source: 'local',
+    lights:
+      Number.isFinite(latitude) && Number.isFinite(longitude) && Number.isFinite(altitude)
+        ? [
+            { point: 1, latitude, longitude, altitude_m: altitude },
+            { point: 2, latitude, longitude, altitude_m: altitude },
+            { point: 3, latitude, longitude, altitude_m: altitude },
+            { point: 4, latitude, longitude, altitude_m: altitude },
+          ]
+        : [],
+  })
+}
+
+function createSessionAnalysis({ media, metadata, runways, frames }) {
+  const completeFrames = frames.map((frame, index) => ({
+    ...frame,
+    sequence: index + 1,
+  }))
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    createdAt: new Date().toLocaleString(),
+    mediaName: media?.name ?? 'Uploaded media',
+    mediaType: media?.type ?? 'media',
+    runwayId: metadata.runwayId,
+    runwayLabel: runwayLabel(metadata.runwayId, runways),
+    frames: completeFrames,
+  }
+}
+
+function sessionFrames(analyses) {
+  return analyses.flatMap((analysis) =>
+    analysis.frames.map((frame) => ({
+      ...frame,
+      analysisId: analysis.id,
+      mediaName: analysis.mediaName,
+      mediaType: analysis.mediaType,
+      runwayId: analysis.runwayId,
+      runwayLabel: analysis.runwayLabel,
+    })),
+  )
+}
+
+function angleValue(frame) {
+  const value = Number(frame.angleSummary?.value)
+  return Number.isFinite(value) ? value : null
+}
+
+function average(values) {
+  const numbers = values.filter((value) => Number.isFinite(value))
+  if (!numbers.length) return 0
+  return numbers.reduce((sum, value) => sum + value, 0) / numbers.length
+}
+
+function frameStateChanges(frames) {
+  return frames.reduce((changes, frame, index) => {
+    if (index > 0 && frame.stateId !== frames[index - 1].stateId) {
+      changes.push({ frame, index })
+    }
+    return changes
+  }, [])
+}
+
+function lampAt(frame, lampIndex) {
+  return frame.lamps.find((lamp) => lamp.id === lampIndex + 1) ?? frame.lamps[lampIndex]
+}
+
 // localStorage keys for the small persistence surface. Centralising them
 // here keeps writes/reads in sync and makes them easy to grep.
 const STORAGE_KEYS = {
@@ -962,8 +1236,10 @@ function App() {
   const [isExporting, setIsExporting] = useState(false)
   const [backendScenario, setBackendScenario] = useState(null)
   const [backendFrames, setBackendFrames] = useState([])
+  const [sessionAnalyses, setSessionAnalyses] = useState([])
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
   const [runways, setRunways] = useState([])
+  const [newRunwayForm, setNewRunwayForm] = useState(defaultRunwayForm)
   const [metadata, setMetadata] = useState(defaultMetadata)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
@@ -1069,7 +1345,7 @@ function App() {
     fetchRunways()
       .then((items) => {
         if (!ignore) {
-          setRunways(items)
+          setRunways(items.map(normalizeRunway))
         }
       })
       .catch((error) => {
@@ -1243,6 +1519,18 @@ function App() {
     setMetadata((current) => ({ ...current, [field]: value }))
   }
 
+  function handleRunwayFormChange(field, value) {
+    setNewRunwayForm((current) => ({ ...current, [field]: value }))
+  }
+
+  function handleAddRunway(event) {
+    event.preventDefault()
+    const runway = runwayFromForm(newRunwayForm)
+    setRunways((current) => [runway, ...current.filter((item) => item.id !== runway.id)])
+    setMetadata((current) => ({ ...current, runwayId: runway.id }))
+    setNewRunwayForm(defaultRunwayForm)
+  }
+
   async function runBackendInference() {
     if (!media?.file || isAnalyzing) {
       return
@@ -1316,6 +1604,15 @@ function App() {
       setBackendFrameIndex(0)
       setBackendScenario(bestScenario)
       setActiveId('backend')
+      setSessionAnalyses((current) => [
+        createSessionAnalysis({
+          media,
+          metadata,
+          runways,
+          frames: nextBackendFrames.length ? nextBackendFrames : [bestScenario],
+        }),
+        ...current,
+      ])
       setMedia((current) =>
         current
           ? {
@@ -1351,7 +1648,7 @@ function App() {
     }
     setViewerResetToken((current) => current + 1)
     if (media?.file && !isAnalyzing) {
-      autoAnalysisKeyRef.current = ''
+      autoAnalysisKeyRef.current = mediaAnalysisKey(media)
       runBackendInference()
     }
   }
@@ -1398,6 +1695,12 @@ function App() {
             to="/insights"
           >
             {copy.nav.insights}
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => clsx('nav-link', isActive && 'active')}
+            to="/runways"
+          >
+            {copy.nav.runways}
           </NavLink>
         </nav>
 
@@ -1460,7 +1763,6 @@ function App() {
               backendFrameIndex={backendFrameIndex}
               viewerMode={viewerMode}
               viewerResetToken={viewerResetToken}
-              runways={runways}
               metadata={metadata}
               analysisError={analysisError}
               analysisProgress={analysisProgress}
@@ -1479,10 +1781,26 @@ function App() {
           element={
             <InsightsPage
               activeScenario={activeScenario}
+              sessionAnalyses={sessionAnalyses}
+              runways={runways}
               plotTheme={plotTheme}
               insightsRef={insightsRef}
               isExporting={isExporting}
               onDownloadCharts={handleDownloadCharts}
+              copy={copy}
+            />
+          }
+        />
+        <Route
+          path="/runways"
+          element={
+            <RunwaysPage
+              runways={runways}
+              activeRunwayId={metadata.runwayId}
+              form={newRunwayForm}
+              onAddRunway={handleAddRunway}
+              onFormChange={handleRunwayFormChange}
+              onSelectRunway={(runwayId) => handleMetadataChange('runwayId', runwayId)}
               copy={copy}
             />
           }
@@ -1600,57 +1918,10 @@ function IntroductionPage({ copy }) {
                 {copy.intro.cta}
               </Link>
             </div>
-            <a className="scroll-cue" href="#airport-context" aria-label="Scroll to airport details">
+            <Link className="scroll-cue" to="/runways" aria-label="Open runway setup">
               <span />
               <small>{copy.intro.scroll}</small>
-            </a>
-          </div>
-        </section>
-
-        <section className="airport-section" id="airport-context">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">{copy.intro.airportEyebrow}</p>
-              <h2>{copy.intro.airportTitle}</h2>
-            </div>
-            <span className="source-note">{copy.intro.runwayNote}</span>
-          </div>
-
-          <div className="airport-grid">
-            <div className="airport-card">
-              <h3>{copy.intro.runwayDetails}</h3>
-              <p>
-                {copy.intro.runwayDescription}
-              </p>
-              <div className="airport-meta">
-                <div>
-                  <span>{copy.intro.coordinates}</span>
-                  <strong>47.67139 N, 9.51139 E</strong>
-                </div>
-                <div>
-                  <span>{copy.intro.elevation}</span>
-                  <strong>414 m AMSL</strong>
-                </div>
-              </div>
-              <a
-                className="text-link"
-                href="https://www.bodensee-airport.eu/en/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Bodensee-Airport Friedrichshafen
-              </a>
-            </div>
-
-            <div className="airport-map">
-              <iframe
-                title="Bodensee-Airport Friedrichshafen map"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=9.4896%2C47.6572%2C9.5332%2C47.6856&layer=mapnik&marker=47.67139%2C9.51139"
-              />
-              <span className="map-caption">47.67139 N, 9.51139 E</span>
-            </div>
+            </Link>
           </div>
         </section>
       </div>
@@ -1667,7 +1938,6 @@ function LiveDemoPage({
   backendFrameIndex,
   viewerMode,
   viewerResetToken,
-  runways,
   metadata,
   analysisError,
   analysisProgress,
@@ -1708,19 +1978,6 @@ function LiveDemoPage({
       </div>
 
       <div className="metadata-panel">
-        <label>
-          <span>{copy.live.runway}</span>
-          <select
-            value={metadata.runwayId}
-            onChange={(event) => handleMetadataChange('runwayId', event.target.value)}
-          >
-            {(runways.length ? runways : [{ id: 'papi_24', label: 'PAPI 24' }]).map((runway) => (
-              <option key={runway.id} value={runway.id}>
-                {runway.label}
-              </option>
-            ))}
-          </select>
-        </label>
         <label>
           <span>{copy.live.droneId}</span>
           <input
@@ -1846,7 +2103,233 @@ function LiveDemoPage({
   )
 }
 
-function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onDownloadCharts, copy }) {
+function RunwaysPage({
+  runways,
+  activeRunwayId,
+  form,
+  onAddRunway,
+  onFormChange,
+  onSelectRunway,
+  copy,
+}) {
+  return (
+    <section className="runways-section">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">{copy.runways.eyebrow}</p>
+          <h2>{copy.runways.title}</h2>
+          <p className="section-description">{copy.runways.description}</p>
+        </div>
+      </div>
+
+      <div className="runways-layout">
+        <article className="runway-form-card">
+          <div className="viz-heading">
+            <MapPin size={18} />
+            <div>
+              <h3>{copy.runways.addTitle}</h3>
+              <p>{copy.runways.localOnly}</p>
+            </div>
+          </div>
+
+          <form className="runway-form" onSubmit={onAddRunway}>
+            <label>
+              <span>{copy.runways.id}</span>
+              <input
+                value={form.id}
+                onChange={(event) => onFormChange('id', event.target.value)}
+                placeholder="papi_18"
+              />
+            </label>
+            <label>
+              <span>{copy.runways.label}</span>
+              <input
+                value={form.label}
+                onChange={(event) => onFormChange('label', event.target.value)}
+                placeholder="PAPI 18"
+                required
+              />
+            </label>
+            <label>
+              <span>{copy.runways.airport}</span>
+              <input
+                value={form.airport}
+                onChange={(event) => onFormChange('airport', event.target.value)}
+                placeholder="Bodensee-Airport Friedrichshafen"
+              />
+            </label>
+            <label>
+              <span>{copy.runways.designation}</span>
+              <input
+                value={form.designation}
+                onChange={(event) => onFormChange('designation', event.target.value)}
+                placeholder="18/36"
+              />
+            </label>
+            <label>
+              <span>{copy.runways.latitude}</span>
+              <input
+                inputMode="decimal"
+                value={form.latitude}
+                onChange={(event) => onFormChange('latitude', event.target.value)}
+                placeholder="47.67139"
+                required
+              />
+            </label>
+            <label>
+              <span>{copy.runways.longitude}</span>
+              <input
+                inputMode="decimal"
+                value={form.longitude}
+                onChange={(event) => onFormChange('longitude', event.target.value)}
+                placeholder="9.51139"
+                required
+              />
+            </label>
+            <label>
+              <span>{copy.runways.altitude}</span>
+              <input
+                inputMode="decimal"
+                value={form.altitudeM}
+                onChange={(event) => onFormChange('altitudeM', event.target.value)}
+                placeholder="461.37"
+                required
+              />
+            </label>
+            <label>
+              <span>{copy.runways.length}</span>
+              <input
+                value={form.length}
+                onChange={(event) => onFormChange('length', event.target.value)}
+                placeholder="2,356 m"
+              />
+            </label>
+            <label>
+              <span>{copy.runways.surface}</span>
+              <input
+                value={form.surface}
+                onChange={(event) => onFormChange('surface', event.target.value)}
+                placeholder="Asphalt"
+              />
+            </label>
+            <label className="runway-notes-field">
+              <span>{copy.runways.notes}</span>
+              <textarea
+                value={form.notes}
+                onChange={(event) => onFormChange('notes', event.target.value)}
+                rows={4}
+              />
+            </label>
+            <button className="primary-button" type="submit">
+              <MapPin size={17} />
+              {copy.runways.add}
+            </button>
+          </form>
+        </article>
+
+        <article className="runway-list-card">
+          <div className="viz-heading">
+            <Radar size={18} />
+            <div>
+              <h3>{copy.runways.existing}</h3>
+              <p>{runways.length ? `${runways.length} ${copy.live.runway.toLowerCase()}` : copy.runways.noRunways}</p>
+            </div>
+          </div>
+
+          <div className="runway-list">
+            {runways.map((runway) => {
+              const isActive = runway.id === activeRunwayId
+              const isBackendSeed = runway.source !== 'local'
+
+              return (
+                <section className={clsx('runway-card', isActive && 'active')} key={runway.id}>
+                  <div className="runway-card-header">
+                    <div>
+                      <span>{runway.id}</span>
+                      <h3>{runway.label}</h3>
+                    </div>
+                    <strong>{isActive ? copy.runways.active : isBackendSeed ? copy.runways.backendSeed : copy.runways.localOnly}</strong>
+                  </div>
+                  <div className="runway-detail-grid">
+                    <div>
+                      <span>{copy.runways.airport}</span>
+                      <strong>{runway.airport || 'N/A'}</strong>
+                    </div>
+                    <div>
+                      <span>{copy.runways.designation}</span>
+                      <strong>{runway.designation || 'N/A'}</strong>
+                    </div>
+                    <div>
+                      <span>{copy.runways.latitude}</span>
+                      <strong>{runway.latitude || 'N/A'}</strong>
+                    </div>
+                    <div>
+                      <span>{copy.runways.longitude}</span>
+                      <strong>{runway.longitude || 'N/A'}</strong>
+                    </div>
+                    <div>
+                      <span>{copy.runways.altitude}</span>
+                      <strong>{runway.altitudeM || 'N/A'}</strong>
+                    </div>
+                    <div>
+                      <span>{copy.runways.surface}</span>
+                      <strong>{runway.surface || 'N/A'}</strong>
+                    </div>
+                  </div>
+                  {runway.notes && <p>{runway.notes}</p>}
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => onSelectRunway(runway.id)}
+                    disabled={isActive || !isBackendSeed}
+                    title={!isBackendSeed ? copy.runways.localOnly : undefined}
+                  >
+                    {isActive ? copy.runways.active : copy.runways.useForAnalysis}
+                  </button>
+                </section>
+              )
+            })}
+          </div>
+        </article>
+      </div>
+    </section>
+  )
+}
+
+function InsightsPage({
+  activeScenario,
+  sessionAnalyses,
+  runways,
+  plotTheme,
+  insightsRef,
+  isExporting,
+  onDownloadCharts,
+  copy,
+}) {
+  const [selectedRunway, setSelectedRunway] = useState('all')
+  const runwayOptions = useMemo(() => {
+    const seen = new Map()
+    runways.forEach((runway) => seen.set(runway.id, runway.label))
+    sessionAnalyses.forEach((analysis) => seen.set(analysis.runwayId, analysis.runwayLabel))
+    return Array.from(seen, ([id, label]) => ({ id, label }))
+  }, [runways, sessionAnalyses])
+  const filteredAnalyses = useMemo(
+    () =>
+      selectedRunway === 'all'
+        ? sessionAnalyses
+        : sessionAnalyses.filter((analysis) => analysis.runwayId === selectedRunway),
+    [selectedRunway, sessionAnalyses],
+  )
+  const frames = useMemo(() => sessionFrames(filteredAnalyses), [filteredAnalyses])
+  const stateChanges = useMemo(() => frameStateChanges(frames), [frames])
+  const avgConfidence = average(frames.map((frame) => frame.metrics.boxConfidence))
+
+  useEffect(() => {
+    if (selectedRunway !== 'all' && !runwayOptions.some((runway) => runway.id === selectedRunway)) {
+      setSelectedRunway('all')
+    }
+  }, [runwayOptions, selectedRunway])
+
   return (
     <section className="insights-section">
       <div className="section-heading">
@@ -1855,6 +2338,17 @@ function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onD
           <h2>{copy.insights.title}</h2>
         </div>
         <div className="section-actions">
+          <label className="insight-filter">
+            <span>{copy.insights.runwayFilter}</span>
+            <select value={selectedRunway} onChange={(event) => setSelectedRunway(event.target.value)}>
+              <option value="all">{copy.insights.allRunways}</option>
+              {runwayOptions.map((runway) => (
+                <option key={runway.id} value={runway.id}>
+                  {runway.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="secondary-button"
             type="button"
@@ -1869,10 +2363,405 @@ function InsightsPage({ activeScenario, plotTheme, insightsRef, isExporting, onD
       </div>
 
       <div className="insight-grid" ref={insightsRef}>
-        <GlobalStateDecoder scenario={activeScenario} plotTheme={plotTheme} copy={copy} />
-        <TransitionRibbon activeScenario={activeScenario} plotTheme={plotTheme} copy={copy} />
+        {frames.length ? (
+          <>
+            <SessionSummaryCards
+              analyses={filteredAnalyses}
+              avgConfidence={avgConfidence}
+              frames={frames}
+              stateChanges={stateChanges}
+              copy={copy}
+            />
+            <SessionMediaHistory analyses={filteredAnalyses} copy={copy} />
+            <LampAngleTrendPanel frames={frames} plotTheme={plotTheme} copy={copy} />
+            <AverageLampScoreChart frames={frames} plotTheme={plotTheme} copy={copy} />
+            <AngleStateChart frames={frames} plotTheme={plotTheme} copy={copy} />
+            <StateChangeTimelineChart frames={frames} plotTheme={plotTheme} copy={copy} />
+          </>
+        ) : (
+          <SessionEmptyState activeScenario={activeScenario} copy={copy} />
+        )}
       </div>
     </section>
+  )
+}
+
+function SessionSummaryCards({ analyses, avgConfidence, frames, stateChanges, copy }) {
+  return (
+    <article className="viz-card session-summary-card">
+      <div className="viz-heading">
+        <Activity size={18} />
+        <div>
+          <h3>{copy.insights.sessionSummary}</h3>
+          <p>{copy.insights.source}</p>
+        </div>
+      </div>
+      <div className="session-stat-grid">
+        <InlineMetric label={copy.insights.uploadedMedia} value={analyses.length} suffix="" />
+        <InlineMetric label={copy.insights.analyzedFrames} value={frames.length} suffix="" />
+        <InlineMetric label={copy.insights.stateChanges} value={stateChanges.length} suffix="" />
+        <InlineMetric label={copy.insights.avgConfidence} value={avgConfidence.toFixed(1)} suffix="%" />
+      </div>
+    </article>
+  )
+}
+
+function SessionMediaHistory({ analyses, copy }) {
+  return (
+    <article className="viz-card session-media-card">
+      <div className="viz-heading">
+        <FolderOpen size={18} />
+        <div>
+          <h3>{copy.insights.mediaHistoryTitle}</h3>
+          <p>{copy.insights.mediaHistoryText}</p>
+        </div>
+      </div>
+      <div className="session-media-list">
+        {analyses.map((analysis) => (
+          <div className="session-media-row" key={analysis.id}>
+            <strong>{analysis.mediaName}</strong>
+            <span>{analysis.runwayLabel}</span>
+            <span>{analysis.mediaType}</span>
+            <span>{analysis.frames.length} {copy.insights.frame.toLowerCase()}</span>
+            <small>{analysis.createdAt}</small>
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function SessionEmptyState({ activeScenario, copy }) {
+  return (
+    <article className="viz-card session-empty-card">
+      <div>
+        <Radar size={34} />
+        <h3>{copy.insights.noSessionTitle}</h3>
+        <p>{copy.insights.noSessionText}</p>
+      </div>
+      <div className="session-empty-preview">
+        <span>{activeScenario.summary}</span>
+      </div>
+    </article>
+  )
+}
+
+function LampAngleTrendPanel({ frames, plotTheme, copy }) {
+  const usesAngle = frames.some((frame) => angleValue(frame) !== null)
+  const lampColors = ['#2f7de1', '#f34f4f', '#2c9c45', '#dbe6f2']
+
+  return (
+    <article className="viz-card lamp-trend-card">
+      <div className="viz-heading">
+        <Gauge size={18} />
+        <div>
+          <h3>{copy.insights.lampTrendTitle}</h3>
+          <p>{copy.insights.lampTrendText}</p>
+        </div>
+      </div>
+      <div className="lamp-trend-list">
+        {[0, 1, 2, 3].map((lampIndex) => (
+          <LampTrendChart
+            key={lampIndex}
+            frames={frames}
+            lampIndex={lampIndex}
+            color={lampColors[lampIndex]}
+            usesAngle={usesAngle}
+            plotTheme={plotTheme}
+            copy={copy}
+          />
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function LampTrendChart({ frames, lampIndex, color, usesAngle, plotTheme, copy }) {
+  const changes = frameStateChanges(frames)
+  const x = frames.map((frame, index) => (usesAngle ? angleValue(frame) ?? index + 1 : index + 1))
+  const y = frames.map((frame) => lampAt(frame, lampIndex)?.confidence ?? 0)
+  const minX = Math.min(...x)
+  const maxX = Math.max(...x)
+  const stateLabels = frames.map((frame) => translateState(
+    stateCatalog.find((state) => state.id === frame.stateId) ?? stateCatalog[stateCatalog.length - 1],
+    copy,
+  ).label)
+
+  return (
+    <LazyPlot
+      className="plotly-chart compact-plot"
+      config={plotlyConfig}
+      data={[
+        {
+          type: 'scatter',
+          mode: 'lines+markers',
+          x,
+          y,
+          name: `PAPI ${String.fromCharCode(65 + lampIndex)}`,
+          line: { color, width: 3 },
+          marker: { color, size: 6 },
+          customdata: frames.map((frame, index) => [
+            frame.frame,
+            stateLabels[index],
+            lampAt(frame, lampIndex)?.status ?? 'unknown',
+          ]),
+          hovertemplate:
+            '<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}: %{y:.1f}%<extra></extra>',
+        },
+      ]}
+      layout={{
+        autosize: true,
+        height: 154,
+        margin: { l: 58, r: 28, t: 8, b: 36 },
+        paper_bgcolor: plotTheme.paper,
+        plot_bgcolor: plotTheme.plot,
+        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
+        xaxis: {
+          title: usesAngle ? `${copy.insights.angleAxis} (deg)` : copy.insights.frameAxis,
+          gridcolor: plotTheme.grid,
+          zeroline: false,
+          fixedrange: true,
+        },
+        yaxis: {
+          title: copy.insights.scoreAxis,
+          range: [0, 105],
+          gridcolor: plotTheme.grid,
+          zeroline: false,
+          fixedrange: true,
+        },
+        showlegend: true,
+        legend: { x: 0.98, y: 0.98, xanchor: 'right', bgcolor: 'rgba(0,0,0,0)' },
+        shapes: [
+          {
+            type: 'line',
+            xref: 'x',
+            yref: 'y',
+            x0: minX,
+            x1: maxX,
+            y0: 50,
+            y1: 50,
+            line: { color: '#5aa15e', width: 1.5, dash: 'dash' },
+          },
+          ...changes.slice(0, 10).map(({ frame, index }) => {
+            const changeX = usesAngle ? angleValue(frame) ?? index + 1 : index + 1
+            return {
+              type: 'line',
+              xref: 'x',
+              yref: 'paper',
+              x0: changeX,
+              x1: changeX,
+              y0: 0,
+              y1: 1,
+              line: { color: '#d891ef', width: 1.5, dash: 'dot' },
+            }
+          }),
+        ],
+        annotations: changes.slice(0, 3).map(({ frame, index }) => {
+          const changeX = usesAngle ? angleValue(frame) ?? index + 1 : index + 1
+          return {
+            x: changeX,
+            y: 100,
+            xref: 'x',
+            yref: 'y',
+            text: copy.insights.changeMarker,
+            showarrow: false,
+            font: { size: 10, color: '#d891ef' },
+          }
+        }),
+      }}
+      useResizeHandler
+    />
+  )
+}
+
+function AverageLampScoreChart({ frames, plotTheme, copy }) {
+  const values = [0, 1, 2, 3].map((lampIndex) =>
+    average(frames.map((frame) => lampAt(frame, lampIndex)?.confidence ?? NaN)),
+  )
+
+  return (
+    <article className="viz-card average-lamp-card">
+      <div className="viz-heading">
+        <Activity size={18} />
+        <div>
+          <h3>{copy.insights.lampAverageTitle}</h3>
+          <p>{copy.insights.lampAverageText}</p>
+        </div>
+      </div>
+      <LazyPlot
+        className="plotly-chart"
+        config={plotlyConfig}
+        data={[
+          {
+            type: 'bar',
+            x: ['Lamp 1', 'Lamp 2', 'Lamp 3', 'Lamp 4'],
+            y: values,
+            marker: { color: ['#78bdf2', '#78bdf2', '#f25c54', '#f25c54'] },
+            text: values.map((value) => `${value.toFixed(1)}%`),
+            textposition: 'outside',
+            hovertemplate: '%{x}<br>%{y:.1f}%<extra></extra>',
+          },
+        ]}
+        layout={{
+          autosize: true,
+          height: 286,
+          margin: { l: 52, r: 20, t: 12, b: 42 },
+          paper_bgcolor: plotTheme.paper,
+          plot_bgcolor: plotTheme.plot,
+          font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
+          yaxis: {
+            title: copy.insights.scoreAxis,
+            range: [0, 105],
+            gridcolor: plotTheme.grid,
+            fixedrange: true,
+          },
+          xaxis: { fixedrange: true },
+          showlegend: false,
+        }}
+        useResizeHandler
+      />
+    </article>
+  )
+}
+
+function AngleStateChart({ frames, plotTheme, copy }) {
+  const angleFrames = frames.filter((frame) => angleValue(frame) !== null)
+
+  return (
+    <article className="viz-card angle-state-card">
+      <div className="viz-heading">
+        <Gauge size={18} />
+        <div>
+          <h3>{copy.insights.angleStateTitle}</h3>
+          <p>{copy.insights.angleStateText}</p>
+        </div>
+      </div>
+      {angleFrames.length ? (
+        <LazyPlot
+          className="plotly-chart"
+          config={plotlyConfig}
+          data={[
+            {
+              type: 'scatter',
+              mode: 'markers',
+              x: angleFrames.map((frame) => angleValue(frame)),
+              y: angleFrames.map((frame) =>
+                translateState(
+                  stateCatalog.find((state) => state.id === frame.stateId) ?? stateCatalog[stateCatalog.length - 1],
+                  copy,
+                ).label,
+              ),
+              marker: {
+                size: angleFrames.map((frame) => Math.max(10, frame.metrics.boxConfidence / 4)),
+                color: angleFrames.map((frame) =>
+                  (stateCatalog.find((state) => state.id === frame.stateId) ?? stateCatalog[stateCatalog.length - 1]).color,
+                ),
+                line: { color: plotTheme.border, width: 1 },
+              },
+              text: angleFrames.map((frame) => frame.frame),
+              hovertemplate: '<b>%{text}</b><br>%{x:.3f} deg<br>%{y}<extra></extra>',
+            },
+          ]}
+          layout={{
+            autosize: true,
+            height: 286,
+            margin: { l: 130, r: 22, t: 12, b: 42 },
+            paper_bgcolor: plotTheme.paper,
+            plot_bgcolor: plotTheme.plot,
+            font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
+            xaxis: {
+              title: `${copy.insights.angleAxis} (deg)`,
+              gridcolor: plotTheme.grid,
+              zeroline: false,
+              fixedrange: true,
+            },
+            yaxis: { fixedrange: true, gridcolor: plotTheme.grid },
+            showlegend: false,
+          }}
+          useResizeHandler
+        />
+      ) : (
+        <div className="insight-empty-note">{copy.insights.noAngles}</div>
+      )}
+    </article>
+  )
+}
+
+function StateChangeTimelineChart({ frames, plotTheme, copy }) {
+  const translatedStates = stateCatalog.map((state) => translateState(state, copy))
+  const stateIndex = new Map(translatedStates.map((state, index) => [state.id, index]))
+  const changes = frameStateChanges(frames)
+
+  return (
+    <article className="viz-card state-timeline-card">
+      <div className="viz-heading">
+        <Activity size={18} />
+        <div>
+          <h3>{copy.insights.transitionTitle}</h3>
+          <p>{copy.insights.transitionText}</p>
+        </div>
+      </div>
+      <LazyPlot
+        className="plotly-chart"
+        config={plotlyConfig}
+        data={[
+          {
+            type: 'scatter',
+            mode: 'lines+markers',
+            line: { shape: 'hv', color: '#58b7e8', width: 3 },
+            marker: {
+              size: 8,
+              color: frames.map((frame) =>
+                (stateCatalog.find((state) => state.id === frame.stateId) ?? stateCatalog[stateCatalog.length - 1]).color,
+              ),
+            },
+            x: frames.map((_, index) => index + 1),
+            y: frames.map((frame) => stateIndex.get(frame.stateId) ?? translatedStates.length - 1),
+            text: frames.map((frame) => frame.frame),
+            customdata: frames.map((frame) => [
+              translateState(
+                stateCatalog.find((state) => state.id === frame.stateId) ?? stateCatalog[stateCatalog.length - 1],
+                copy,
+              ).label,
+              formatLampCounts(frame.lamps, copy),
+            ]),
+            hovertemplate: '<b>%{text}</b><br>%{customdata[0]}<br>%{customdata[1]}<extra></extra>',
+          },
+        ]}
+        layout={{
+          autosize: true,
+          height: 286,
+          margin: { l: 122, r: 24, t: 12, b: 42 },
+          paper_bgcolor: plotTheme.paper,
+          plot_bgcolor: plotTheme.plot,
+          font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
+          xaxis: {
+            title: copy.insights.frameAxis,
+            gridcolor: plotTheme.grid,
+            fixedrange: true,
+          },
+          yaxis: {
+            tickmode: 'array',
+            tickvals: translatedStates.map((_, index) => index),
+            ticktext: translatedStates.map((state) => state.label),
+            gridcolor: plotTheme.grid,
+            fixedrange: true,
+          },
+          shapes: changes.slice(0, 12).map(({ index }) => ({
+            type: 'line',
+            xref: 'x',
+            yref: 'paper',
+            x0: index + 1,
+            x1: index + 1,
+            y0: 0,
+            y1: 1,
+            line: { color: '#d891ef', width: 1.5, dash: 'dot' },
+          })),
+          showlegend: false,
+        }}
+        useResizeHandler
+      />
+    </article>
   )
 }
 

@@ -746,7 +746,8 @@ html[data-theme='dark'] .brand-logo .logo-light {
 }
 
 .demo-section,
-.insights-section {
+.insights-section,
+.runways-section {
   width: min(1500px, calc(100% - 32px));
   margin: 34px auto 0;
   padding: 20px 0 16px;
@@ -778,6 +779,13 @@ html[data-theme='dark'] .brand-logo .logo-light {
   color: var(--text-muted);
   font-size: 13px;
   white-space: nowrap;
+}
+
+.section-description {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 15px;
 }
 
 .secondary-button {
@@ -878,7 +886,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
 
 .metadata-panel {
   display: grid;
-  grid-template-columns: 1.15fr repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -956,6 +964,163 @@ html[data-theme='dark'] .brand-logo .logo-light {
 
 .frame-stage {
   height: 100%;
+}
+
+.runways-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.runway-form-card,
+.runway-list-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+}
+
+.runway-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.runway-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.runway-form span,
+.runway-detail-grid span,
+.runway-card-header span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.runway-form input,
+.runway-form textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  padding: 10px;
+  font: inherit;
+}
+
+.runway-form input {
+  min-height: 40px;
+}
+
+.runway-form textarea {
+  resize: vertical;
+}
+
+.runway-form input:focus,
+.runway-form textarea:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.runway-notes-field,
+.runway-form .primary-button {
+  grid-column: 1 / -1;
+}
+
+.runway-form .primary-button {
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+}
+
+.runway-list {
+  display: grid;
+  gap: 12px;
+  max-height: 760px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.runway-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.runway-card.active {
+  border-color: var(--accent);
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 48%),
+    var(--surface-muted);
+}
+
+.runway-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.runway-card-header h3 {
+  margin: 3px 0 0;
+  color: var(--text-strong);
+  font-size: 22px;
+}
+
+.runway-card-header > strong {
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+  padding: 5px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.runway-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runway-detail-grid div {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--surface);
+}
+
+.runway-detail-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.runway-card p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.runway-card .secondary-button {
+  width: fit-content;
+}
+
+.runway-card .secondary-button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .frame-toolbar {
@@ -1688,6 +1853,151 @@ html[data-theme='dark'] .brand-logo .logo-light {
   grid-column: span 6;
 }
 
+.session-summary-card,
+.session-media-card,
+.lamp-trend-card {
+  grid-column: span 6;
+}
+
+.average-lamp-card,
+.angle-state-card,
+.state-timeline-card,
+.session-empty-card {
+  grid-column: span 3;
+}
+
+.session-empty-card {
+  min-height: 360px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.8fr);
+  gap: 22px;
+  align-items: center;
+}
+
+.session-empty-card > div:first-child {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.session-empty-card svg {
+  color: var(--accent);
+}
+
+.session-empty-card h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 28px;
+}
+
+.session-empty-card p,
+.session-empty-preview {
+  color: var(--text-muted);
+}
+
+.session-empty-preview {
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, transparent), transparent),
+    var(--surface-muted);
+  padding: 20px;
+  text-align: center;
+}
+
+.insight-filter {
+  min-width: 220px;
+  display: grid;
+  gap: 6px;
+}
+
+.insight-filter span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.insight-filter select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text-strong);
+  padding: 0 10px;
+}
+
+.insight-filter select:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.session-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.session-media-list {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.session-media-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.6fr) minmax(110px, 0.8fr) minmax(90px, 0.65fr) minmax(90px, 0.65fr) minmax(150px, 0.9fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+  padding: 10px 12px;
+}
+
+.session-media-row strong {
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-media-row span,
+.session-media-row small {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.lamp-trend-list {
+  display: grid;
+  gap: 12px;
+}
+
+.compact-plot {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.insight-empty-note {
+  min-height: 210px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--accent) 36%, var(--border));
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-weight: 700;
+  text-align: center;
+  padding: 20px;
+}
+
 .viz-heading {
   display: flex;
   align-items: start;
@@ -2072,13 +2382,30 @@ html[data-theme='dark'] .brand-logo .logo-light {
     grid-template-columns: minmax(86px, 0.7fr) minmax(150px, 1.2fr) minmax(130px, 1fr) minmax(110px, 0.8fr) 64px;
   }
 
+  .runways-layout {
+    grid-template-columns: 1fr;
+  }
+
   .airport-grid {
     grid-template-columns: 1fr;
   }
 
   .state-decoder-card,
-  .transition-card {
+  .transition-card,
+  .average-lamp-card,
+  .angle-state-card,
+  .state-timeline-card,
+  .session-empty-card {
     grid-column: span 6;
+  }
+
+  .session-empty-card,
+  .session-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .session-media-row {
+    grid-template-columns: 1fr 1fr;
   }
 
   .decoder-layout {
@@ -2200,6 +2527,15 @@ html[data-theme='dark'] .brand-logo .logo-light {
     grid-template-columns: 1fr;
   }
 
+  .runway-form,
+  .runway-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .runway-card-header {
+    flex-direction: column;
+  }
+
   .video-surface {
     min-height: 360px;
   }
@@ -2220,6 +2556,11 @@ html[data-theme='dark'] .brand-logo .logo-light {
 
   .history-stat-grid,
   .history-row {
+    grid-template-columns: 1fr;
+  }
+
+  .session-stat-grid,
+  .session-media-row {
     grid-template-columns: 1fr;
   }
 
