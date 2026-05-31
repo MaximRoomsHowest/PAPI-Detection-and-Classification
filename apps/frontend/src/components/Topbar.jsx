@@ -91,7 +91,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
 
   return (
     <header className="topbar">
-      <Link className="brand" to="/" aria-label="PAPI Vision dashboard">
+      <Link className="brand" to="/" aria-label={copy.a11y.brandLabel}>
         <span className="brand-logo" aria-hidden="true">
           <img className="logo-light" src="/intersoft-electronics-logo.svg" alt="" />
           <img className="logo-dark" src="/intersoft-electronics-logo-white-inverse.svg" alt="" />
@@ -103,7 +103,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
         </span>
       </Link>
 
-      <nav className="topnav" aria-label="Primary">
+      <nav className="topnav" aria-label={copy.a11y.primaryNav}>
         {navItems.map((item, index) => (
           <NavLink
             key={item.to}
@@ -138,9 +138,17 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
             type="button"
             ref={languageTriggerRef}
             onClick={() => setLanguageMenuOpen((current) => !current)}
+            onKeyDown={(event) => {
+              // Escape from the trigger itself also closes the menu (the menu's
+              // own handler only fires when focus is already inside it).
+              if (event.key === 'Escape' && languageMenuOpen) {
+                event.preventDefault()
+                setLanguageMenuOpen(false)
+              }
+            }}
             aria-expanded={languageMenuOpen}
             aria-haspopup="menu"
-            aria-label="Choose language"
+            aria-label={copy.a11y.chooseLanguage}
           >
             <Globe size={18} />
             <span>{language.toUpperCase()}</span>
@@ -149,7 +157,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
             <div
               className="language-menu"
               role="menu"
-              aria-label="Language"
+              aria-label={copy.a11y.languageMenu}
               tabIndex={-1}
               onKeyDown={handleLanguageMenuKeyDown}
             >
@@ -181,7 +189,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
             className="icon-button"
             type="button"
             onClick={onToggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            aria-label={theme === 'dark' ? copy.a11y.switchToLight : copy.a11y.switchToDark}
           >
             {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
           </button>

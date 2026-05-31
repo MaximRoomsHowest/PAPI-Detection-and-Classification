@@ -2744,6 +2744,35 @@ html[data-theme='dark'] .brand-logo .logo-light {
   white-space: nowrap;
 }
 
+/* Per-global-state History pill tints. HistoryPage applies
+   `state-pill-<global_state>`; these were previously undefined, so every pill
+   rendered with the same neutral background. Text stays var(--text-strong) so
+   contrast holds in both themes; the background tint conveys the state. */
+.state-pill-far_too_high { background: rgba(53, 215, 183, 0.22); }
+.state-pill-too_high { background: rgba(111, 200, 255, 0.24); }
+.state-pill-correct_glidepath { background: rgba(167, 227, 92, 0.26); }
+.state-pill-too_low { background: rgba(255, 182, 87, 0.26); }
+.state-pill-far_too_low { background: rgba(255, 107, 107, 0.24); }
+.state-pill-transition { background: rgba(255, 177, 31, 0.26); }
+.state-pill-unknown { background: var(--surface-muted); color: var(--text-muted); }
+
+/* Keyboard focus ring for the secondary button (Download / Export CSV /
+   Refresh / pagination) — the other interactive controls already have one. */
+.secondary-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* A detected lamp under 50% confidence is flagged amber (plus a ⚠ glyph in the
+   card) so a shaky verdict is not presented as certain. */
+.lamp-card.is-low-confidence {
+  border-color: var(--warn, #d9920a);
+}
+.lamp-card.is-low-confidence small {
+  color: var(--warn, #d9920a);
+  font-weight: 700;
+}
+
 .history-empty {
   padding: 28px;
   color: var(--text-muted);

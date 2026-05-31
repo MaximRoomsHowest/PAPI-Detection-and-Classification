@@ -24,16 +24,21 @@ import '@fontsource/jetbrains-mono/700.css'
 
 import './index.css'
 import App from './App.jsx'
+import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      {/* LazyMotion + domAnimation loads only the DOM animation features (~15kB)
-          instead of the full Motion bundle; `strict` enforces the lightweight
-          `m` components so no component can pull in the heavy `motion.*` API. */}
-      <LazyMotion features={domAnimation} strict>
-        <App />
-      </LazyMotion>
-    </BrowserRouter>
+    {/* Top-level boundary so a render error shows a recover-by-reload fallback
+        instead of a blank white screen. */}
+    <ErrorBoundary>
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        {/* LazyMotion + domAnimation loads only the DOM animation features (~15kB)
+            instead of the full Motion bundle; `strict` enforces the lightweight
+            `m` components so no component can pull in the heavy `motion.*` API. */}
+        <LazyMotion features={domAnimation} strict>
+          <App />
+        </LazyMotion>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

@@ -6,7 +6,7 @@ from fastapi import UploadFile
 from app.config import Settings
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 GENERIC_CONTENT_TYPES = {"application/octet-stream", "binary/octet-stream"}
 
 
