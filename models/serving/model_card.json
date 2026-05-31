@@ -1,35 +1,35 @@
 {
-  "model_id": "yolo26n-seq-red-white-safe",
-  "training_run": "yolo26n_sequence_red_white_safe",
-  "base_weights": "yolo26n.pt",
+  "model_id": "yolo26s-fulldata-1280",
+  "training_run": "yolo26s-fulldata-1280",
+  "base_weights": "yolo26s.pt",
   "task": "detect",
-  "classes": {
-    "0": "papi_light_red",
-    "1": "papi_light_white"
-  },
   "imgsz": 1280,
-  "batch": 2,
+  "batch": 4,
   "epochs_configured": 100,
-  "epochs_trained": 50,
-  "seed": 42,
+  "epochs_trained": 54,
+  "seed": 0,
   "deterministic": true,
   "split_evaluated": "val",
   "val_metrics": {
     "selection": "best_fitness_epoch",
-    "epoch": 30,
-    "precision": 0.8613,
-    "recall": 0.8706,
-    "map50": 0.9141,
-    "map50_95": 0.474,
+    "epoch": 39,
+    "precision": 0.9479,
+    "recall": 0.9367,
+    "map50": 0.9828,
+    "map50_95": 0.6791,
     "note": "Validation-split box (B) detection metrics from results.csv - not the held-out test regime and not per-class (red/white). Fill per-state F1 from the evaluation notebook (04_*)."
   },
   "final_epoch_metrics": {
-    "epoch": 50,
-    "precision": 0.7413,
-    "recall": 0.7741,
-    "map50": 0.8262,
-    "map50_95": 0.3265
+    "epoch": 54,
+    "precision": 0.9367,
+    "recall": 0.9363,
+    "map50": 0.9816,
+    "map50_95": 0.6684
   },
-  "source_results_csv": "models/runs/yolo26n_sequence_red_white_safe/results.csv",
-  "generated_by": "workflows/scripts/populate_model_metrics.py"
+  "source_results_csv": "models/runs/detect/yolo26s-fulldata-1280/results.csv",
+  "generated_by": "workflows/scripts/populate_model_metrics.py",
+  "classes": {
+    "0": "PAPI-Red",
+    "1": "PAPI-White"
+  }
 }

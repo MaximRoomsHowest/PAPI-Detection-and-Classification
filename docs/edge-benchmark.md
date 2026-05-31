@@ -33,7 +33,7 @@ The serving slot holds two artifacts:
 ```
 models/serving/best.pt           # PyTorch float32, ultralytics format
 models/serving/best_int8.onnx    # ONNX quantised INT8
-models/runs/detect/train-2/weights/best.onnx  # ONNX fp32 artifact
+models/runs/detect/yolo26n-baseline/weights/best.onnx  # ONNX fp32 artifact
 ```
 
 Plus the base weights:
@@ -102,7 +102,7 @@ python workflows/scripts/edge_benchmark.py \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
-    --model models/runs/detect/train-2/weights/best.onnx \
+    --model models/runs/detect/yolo26n-baseline/weights/best.onnx \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \

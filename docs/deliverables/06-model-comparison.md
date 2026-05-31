@@ -52,11 +52,13 @@ The decision criteria are spelled out in §4.
 > **Real numbers available today (validation split, box metrics).** The §3.1-3.3
 > tables below are the *controlled, test-split* comparison and still need the eval
 > notebook (§6) run per variant — they stay `<!-- TEAM -->` until then. Meanwhile the
-> committed runs already give validation-split box metrics for two points: the serving
-> **yolo26n** (mAP@0.5 **0.914**, mAP@0.5:0.95 **0.474** —
-> `models/runs/yolo26n_sequence_red_white_safe/results.csv`, see MODELS.md §3.1.3) and a
-> full-dataset **yolo26s** at 640px (train-6: mAP@0.5 **0.938**, mAP@0.5:0.95 **0.616** —
-> `models/runs/detect/train-6/results.csv`). These are single-run *validation* numbers on
+> committed runs already give validation-split box metrics for three points: the **serving
+> yolo26s at 1280px** (`yolo26s-fulldata-1280`: mAP@0.5 **0.983**, mAP@0.5:0.95 **0.679** —
+> `models/runs/detect/yolo26s-fulldata-1280/results.csv`, see MODELS.md §3.1.1), the
+> **previous-serving yolo26n** (mAP@0.5 **0.914**, mAP@0.5:0.95 **0.474** —
+> `models/runs/yolo26n-sequence-1280/results.csv`), and a full-dataset **yolo26s** at 640px
+> (`yolo26s-fulldata-640`: mAP@0.5 **0.938**, mAP@0.5:0.95 **0.616** —
+> `models/runs/detect/yolo26s-fulldata-640/results.csv`). These are single-run *validation* numbers on
 > differing dataset snapshots, **not** the like-for-like test-split per-state comparison
 > §3.1 calls for, so they inform but do not replace it.
 

@@ -1,219 +1,221 @@
 # Model Registry — PAPI Vision
 
-> Source of truth for every trained / deployed model artifact in
-> this repository. Updated whenever a new training run lands in
-> `models/runs/` or whenever the serving symlink rotates.
+> Source of truth for every trained / deployed model artifact in this
+> repository. Updated whenever a new training run lands in `models/runs/`
+> or whenever the serving slot rotates.
 >
-> Companion to [`models/README.md`](README.md) (which covers the
-> local filesystem layout). This file covers **lineage, metrics,
-> and deployment status** — the things you need to roll back or
-> roll forward responsibly.
->
-> **Rubric**: LR1D band-lift evidence — "model fine-tuning" and
-> "compares models against each other" (10-12) plus "model
-> registry / lineage" (16+ "future-proof model").
+> Companion to [`models/README.md`](README.md) (which covers the local
+> filesystem layout). This file covers **lineage, metrics, and deployment
+> status** — the things you need to roll back or roll forward responsibly.
 
-## 1. Conventions
+## 0. Naming convention (read this first)
 
-Every model record has the same shape:
+Every run folder is named **`<arch>-<dataset>-<resolution>`** so the name
+alone tells you which model it is — no need to open the file:
+
+- `<arch>` — `yolo26n` (≈2.6 M params, fast), `yolo26s` (≈9.1 M, accurate),
+  `yolov8s` (legacy comparison).
+- `<dataset>` — `baseline` (first cut), `augmented` (image-augmentation
+  experiment), `fulldata` (full labelled set), `sequence` (red/white
+  sequence set), `transfer` (transfer-learning seed).
+- `<resolution>` — training `imgsz` in px (`640` / `1280`) when it
+  distinguishes two otherwise-identical runs.
+
+Inside every run folder the weights keep Ultralytics' conventional
+`weights/best.pt` + `weights/last.pt` names — tooling
+(`populate_model_metrics.py`, `yolo val`) depends on that, so only the
+**folder** carries the descriptive name.
+
+The **serving slot** is always `models/serving/best.pt` (a copy of the
+chosen run's `best.pt`). The slot filename is intentionally stable — the
+Dockerfile, docker-compose, `.env`, and the promotion procedure (§5) all
+point at it, so swapping models means copying a new file into the slot,
+**not** renaming the slot. Which run is currently in the slot is recorded
+in `models/serving/model_card.json` (`model_id`) and in §3.1 below.
+
+### Rename map (2026-05-31)
+
+The old Ultralytics auto-names were renamed to the convention above. The
+historical benchmark records under `docs/qa-artifacts/benchmarks/` still
+reference the **old** paths (they record what was run at that time and are
+left intact); use this map to trace them:
+
+| Old name | New name |
+| --- | --- |
+| `train-2` | `yolo26n-baseline` |
+| `train-3` | `yolo26s-baseline` |
+| `train-5` | `yolo26s-augmented` |
+| `train-6` | `yolo26s-fulldata-640` |
+| `train-7` | `yolo26s-fulldata-1280` *(now serving)* |
+| `yolo26n_sequence_red_white_safe` | `yolo26n-sequence-1280` *(previous serving)* |
+| `modeltransfered` | `yolov8s-transfer` |
+
+## 1. Record shape
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Stable identifier, format `<arch>-<run>` (e.g. `yolo26n-seq-red-white-safe`) |
 | `path` | Path under `models/` |
-| `arch` | YOLO 26 variant (n / s / m), params in millions |
-| `dataset` | Snapshot the model was trained on (commit SHA + split file) |
-| `training` | Pointer to args.yaml + results.csv inside the run folder |
+| `arch` | YOLO variant, params in millions |
+| `dataset` | Snapshot the model was trained on |
+| `training` | Pointer to `args.yaml` + `results.csv` inside the run folder |
 | `eval` | Per-class metrics on the held-out test split |
-| `status` | `serving` / `staging` / `archived` / `experimental` |
-| `notes` | Free-text caveats, known failures, why we kept or retired it |
+| `status` | `serving` / `previous` / `comparison` / `archived` |
+| `notes` | Caveats, known failures, why we kept or retired it |
 
 ## 2. Base weights
 
-These are the upstream Ultralytics base weights — used as starting
-points for fine-tuning, never deployed directly.
+Upstream Ultralytics base weights — starting points for fine-tuning, never
+deployed directly.
 
-| File | Arch | Params | Source | Notes |
-| --- | --- | --- | --- | --- |
-| `models/base/yolo26n.pt` | n | ≈ 2.6 M | Ultralytics official | Quick local retraining baseline; smallest INT8-friendly |
-| `models/base/yolo26s.pt` | s | ≈ 9.1 M | Ultralytics official | Mid-size baseline for accuracy comparison |
-| `models/base/yolov26m.pt` | m | ≈ 24 M | Ultralytics official | Accuracy ceiling for the active-learning experiments |
-
-**Lineage rule:** changing a base weight invalidates every
-downstream run. If a base weight is retrained or replaced, bump the
-filename to a versioned form (`yolo26n-v2.pt`) and update every run
-that consumed it below.
+| File | Arch | Params | Notes |
+| --- | --- | --- | --- |
+| `models/base/yolo26n.pt` | n | ≈ 2.6 M | Smallest, INT8-friendly; quick retraining baseline |
+| `models/base/yolo26s.pt` | s | ≈ 9.1 M | Mid-size; base of the **serving** model |
+| `models/base/yolov26m.pt` | m | ≈ 24 M | Accuracy ceiling for active-learning experiments |
 
 ## 3. Trained runs
 
-### 3.1 `yolo26n-seq-red-white-safe` (current serving)
+### 3.1 `yolo26s-fulldata-1280` — **CURRENT SERVING** ⭐
+
+> The higher-resolution full-dataset run from the `data_analysis` branch
+> (MaximRoomsHowest, commit `d2b8b8f` "trained new model on higher
+> resolution", was `train-7`). Promoted to serving on **2026-05-31** —
+> substantially more accurate than the previous yolo26n model (§3.2).
 
 | Field | Value |
 | --- | --- |
-| **Path** | `models/runs/yolo26n_sequence_red_white_safe/` |
-| **Arch** | yolo26n (≈ 2.6 M params) |
-| **Base** | `models/base/yolo26n.pt` |
-| **Classes** | 2 — `papi_light_red` (0), `papi_light_white` (1) |
-| **Dataset** | EDNY sequence dataset, snapshot at git SHA <!-- TEAM: paste the SHA used to build the training split --> |
-| **Split** | `configs/split.yaml` — flight-level, regime-aware (1000 m day wide / 300 m day zoom / 500 m night wide held out as test) |
-| **Training config** | `models/runs/yolo26n_sequence_red_white_safe/args.yaml` |
-| **Training log** | `models/runs/yolo26n_sequence_red_white_safe/results.csv` |
-| **Epochs** | <!-- TEAM --> |
-| **Augmentation** | <!-- TEAM: summary line — e.g. "default Ultralytics + nighttime brightness jitter" --> |
-| **Status** | **serving** (alias at `models/serving/best.pt`) |
-| **Eval (held-out test)** | see §3.1.1 |
-| **INT8 ONNX export** | `models/serving/best_int8.onnx` — see §3.1.2 |
-| **Known issues** | (1) `best_int8.onnx` fails on CPU ONNX Runtime (`ConvInteger(10)` not implemented). (2) ZoomCamera frames degraded — zoom focal length unconfirmed in `configs/papi_edny.yaml`. |
+| **Path** | `models/runs/detect/yolo26s-fulldata-1280/` |
+| **Arch** | yolo26s (≈ 9.1 M params) |
+| **Base** | `models/base/yolo26s.pt` |
+| **Classes** | 2 — `PAPI-Red` (0), `PAPI-White` (1) |
+| **Dataset** | Full labelled PAPI set (`PAPI_Split/data.yaml`) |
+| **imgsz** | 1280 |
+| **Epochs** | 100 configured, early-stopped at 54 (patience 15); `best.pt` = epoch 39 |
+| **Training config** | `models/runs/detect/yolo26s-fulldata-1280/args.yaml` |
+| **Training log** | `models/runs/detect/yolo26s-fulldata-1280/results.csv` |
+| **Status** | **serving** (copied to `models/serving/best.pt`; card `model_id=yolo26s-fulldata-1280`) |
+| **Known behaviour** | More precise than the old model → more conservative on faint lamps. On a single dim still-frame the weakest of the 4 lamps can score ≈0.34, below the `PAPI_CONFIDENCE_THRESHOLD=0.4` gate, so that one frame reads "unknown"; video aggregation recovers all 4. Lower the threshold to ≈0.3 if single-frame 4-lamp recall matters more than precision. |
 
-#### 3.1.1 Eval metrics (held-out test split)
+#### 3.1.1 Validation metrics (auto-filled from `results.csv`)
+
+Generated by `python workflows/scripts/populate_model_metrics.py models/runs/detect/yolo26s-fulldata-1280 --write-model-card models/serving/model_card.json`.
+These are **validation-split box (B) detection** metrics — not the held-out
+test regime and not per-class. Per-regime / per-state **test** numbers come
+from the evaluation notebook (`04_*`), which the team owns.
+
+| Selection | Epoch | precision | recall | mAP@0.5 | mAP@0.5:0.95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| best fitness | 39 | 0.9479 | 0.9367 | 0.9828 | 0.6791 |
+| final epoch | 54 | 0.9367 | 0.9363 | 0.9816 | 0.6684 |
+
+#### 3.1.2 Held-out test eval (per regime / per state)
 
 | Metric | Day rwy 24 Wide | Night rwy 06 Wide | Day rwy 24 Zoom | Aggregate |
 | --- | ---: | ---: | ---: | ---: |
 | Detection F1 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
 | Per-state F1 — red | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
 | Per-state F1 — white | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| Per-state F1 — transition (geometric, post-hoc) | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
 | mAP@0.5 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| mAP@0.5:0.95 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
 
-Fill these in from `04_yolov26n_sequence_model_evaluation.ipynb` after
-the final eval run.
+Fill from `04_yolov26n_sequence_model_evaluation.ipynb` after the final eval run.
 
-#### 3.1.2 INT8 ONNX export — `best_int8.onnx`
+### 3.2 `yolo26n-sequence-1280` — previous serving (superseded 2026-05-31)
+
+| Field | Value |
+| --- | --- |
+| **Path** | `models/runs/yolo26n-sequence-1280/` |
+| **Arch** | yolo26n (≈ 2.6 M params) |
+| **Base** | `models/base/yolo26n.pt` |
+| **Classes** | 2 — `papi_light_red` (0), `papi_light_white` (1) |
+| **imgsz** | 1280 |
+| **Status** | **previous** — kept for rollback (see §5.9) |
+| **Val metrics** | best (epoch 30): P 0.8613, R 0.8706, mAP@0.5 0.9141, mAP@0.5:0.95 0.4740 |
+| **Why retired** | yolo26s-fulldata-1280 beats it on every val metric (mAP@0.5 0.983 vs 0.914, mAP@0.5:0.95 0.679 vs 0.474). |
+
+#### 3.2.1 INT8 ONNX export — `models/serving/best_int8.onnx`
 
 | Field | Value |
 | --- | --- |
 | **Path** | `models/serving/best_int8.onnx` |
-| **Source PT** | `models/serving/best.pt` |
-| **Export tool** | <!-- TEAM: e.g. `yolo export model=best.pt format=onnx int8=True` --> |
-| **Status** | **experimental** — see Known issues §3.1 |
-| **Failure** | CPU ONNX Runtime raises `ConvInteger(10) not implemented`. Runnable only on GPU-accelerated ONNX Runtime. |
-| **Remediation** | (a) Re-export with `--opset 18+` to use the wider operator set; (b) test on Jetson Orin Nano ORT GPU EP; (c) document GPU-only deploy path if both fail. |
+| **Source model** | the **previous** `yolo26n-sequence-1280` (NOT the current serving model) |
+| **Status** | **experimental + stale** — quantised from the retired yolo26n model |
+| **Failure** | CPU ONNX Runtime raises `ConvInteger(10) not implemented`; runnable only on GPU-accelerated ORT. |
+| **Follow-up** | Re-export INT8 from `yolo26s-fulldata-1280` once an edge target is confirmed; kept in place for now because the edge-benchmark records (`docs/edge-benchmark.md`, `docs/qa-artifacts/`) reference this exact file. |
 
-#### 3.1.3 Validation metrics (auto-filled from results.csv)
+### 3.3 Comparison / experiment runs
 
-Generated by `python workflows/scripts/populate_model_metrics.py models/runs/yolo26n_sequence_red_white_safe`
-and consumed by the backend `/api/model` endpoint via `models/serving/model_card.json`.
-These are **validation-split box (B) detection** metrics — not the held-out test
-regime and not per-class. The per-regime / per-state **test** numbers in §3.1.1 are
-filled from the evaluation notebook (`04_*`), which the team owns.
+Empirical input for the alternative-model comparison
+(`docs/deliverables/06-model-comparison.md`). Val-split metrics are read
+straight from each run's `results.csv`.
 
-| Selection | Epoch | precision | recall | mAP@0.5 | mAP@0.5:0.95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| best fitness | 30 | 0.8613 | 0.8706 | 0.9141 | 0.4740 |
-| final epoch | 50 | 0.7413 | 0.7741 | 0.8262 | 0.3265 |
-
-Run config: imgsz 1280, batch 2, seed 42, deterministic; early-stopped at epoch 50
-(patience 20). `best.pt` corresponds to the best-fitness epoch.
-
-### 3.2 `yolo26s-comparison` (alternative-model comparison)
-
-> Trained for the alternative-model comparison required for LR1D
-> 16+ "alternative AI models implemented when they add value". See
-> `docs/deliverables/06-model-comparison.md` for the head-to-head.
-
-| Field | Value |
-| --- | --- |
-| **Path** | `models/runs/yolo26s_comparison/` <!-- TEAM: create this run when training completes --> |
-| **Arch** | yolo26s (≈ 9.1 M params) |
-| **Base** | `models/base/yolo26s.pt` |
-| **Classes** | Same as §3.1 |
-| **Dataset** | Same as §3.1 |
-| **Split** | Same as §3.1 |
-| **Training config** | <!-- TEAM --> |
-| **Epochs** | <!-- TEAM --> |
-| **Status** | **<!-- TEAM: staging until comparison decision --></sub>** |
-| **Eval (held-out test)** | see `06-model-comparison.md` |
-
-### 3.3 `yolo26m-comparison` (optional larger comparator)
-
-| Field | Value |
-| --- | --- |
-| **Path** | `models/runs/yolo26m_comparison/` <!-- TEAM: optional --> |
-| **Arch** | yolo26m (≈ 24 M params) |
-| **Base** | `models/base/yolov26m.pt` |
-| **Status** | **<!-- TEAM: experimental — only if time permits before final --></sub>** |
-| **Notes** | Accuracy ceiling for the trade-off analysis. May exceed real-time fps target on every edge tier below the NUC. |
-
-### 3.4 `data_analysis` runs (merged 2026-05-28)
-
-> Brought in from the `data_analysis` branch (MaximRoomsHowest). The
-> canonical run artifacts — `results.csv`, `args.yaml`, weights and the
-> training/validation plots — are committed under `models/runs/detect/`
-> (the registry convention above). The duplicate copies that the branch
-> had committed under the gitignored `data/runs/detect/` were dropped from
-> Git in the 2026-05-29 cleanup; local working copies are unaffected.
-
-| Run | Arch | Dataset / imgsz | Artifacts in repo | Notes |
+| Run | Arch | Dataset / imgsz | Path | Notes |
 | --- | --- | --- | --- | --- |
-| train-2 | yolo26n | baseline | `models/runs/detect/train-2/` (`weights/{best,last}.pt`, `best.onnx`, `results.csv`, plots) | Early baseline |
-| train-3 | yolo26s | baseline | `models/runs/detect/train-3/` (`weights/{best,last}.pt`, `results.csv`, plots) | Baseline yolo26s |
-| train-5 | yolo26s | augmented dataset | `models/runs/detect/train-5/` (`weights/{best,last}.pt`, `results.csv`, plots) | Augmented dataset |
-| **train-6** | **yolo26s** | **full dataset, 640×640** | `models/runs/detect/train-6/` (`weights/{best,last}.pt`, `results.csv`, plots) | Full-dataset train + validation |
-| **train-7** | **yolo26s** | **full dataset, 1280×1280** | — (local only; the `data/runs/` copy was untracked in cleanup) | Higher-resolution experiment, `epochs=100`. Re-add under `models/runs/` to publish its metrics |
-| val-2 … val-4 | yolo26s | validation passes | `models/runs/detect/val-*/` | PR/F1 curves + confusion matrices, no weights |
-
-The PAPI-24 reference-height angle work (commit 11973a7) lives in the
-analysis notebooks (`workflows/notebooks/07_model_performance.ipynb`,
-`08_model_training_optimization.ipynb`), not in `apps/` or `packages/`.
-
-**Reconciliation note:** these runs are the empirical input for the
-alternative-model comparison in §3.2 and
-`docs/deliverables/06-model-comparison.md`. The val-split metrics are read
-straight from the committed `models/runs/detect/train-{2,3,5,6}/results.csv`
-(train-2 = yolo26n, train-3/5/6 = yolo26s). The 1280px train-7 run is a
-local-only experiment; re-commit it under `models/runs/` if its numbers are
-needed in the comparison.
+| `yolo26n-baseline` | yolo26n | baseline | `models/runs/detect/yolo26n-baseline/` | Early baseline; also has `weights/best.onnx` (fp32 export used in edge benchmarks) |
+| `yolo26s-baseline` | yolo26s | baseline | `models/runs/detect/yolo26s-baseline/` | Baseline yolo26s |
+| `yolo26s-augmented` | yolo26s | augmented | `models/runs/detect/yolo26s-augmented/` | Image-augmentation experiment |
+| `yolo26s-fulldata-640` | yolo26s | full dataset, 640 | `models/runs/detect/yolo26s-fulldata-640/` | Full-dataset at 640; the 1280 sibling (§3.1) supersedes it |
+| `yolov8s-transfer` | yolov8s | transfer | `models/runs/detect/yolov8s-transfer/` | Legacy YOLOv8 transfer seed; comparison only |
+| `val`, `val-2…4` | yolo26s | validation passes | `models/runs/detect/val*/` | PR/F1 curves + confusion matrices, no weights |
 
 ## 4. Deprecated / archived runs
 
-Historical training artefacts live outside the repo at:
-
-```
-..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\
-```
-
-Do **not** use these checkpoints for the integrated app unless
-explicitly comparing historical experiments. They predate the
-two-class label spec (some have a third `transition` class), the
-dual-runway resolution, and the final calibration result.
+Historical training artefacts live outside the repo at
+`..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\`. Do **not** use these for
+the integrated app unless explicitly comparing historical experiments —
+they predate the two-class label spec, the dual-runway resolution, and the
+final calibration.
 
 | Archived run | Why archived |
 | --- | --- |
-| `yolo11n-*` | YOLO11 was an early experiment; replaced by YOLO26 family |
-| Pre-2026-05-26 yolo26n runs | Used single-runway assumption; replaced by dual-runway aware model |
-| Three-class transition runs | Replaced by two-class + geometric transition (design doc §6 / §11) |
+| `yolo11n-*` | YOLO11 early experiment; replaced by the YOLO26 family |
+| Pre-2026-05-26 yolo26n runs | Single-runway assumption; replaced |
+| Three-class transition runs | Replaced by two-class + geometric transition (design doc §6/§11) |
 
 ## 5. Deployment promotion procedure
 
 When promoting a new run to serving:
 
-1. Train and evaluate in `models/runs/<new_run>/`.
-2. Update §3 of this file with the new run record.
-3. Add the run to the comparison table in `docs/deliverables/06-model-comparison.md`.
-4. Compute the eval delta vs the currently-serving model on the held-out test split. If detection F1 regresses by more than **1 percentage point**, escalate to the team before promotion.
-5. Copy the new weight to the deployment alias:
+1. Train and evaluate in `models/runs/detect/<arch>-<dataset>-<res>/`.
+2. Update §3 of this file with the new run record + metrics.
+3. Add the run to `docs/deliverables/06-model-comparison.md`.
+4. Compute the eval delta vs the current serving model on the held-out test
+   split. If detection F1 regresses by more than **1 pp**, escalate before
+   promoting.
+5. Copy the new weight into the serving slot (the slot filename never changes):
    ```powershell
-   Copy-Item models\runs\<new_run>\weights\best.pt models\serving\best.pt -Force
+   Copy-Item models\runs\detect\<new_run>\weights\best.pt models\serving\best.pt -Force
    ```
-6. If the INT8 path is in scope: re-export `best_int8.onnx` (Ultralytics `yolo export`), re-run the §3.1.2 sanity check.
-7. Restart the backend container (`docker compose restart backend`) — model is lazy-loaded on first request, so cold-start of the first inference will surface any load error.
-8. Run the 43-test backend suite + 15-test papi suite + the user-testing-rerun smoke commands. If any test fails, roll back via step 9.
-9. **Rollback**: keep the previous `best.pt` at `models/serving/best.pt.previous` for one full sprint after promotion. Restore with:
+6. Regenerate the model card so `/api/model` reports the new run:
    ```powershell
-   Copy-Item models\serving\best.pt.previous models\serving\best.pt -Force
-   docker compose restart backend
+   ..\..\.venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
+     models\runs\detect\<new_run> --write-model-card models\serving\model_card.json
    ```
+7. Restart the backend (`docker compose restart backend`, or the uvicorn
+   process). The model is pre-warmed at startup, so a load error surfaces
+   immediately.
+8. Run the backend + papi pytest suites and a smoke inference. Roll back if
+   anything fails.
+9. **Rollback**: the previous serving model is preserved in its run folder.
+   Restore with:
+   ```powershell
+   Copy-Item models\runs\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force
+   ```
+   then regenerate the card (step 6, pointing at `models\runs\yolo26n-sequence-1280`)
+   and restart the backend.
 
 ## 6. Open items
 
-- ZoomCamera `calibrated_focal_px` is `null` in `configs/papi_edny.yaml`. Zoom-camera frames are degraded for every model in this registry until that lands. <!-- TEAM: status after sprint 4 -->
-- Set-angles for both runways are FAA defaults; no commissioned-angle override yet. <!-- TEAM: status after 2026-06-01 client meeting -->
-- INT8 CPU path remains experimental — see §3.1.2.
+- ZoomCamera `calibrated_focal_px` is `null` in `configs/papi_edny.yaml`;
+  zoom-camera frames are degraded for every model here until that lands.
+- Set-angles for both runways are FAA defaults; no commissioned-angle
+  override yet.
+- INT8 path: re-export from the new serving model (§3.2.1) once an edge
+  target is fixed; current `best_int8.onnx` is the retired model's export
+  and CPU-broken.
 
 ## 7. Sources
 
 - Layout convention: `models/README.md`
-- Training notebooks: `workflows/notebooks/03_*`, `04_*`, `05_*`
+- Training notebooks: `workflows/notebooks/03_*`, `04_*`, `05_*`, `08_*`
 - Eval methodology: `docs/edge-benchmark.md §5.3` for accuracy-delta protocol
-- Architecture: `docs/architecture-overview.md §5.1` for why two classes + geometric transition
+- Architecture: `docs/architecture-overview.md §5.1` for two classes + geometric transition

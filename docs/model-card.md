@@ -6,9 +6,10 @@ this card adds the intended-use, limitations and ethics framing a registry omits
 
 ## Model details
 
-- **Name / run**: `yolo26n-seq-red-white-safe` (serving alias `models/serving/best.pt`).
-- **Architecture**: Ultralytics YOLO26n (~2.6 M params), object detection.
-- **Classes**: 2 — `papi_light_red` (0), `papi_light_white` (1). The third per-lamp
+- **Name / run**: `yolo26s-fulldata-1280` (serving slot `models/serving/best.pt`; promoted
+  2026-05-31, superseding the yolo26n sequence model).
+- **Architecture**: Ultralytics YOLO26s (~9.1 M params), object detection.
+- **Classes**: 2 — `PAPI-Red` (0), `PAPI-White` (1). The third per-lamp
   state, *transition*, is derived geometrically from the viewing angle, not learned.
 - **Inputs**: a single image / video frame (plus optional drone GPS + altitude supplied
   by the surrounding software — the angle is **not** inferred from pixels).
@@ -29,12 +30,12 @@ this card adds the intended-use, limitations and ethics framing a registry omits
 
 ## Metrics
 
-Validation-split box (B) detection metrics (best-fitness epoch, imgsz 1280) — see
-`models/MODELS.md §3.1.3`:
+Validation-split box (B) detection metrics (best-fitness epoch 39, imgsz 1280) — see
+`models/MODELS.md §3.1.1`:
 
 | precision | recall | mAP@0.5 | mAP@0.5:0.95 |
 | ---: | ---: | ---: | ---: |
-| 0.861 | 0.871 | 0.914 | 0.474 |
+| 0.948 | 0.937 | 0.983 | 0.679 |
 
 Per-regime (day-wide / night-wide / day-zoom) and per-state F1 on the held-out **test**
 split are produced by the evaluation notebook (`workflows/notebooks/04_*`) and tracked
@@ -49,8 +50,10 @@ in `MODELS.md §3.1.1`.
   unconfirmed by the client; transition-boundary labels shift once they are bound.
 - **ZoomCamera** frames are degraded until `calibrated_focal_px` is supplied.
 - **Throughput** — ~0.4 fps on a laptop CPU; far from the "real-time on a
-  resource-constrained device" requirement. GPU / ONNX-runtime / smaller-input paths are
-  the levers, and real edge-hardware numbers are still pending (`docs/edge-benchmark.md`).
+  resource-constrained device" requirement. That figure was measured on the previous
+  yolo26n; the serving model is now the ~3.5× larger yolo26s, so CPU throughput will be
+  lower and needs re-measuring. GPU / ONNX-runtime / smaller-input paths are the levers,
+  and real edge-hardware numbers are still pending (`docs/edge-benchmark.md`).
 - **INT8 ONNX export** fails on CPU ONNX Runtime (`ConvInteger(10)` unimplemented).
 
 ## Ethical considerations

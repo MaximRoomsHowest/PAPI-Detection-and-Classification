@@ -1,60 +1,48 @@
-# Local Model Weights
+# Local Model Weights — filesystem layout
 
-Model binaries are intentionally ignored by Git.
+This file covers **where the files live**. For model lineage, metrics, and
+deployment status see the registry: [`models/MODELS.md`](MODELS.md).
 
-## Current Local Files
+## Layout
 
 | Path | Type | Purpose |
 |---|---|---|
-| `models/base/yolo26n.pt` | Base weight | Small YOLOv26 base model for notebook 03 and quick local retraining. |
-| `models/base/yolov26m.pt` | Base weight | Preferred larger YOLOv26m base model for active-learning experiments. |
-| `models/runs/yolo26n_sequence_red_white_safe/` | Current trained run | Local canonical run metadata and checkpoint for the active sequence model. |
-| `models/serving/best.pt` | Deployment alias | Runtime model loaded by the FastAPI backend by default. Keep this copied from the active run checkpoint. |
+| `models/base/*.pt` | Base weights | Upstream Ultralytics seeds (yolo26n / yolo26s / yolo26m) for fine-tuning. |
+| `models/runs/detect/<arch>-<dataset>-<res>/` | Trained runs | Each run's `args.yaml`, `results.csv`, plots, and `weights/best.pt` + `last.pt`. Named so the folder tells you the model — see MODELS.md §0. |
+| `models/serving/best.pt` | Serving slot | The model the FastAPI backend loads by default. A **copy** of the active run's `best.pt`; the slot filename is stable (see below). |
+| `models/serving/model_card.json` | Provenance | Identifies which run is in the slot + its val metrics; served by `/api/model`. |
+| `models/serving/best_int8.onnx` | INT8 export | Quantised export of the **previous** yolo26n model; experimental / CPU-broken (MODELS.md §3.2.1). |
 
-`models/base/yolo11n.pt` was removed from the local workspace because YOLO11 was
-an early deprecated experiment and is not referenced by the current notebooks or
-backend.
+> **Git tracking:** `.gitignore` ignores `*.pt`/`*.onnx` globally but
+> **un-ignores** `models/base/*`, `models/serving/*`, and `models/runs/**`,
+> so the weights under those paths **are** committed. Weights under
+> `data/runs/` (the data_analysis workspace) stay ignored.
 
-## Serving Model
+## Serving model
 
-For current app testing, the canonical local run checkpoint is:
-
-```text
-models/runs/yolo26n_sequence_red_white_safe/weights/best.pt
-```
-
-The backend runtime alias is:
+The backend loads `models/serving/best.pt`. As of **2026-05-31** the slot
+holds **`yolo26s-fulldata-1280`** (the higher-resolution full-dataset run
+from the `data_analysis` branch):
 
 ```text
-models/serving/best.pt
+models/runs/detect/yolo26s-fulldata-1280/weights/best.pt   ->   models/serving/best.pt
 ```
 
-To restore the current run from the archive:
+To rotate the serving model, copy a different run's `best.pt` into the slot
+and regenerate the card — full procedure in [`models/MODELS.md`](MODELS.md) §5.
+The slot filename stays `best.pt` (the Dockerfile, compose, `.env`, and docs
+all reference it).
+
+To roll back to the previous yolo26n model:
 
 ```powershell
-Copy-Item ..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\yolo26n_sequence_red_white_safe\args.yaml models\runs\yolo26n_sequence_red_white_safe\args.yaml -Force
-Copy-Item ..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\yolo26n_sequence_red_white_safe\results.csv models\runs\yolo26n_sequence_red_white_safe\results.csv -Force
-Copy-Item ..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\yolo26n_sequence_red_white_safe\weights\best.pt models\runs\yolo26n_sequence_red_white_safe\weights\best.pt -Force
-Copy-Item models\runs\yolo26n_sequence_red_white_safe\weights\best.pt models\serving\best.pt -Force
+Copy-Item models\runs\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force
+..\..\.venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
+  models\runs\yolo26n-sequence-1280 --write-model-card models\serving\model_card.json
 ```
 
-To prepare the backend from the small base weight instead:
+## Deprecated archived runs
 
-```powershell
-Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
-```
-
-For project-quality YOLOv26m demos, copy the intended trained YOLOv26m checkpoint
-into `models/serving/best.pt` before starting the backend.
-
-## Deprecated Archived Runs
-
-Historical runs remain outside the repo at:
-
-```text
-..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\
-```
-
-Treat everything except `yolo26n_sequence_red_white_safe` as deprecated training
-lineage. Do not use those checkpoints for the integrated app unless explicitly
-comparing historical experiments.
+Historical runs predating the current label spec live outside the repo at
+`..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\` and must not be used for
+the integrated app — see MODELS.md §4.

@@ -19,7 +19,7 @@ Honesty guardrails (the project's design principle — no invented numbers):
     which is what ``best.pt`` is saved against — and the final epoch is reported too.
 
 Usage:
-    python workflows/scripts/populate_model_metrics.py models/runs/yolo26n_sequence_red_white_safe
+    python workflows/scripts/populate_model_metrics.py models/runs/detect/yolo26s-fulldata-1280
     python workflows/scripts/populate_model_metrics.py <run_dir> --write-model-card models/serving/model_card.json
     python workflows/scripts/populate_model_metrics.py <run_dir> --markdown
 """
