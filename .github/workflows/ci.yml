@@ -4,7 +4,9 @@ on:
   push:
     branches: [main, cleanup-merge]
   pull_request:
-    branches: [main]
+    # Include cleanup-merge so PRs into the integration branch (not only main) run
+    # CI — feature branches such as refactor/* are validated via their PR.
+    branches: [main, cleanup-merge]
 
 # Cancel earlier in-flight runs on the same PR/branch when a new push arrives.
 concurrency:
@@ -46,6 +48,15 @@ jobs:
       - name: Pytest — backend
         working-directory: apps/backend
         run: pytest -v
+
+      - name: Mypy (type check — reported, not gating)
+        # Non-gating, like the pip-audit / npm-audit jobs (continue-on-error): surfaces
+        # the current type-error count so the team can decide when to promote it to a
+        # hard gate, without blocking the build today.
+        continue-on-error: true
+        run: |
+          pip install mypy
+          mypy apps/backend/app packages/papi/src --ignore-missing-imports
 
   frontend:
     name: Frontend (lint + build)
