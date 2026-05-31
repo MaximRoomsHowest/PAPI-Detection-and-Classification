@@ -14,6 +14,39 @@
   box-shadow: var(--shadow-soft);
 }
 
+/* Runway selector row above the Live-Demo upload controls (papi_24 / papi_06). */
+.live-runway {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.live-runway label {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.live-runway select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
+.live-runway select:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.live-runway select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .frame-tool {
   min-width: 0;
   overflow: hidden;
