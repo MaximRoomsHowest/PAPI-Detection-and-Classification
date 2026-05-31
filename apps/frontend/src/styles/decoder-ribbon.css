@@ -1,0 +1,1203 @@
+.decoder-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Classifier ladder (Stage 4): a hand-rolled high->low glidepath ladder
+   adapted from the design .ins-ladder/.ins-rung. Square corners, 1px hairline
+   dividers, no rounded pills, no translateY hover — the cross-highlight state
+   machine (active/selected) is preserved so the side Plotly chart still
+   responds to hover. */
+.decoder-ladder {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.decoder-ladder__axis {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.decoder-ladder__axis::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 22px;
+  bottom: 22px;
+  width: 1px;
+  background: var(--border);
+}
+
+.decoder-ladder__axis .cap {
+  position: relative;
+  padding-left: 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.decoder-ladder__axis .cap.mid {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.decoder-ladder__axis .cap.mid::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.decoder-ladder__rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.decoder-rung {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) minmax(96px, 1fr) 52px;
+  align-items: center;
+  column-gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.decoder-rung:last-child {
+  border-bottom: 0;
+}
+
+.decoder-rung:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* Active (model-selected) rung — solid accent evidence fill + inset 4px left
+   stripe (replaces the old per-state gradient). */
+.decoder-rung.active {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.decoder-rung.active .decoder-rung__name strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.decoder-rung.active .decoder-rung__bar > i {
+  background: var(--accent);
+}
+
+.decoder-rung.active .decoder-rung__pct {
+  color: var(--accent);
+}
+
+/* Selected (hover/compare) rung — hairline accent outline for cross-highlight
+   with the Plotly chart, without the solid stripe. */
+.decoder-rung.selected:not(.active) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.decoder-rung:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.decoder-rung__lamps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.decoder-rung__name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.decoder-rung__name strong {
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+}
+
+.decoder-rung__name small {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.decoder-rung__bar {
+  position: relative;
+  height: 8px;
+  background: var(--meter-track);
+}
+
+.decoder-rung__bar > i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--evidence);
+  background: color-mix(in srgb, var(--accent) 55%, var(--meter-track));
+}
+
+.decoder-rung__pct {
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.decoder-big-lamps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.decoder-lamp,
+.decoder-big-lamps span {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: 0 0 13px currentColor;
+}
+
+.decoder-white {
+  color: #f8fbff;
+  background: #f8fbff;
+}
+
+.decoder-red {
+  color: #ff4545;
+  background: #ff4545;
+}
+
+.decoder-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(160px, 0.7fr) minmax(160px, 0.6fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 24% 18%, color-mix(in srgb, var(--state-color) 22%, transparent), transparent 34%),
+    var(--surface-muted);
+}
+
+.decoder-chip {
+  width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--state-color) 58%, transparent);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--state-color);
+  background: color-mix(in srgb, var(--state-color) 12%, transparent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.decoder-readout > div:first-child > strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 24px;
+  line-height: 1.1;
+  margin-top: 10px;
+}
+
+.decoder-readout p {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 13px;
+}
+
+.decoder-big-lamps {
+  width: min(220px, 100%);
+}
+
+.decoder-rule {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 10px;
+  align-items: baseline;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.decoder-rule span,
+.decoder-rule small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.decoder-rule strong {
+  color: var(--text-strong);
+  font-size: 22px;
+}
+
+.decoder-rule small {
+  grid-column: 1 / -1;
+}
+
+.decoder-plot {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  overflow: hidden;
+  /* Grows with the taller (400px) decision plot on large screens. */
+  min-height: 360px;
+}
+
+.plotly-chart {
+  width: 100%;
+}
+
+.plotly-chart .modebar {
+  right: 8px !important;
+}
+
+.plotly-chart .modebar-btn svg {
+  fill: var(--text-muted) !important;
+}
+
+/* Transition ribbon chrome (Stage 4): a flat ruled block with HUD corner ticks
+   that frames either the real per-lamp swimlane or the illustrative demo
+   matrix. Square corners — distinct from the rounded decoder/chart panels. */
+.ribbon-frame {
+  position: relative;
+  min-width: 0;
+  margin-top: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.ribbon-tick {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  z-index: 1;
+  pointer-events: none;
+  border-color: var(--accent);
+  border-style: solid;
+  border-width: 0;
+}
+
+.ribbon-tick.tl {
+  top: 5px;
+  left: 5px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.ribbon-tick.tr {
+  top: 5px;
+  right: 5px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.ribbon-tick.bl {
+  bottom: 5px;
+  left: 5px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.ribbon-tick.br {
+  bottom: 5px;
+  right: 5px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+.ribbon-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+}
+
+.ribbon-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.ribbon-dot {
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+.ribbon-dot.dot-white {
+  background: #f8fbff;
+}
+
+.ribbon-dot.dot-red {
+  background: #ff4545;
+}
+
+.ribbon-dot.dot-now {
+  background: var(--warn);
+}
+
+.ribbon-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ribbon-readout strong {
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.history-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.history-filter {
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+/* Match the rest of the app's keyboard-focus affordance (audit F11). */
+.history-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Tertiary "Clear filters" action: lighter than the secondary buttons so it
+   reads as a reset, not a primary control. */
+.ghost-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.ghost-button:hover {
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+.ghost-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.history-checksum {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.field-error {
+  color: var(--danger, #d23b3b);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The dialog takes programmatic focus on open (tabIndex=-1); it doesn't need a
+   focus ring of its own — the focusable controls inside it still show theirs. */
+.history-modal:focus {
+  outline: none;
+}
+
+/* Respect the OS "reduce motion" preference (audit IMP-FE-9, WCAG 2.3.3):
+   neutralise the infinite spin / pulse / scroll-cue animations and long
+   transitions for users who opt out. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.history-summary {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.history-summary span,
+.history-detail-grid span,
+.history-angle-note span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.history-summary strong,
+.history-detail-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.history-summary small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.history-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.history-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 13px;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+.history-table th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.history-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.history-link:hover,
+.history-table a:hover {
+  text-decoration: underline;
+}
+
+/* Keyboard-focus ring on the filename trigger to match the rest of the app
+   (audit F11). */
+.history-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Scroll affordance for the wide table on narrow viewports (audit F12). Hidden
+   by default; only revealed at the breakpoint where the table can overflow. */
+.history-scroll-cue {
+  display: none;
+  margin: 0;
+  padding: 8px 13px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+/* Per-global-state History pill tints. HistoryPage applies
+   `state-pill-<global_state>`; these were previously undefined, so every pill
+   rendered with the same neutral background. Text stays var(--text-strong) so
+   contrast holds in both themes; the background tint conveys the state. */
+.state-pill-far_too_high { background: rgba(53, 215, 183, 0.22); }
+.state-pill-too_high { background: rgba(111, 200, 255, 0.24); }
+.state-pill-correct_glidepath { background: rgba(167, 227, 92, 0.26); }
+.state-pill-too_low { background: rgba(255, 182, 87, 0.26); }
+.state-pill-far_too_low { background: rgba(255, 107, 107, 0.24); }
+.state-pill-transition { background: rgba(255, 177, 31, 0.26); }
+.state-pill-unknown { background: var(--surface-muted); color: var(--text-muted); }
+
+/* Keyboard focus ring for the secondary button (Download / Export CSV /
+   Refresh / pagination) — the other interactive controls already have one. */
+.secondary-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* A detected lamp under 50% confidence is flagged amber (plus a ⚠ glyph in the
+   card) so a shaky verdict is not presented as certain. */
+.lamp-card.is-low-confidence {
+  border-color: var(--warn, #d9920a);
+}
+.lamp-card.is-low-confidence small {
+  color: var(--warn, #d9920a);
+  font-weight: 700;
+}
+
+.history-empty {
+  padding: 28px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.history-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.54);
+}
+
+.history-modal {
+  width: min(940px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-strong);
+  padding: 18px;
+}
+
+.history-modal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.history-modal-heading h3 {
+  color: var(--text-strong);
+  font-size: 22px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.history-detail-grid > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--surface-muted);
+}
+
+.history-artifact {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b1521;
+}
+
+.history-artifact img,
+.history-artifact video {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.history-modal-columns {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.history-modal-columns h4 {
+  margin-bottom: 8px;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.history-lamps {
+  display: grid;
+  gap: 8px;
+}
+
+.history-lamp {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-muted);
+  border-radius: 4px;
+  padding: 7px 10px;
+  color: var(--text-strong);
+  background: var(--surface-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.history-lamp-white { border-left-color: #f8fbff; }
+.history-lamp-red { border-left-color: #ff4545; }
+.history-lamp-transition { border-left-color: #ffb11f; }
+
+/* Compact detections summary table (audit F19): the common-case view shown
+   before the raw JSON is expanded. */
+.history-detections-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.history-detections-table th,
+.history-detections-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.history-detections-table th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.history-detections-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-detections-empty {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* "Show raw" disclosure toggle for the full detections JSON (audit F19). */
+.history-raw-toggle {
+  margin-top: 10px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.history-raw-toggle:hover {
+  text-decoration: underline;
+}
+
+.history-raw-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.history-json {
+  min-height: 150px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 10px 0 0;
+  padding: 10px;
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+/* Keyboard-focus ring on the scrollable raw region (audit F19, WCAG 2.4.7). */
+.history-json:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.history-angle-note {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.history-angle-note svg {
+  color: var(--accent);
+}
+
+.history-angle-note p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cue-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-cue span {
+    animation: none;
+  }
+}
+
+@media (max-width: 1040px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .topnav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-top: 1px solid var(--border);
+  }
+
+  /* On the second row the leading nav link's left rule would float against the
+     viewport edge — drop it so the row reads cleanly. */
+  .topnav .nav-link:first-child {
+    border-left: 0;
+  }
+
+  .topbar-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .live-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .airport-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stack the hero: copy centered above the glidepath diagram. */
+  .intro-band {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    justify-items: center;
+    padding: 48px 0 32px;
+  }
+
+  .intro-copy {
+    justify-items: center;
+    text-align: center;
+    max-width: 720px;
+  }
+
+  .intro-actions {
+    justify-content: center;
+  }
+
+  .intro-diagram {
+    width: min(640px, 100%);
+  }
+
+  .state-decoder-card,
+  .transition-card {
+    grid-column: span 6;
+  }
+
+  .history-summary-grid,
+  .history-detail-grid,
+  .history-modal-columns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .decoder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .decoder-readout {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.6fr);
+  }
+
+  .decoder-rule {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .topnav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    overflow-x: auto;
+    border-top: 1px solid var(--border);
+  }
+
+  .topnav .nav-link {
+    /* Tighten padding + font + letter spacing so the four nav links fit a
+       390 px (iPhone) viewport without horizontal clipping (regression
+       USERTEST-MAJ-3, papi-user-test-2026-05-28). */
+    padding: 10px 12px;
+    font-size: 12px;
+    letter-spacing: 0.2px;
+  }
+
+  /* The decorative SITE EDNY + UTC clock cells are real but non-essential;
+     drop them on phones so the status badge + language + theme controls
+     keep room. */
+  .util-cell:not(.status-cell) {
+    display: none;
+  }
+
+  .nav-link__idx {
+    display: none;
+  }
+
+  .intro-band {
+    padding: 36px 0 28px;
+  }
+
+  .brand-logo {
+    width: 120px;
+    height: 38px;
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .language-switch button {
+    min-width: 34px;
+    height: 38px;
+    font-size: 11px;
+  }
+
+  .intro-copy h1 {
+    font-size: 40px;
+  }
+
+  .intro-description {
+    font-size: 16px;
+  }
+
+  .intro-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cta-button {
+    width: 100%;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-actions {
+    justify-content: flex-start;
+  }
+
+  .section-heading h2 {
+    font-size: 25px;
+  }
+
+  .source-note {
+    white-space: normal;
+  }
+
+  .demo-actions {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .history-summary-grid,
+  .history-detail-grid,
+  .history-modal-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .history-modal-backdrop {
+    padding: 12px;
+  }
+
+  .history-modal {
+    padding: 14px;
+  }
+
+  .history-angle-note {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .history-angle-note p {
+    grid-column: 1 / -1;
+  }
+
+  .upload-button,
+  .primary-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .frame-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lamp-card {
+    grid-template-columns: 1fr;
+  }
+
+  .decoder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .decoder-readout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Ladder collapses to glyph + name + % on phones; the evidence bar (an at-a-
+     glance extra, not the source of truth) drops out. */
+  .decoder-ladder {
+    grid-template-columns: 1fr;
+  }
+
+  .decoder-ladder__axis {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .decoder-ladder__axis::before,
+  .decoder-ladder__axis .cap.mid::before {
+    display: none;
+  }
+
+  .decoder-ladder__axis .cap {
+    padding-left: 0;
+  }
+
+  .decoder-rung {
+    grid-template-columns: 72px minmax(0, 1fr) 48px;
+    column-gap: 12px;
+  }
+
+  .decoder-rung__bar {
+    display: none;
+  }
+}
+
+/* The history table has a 980px min-width, so on tablet/phone widths it scrolls
+   horizontally inside .history-table-wrap. Reveal the scroll cue there as an
+   affordance (audit F12); it is hidden again at <=480px where the table is
+   re-laid-out as stacked cards and no longer scrolls sideways. */
+@media (max-width: 980px) {
+  .history-scroll-cue {
+    display: block;
+  }
+}
+
+/* <=480px: collapse the 9-column table into stacked cards (audit F12). thead is
+   hidden and each cell carries its column label via data-label, so every field
+   (including the secondary frames/processing/angle columns) stays reachable
+   without a detail-modal round-trip and without horizontal scrolling. */
+@media (max-width: 480px) {
+  .history-table-wrap {
+    overflow-x: visible;
+  }
+
+  .history-table {
+    min-width: 0;
+  }
+
+  .history-table thead {
+    /* Visually hidden but kept for assistive tech / DOM order. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .history-table tr {
+    display: block;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .history-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .history-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 0;
+    padding: 7px 0;
+  }
+
+  .history-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  /* The secondary columns are still present as stacked rows — no longer hidden,
+     just deprioritised visually with a hairline separator above them. */
+  .history-table td.history-col-secondary {
+    color: var(--text-muted);
+  }
+
+  .history-scroll-cue {
+    display: none;
+  }
+}

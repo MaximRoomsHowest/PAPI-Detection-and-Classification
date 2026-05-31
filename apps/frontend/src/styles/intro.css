@@ -1,0 +1,290 @@
+/* Stage 3 hero: no photo wash, no parallax/ken-burns. A calm drafted
+   glidepath cross-section (inline SVG) sits beside the copy over a faint
+   blueprint panel; the app-shell already carries the page grid. */
+.intro-hero {
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.intro-hero-inner {
+  position: relative;
+}
+
+.intro-band {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: 48px;
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 64px 0 40px;
+}
+
+.intro-copy {
+  display: grid;
+  justify-items: start;
+  text-align: left;
+  max-width: 560px;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.intro-copy h1,
+.section-heading h2 {
+  color: var(--text-strong);
+  margin: 0;
+}
+
+.intro-copy h1 {
+  font-size: 60px;
+  line-height: 1.05;
+  font-weight: 600;
+  max-width: 860px;
+}
+
+.intro-description {
+  max-width: 720px;
+  margin-top: 18px;
+  color: var(--text-muted);
+  font-size: 18px;
+  margin-bottom: 0;
+}
+
+.intro-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 24px;
+  justify-content: flex-start;
+}
+
+/* Glidepath cross-section panel — faint blueprint grid, 1px ruled frame.
+   No shadow/photo; honors light + dark via the shared tokens. */
+.intro-diagram {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.intro-diagram__panel {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--grid) 0,
+      var(--grid) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid) 0,
+      var(--grid) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    var(--surface);
+  padding: 18px 20px;
+}
+
+.intro-diagram__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--accent);
+}
+
+.intro-diagram__caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 18px;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Flat navy fill + 1px border, no big shadow (Stage 3). */
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 3px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.cta-button:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.cta-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.scroll-cue {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(1180px, calc(100% - 32px));
+  margin: 4px auto 0;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.scroll-cue span {
+  width: 42px;
+  height: 42px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  animation: cue-bounce 2s ease-in-out infinite;
+}
+
+.scroll-cue span::before {
+  content: '';
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.scroll-cue small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.scroll-cue:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 5px;
+}
+
+.inline-metric span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 14px;
+}
+
+.inline-metric small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.airport-section {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 42px 0 28px;
+  scroll-margin-top: 92px;
+}
+
+.airport-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.airport-card,
+.airport-map {
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.airport-card {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.airport-card h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.airport-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.airport-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.airport-meta span {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.airport-meta strong {
+  display: block;
+  color: var(--text-strong);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.airport-map {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
+}
+
+.airport-map iframe {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  border: 0;
+}
+
+.map-caption {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+.text-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
