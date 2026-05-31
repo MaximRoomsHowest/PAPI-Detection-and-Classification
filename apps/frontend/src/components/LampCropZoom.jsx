@@ -53,36 +53,46 @@ export function LampCropZoom({ imageUrl, naturalWidth, naturalHeight, lamps, cop
             className="crop-zoom__viewport"
             role="img"
             aria-label={`${copy.live.cropTitle}. ${cropSummary}`}
-            style={{ aspectRatio: `${crop.width} / ${crop.height}` }}
           >
-            <img
-              className="crop-zoom__img"
-              src={imageUrl}
-              alt=""
-              onError={() => setImageFailed(true)}
-              style={{
-                width: `${(naturalWidth / crop.width) * 100}%`,
-                left: `${-(crop.x / crop.width) * 100}%`,
-                top: `${-(crop.y / crop.height) * 100}%`,
-              }}
-            />
-            {crop.boxes.map((box) => (
-              <div
-                key={box.id}
-                className={clsx('crop-zoom__box', `is-${box.status}`)}
+            {/* The film holds the EXACT crop aspect-ratio. The image scales by
+                width while the box top/left percentages resolve against this
+                element's height, so both share one scale only if the box keeps
+                the crop's true proportions. Carrying the ratio here (not on the
+                viewport, whose max-height clamp would skew it) keeps the boxes
+                pinned to the lamps regardless of the viewport's clamped size. */}
+            <div
+              className="crop-zoom__film"
+              style={{ aspectRatio: `${crop.width} / ${crop.height}` }}
+            >
+              <img
+                className="crop-zoom__img"
+                src={imageUrl}
+                alt=""
+                onError={() => setImageFailed(true)}
                 style={{
-                  left: `${(box.x / crop.width) * 100}%`,
-                  top: `${(box.y / crop.height) * 100}%`,
-                  width: `${(box.width / crop.width) * 100}%`,
-                  height: `${(box.height / crop.height) * 100}%`,
-                  '--box-color': toneFor(box.status).color,
+                  width: `${(naturalWidth / crop.width) * 100}%`,
+                  left: `${-(crop.x / crop.width) * 100}%`,
+                  top: `${-(crop.y / crop.height) * 100}%`,
                 }}
-              >
-                <span className="crop-zoom__badge mono" aria-hidden="true">
-                  {box.id}
-                </span>
-              </div>
-            ))}
+              />
+              {crop.boxes.map((box) => (
+                <div
+                  key={box.id}
+                  className={clsx('crop-zoom__box', `is-${box.status}`)}
+                  style={{
+                    left: `${(box.x / crop.width) * 100}%`,
+                    top: `${(box.y / crop.height) * 100}%`,
+                    width: `${(box.width / crop.width) * 100}%`,
+                    height: `${(box.height / crop.height) * 100}%`,
+                    '--box-color': toneFor(box.status).color,
+                  }}
+                >
+                  <span className="crop-zoom__badge mono" aria-hidden="true">
+                    {box.id}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <ul className="crop-zoom__legend">

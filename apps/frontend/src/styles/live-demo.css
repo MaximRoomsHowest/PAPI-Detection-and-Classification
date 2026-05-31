@@ -802,12 +802,27 @@
 
 .crop-zoom__viewport {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   max-height: 56vh;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #05080c;
+}
+
+/* Carries the exact crop aspect-ratio (set inline) so the image's width-driven
+   scale and the box top/left percentages share one basis — see LampCropZoom.
+   The viewport above only clips + centres this; its max-height can never skew
+   the ratio (which previously floated the boxes above the lamps). When the film
+   is taller than the clamped viewport it overflows equally top/bottom, keeping
+   the lamp-centred crop visible. */
+.crop-zoom__film {
+  position: relative;
+  flex: none;
+  width: 100%;
 }
 
 .crop-zoom__img {
