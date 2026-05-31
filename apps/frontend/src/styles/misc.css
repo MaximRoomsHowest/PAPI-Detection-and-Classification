@@ -1,0 +1,77 @@
+/* -------------------------------------------------------------------------
+ * Audit follow-on styles — added by Tier-A fixes
+ * ------------------------------------------------------------------------- */
+
+/* Compact 2-column metric grid (replaces the old 4-column fake-metric grid).
+   Real metrics: detection confidence + processing time. */
+.metric-grid--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Visible error state for LazyPlot when the chart bundle fails to load
+   (audit SMOKE-CRIT-3). Replaces the previously-silent failure mode where
+   the chart area sat blank with `Uncaught (in promise)` in the console. */
+.plot-error {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  justify-items: center;
+  padding: 24px;
+  min-height: 160px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border: 1px dashed color-mix(in srgb, var(--danger) 50%, transparent);
+  color: var(--text-strong);
+}
+
+.plot-error strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.plot-error small {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  max-width: 36ch;
+}
+
+/* Real 404 page (audit F01) shown by the catch-all route. */
+.not-found {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  min-height: calc(100vh - 220px);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 64px 0;
+  text-align: center;
+}
+
+.not-found__code {
+  margin: 0;
+  color: var(--accent);
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.not-found__title {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.not-found__message {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.not-found .cta-button {
+  margin-top: 10px;
+}

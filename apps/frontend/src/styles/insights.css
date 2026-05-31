@@ -1,0 +1,223 @@
+/* ---------- Insights: Radix tabs ---------- */
+.insights-tabs {
+  margin-top: 4px;
+}
+
+.insights-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+
+.insights-tab-trigger {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.insights-tab-trigger:hover {
+  color: var(--text-strong);
+}
+
+.insights-tab-trigger[data-state='active'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.insights-tab-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Force-mounted panels: keep the inactive tab rendered at full size but parked
+   off-screen so Plotly sizes correctly and PDF export still captures every
+   chart node. */
+.insights-tab-viewport {
+  position: relative;
+}
+
+.insights-tab-content {
+  width: 100%;
+}
+
+.insights-tab-content[data-state='inactive'] {
+  position: absolute;
+  top: 0;
+  left: -200vw;
+  pointer-events: none;
+}
+
+/* ---------- Insights: responsive card grid ---------- */
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.insights-grid .span-all {
+  grid-column: 1 / -1;
+}
+
+/* ---------- Angle vs. light state ---------- */
+.angle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.angle-chart {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px 4px;
+  background: var(--surface-muted);
+}
+
+.angle-chart h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.angle-chart--empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 150px;
+}
+
+.angle-chart--empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Client-requirement badge — positive accent, distinct from the warn-coloured
+   "demo data" tag so a juror reads it as "this is the asked-for feature". */
+.client-tag {
+  margin-left: auto;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ---------- Shared chart empty / loading states ---------- */
+.chart-empty,
+.chart-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.chart-empty svg {
+  opacity: 0.5;
+}
+
+.chart-empty strong {
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.chart-empty p {
+  margin: 0;
+  max-width: 48ch;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.chart-skeleton {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.stats-metrics {
+  margin-top: 14px;
+}
+
+/* ---------- Transition event table ---------- */
+.transition-table-wrap {
+  overflow-x: auto;
+}
+
+.transition-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.transition-table th,
+.transition-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.transition-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.transition-table td.num,
+.transition-table th.num {
+  text-align: right;
+}
+
+.transition-table td.muted {
+  color: var(--text-muted);
+}
+
+.state-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.state-pill.is-white {
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  border: 1px solid var(--border);
+}
+
+.state-pill.is-red {
+  background: rgba(255, 69, 69, 0.16);
+  color: #e23b3b;
+}
+
+/* ---------- sonner toast (match the blueprint surface) ---------- */
+.papi-toast {
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text-strong) !important;
+  font-family: inherit !important;
+}

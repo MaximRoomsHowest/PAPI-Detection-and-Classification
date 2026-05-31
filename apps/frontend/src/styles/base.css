@@ -1,0 +1,419 @@
+/* Numeric/label utilities — pair with var(--font-mono) (JetBrains Mono).
+   .mono switches the family and enables tabular figures + slashed zero;
+   .tnum just locks tabular numerals on text that stays in the body font. */
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum', 'zero';
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell {
+  min-height: 100vh;
+  /* Faint blueprint grid: two repeating gradients in var(--grid) over the
+     base background, 32px cells. body.no-grid is the escape hatch. */
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--grid) 0,
+      var(--grid) 1px,
+      transparent 1px,
+      transparent 32px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid) 0,
+      var(--grid) 1px,
+      transparent 1px,
+      transparent 32px
+    ),
+    var(--bg);
+  color: var(--text);
+}
+
+body.no-grid .app-shell {
+  background: var(--bg);
+}
+
+/* Flight-strip topbar (Stage 2): full-bleed, single bottom rule, no float /
+   blur / drop shadow. Brand | nav | util cluster divided by hairline rules. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background: var(--paper);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 22px;
+  border-right: 1px solid var(--border);
+  color: var(--text-strong);
+  text-decoration: none;
+  min-width: 0;
+}
+
+.brand-logo {
+  width: 156px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.brand-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+html[data-theme='light'] .brand-logo .logo-dark {
+  display: none;
+}
+
+html[data-theme='dark'] .brand-logo .logo-light {
+  display: none;
+}
+
+.brand-text {
+  display: grid;
+  gap: 3px;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand strong {
+  color: var(--text-strong);
+  font-size: 16px;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+}
+
+.brand small {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.brand-company {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.brand-company span {
+  display: block;
+}
+
+.icon-button,
+.viz-heading svg {
+  display: inline-grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.topnav {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  justify-self: end;
+  align-items: stretch;
+}
+
+/* Read-only info cells in the util cluster (status / SITE EDNY / UTC clock).
+   Each is divided from its neighbour by a hairline left rule; labels are
+   uppercase mono in var(--faint). */
+.util-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.util-cell__label {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+
+.util-cell__value {
+  color: var(--text-strong);
+  font-size: 12.5px;
+  letter-spacing: 0.4px;
+}
+
+.clock-cell {
+  min-width: 116px;
+  justify-content: center;
+}
+
+/* Wrappers that keep the existing language dropdown + theme toggle button
+   chrome but seat each control in its own flight-strip segment. */
+.topbar-control {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-left: 1px solid var(--border);
+}
+
+/* Backend status badge dot (audit F17 / IMP-FE-17): colour driven by the real
+   readiness probe — green online, red offline, amber checking. */
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--faint);
+}
+
+.status-dot--online {
+  background: #3fae5a;
+  box-shadow: 0 0 9px color-mix(in srgb, #3fae5a 70%, transparent);
+}
+
+.status-dot--offline {
+  background: var(--danger);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--danger) 70%, transparent);
+}
+
+.status-dot--checking {
+  background: var(--warn);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--warn) 70%, transparent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* Skip link (audit F08): first focusable element, off-screen until focused,
+   then pinned top-left so keyboard users can jump straight to <main>. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -56px;
+  z-index: 80;
+  padding: 9px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top 160ms ease;
+}
+
+.skip-link:focus {
+  top: 12px;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.language-switch {
+  position: relative;
+}
+
+.language-trigger {
+  min-width: 70px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.language-trigger:hover,
+.language-trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-cyan) 12%, var(--surface));
+  color: var(--text-strong);
+}
+
+.language-trigger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.language-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 35;
+  display: grid;
+  gap: 5px;
+  min-width: 184px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 6px;
+  animation: language-menu-enter 160ms ease-out;
+}
+
+@keyframes language-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.language-menu button {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 9px;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.language-menu button span {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+}
+
+.language-menu button small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.language-menu button:hover {
+  border-color: color-mix(in srgb, var(--accent-cyan) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
+}
+
+.language-menu button.active {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+}
+
+.language-menu button.active small {
+  color: var(--accent);
+}
+
+.language-menu button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.topnav .nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 22px;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  transition: color 160ms ease;
+}
+
+.topnav .nav-link:last-child {
+  border-right: 1px solid var(--border);
+}
+
+.nav-link__idx {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: var(--faint);
+}
+
+.topnav .nav-link:hover {
+  color: var(--accent);
+}
+
+.topnav .nav-link.active {
+  color: var(--accent);
+}
+
+.topnav .nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.topnav .nav-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.icon-button,
+.primary-button,
+.upload-button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.icon-button:hover,
+.primary-button:hover,
+.upload-button:hover {
+  transform: translateY(-1px);
+}
+
+.icon-button:focus-visible,
+.primary-button:focus-visible,
+.upload-button:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
