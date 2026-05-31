@@ -154,6 +154,45 @@ def test_media_404s_on_missing_file(client, monkeypatch: pytest.MonkeyPatch, tmp
 
 
 # ---------------------------------------------------------------------------
+# API-key gate on the data routes (previously only /media was covered)
+# ---------------------------------------------------------------------------
+
+
+_AUTH_GATED_GET_ROUTES = ["/api/logs", "/api/stats", "/api/model", "/api/system"]
+
+
+@pytest.mark.parametrize("route", _AUTH_GATED_GET_ROUTES)
+def test_data_route_rejects_missing_or_wrong_api_key(client, monkeypatch: pytest.MonkeyPatch, route: str):
+    """With PAPI_API_KEY configured, every data route — not only /media — must
+    reject a request with no key or a wrong key with 401. ``require_api_key`` raises
+    during dependency resolution, before any DB query, so this holds with no Postgres
+    available (audit backend-tests: the auth gate was only ever exercised on /media,
+    so dropping it from a route would have passed every test)."""
+    monkeypatch.setattr(main_module.settings, "api_key", "test-secret", raising=True)
+
+    assert client.get(route).status_code == 401
+    assert client.get(route, headers={"X-API-Key": "wrong-key"}).status_code == 401
+
+
+def test_dbless_data_routes_accept_correct_api_key(client, monkeypatch: pytest.MonkeyPatch):
+    """/api/model and /api/system don't touch the database, so a correct key yields
+    200 in CI — proving the gate passes valid keys, not just rejects bad ones."""
+    monkeypatch.setattr(main_module.settings, "api_key", "test-secret", raising=True)
+
+    assert client.get("/api/model", headers={"X-API-Key": "test-secret"}).status_code == 200
+    assert client.get("/api/system", headers={"X-API-Key": "test-secret"}).status_code == 200
+
+
+def test_dbless_data_routes_open_in_local_mode(client, monkeypatch: pytest.MonkeyPatch):
+    """No PAPI_API_KEY ⇒ data routes serve without a key (local-dev / back-compat,
+    matching the /media behaviour)."""
+    monkeypatch.setattr(main_module.settings, "api_key", None, raising=True)
+
+    assert client.get("/api/model").status_code == 200
+    assert client.get("/api/system").status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # Production-mode default-credential rejection
 # ---------------------------------------------------------------------------
 
