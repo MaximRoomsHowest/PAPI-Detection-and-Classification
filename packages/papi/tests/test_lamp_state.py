@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
 import yaml
 from papi.global_state import derive_global_state
 from papi.lamp_state import compute_lamp_state
@@ -65,6 +66,17 @@ def test_lamp_state_crossing_red_transition_white():
     assert compute_lamp_state(below, cfg)[0][0] == "red"
     assert compute_lamp_state(at, cfg)[0][0] == "transition"
     assert compute_lamp_state(above, cfg)[0][0] == "white"
+
+
+def test_non_finite_altitude_raises_instead_of_false_transition():
+    """A NaN camera altitude must raise (so the caller records the frame as
+    'unknown') rather than silently classifying every lamp as 'transition' via
+    NaN band comparisons."""
+    cfg = _load_papi_cfg()
+    row = _camera_at_angle(cfg, light_no=1, elev_deg=cfg["faa_default_set_angles_deg"][0])
+    row["alt_ellipsoidal_m"] = float("nan")
+    with pytest.raises(ValueError):
+        compute_lamp_state(row, cfg)
 
 
 def test_derive_global_state_basic():

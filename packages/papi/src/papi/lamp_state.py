@@ -7,6 +7,7 @@ mirror that physics: above set+halfwidth = white, below set-halfwidth = red, els
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from .geometry import elevation_angle_deg
@@ -40,14 +41,24 @@ def compute_lamp_state(
     """
     half_width = float(papi_config["transition_half_width_deg"])
 
+    # A missing/NaN camera position makes every elevation NaN, and the band
+    # comparison below would then silently fall through to "transition" for every
+    # lamp. Reject it up front so the caller records the frame as unknown rather
+    # than a fabricated transition (it already catches ValueError).
+    camera_lat = float(image_row["lat"])
+    camera_lon = float(image_row["lon"])
+    camera_alt_m = float(image_row["alt_ellipsoidal_m"])
+    if not all(math.isfinite(v) for v in (camera_lat, camera_lon, camera_alt_m)):
+        raise ValueError("non-finite camera position (lat / lon / alt_ellipsoidal_m)")
+
     states: list[LampState] = []
     min_margin = float("inf")
     for i in range(1, 5):
         light = papi_config[f"light_{i}"]
         elev = elevation_angle_deg(
-            camera_lat=float(image_row["lat"]),
-            camera_lon=float(image_row["lon"]),
-            camera_alt_m=float(image_row["alt_ellipsoidal_m"]),
+            camera_lat=camera_lat,
+            camera_lon=camera_lon,
+            camera_alt_m=camera_alt_m,
             target_lat=float(light["lat"]),
             target_lon=float(light["lon"]),
             target_alt_m=_lamp_alt(papi_config, i),
