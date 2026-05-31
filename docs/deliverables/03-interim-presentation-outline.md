@@ -145,7 +145,7 @@ Bullets:
   frontend.
 - Three containers run as non-root; secrets via `.env`; healthchecks
   on every service.
-- CI runs ruff + 43 backend tests + 15 papi tests + npm lint/build
+- CI runs ruff + 90 backend tests + 41 papi tests + npm lint/build/vitest
   + Docker build on every push.
 
 Talking point (60 s): no surprises here — keep it short, this slide

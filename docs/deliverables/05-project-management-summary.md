@@ -74,7 +74,7 @@ PAPI Vision
 │   │   ├── 2.3.2 Nginx reverse proxy (non-root, security headers)
 │   │   └── 2.3.3 GitHub Actions CI
 │   └── 2.4 Verification
-│       ├── 2.4.1 43 backend tests + 15 papi tests on CI
+│       ├── 2.4.1 90 backend tests + 41 papi tests on CI
 │       ├── 2.4.2 Frontend lint + build on CI
 │       └── 2.4.3 User testing × 2 rounds (2026-05-28)
 └── 3. Project ceremony
@@ -238,7 +238,7 @@ per-work-package pie (Data+Model vs Application vs Ceremony).
 | R1 | PAPI 06 height + datum unconfirmed by 2026-06-03 | Med | High (angles unreliable) | Mon 2026-06-01 client meeting; use FAA defaults as fallback | active — see meeting-reports/2026-06-01-geometry-closure.md |
 | R2 | Edge-device hardware unavailable before final | Med | Med (LR1B band capped) | Order Raspberry Pi 5 Mon; fall back on a school NUC if needed | active |
 | R3 | INT8 ONNX path fails on CPU (`ConvInteger(10)`) | Realised | Low (FP32 path works) | Document as measured failure; fall back FP32 in demo | closed (documented) |
-| R4 | App.jsx monolith grows un-maintainable | Low | Low | Modularisation card in sprint 4 | active |
+| R4 | App.jsx monolith grows un-maintainable | Low | Low | Modularised: pages/, Topbar component, lib/ helpers | resolved |
 | R5 | A team member loses days to illness | Low | Med | Cross-training: every speaker briefs one backup speaker | active |
 | R6 | Coaches lose access to Trello / repo | Low | High (LR3 risk) | Re-verify access Mon 2026-06-01 | active |
 
