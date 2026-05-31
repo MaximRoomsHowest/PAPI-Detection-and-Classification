@@ -175,9 +175,6 @@ function App() {
               runBackendInference={analysis.runBackendInference}
               selectBackendFrame={analysis.selectBackendFrame}
               handleMediaChange={analysis.handleMediaChange}
-              runways={analysis.runways}
-              runwayId={analysis.runwayId}
-              onSelectRunway={analysis.setRunwayId}
               copy={copy}
             />
           }

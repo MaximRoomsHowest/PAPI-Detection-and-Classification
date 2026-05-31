@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { analyzeFrame, analyzeFrames, analyzeMedia, fetchRunways } from '../lib/api'
+import { analyzeFrame, analyzeFrames, analyzeMedia } from '../lib/api'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { loadPlotlyBundle } from '../lib/plotlyBundle'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
@@ -30,16 +30,6 @@ export function useAnalysis(copy) {
   // mid-flight discards its (now stale) result instead of painting it onto the new
   // upload (audit frontend-bugs: mid-analysis file swap).
   const runIdRef = useRef(0)
-  // Runway the live analysis runs against. EDNY has two PAPI units (papi_24 /
-  // papi_06) and the angle/state solution depends on which one — the backend
-  // accepts runway_id (default papi_24), so expose it as a Live-Demo selector
-  // rather than hardwiring papi_24. Seeded with the two known runways so the
-  // picker works even before (or without) the /api/runways fetch below.
-  const [runways, setRunways] = useState([
-    { id: 'papi_24', label: 'PAPI 24' },
-    { id: 'papi_06', label: 'PAPI 06' },
-  ])
-  const [runwayId, setRunwayId] = useState('papi_24')
 
   useEffect(() => {
     return () => {
@@ -48,22 +38,6 @@ export function useAnalysis(copy) {
       }
     }
   }, [media?.url])
-
-  // Load the real runway list once for the selector. Resilient by design — a
-  // failed fetch keeps the seeded fallback instead of breaking the Live Demo.
-  useEffect(() => {
-    let active = true
-    fetchRunways()
-      .then((list) => {
-        if (active && Array.isArray(list) && list.length) {
-          setRunways(list.map((runway) => ({ id: runway.id, label: runway.label ?? runway.id })))
-        }
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
 
   function handleMediaFiles(files) {
     const selectedFiles = Array.from(files ?? [])
@@ -241,7 +215,7 @@ export function useAnalysis(copy) {
         }
 
         setAnalysisProgress(copy.live.uploadingFolder.replace('{count}', folderImages.length))
-        const batch = await analyzeFrames(folderImages, { runwayId })
+        const batch = await analyzeFrames(folderImages)
         rawResults = batch.results
         nextBackendFrames = batch.results.map((result, index) =>
           scenarioFromBackendResult(result, {
@@ -252,7 +226,7 @@ export function useAnalysis(copy) {
         bestScenario = nextBackendFrames[0]
       } else if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
-        const result = await analyzeMedia(media.file, { runwayId })
+        const result = await analyzeMedia(media.file)
         rawResults = [result]
         bestScenario = scenarioFromBackendResult(result, {
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
@@ -265,7 +239,7 @@ export function useAnalysis(copy) {
 
         for (const [index, frame] of frames.entries()) {
           setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
-          const result = await analyzeFrame(frame.file, { runwayId })
+          const result = await analyzeFrame(frame.file)
           rawResults.push(result)
           const scenario = scenarioFromBackendResult(result, {
             frameLabel: frame.label,
@@ -343,8 +317,5 @@ export function useAnalysis(copy) {
     selectBackendFrame,
     handleDownloadCharts,
     runBackendInference,
-    runways,
-    runwayId,
-    setRunwayId,
   }
 }

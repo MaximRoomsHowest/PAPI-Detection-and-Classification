@@ -21,9 +21,6 @@ export function LiveDemoPage({
   runBackendInference,
   selectBackendFrame,
   handleMediaChange,
-  runways,
-  runwayId,
-  onSelectRunway,
   copy,
 }) {
   // The Live Demo shows real backend output only. Until an analysis has run the
@@ -73,25 +70,6 @@ export function LiveDemoPage({
             {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
           </button>
         </div>
-      </div>
-
-      {/* Runway selector — picks which PAPI unit the backend analyses against
-          (papi_24 / papi_06). The elevation angle + glidepath state depend on it;
-          without a choice the backend defaults to papi_24. */}
-      <div className="live-runway">
-        <label htmlFor="papi-runway-select">{copy.live.runway}</label>
-        <select
-          id="papi-runway-select"
-          value={runwayId}
-          onChange={(event) => onSelectRunway(event.target.value)}
-          disabled={isAnalyzing}
-        >
-          {runways.map((runway) => (
-            <option key={runway.id} value={runway.id}>
-              {runway.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {(analysisError || analysisProgress) && (
