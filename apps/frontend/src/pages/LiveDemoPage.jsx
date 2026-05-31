@@ -5,6 +5,7 @@ import { LampCard } from '../components/LampCard'
 import { InlineMetric } from '../components/InlineMetric'
 import { LampCropZoom } from '../components/LampCropZoom'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
+import { formatDurationMs } from '../lib/format'
 
 export function LiveDemoPage({
   activeScenario,
@@ -122,8 +123,8 @@ export function LiveDemoPage({
                 />
                 <InlineMetric
                   label={copy.live.latency}
-                  value={activeScenario.metrics.latency}
-                  suffix=" ms"
+                  value={formatDurationMs(activeScenario.metrics.latency).value}
+                  suffix={formatDurationMs(activeScenario.metrics.latency).suffix}
                 />
               </div>
 

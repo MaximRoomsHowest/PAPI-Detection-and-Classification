@@ -138,6 +138,14 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
             type="button"
             ref={languageTriggerRef}
             onClick={() => setLanguageMenuOpen((current) => !current)}
+            onKeyDown={(event) => {
+              // Escape from the trigger itself also closes the menu (the menu's
+              // own handler only fires when focus is already inside it).
+              if (event.key === 'Escape' && languageMenuOpen) {
+                event.preventDefault()
+                setLanguageMenuOpen(false)
+              }
+            }}
             aria-expanded={languageMenuOpen}
             aria-haspopup="menu"
             aria-label="Choose language"

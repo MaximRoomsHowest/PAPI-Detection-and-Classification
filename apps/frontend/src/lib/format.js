@@ -23,3 +23,17 @@ export function formatTimestamp(value) {
 export function formatAngle(value, fallback = '—') {
   return Number.isFinite(Number(value)) ? `${Number(value).toFixed(3)}°` : fallback
 }
+
+// Human-readable duration: sub-second renders as ms, 1s+ as seconds, so a video
+// figure (e.g. 45000 ms) reads as "45 s" instead of a wall of milliseconds.
+// Returns { value, suffix } to match the InlineMetric props.
+export function formatDurationMs(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n < 0) {
+    return { value: 0, suffix: ' ms' }
+  }
+  if (n >= 1000) {
+    return { value: (n / 1000).toFixed(n >= 10000 ? 0 : 1), suffix: ' s' }
+  }
+  return { value: Math.round(n), suffix: ' ms' }
+}
