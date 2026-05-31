@@ -637,7 +637,6 @@ function App() {
           path="/insights"
           element={
             <InsightsPage
-              activeScenario={activeScenario}
               backendResults={backendResults}
               plotTheme={plotTheme}
               insightsRef={insightsRef}

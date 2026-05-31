@@ -49,17 +49,6 @@ export const stateCatalog = [
   },
 ]
 
-export const legalStateCatalog = stateCatalog.filter((state) => state.id !== 'unknown')
-
-export const stateLampPatterns = {
-  'far-high': ['white', 'white', 'white', 'white'],
-  'too-high': ['white', 'white', 'white', 'red'],
-  correct: ['white', 'white', 'red', 'red'],
-  'too-low': ['white', 'red', 'red', 'red'],
-  'far-low': ['red', 'red', 'red', 'red'],
-  unknown: ['occluded', 'occluded', 'occluded', 'occluded'],
-}
-
 export const backendStateId = {
   far_too_high: 'far-high',
   too_high: 'too-high',
