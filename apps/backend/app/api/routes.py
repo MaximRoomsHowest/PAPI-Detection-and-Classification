@@ -343,13 +343,22 @@ def export_logs_csv(
     def generate():
         buffer = io.StringIO()
         writer = csv.writer(buffer)
+
+        def _csv_safe(value):
+            # Neutralise CSV/formula injection (CWE-1236): a cell starting with
+            # = + - @ or a control char can execute when the export is opened in a
+            # spreadsheet. original_filename is attacker-controlled free text, so
+            # force it to a literal with a leading apostrophe (audit M3).
+            text = "" if value is None else str(value)
+            return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
         writer.writerow(_CSV_COLUMNS)
         for log in rows:
             created = log.created_at.isoformat() if hasattr(log.created_at, "isoformat") else log.created_at
             writer.writerow([
                 log.id, created, log.media_type, log.runway_id, log.global_state,
                 log.confidence, log.angle_available, log.elevation_angle_deg,
-                log.frame_count, log.processing_ms, log.original_filename,
+                log.frame_count, log.processing_ms, _csv_safe(log.original_filename),
             ])
         yield buffer.getvalue()
 

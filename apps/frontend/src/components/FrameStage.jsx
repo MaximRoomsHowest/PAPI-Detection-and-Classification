@@ -107,9 +107,12 @@ export function FrameStage({
         onDrop={handleDrop}
       >
         {displayMedia?.type === 'video' ? (
-          <video src={displayMedia.url} autoPlay muted loop playsInline controls />
+          // key on the URL so toggling annotated<->original remounts the <video>
+          // and actually loads the new source (changing src alone does not reload
+          // a media element per the HTML spec) (audit H3).
+          <video key={displayMedia.url} src={displayMedia.url} autoPlay muted loop playsInline controls />
         ) : displayMedia?.type === 'image' ? (
-          <img src={displayMedia.url} alt={copy.live.frameAlt} />
+          <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />
         ) : (
           <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
         )}

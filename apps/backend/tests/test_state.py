@@ -99,10 +99,24 @@ def test_detect_lamp_transitions_finds_consecutive_red_to_white():
     assert event.elevation_angle_deg == 3.05
 
 
-def test_detect_lamp_transitions_ignores_non_consecutive():
-    """A switch across a frame gap is not counted (mirrors the offline pipeline)."""
-    track_observations = {3: [(0, "red", 50.0), (5, "white", 50.0)]}
+def test_detect_lamp_transitions_ignores_large_frame_gap():
+    """A switch across a gap larger than TRANSITION_MAX_FRAME_GAP is not counted."""
+    track_observations = {3: [(0, "red", 50.0), (5, "white", 50.0)]}  # gap 5 > 2
     assert detect_lamp_transitions(track_observations) == []
+
+
+def test_detect_lamp_transitions_gap_tolerance_boundary():
+    """Gap tolerance (TRANSITION_MAX_FRAME_GAP=2): a 2-frame gap is still counted so
+    a single dropped/occluded frame can't silently drop a real switch; a 3-frame
+    gap is rejected. Pins the recently-landed boundary (audit H4)."""
+    # gap 2 -> exactly one event, attributed to the later frame
+    events = detect_lamp_transitions({1: [(0, "red", 10.0), (2, "white", 10.0)]})
+    assert len(events) == 1
+    assert events[0].lamp_index == 1
+    assert (events[0].from_state, events[0].to_state) == ("red", "white")
+    assert events[0].frame_index == 2
+    # gap 3 -> rejected (exceeds the tolerance)
+    assert detect_lamp_transitions({1: [(0, "red", 10.0), (3, "white", 10.0)]}) == []
 
 
 def test_detect_lamp_transitions_empty_without_a_switch():

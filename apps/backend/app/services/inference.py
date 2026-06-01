@@ -1,4 +1,5 @@
 import os
+import threading
 from collections import Counter, deque
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -27,6 +28,15 @@ class InferenceService:
         self._model: Any | None = None
         self._loaded_at: str | None = None
         self._resolved_device: str | None = None
+        # A single Ultralytics YOLO instance (with one shared, mutable ByteTrack
+        # predictor) is NOT thread-safe. The analyze endpoints are sync `def`s run
+        # in FastAPI's threadpool, so concurrent requests would interleave on the
+        # shared tracker and scramble the per-lamp identity the verdict/transitions
+        # rely on. Serialise all inference (and the lazy model load) on one
+        # RE-ENTRANT lock so the dispatcher can also call self.model while holding
+        # it. On the single-CPU deployment this matches the ~0.4 fps reality and
+        # costs no real throughput (audit H1 / M2 / L1).
+        self._lock = threading.RLock()
 
     def analyze(
         self,
@@ -37,11 +47,14 @@ class InferenceService:
         drone_id: str | None = None,
         drone_metadata: tuple[float, float, float] | None = None,
     ) -> AnalysisPayload:
-        if media_type == "image":
-            return self.analyze_image(media_path, runway_id, original_filename, drone_id, drone_metadata)
-        if media_type == "video":
-            return self.analyze_video(media_path, runway_id, original_filename, drone_id, drone_metadata)
-        raise ValueError(f"Unsupported media type: {media_type}")
+        # Serialise the whole inference so concurrent threadpool requests never
+        # share the YOLO/ByteTrack state mid-stream (audit H1).
+        with self._lock:
+            if media_type == "image":
+                return self.analyze_image(media_path, runway_id, original_filename, drone_id, drone_metadata)
+            if media_type == "video":
+                return self.analyze_video(media_path, runway_id, original_filename, drone_id, drone_metadata)
+            raise ValueError(f"Unsupported media type: {media_type}")
 
     @property
     def is_loaded(self) -> bool:
@@ -84,15 +97,19 @@ class InferenceService:
     @property
     def model(self) -> Any:
         if self._model is None:
-            os.environ.setdefault("YOLO_AUTOINSTALL", "False")
-            try:
-                from ultralytics import YOLO
-            except ImportError as exc:
-                raise RuntimeError("Ultralytics is not installed. Run `pip install -r requirements.txt`.") from exc
-            if not self.settings.model_path.exists():
-                raise RuntimeError(f"Model file not found: {self.settings.model_path}")
-            self._model = YOLO(str(self.settings.model_path))
-            self._loaded_at = datetime.now(timezone.utc).isoformat()
+            # Double-checked locking: re-check inside the lock so a concurrent
+            # first burst constructs the weights once, not N times (audit L1).
+            with self._lock:
+                if self._model is None:
+                    os.environ.setdefault("YOLO_AUTOINSTALL", "False")
+                    try:
+                        from ultralytics import YOLO
+                    except ImportError as exc:
+                        raise RuntimeError("Ultralytics is not installed. Run `pip install -r requirements.txt`.") from exc
+                    if not self.settings.model_path.exists():
+                        raise RuntimeError(f"Model file not found: {self.settings.model_path}")
+                    self._model = YOLO(str(self.settings.model_path))
+                    self._loaded_at = datetime.now(timezone.utc).isoformat()
         return self._model
 
     def model_info(self) -> ModelInfo:

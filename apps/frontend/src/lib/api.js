@@ -12,6 +12,14 @@ const MAX_UPLOAD_BYTES =
 const REQUEST_TIMEOUT_MS = Number(
   import.meta.env.VITE_PAPI_REQUEST_TIMEOUT_MS ?? DEFAULT_REQUEST_TIMEOUT_MS,
 )
+// Inference is sequential at ~0.4 fps, so a long video (up to 600 frames) or a
+// folder batch (up to 200 images) can legitimately run for many minutes — far
+// past the 60s GET timeout. The three analyze calls get their own generous budget
+// so the headline video/batch features aren't aborted mid-analysis (audit H2).
+const DEFAULT_ANALYZE_TIMEOUT_MS = 30 * 60_000
+const ANALYZE_TIMEOUT_MS = Number(
+  import.meta.env.VITE_PAPI_ANALYZE_TIMEOUT_MS ?? DEFAULT_ANALYZE_TIMEOUT_MS,
+)
 
 function buildHeaders(extra = {}) {
   const headers = { ...extra }
@@ -55,9 +63,9 @@ function checkUploadSize(files) {
  * UI spinning forever. The signal is the only way to give fetch() a timeout
  * in the browser — there is no built-in timeout option.
  */
-async function fetchWithTimeout(input, init = {}) {
+async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController()
-  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
     // no-store: API responses (logs, stats, model) must never be served from
     // the browser HTTP cache, or the History "Refresh" button could re-render
@@ -68,7 +76,7 @@ async function fetchWithTimeout(input, init = {}) {
       // Attach the original AbortError as the cause so devtools / Sentry
       // / future error boundaries can inspect both layers (preserve-caught-error).
       throw new Error(
-        `Backend did not respond within ${Math.round(REQUEST_TIMEOUT_MS / 1000)} s. The request may still finish server-side — refresh logs to verify.`,
+        `Backend did not respond within ${Math.round(timeoutMs / 1000)} s. The request may still finish server-side — refresh logs to verify.`,
         { cause: error },
       )
     }
@@ -265,11 +273,11 @@ export async function analyzeFrame(file, metadata) {
   formData.append('file', file)
   appendMetadata(formData, metadata)
 
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze-frame`, {
-    method: 'POST',
-    headers: buildHeaders(),
-    body: formData,
-  })
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/analyze-frame`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
 
   return parseAnalysisResponse(response)
 }
@@ -282,11 +290,11 @@ export async function analyzeFrames(files, metadata) {
   })
   appendMetadata(formData, metadata)
 
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze-frames`, {
-    method: 'POST',
-    headers: buildHeaders(),
-    body: formData,
-  })
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/analyze-frames`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
 
   return parseAnalysisResponse(response)
 }
@@ -297,11 +305,11 @@ export async function analyzeMedia(file, metadata) {
   formData.append('file', file)
   appendMetadata(formData, metadata)
 
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/analyze`, {
-    method: 'POST',
-    headers: buildHeaders(),
-    body: formData,
-  })
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/analyze`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
 
   return parseAnalysisResponse(response)
 }
