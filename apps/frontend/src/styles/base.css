@@ -13,7 +13,7 @@
 .app-shell {
   min-height: 100vh;
   /* Faint blueprint grid: two repeating gradients in var(--grid) over the
-     base background, 32px cells. body.no-grid is the escape hatch. */
+     base background, 32px cells. */
   background:
     repeating-linear-gradient(
       to right,
@@ -31,10 +31,6 @@
     ),
     var(--bg);
   color: var(--text);
-}
-
-body.no-grid .app-shell {
-  background: var(--bg);
 }
 
 /* Flight-strip topbar (Stage 2): full-bleed, single bottom rule, no float /

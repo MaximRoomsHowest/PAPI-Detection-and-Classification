@@ -156,6 +156,20 @@
   font-size: 13px;
 }
 
+/* Plotly chart sizing + modebar theming (moved here from decoder-ribbon.css
+   when the dead decoder/ribbon UI was removed — audit dead-CSS cleanup). */
+.plotly-chart {
+  width: 100%;
+}
+
+.plotly-chart .modebar {
+  right: 8px !important;
+}
+
+.plotly-chart .modebar-btn svg {
+  fill: var(--text-muted) !important;
+}
+
 .stats-metrics {
   margin-top: 14px;
 }

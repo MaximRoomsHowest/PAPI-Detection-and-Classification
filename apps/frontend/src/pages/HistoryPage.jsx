@@ -161,10 +161,16 @@ export function HistoryPage({ copy }) {
     setIsExporting(true)
     setError('')
     try {
-      await downloadLogsCsv({
-        runwayId: runwayFilter || undefined,
-        globalState: stateFilter || undefined,
-      })
+      // Filter-aware filename so a filtered export isn't indistinguishable from a
+      // full export once downloaded (audit FB-08).
+      const nameParts = ['papi_analysis_logs', runwayFilter, stateFilter].filter(Boolean)
+      await downloadLogsCsv(
+        {
+          runwayId: runwayFilter || undefined,
+          globalState: stateFilter || undefined,
+        },
+        `${nameParts.join('_')}.csv`,
+      )
     } catch (exportError) {
       setError(exportError.message)
     } finally {

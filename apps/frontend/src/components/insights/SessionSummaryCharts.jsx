@@ -102,6 +102,13 @@ function ConfidenceDistribution({ results, plotTheme, copy }) {
 
 export function SessionSummaryCharts({ backendResults, plotTheme, copy }) {
   const hasData = (backendResults?.length ?? 0) > 0
+  // The confidence histogram filters to confidence > 0, so a session where every
+  // lamp came back unknown/0 would otherwise render an empty-but-populated chart;
+  // gate it on its own derived data instead of the shared hasData (audit FB-09).
+  const hasConfidenceData = useMemo(
+    () => confidenceValues(backendResults).length > 0,
+    [backendResults],
+  )
   return (
     <>
       <article className="viz-card">
@@ -131,7 +138,7 @@ export function SessionSummaryCharts({ backendResults, plotTheme, copy }) {
             <p>{copy.insights.confidenceText}</p>
           </div>
         </div>
-        {hasData ? (
+        {hasConfidenceData ? (
           <ConfidenceDistribution results={backendResults} plotTheme={plotTheme} copy={copy} />
         ) : (
           <AngleEmptyState

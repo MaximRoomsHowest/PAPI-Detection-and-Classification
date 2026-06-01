@@ -168,6 +168,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
                   type="button"
                   role="menuitemradio"
                   aria-checked={option === language}
+                  tabIndex={option === language ? 0 : -1}
                   ref={(node) => {
                     languageOptionRefs.current[index] = node
                   }}
