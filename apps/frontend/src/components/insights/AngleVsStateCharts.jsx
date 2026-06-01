@@ -12,6 +12,7 @@ import { angleVsStateSeries } from '../../lib/insightsTransforms'
 // The angleVsStateSeries transform lives in lib/insightsTransforms.js.
 
 const STATE_COLOR = {
+  obscured: '#7b8794',
   red: plotlyPalette.red,
   transition: plotlyPalette.transition,
   white: plotlyPalette.white,
@@ -68,9 +69,9 @@ function AngleChart({ lampIndex, points, plotTheme, copy }) {
       tickfont: { color: plotTheme.muted },
     },
     yaxis: {
-      tickvals: [0, 1, 2],
-      ticktext: [copy.status.red, copy.status.transition, copy.status.white],
-      range: [-0.4, 2.4],
+      tickvals: [-1, 0, 1, 2],
+      ticktext: [copy.status.obscured, copy.status.red, copy.status.transition, copy.status.white],
+      range: [-1.4, 2.4],
       fixedrange: true,
       gridcolor: plotTheme.grid,
       tickfont: { color: plotTheme.muted },

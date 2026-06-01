@@ -114,7 +114,11 @@ export function FrameStage({
         ) : displayMedia?.type === 'image' ? (
           <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />
         ) : (
-          <DropzonePlaceholder isDragActive={isDragActive} copy={copy} />
+          <DropzonePlaceholder
+            isDragActive={isDragActive}
+            onFilesSelected={onFilesSelected}
+            copy={copy}
+          />
         )}
 
         {analyzing && (
@@ -128,14 +132,30 @@ export function FrameStage({
   )
 }
 
-function DropzonePlaceholder({ isDragActive, copy }) {
+function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
+  // <label> + hidden <input> so the whole empty surface is one accessible
+  // upload control: clicking anywhere (or Tab + Enter/Space) opens the native
+  // picker, reusing the same handler and accept types as the LiveDemo upload
+  // button. The drag-and-drop handlers live on the parent .video-surface, so
+  // they keep working. event.target.value is cleared so picking the same file
+  // twice still fires onChange.
   return (
-    <div className={clsx('dropzone-placeholder', isDragActive && 'active')}>
+    <label className={clsx('dropzone-placeholder', isDragActive && 'active')}>
+      <input
+        className="dropzone-input"
+        accept="image/*,video/*"
+        type="file"
+        aria-label={copy.live.dropTitle}
+        onChange={(event) => {
+          onFilesSelected?.(event.target.files)
+          event.target.value = ''
+        }}
+      />
       <div className="dropzone-card">
         <Upload size={28} />
         <strong>{copy.live.dropTitle}</strong>
         <span>{copy.live.dropText}</span>
       </div>
-    </div>
+    </label>
   )
 }

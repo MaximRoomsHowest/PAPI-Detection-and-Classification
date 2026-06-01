@@ -191,7 +191,9 @@
 
 .demo-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* auto-fit so the runway selector + the three action buttons wrap cleanly
+     instead of overflowing a fixed 3-column track (a 4th control was added). */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   align-items: stretch;
   justify-content: end;
@@ -205,6 +207,38 @@
 
 .demo-actions .upload-button {
   max-width: none;
+}
+
+/* Runway selector — a bordered control matching the upload buttons (same height,
+   border, surface) with an inline "Runway" label + dropdown. Sits in the
+   demo-actions grid alongside the upload/run controls. */
+.runway-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.runway-select span {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.runway-select select {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  cursor: pointer;
 }
 
 .upload-button,

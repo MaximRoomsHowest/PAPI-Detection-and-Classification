@@ -66,6 +66,21 @@ describe('angleVsStateSeries', () => {
     expect(series[2].points[0].stateNum).toBe(1) // transition
   })
 
+  it('includes obscured lamps on their own tier (-1) so non-detections are visible', () => {
+    const series = angleVsStateSeries([
+      result({
+        lamps: [
+          { index: 1, state: 'obscured', confidence: 0 },
+          { index: 2, state: 'unknown', confidence: 0 },
+        ],
+      }),
+    ])
+    expect(series[0].points).toHaveLength(1) // light 1 obscured -> plotted
+    expect(series[0].points[0].stateNum).toBe(-1)
+    expect(series[0].points[0].state).toBe('obscured')
+    expect(series[1].points).toHaveLength(0) // light 2 unknown -> still skipped
+  })
+
   it('uses per-light angles per lamp and sorts points by angle', () => {
     const series = angleVsStateSeries([
       result({
@@ -111,7 +126,7 @@ describe('perLightStateSeries', () => {
   it('returns four zeroed light buckets for no input', () => {
     const series = perLightStateSeries([])
     expect(series).toHaveLength(4)
-    expect(series[0]).toEqual({ white: 0, red: 0, transition: 0, unknown: 0 })
+    expect(series[0]).toEqual({ white: 0, red: 0, transition: 0, obscured: 0, unknown: 0 })
   })
 
   it('counts states per light index across results', () => {

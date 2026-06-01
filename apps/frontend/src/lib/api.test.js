@@ -23,6 +23,7 @@ import {
   analyzeFrame,
   analyzeFrames,
   analyzeMedia,
+  analyzeSequence,
   fetchLogs,
   fetchModelInfo,
   fetchReady,
@@ -168,6 +169,22 @@ describe('analyze* — multipart payload + auth', () => {
     // pinning the names directly is the actual contract under test.
     const names = files.map((f) => f.name)
     expect(names).toEqual(['flight1/a.jpg', 'flight1/b.jpg'])
+  })
+
+  it('analyzeSequence POSTs every file under "files" to /api/analyze-sequence', async () => {
+    const f1 = makeFile('a.jpg', 1_000)
+    const f2 = makeFile('b.jpg', 1_000)
+    Object.defineProperty(f1, 'webkitRelativePath', { value: 'flight1/a.jpg' })
+    Object.defineProperty(f2, 'webkitRelativePath', { value: 'flight1/b.jpg' })
+
+    await analyzeSequence([f1, f2], metadata)
+
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/api\/analyze-sequence$/)
+    expect(init.method).toBe('POST')
+    const files = init.body.getAll('files')
+    expect(files.map((f) => f.name)).toEqual(['flight1/a.jpg', 'flight1/b.jpg'])
+    expect(init.body.get('runway_id')).toBe('24')
   })
 
   it('analyzeMedia POSTs to /api/analyze (the polymorphic image+video route)', async () => {

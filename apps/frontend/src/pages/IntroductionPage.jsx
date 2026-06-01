@@ -1,4 +1,14 @@
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Pause, Play } from 'lucide-react'
+
+// Respect the OS "reduce motion" setting: don't auto-play the looping hero video
+// for users who asked for less motion (WCAG 2.3.3). Computed once at module load;
+// this is a client-only SPA so window is always present.
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /*
   Hero glidepath cross-section — inline SVG over a faint blueprint-grid
@@ -322,10 +332,50 @@ function GlidepathDiagram({ copy }) {
 }
 
 export function IntroductionPage({ copy }) {
+  const videoRef = useRef(null)
+  const [isPlaying, setIsPlaying] = useState(!PREFERS_REDUCED_MOTION)
+
+  // Pause/play control satisfies WCAG 2.2.2 for the auto-playing looping video.
+  const toggleHeroVideo = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      video.play().then(() => setIsPlaying(true)).catch(() => {})
+    } else {
+      video.pause()
+      setIsPlaying(false)
+    }
+  }
+
   return (
     <section className="intro-hero">
       <div className="intro-hero-inner">
         <section className="intro-band">
+          {/* Bodensee approach footage as a faint hero wash (restored, compressed
+              to a 1.5 MB 720p loop). Muted + looping; the toggle is a pause control
+              and reduced-motion users get the poster instead of autoplay. */}
+          <div className="intro-band__bg" aria-hidden="true">
+            <video
+              ref={videoRef}
+              className="intro-band__video"
+              src="/intro-hero.mp4"
+              poster="/intro-hero-poster.jpg"
+              muted
+              loop
+              playsInline
+              autoPlay={!PREFERS_REDUCED_MOTION}
+              preload="metadata"
+            />
+            <span className="intro-band__scrim" />
+          </div>
+          <button
+            type="button"
+            className="intro-band__toggle"
+            onClick={toggleHeroVideo}
+            aria-label={isPlaying ? copy.intro.pauseMedia : copy.intro.playMedia}
+          >
+            {isPlaying ? <Pause size={15} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
+          </button>
           <div className="intro-copy">
             <p className="eyebrow">{copy.intro.eyebrow}</p>
             <h1>{copy.intro.title}</h1>

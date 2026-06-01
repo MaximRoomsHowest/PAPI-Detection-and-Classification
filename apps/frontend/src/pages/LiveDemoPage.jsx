@@ -4,6 +4,7 @@ import { FrameStage } from '../components/FrameStage'
 import { LampCard } from '../components/LampCard'
 import { InlineMetric } from '../components/InlineMetric'
 import { LampCropZoom } from '../components/LampCropZoom'
+import { AnalysisHistoryPanel } from '../components/AnalysisHistoryPanel'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
 import { formatDurationMs } from '../lib/format'
 
@@ -12,6 +13,9 @@ export function LiveDemoPage({
   activeState,
   isAnalyzing,
   media,
+  runways,
+  selectedRunwayId,
+  onSelectRunway,
   backendScenario,
   backendFrames,
   backendFrameIndex,
@@ -35,6 +39,23 @@ export function LiveDemoPage({
           <h2>{copy.live.title}</h2>
         </div>
         <div className="demo-actions">
+          <label className="runway-select">
+            <span>{copy.live.runway}</span>
+            <select
+              value={selectedRunwayId}
+              onChange={(event) => onSelectRunway(event.target.value)}
+              aria-label={copy.live.runway}
+            >
+              {/* Keep the chosen id selectable before the list loads so the
+                  control never renders blank on first paint. */}
+              {runways.length === 0 && <option value={selectedRunwayId}>{selectedRunwayId}</option>}
+              {runways.map((runway) => (
+                <option key={runway.id} value={runway.id}>
+                  {runway.label ?? runway.id}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="upload-button">
             <Upload size={18} />
             <span>{media ? media.name : copy.live.upload}</span>
@@ -167,6 +188,20 @@ export function LiveDemoPage({
           )}
         </aside>
       </div>
+
+      {/* Per-frame detection history — only for multi-image uploads, where each
+          extracted frame has its own scenario to step through. Folders/videos
+          collapse to one aggregated result (backendFrames is empty), so no
+          history is shown. Selecting a row drives the whole result panel above. */}
+      {hasResult && backendFrames.length > 1 && (
+        <AnalysisHistoryPanel
+          activeScenario={activeScenario}
+          backendFrames={backendFrames}
+          backendFrameIndex={backendFrameIndex}
+          onSelectFrame={selectBackendFrame}
+          copy={copy}
+        />
+      )}
 
       {/* PAPI close-up: high-res frames hide the lamp states, so reframe to the
           detected boxes for visual verification. Image uploads only — folder

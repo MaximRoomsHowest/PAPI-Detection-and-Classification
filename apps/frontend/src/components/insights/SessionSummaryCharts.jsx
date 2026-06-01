@@ -11,11 +11,12 @@ import { confidenceValues, perLightStateSeries } from '../../lib/insightsTransfo
 // for the media analysed this session — no fabrication. The aggregation
 // transforms live in lib/insightsTransforms.js.
 
-const STATES = ['white', 'red', 'transition', 'unknown']
+const STATES = ['white', 'red', 'transition', 'obscured', 'unknown']
 const STATE_COLOR = {
   white: plotlyPalette.white,
   red: plotlyPalette.red,
   transition: plotlyPalette.transition,
+  obscured: '#7b8794',
   unknown: '#9aa5b1',
 }
 

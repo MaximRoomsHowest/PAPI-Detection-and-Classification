@@ -13,6 +13,9 @@ export function lampPattern(lamps) {
     if (lamp.state === 'transition') {
       return 'transition'
     }
+    if (lamp.state === 'obscured') {
+      return 'obscured'
+    }
     return 'unknown'
   })
   return labels.join(' + ')

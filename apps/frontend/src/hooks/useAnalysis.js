@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { analyzeFrame, analyzeFrames, analyzeMedia } from '../lib/api'
+import { analyzeFrame, analyzeMedia, analyzeSequence, fetchRunways } from '../lib/api'
+import { useFetch } from './useFetch'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { loadPlotlyBundle } from '../lib/plotlyBundle'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
@@ -12,6 +13,12 @@ import { scenarioFromBackendResult } from '../lib/papi'
 export function useAnalysis(copy) {
   const [activeId, setActiveId] = useState('clean')
   const [media, setMedia] = useState(null)
+  // Runway selection: the list comes from the backend (/api/runways); the chosen
+  // id is sent as `runway_id` so the analysis scores against the right PAPI unit's
+  // surveyed geometry. Defaults to papi_24 to match the backend's own default.
+  const { data: runwayData } = useFetch(fetchRunways, [])
+  const runways = runwayData ?? []
+  const [selectedRunwayId, setSelectedRunwayId] = useState('papi_24')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -210,11 +217,17 @@ export function useAnalysis(copy) {
 
     try {
       let bestScenario = null
-      let nextBackendFrames = []
-      // Raw payloads retained for the result-driven charts. For a folder every
-      // image's payload is kept (one angle/state point per image); for a single
-      // image or video it is the one aggregated payload.
+      // Per-image scenarios for the frame-history panel + FrameStage prev/next
+      // nav. Stays empty for folders/videos, which collapse to a single
+      // aggregated result (no per-frame stepping).
+      const nextBackendFrames = []
+      // Raw payloads retained for the result-driven charts. A folder is now
+      // analysed as one sequenced video, so (like a video) it yields a single
+      // aggregated payload; a single image yields its one payload.
       let rawResults = []
+      // Telemetry sent with every analyze call. runway_id selects which PAPI
+      // unit's geometry the backend scores + computes elevation angles against.
+      const metadata = { runwayId: selectedRunwayId }
 
       if (media.type === 'folder') {
         const folderImages = media.files ?? []
@@ -223,18 +236,19 @@ export function useAnalysis(copy) {
         }
 
         setAnalysisProgress(copy.live.uploadingFolder.replace('{count}', folderImages.length))
-        const batch = await analyzeFrames(folderImages)
-        rawResults = batch.results
-        nextBackendFrames = batch.results.map((result, index) =>
-          scenarioFromBackendResult(result, {
-            frameLabel: `Frame ${index + 1}`,
-            totalFrames: batch.results.length,
-          }),
-        )
-        bestScenario = nextBackendFrames[0]
+        // Folder -> one time-sequenced video: the backend stitches the frames
+        // through the same ByteTrack + transition pipeline as a real video and
+        // returns a single aggregated payload, so treat the result like the video
+        // branch (one annotated artifact + verdict, no per-image frame nav).
+        const result = await analyzeSequence(folderImages, metadata)
+        rawResults = [result]
+        bestScenario = scenarioFromBackendResult(result, {
+          frameLabel: `${result.frame_count ?? folderImages.length} sequenced frames`,
+          totalFrames: 1,
+        })
       } else if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
-        const result = await analyzeMedia(media.file)
+        const result = await analyzeMedia(media.file, metadata)
         rawResults = [result]
         bestScenario = scenarioFromBackendResult(result, {
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
@@ -247,7 +261,7 @@ export function useAnalysis(copy) {
 
         for (const [index, frame] of frames.entries()) {
           setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
-          const result = await analyzeFrame(frame.file)
+          const result = await analyzeFrame(frame.file, metadata)
           rawResults.push(result)
           const scenario = scenarioFromBackendResult(result, {
             frameLabel: frame.label,
@@ -258,6 +272,10 @@ export function useAnalysis(copy) {
             bestScore = score
             bestScenario = scenario
           }
+          // Keep every per-image scenario (in upload order) so the history
+          // panel can list each frame's lamp state, angle, and confidence and
+          // let the user step through them.
+          nextBackendFrames.push(scenario)
         }
       }
 
@@ -309,6 +327,9 @@ export function useAnalysis(copy) {
   return {
     activeId,
     media,
+    runways,
+    selectedRunwayId,
+    setSelectedRunwayId,
     isAnalyzing,
     isExporting,
     exportError,

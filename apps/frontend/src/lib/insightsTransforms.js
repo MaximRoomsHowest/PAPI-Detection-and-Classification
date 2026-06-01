@@ -3,7 +3,10 @@
 // can be unit-tested in isolation. Every function reads only real backend
 // fields — there is no fabrication anywhere in here.
 
-const STATE_NUM = { red: 0, transition: 1, white: 2 }
+// "obscured" sits on its own tier below red so a lamp the detector never found is
+// still plotted against the viewing angle (client ask: surface non-detections in
+// the graphs). A bare "unknown" has no tier and is intentionally dropped.
+const STATE_NUM = { obscured: -1, red: 0, transition: 1, white: 2 }
 
 // --- Angle vs. light state ---------------------------------------------------
 
@@ -19,8 +22,9 @@ export function resolveAngle(angle, lampIndex) {
 }
 
 // Build per-light (angle, state) point series from raw AnalysisPayload[]. Only
-// results with `angle.angle_available` contribute, and `unknown` lamp states are
-// skipped (no place on the red/transition/white axis).
+// results with `angle.angle_available` contribute. "obscured" lamps DO appear (on
+// their own tier below red) so non-detections show up against angle; a bare
+// `unknown` state has no tier on the axis and is skipped.
 export function angleVsStateSeries(results) {
   const series = [1, 2, 3, 4].map((lampIndex) => ({ lampIndex, points: [] }))
   for (const result of results ?? []) {
@@ -75,7 +79,7 @@ export function transitionCountSeries(transitions) {
 
 // Per-light state counts across the session's results (real lamps[].state).
 export function perLightStateSeries(results) {
-  const counts = [1, 2, 3, 4].map(() => ({ white: 0, red: 0, transition: 0, unknown: 0 }))
+  const counts = [1, 2, 3, 4].map(() => ({ white: 0, red: 0, transition: 0, obscured: 0, unknown: 0 }))
   for (const result of results ?? []) {
     for (const lamp of result?.lamps ?? []) {
       const index = lamp.index

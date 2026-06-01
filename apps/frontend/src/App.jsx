@@ -166,6 +166,9 @@ function App() {
               activeState={activeState}
               isAnalyzing={analysis.isAnalyzing}
               media={analysis.media}
+              runways={analysis.runways}
+              selectedRunwayId={analysis.selectedRunwayId}
+              onSelectRunway={analysis.setSelectedRunwayId}
               backendScenario={analysis.backendScenario}
               backendFrames={analysis.backendFrames}
               backendFrameIndex={analysis.backendFrameIndex}

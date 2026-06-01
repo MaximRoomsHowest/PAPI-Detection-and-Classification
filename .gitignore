@@ -74,6 +74,7 @@ models/**/*.safetensors
 # Frontend/backend generated outputs
 apps/frontend/node_modules/
 apps/frontend/dist/
+apps/frontend/coverage/
 apps/backend/storage/
 
 # Local trial folders created outside the canonical apps/* workspace.
@@ -87,6 +88,8 @@ apps/backend/storage/
 *.avi
 !test_videos/*.mp4
 !models/runs/**/*.mp4
+# Intro hero loop: a real shipped frontend asset (compressed 720p, ~1.5 MB), not a generated artifact.
+!apps/frontend/public/intro-hero.mp4
 
 # --------------------------------------------------------------------------
 # Audit / review artefacts (added 2026-05-27 after the v1.1 audit follow-up).

@@ -299,6 +299,29 @@ export async function analyzeFrames(files, metadata) {
   return parseAnalysisResponse(response)
 }
 
+/**
+ * Analyse a folder of images as ONE time-sequenced video: the backend stitches
+ * the frames through the same ByteTrack + transition pipeline as a real video
+ * and returns a single AnalysisPayload (not a per-image batch like analyzeFrames).
+ * Files keep their folder paths so the backend can order them by capture sequence.
+ */
+export async function analyzeSequence(files, metadata) {
+  checkUploadSize(files)
+  const formData = new FormData()
+  files.forEach((file) => {
+    formData.append('files', file, file.webkitRelativePath || file.name)
+  })
+  appendMetadata(formData, metadata)
+
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/analyze-sequence`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
+
+  return parseAnalysisResponse(response)
+}
+
 export async function analyzeMedia(file, metadata) {
   checkUploadSize(file)
   const formData = new FormData()
