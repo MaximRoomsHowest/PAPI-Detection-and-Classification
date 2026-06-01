@@ -16,5 +16,8 @@ lap==0.5.13
 # system package (audit DCK-D2).
 opencv-python-headless==4.10.0.84
 exifread==3.0.0
+# ONNX stack — only exercised when PAPI_MODEL_PATH points at a .onnx model (the
+# INT8 edge-export serving path); the default .pt path never imports these
+# (audit DCK-RE DEP-1).
 onnx==1.17.0
 onnxruntime==1.20.1

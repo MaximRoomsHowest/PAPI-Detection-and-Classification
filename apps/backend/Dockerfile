@@ -48,6 +48,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PAPI_STORAGE_DIR=/storage \
     DATABASE_URL=postgresql+psycopg://papi:papi@postgres:5432/papi_backend
 
+# Never let ultralytics pip-install the full opencv-python at runtime — keeps the
+# headless guarantee robust even if an import path changes (audit DCK-RE BACKEND-2).
+ENV YOLO_AUTOINSTALL=False
+
 # Runtime-only system libs. opencv-python-headless still needs libglib2.0-0
 # (libgthread); the libGL/X11 stack is gone with the headless wheel (audit
 # DCK-D2). No curl — the healthcheck uses the Python stdlib (audit DCK-D11).
