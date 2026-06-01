@@ -96,7 +96,30 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             detections=[],
         )
 
+    def _fake_analyze_sequence(image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None):
+        return AnalysisPayload(
+            media_type="video",
+            original_filename=original_filename,
+            runway_id=runway_id,
+            drone_id=drone_id,
+            global_state="correct_glidepath",
+            lamps=[
+                LampResult(index=1, state="white", confidence=0.95),
+                LampResult(index=2, state="white", confidence=0.94),
+                LampResult(index=3, state="red", confidence=0.93),
+                LampResult(index=4, state="red", confidence=0.92),
+            ],
+            confidence=0.935,
+            frame_count=len(image_paths),
+            processing_ms=99,
+            angle=AngleResult(angle_available=False, angle_note="fixture: no metadata"),
+            artifact_url="/media/seq_annotated.webm",
+            detections=[],
+            transitions=[],
+        )
+
     fake_service.analyze.side_effect = _fake_analyze
+    fake_service.analyze_frame_sequence.side_effect = _fake_analyze_sequence
     # Readiness gates on the model being loaded; the stub reports loaded by default
     # (test_health_ready_returns_503_when_model_not_loaded flips this).
     fake_service.is_loaded = True
@@ -389,6 +412,34 @@ def test_analyze_frames_caps_batch_size(client, monkeypatch):
     finally:
         # Other tests rely on the default cap; restore.
         get_settings.cache_clear()
+
+
+def test_analyze_sequence_returns_single_video_payload(client):
+    """A folder of images analysed as a time sequence yields ONE video-type payload
+    (not a per-image batch) plus a persisted log row."""
+    files = [
+        ("files", (f"flight/frame_{i:03d}.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg"))
+        for i in range(3)
+    ]
+    response = client.post("/api/analyze-sequence", files=files, data={"runway_id": "papi_24"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["media_type"] == "video"
+    assert body["frame_count"] == 3
+    assert body["original_filename"].endswith("(3 frames)")
+    assert body["log_id"]
+
+
+def test_analyze_sequence_rejects_empty_list(client):
+    response = client.post("/api/analyze-sequence", files=[], data={"runway_id": "papi_24"})
+    assert response.status_code in (400, 422)
+
+
+def test_analyze_sequence_rejects_video_file(client):
+    """The sequence endpoint is image-only; a video among the files is a 400."""
+    files = [("files", ("clip.mp4", BytesIO(b"\x00" * 16), "video/mp4"))]
+    response = client.post("/api/analyze-sequence", files=files, data={"runway_id": "papi_24"})
+    assert response.status_code == 400
 
 
 def test_health_ready_reports_dependencies(client):

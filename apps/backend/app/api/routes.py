@@ -144,6 +144,98 @@ def analyze_frames(
     )
 
 
+@router.post("/analyze-sequence", response_model=AnalysisPayload)
+def analyze_sequence(
+    files: Annotated[list[UploadFile], File()],
+    params: Annotated[AnalyzeParams, Depends(analyze_params)],
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(require_api_key)] = None,
+) -> AnalysisPayload:
+    """Analyse an ordered folder of images as ONE video (folder->video feature).
+
+    Unlike ``/analyze-frames`` (which returns a per-image batch), this treats the
+    uploaded images as consecutive frames of a single clip: ByteTrack continuity,
+    temporal red<->white transitions, and one annotated WebM artifact + aggregated
+    verdict — the same pipeline as a real video upload. Files are ordered by
+    filename so a drone's frame_000.jpg…frame_NNN.jpg sequence plays in capture order.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one image file.")
+
+    settings = get_settings()
+    if len(files) > settings.max_batch_frames:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Image sequences are limited to {settings.max_batch_frames} frames per "
+                f"request. Got {len(files)}. Split the folder and retry, or raise "
+                f"PAPI_MAX_BATCH_FRAMES on the server."
+            ),
+        )
+
+    try:
+        get_runway(params.runway_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Validate drone metadata BEFORE writing any upload to disk (same ordering as
+    # _analyze_upload), so an invalid request can't leak saved files.
+    manual_metadata = parse_manual_drone_metadata(
+        params.drone_latitude, params.drone_longitude, params.drone_altitude_m
+    )
+
+    # Capture order: a folder upload arrives via webkitdirectory with names like
+    # "flight/frame_000.jpg"; sort so the assembled clip plays in numeric capture order.
+    ordered = sorted(files, key=lambda upload: upload.filename or "")
+    first_name = ordered[0].filename or "sequence"
+    folder = first_name.split("/")[0] if "/" in first_name else None
+    display_name = f"{folder} ({len(ordered)} frames)" if folder else f"sequence ({len(ordered)} frames)"
+
+    saved_paths: list = []
+    try:
+        for upload in ordered:
+            if detect_media_type(upload.filename or "", upload.content_type) != "image":
+                raise HTTPException(status_code=400, detail="Image sequences accept image files only.")
+            saved_paths.append(save_upload(upload, settings))
+
+        payload = get_inference_service().analyze_frame_sequence(
+            image_paths=saved_paths,
+            runway_id=params.runway_id,
+            original_filename=display_name,
+            drone_id=params.drone_id,
+            drone_metadata=manual_metadata,
+        )
+        log = AnalysisLogRepository(db).create_from_payload(payload)
+        payload.log_id = log.id
+        logger.info(
+            "analysis.success",
+            extra={
+                "media_type": "video",
+                "runway_id": params.runway_id,
+                "global_state": payload.global_state,
+                "confidence": payload.confidence,
+                "processing_ms": payload.processing_ms,
+                "log_id": log.id,
+                "frame_count": payload.frame_count,
+            },
+        )
+        return payload
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.warning("analysis.value_error", extra={"runway_id": params.runway_id, "detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("analysis.error", extra={"runway_id": params.runway_id})
+        raise HTTPException(
+            status_code=503,
+            detail="Inference service is temporarily unavailable. Check the server logs.",
+        ) from exc
+    finally:
+        for path in saved_paths:
+            path.unlink(missing_ok=True)
+
+
 def _analyze_upload(
     file: UploadFile,
     params: AnalyzeParams,

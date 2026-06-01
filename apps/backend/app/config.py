@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # count was not. Configurable via env so the demo can raise it for
     # benchmarking (audit B-MAJ-5).
     max_batch_frames: int = Field(default=200, ge=1, alias="PAPI_MAX_BATCH_FRAMES")
+    # FPS assigned to a folder->video sequence: the uploaded images are treated as
+    # consecutive video frames, so this sets annotated-playback speed and the
+    # transition frame-gap timing. It does not affect detection.
+    sequence_fps: float = Field(default=4.0, gt=0, alias="PAPI_SEQUENCE_FPS")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

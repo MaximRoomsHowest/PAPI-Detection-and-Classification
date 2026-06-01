@@ -12,7 +12,7 @@ from app.services.inference import InferenceService
 _aggregate = InferenceService._aggregate_video_lamps
 
 
-def test_aggregate_majority_vote_and_unknown_padding():
+def test_aggregate_majority_vote_and_obscured_padding():
     # Three tracks, left-to-right by mean center_x (10 < 20 < 30); track 4 absent.
     obs = {
         101: [(0, "red", 10.0, 0.8), (1, "red", 10.0, 0.6), (2, "white", 10.0, 0.9)],  # majority red
@@ -32,8 +32,8 @@ def test_aggregate_majority_vote_and_unknown_padding():
     # Lamp 3 (track 103): single red observation.
     assert by_index[3].state == "red"
     assert by_index[3].confidence == 0.4
-    # Lamp 4: never tracked -> unknown.
-    assert by_index[4].state == "unknown"
+    # Lamp 4: never tracked -> obscured (detector found nothing at that slot).
+    assert by_index[4].state == "obscured"
     assert by_index[4].confidence == 0.0
 
 
@@ -48,8 +48,8 @@ def test_aggregate_follows_track_identity_not_per_frame_rank():
     by_index = {lamp.index: lamp for lamp in _aggregate(obs)}
     assert by_index[1].state == "red"
     assert by_index[2].state == "white"
-    assert by_index[3].state == "unknown"
-    assert by_index[4].state == "unknown"
+    assert by_index[3].state == "obscured"
+    assert by_index[4].state == "obscured"
 
 
 def test_aggregate_keeps_the_four_most_persistent_tracks():

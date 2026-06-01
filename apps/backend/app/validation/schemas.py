@@ -2,7 +2,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-LampState = Literal["white", "red", "transition", "unknown"]
+# Per-frame lamp verdict. "obscured" = a lamp position the detector did not find
+# (occluded, too dim/distant, or physically missing) — surfaced as a real category
+# so the insights charts can show it instead of silently dropping the lamp. The
+# "transition" label is temporal (a red<->white switch across frames; see TransitionEvent).
+LampState = Literal["white", "red", "transition", "obscured", "unknown"]
 MediaType = Literal["image", "video"]
 # The five glidepath verdicts plus the geometry-derived "transition" and the
 # "unknown" fallback (audit B-MAJ-10). Matches global_state_from_lamps + the papi

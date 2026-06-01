@@ -1,12 +1,38 @@
+"""Drone→PAPI elevation-angle geometry.
+
+Implements the **client's** method (see the BigBrain reference diagrams
+papi-angle-calculation-example*.png): convert both the drone and the PAPI from
+WGS-84 LLA → ECEF → ENU (a local East-North-Up tangent frame at the PAPI), then
+the elevation angle is ``alpha = arctan(Up / horizontal)`` where
+``horizontal = sqrt(East**2 + North**2)``. The primary angle is taken from the
+**PAPI midpoint** (centroid of the lamp row); per-lamp angles are also returned
+(each lamp as its own ENU origin).
+
+This supersedes the earlier haversine + raw-altitude-subtraction approximation.
+At 300-1000 m baselines the two agree to ~0.01 deg, but ENU is the geodetically
+correct transform the client specified and avoids the spherical-earth shortcut.
+``haversine`` is retained for distance display / cross-checks.
+"""
+
 import math
+import re
 from pathlib import Path
 from typing import Any
 
 from app.services.runways import get_runway
 from app.validation.schemas import AnglePerLight, AngleResult
 
+# WGS-84 ellipsoid — the datum the DJI GPS metadata and the surveyed lamp
+# coordinates are both expressed in (ellipsoidal height). Keeping drone and lamp
+# in the SAME datum is what makes the Up component a true height difference.
+_WGS84_A = 6_378_137.0  # semi-major axis (m)
+_WGS84_F = 1.0 / 298.257223563  # flattening
+_WGS84_E2 = _WGS84_F * (2.0 - _WGS84_F)  # first eccentricity squared
+
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle horizontal distance (m). Retained for display + cross-checks;
+    the elevation angle itself now comes from the ENU transform below."""
     radius_m = 6_371_000
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
@@ -18,6 +44,56 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return radius_m * c
 
 
+def _geodetic_to_ecef(lat_deg: float, lon_deg: float, alt_m: float) -> tuple[float, float, float]:
+    """WGS-84 geodetic (lat, lon, ellipsoidal height) → ECEF (X, Y, Z) in metres."""
+    lat = math.radians(lat_deg)
+    lon = math.radians(lon_deg)
+    sin_lat = math.sin(lat)
+    cos_lat = math.cos(lat)
+    n = _WGS84_A / math.sqrt(1.0 - _WGS84_E2 * sin_lat * sin_lat)
+    x = (n + alt_m) * cos_lat * math.cos(lon)
+    y = (n + alt_m) * cos_lat * math.sin(lon)
+    z = (n * (1.0 - _WGS84_E2) + alt_m) * sin_lat
+    return x, y, z
+
+
+def _geodetic_to_enu(
+    lat_deg: float,
+    lon_deg: float,
+    alt_m: float,
+    ref_lat_deg: float,
+    ref_lon_deg: float,
+    ref_alt_m: float,
+) -> tuple[float, float, float]:
+    """A WGS-84 LLA point → local ENU (East, North, Up) metres at the reference
+    origin. This is the LLA→ECEF→ENU chain from the client's reference diagram."""
+    x, y, z = _geodetic_to_ecef(lat_deg, lon_deg, alt_m)
+    x0, y0, z0 = _geodetic_to_ecef(ref_lat_deg, ref_lon_deg, ref_alt_m)
+    dx, dy, dz = x - x0, y - y0, z - z0
+
+    ref_lat = math.radians(ref_lat_deg)
+    ref_lon = math.radians(ref_lon_deg)
+    sin_lat = math.sin(ref_lat)
+    cos_lat = math.cos(ref_lat)
+    sin_lon = math.sin(ref_lon)
+    cos_lon = math.cos(ref_lon)
+
+    east = -sin_lon * dx + cos_lon * dy
+    north = -sin_lat * cos_lon * dx - sin_lat * sin_lon * dy + cos_lat * dz
+    up = cos_lat * cos_lon * dx + cos_lat * sin_lon * dy + sin_lat * dz
+    return east, north, up
+
+
+def _elevation_from_enu(east: float, north: float, up: float) -> tuple[float, float]:
+    """Return (horizontal_distance_m, elevation_angle_deg) from an ENU vector."""
+    horizontal = math.hypot(east, north)
+    if horizontal == 0.0:
+        angle = 90.0 if up > 0 else (-90.0 if up < 0 else 0.0)
+    else:
+        angle = math.degrees(math.atan2(up, horizontal))
+    return horizontal, angle
+
+
 def compute_elevation_angles(
     drone_latitude: float,
     drone_longitude: float,
@@ -25,32 +101,53 @@ def compute_elevation_angles(
     runway_id: str,
     angle_source: str = "metadata",
 ) -> AngleResult:
+    """Elevation angle(s) from the drone to a PAPI installation via WGS-84 ENU.
+
+    ``elevation_angle_deg`` is the client's primary metric — the angle to the PAPI
+    **midpoint** (centroid of the lamp row). ``per_light_angles`` gives one angle
+    per lamp (each lamp as its own ENU origin), preserving the existing per-lamp chart.
+    """
     runway = get_runway(runway_id)
-    per_light = []
-    for light in runway["lights"]:
-        distance_m = haversine(
+    lights = runway["lights"]
+
+    per_light: list[AnglePerLight] = []
+    for light in lights:
+        east, north, up = _geodetic_to_enu(
             drone_latitude,
             drone_longitude,
+            drone_altitude_m,
             light["latitude"],
             light["longitude"],
+            light["altitude_m"],
         )
-        height_delta_m = drone_altitude_m - light["altitude_m"]
-        angle_deg = math.degrees(math.atan2(height_delta_m, distance_m)) if distance_m else 0.0
+        horizontal, angle_deg = _elevation_from_enu(east, north, up)
         per_light.append(
             AnglePerLight(
                 runway_lamp=light["point"],
-                distance_m=round(distance_m, 3),
+                distance_m=round(horizontal, 3),
                 elevation_angle_deg=round(angle_deg, 6),
             )
         )
 
-    avg_angle = sum(item.elevation_angle_deg for item in per_light) / len(per_light)
+    # PAPI midpoint (centroid of the four lamps) — the apex of the angle in the
+    # client's diagram. Lamp altitudes are equal, so the mean is the row centre.
+    mid_lat = sum(light["latitude"] for light in lights) / len(lights)
+    mid_lon = sum(light["longitude"] for light in lights) / len(lights)
+    mid_alt = sum(light["altitude_m"] for light in lights) / len(lights)
+    east, north, up = _geodetic_to_enu(
+        drone_latitude, drone_longitude, drone_altitude_m, mid_lat, mid_lon, mid_alt
+    )
+    _, midpoint_angle = _elevation_from_enu(east, north, up)
+
     return AngleResult(
         angle_available=True,
-        elevation_angle_deg=round(avg_angle, 6),
+        elevation_angle_deg=round(midpoint_angle, 6),
         per_light_angles=per_light,
         angle_source=angle_source,
-        angle_note="Calculated from drone GPS/altitude metadata and seeded PAPI coordinates.",
+        angle_note=(
+            "Elevation from the PAPI midpoint via a WGS-84 LLA->ECEF->ENU transform "
+            "(client method); per-lamp angles are relative to each lamp."
+        ),
     )
 
 
@@ -92,7 +189,53 @@ def _gps_to_degrees(value: Any) -> float | None:
         return None
 
 
+def _extract_dji_xmp_pose(raw_head: bytes) -> dict[str, float]:
+    """RTK-corrected DJI pose from a JPEG's XMP packet (drone-dji:* tags).
+
+    DJI writes the RTK/fused pose into XMP, e.g. ``drone-dji:AbsoluteAltitude="+475.20"``
+    (WGS-84 ELLIPSOIDAL height, ~1.5 cm with an RTK fix) plus ``drone-dji:RtkFlag``. The
+    EXIF ``GPS GPSAltitude`` is GPS/baro-blended and on non-RTK frames carries 1-15 m of
+    vertical error (DJI Enterprise docs) — enough to drag the PAPI elevation angle well
+    below the true 2.5-4 deg band. Both attribute (``name="..."``) and element
+    (``<name>...</name>``) XMP forms are matched.
+    """
+    text = raw_head.decode("latin-1", errors="ignore")
+    fields = {
+        "lat": "GpsLatitude",
+        "lon": "GpsLongitude",
+        "abs_alt": "AbsoluteAltitude",
+        "rel_alt": "RelativeAltitude",
+        "rtk_flag": "RtkFlag",
+    }
+    pose: dict[str, float] = {}
+    for key, name in fields.items():
+        match = re.search(rf'drone-dji:{name}(?:="?|>)\s*([+-]?\d+(?:\.\d+)?)', text)
+        if match:
+            try:
+                pose[key] = float(match.group(1))
+            except ValueError:
+                pass
+    return pose
+
+
 def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
+    # Prefer the RTK-corrected DJI XMP pose (ellipsoidal AbsoluteAltitude) over EXIF.
+    # exifread reads EXIF only; the RTK altitude lives in the XMP APP1 segment near the
+    # file start, so a bounded head read is enough and keeps videos cheap. Using EXIF
+    # GPSAltitude (1-15 m non-RTK vertical error) is what pushed the computed PAPI angle
+    # below 2.5 deg; the RTK ellipsoidal altitude is the fix.
+    try:
+        with media_path.open("rb") as file:
+            head = file.read(262_144)  # 256 KB covers the XMP packet
+    except Exception:
+        head = b""
+    xmp = _extract_dji_xmp_pose(head) if head else {}
+    if all(field in xmp for field in ("lat", "lon", "abs_alt")):
+        lat, lon, alt = xmp["lat"], xmp["lon"], xmp["abs_alt"]
+        if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0 and -500.0 <= alt <= 15_000.0:
+            return lat, lon, alt
+
+    # Fallback: EXIF GPSAltitude (no RTK XMP present) — less accurate vertically.
     try:
         import exifread
     except ImportError:
@@ -132,5 +275,14 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
         alt_ref_value = alt_ref_value[0]
     if alt_ref_value == 1:
         altitude = -altitude
+
+    # Range-validate before the values reach the angle math — a corrupted/crafted
+    # EXIF (e.g. lat=999) must NOT flow into ENU and fabricate an angle shown as
+    # real. Mirrors the manual-metadata validation in validation/analyze.py (audit:
+    # extract_gps_metadata had no bounds check while the manual path did).
+    if not (-90.0 <= latitude <= 90.0) or not (-180.0 <= longitude <= 180.0):
+        return None
+    if not (-500.0 <= altitude <= 15_000.0):
+        return None
 
     return latitude, longitude, altitude

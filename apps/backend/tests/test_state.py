@@ -42,6 +42,19 @@ def test_confidence_ignores_unknown_lamps():
     assert confidence_from_lamps(lamps) == 0.7
 
 
+def test_normalize_pads_missing_lamps_as_obscured():
+    """Fewer than 4 detections -> the empty slots are 'obscured' (a real, charted
+    category for 'detector found nothing here'), not the generic 'unknown'."""
+    lamps = normalize_detections(
+        [{"class_id": 1, "confidence": 0.9, "bbox": {"x1": 1, "y1": 1, "x2": 2, "y2": 2}}]
+    )
+    assert [lamp.state for lamp in lamps] == ["white", "obscured", "obscured", "obscured"]
+    # Global verdict is still 'unknown' when <4 lamps are red/white (no logic change).
+    assert global_state_from_lamps(lamps) == "unknown"
+    # Obscured slots carry no detection, so confidence reflects only the white lamp.
+    assert confidence_from_lamps(lamps) == 0.9
+
+
 def test_single_frame_states_are_colour_only():
     """A single frame is never 'transition' -- only red / white / unknown.
     A transition is a temporal red<->white event detected across frames."""

@@ -93,7 +93,8 @@ pyproject.toml       Editable install for the papi package
 1. Browser ──multipart upload──► FastAPI route handler
 2. Validate metadata, save upload bytes to /storage/uploads/
 3. cv2.imread(upload)
-4. Compute per-lamp elevation angles from drone GPS + runway config
+4. Compute per-lamp + PAPI-midpoint elevation angles from drone GPS + runway config
+   via a WGS-84 LLA->ECEF->ENU transform (client method; app/services/angle.py)
 5. inference_service.model.predict(frame, conf=0.4)
    → list[Detection] with class_id (0=red, 1=white) + bbox + confidence
 6. normalize_detections(detections, per_light_angles=angle.per_light_angles)

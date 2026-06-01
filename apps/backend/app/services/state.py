@@ -61,8 +61,11 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
             )
         )
 
+    # Pad missing lamp slots so every verdict has exactly 4 entries. An undetected
+    # slot is "obscured" (not the generic "unknown") so the insights charts can
+    # surface it as a distinct, real category rather than silently dropping the lamp.
     while len(lamps) < 4:
-        lamps.append(LampResult(index=len(lamps) + 1, state="unknown", confidence=0.0))
+        lamps.append(LampResult(index=len(lamps) + 1, state="obscured", confidence=0.0))
 
     return lamps
 
@@ -163,7 +166,9 @@ def global_state_from_lamps(lamps: list[LampResult]) -> str:
 
 
 def confidence_from_lamps(lamps: list[LampResult]) -> float:
-    known = [lamp.confidence for lamp in lamps if lamp.state != "unknown"]
+    # Only actually-detected lamps (red/white) contribute; "obscured"/"unknown"
+    # slots carry no real detection, so they must not dilute the average.
+    known = [lamp.confidence for lamp in lamps if lamp.state in {"white", "red"}]
     if not known:
         return 0.0
     return round(sum(known) / len(known), 4)

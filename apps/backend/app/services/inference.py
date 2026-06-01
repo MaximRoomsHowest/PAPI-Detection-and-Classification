@@ -239,17 +239,138 @@ class InferenceService:
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 15
         max_frames = self._video_frame_limit(fps)
+        too_long = (
+            f"Uploaded video is too long. Limit is {max_frames} frames "
+            f"or {self.settings.max_video_seconds} seconds."
+        )
         source_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         if source_frame_count > max_frames:
             cap.release()
-            raise ValueError(
-                f"Uploaded video is too long. Limit is {max_frames} frames "
-                f"or {self.settings.max_video_seconds} seconds."
+            raise ValueError(too_long)
+
+        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
+        # Release the capture deterministically even if the core raises mid-stream
+        # (e.g. the in-loop too-long guard) — a generator's finally would only run on GC.
+        try:
+            return self._run_tracked_sequence(
+                self._iter_video_frames(cap),
+                fps=fps,
+                width=frame_width,
+                height=frame_height,
+                runway_id=runway_id,
+                original_filename=original_filename,
+                drone_id=drone_id,
+                angle=angle,
+                start=start,
+                max_frames=max_frames,
+                too_long_message=too_long,
+                empty_message="Uploaded video did not contain readable frames.",
             )
-        base_path = self.settings.exports_dir / f"{uuid4()}_annotated"
-        writer, artifact_path = self._open_video_writer(cv2, base_path, fps, frame_width, frame_height)
-        if writer is None:
+        finally:
             cap.release()
+
+    @staticmethod
+    def _iter_video_frames(cap: Any):
+        """Yield decoded BGR frames from an open ``cv2.VideoCapture``.
+
+        Releasing the capture is the CALLER's job (``analyze_video`` does it in a
+        ``finally``) so an early raise in the tracked-sequence core can't leak the handle.
+        """
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            yield frame
+
+    def analyze_frame_sequence(
+        self,
+        image_paths: list[Path],
+        runway_id: str,
+        original_filename: str,
+        drone_id: str | None,
+        drone_metadata: tuple[float, float, float] | None,
+    ) -> AnalysisPayload:
+        """Treat an ordered list of images as consecutive video frames (folder->video).
+
+        A folder upload is analysed exactly like a video — ByteTrack continuity +
+        temporal red<->white transitions + a single annotated WebM artifact — by
+        feeding the images through the SAME tracked-sequence core as ``analyze_video``.
+        Frames are sized to the first image; a synthetic FPS (``PAPI_SEQUENCE_FPS``)
+        drives playback/timing. The viewing angle is read once from the first image's
+        EXIF (or the request's drone telemetry), mirroring the one-angle-per-video model.
+        """
+        cv2 = self._require_cv2()
+        # Serialise like analyze() does for image/video: the shared YOLO/ByteTrack
+        # state is not thread-safe (audit H1). The lock is re-entrant, so self.model
+        # / _detect_frame can re-acquire it while we hold it.
+        with self._lock:
+            start = perf_counter()
+            if not image_paths:
+                raise ValueError("No images were supplied for sequence analysis.")
+            first = cv2.imread(str(image_paths[0]))
+            if first is None:
+                raise ValueError("Could not read the first image in the sequence.")
+            height, width = first.shape[:2]
+            fps = float(self.settings.sequence_fps)
+            max_frames = max(1, self.settings.max_batch_frames)
+            too_long = f"Image sequence is too long. Limit is {max_frames} frames."
+            angle = self._angle_for_media(image_paths[0], runway_id, drone_metadata)
+
+            def frames():
+                for path in image_paths:
+                    frame = cv2.imread(str(path))
+                    if frame is None:
+                        # Skip an unreadable frame rather than abort the whole run;
+                        # _run_tracked_sequence raises if NONE were readable.
+                        continue
+                    if frame.shape[:2] != (height, width):
+                        # The VideoWriter needs a fixed size; normalise odd frames
+                        # to the first image's dimensions.
+                        frame = cv2.resize(frame, (width, height))
+                    yield frame
+
+            return self._run_tracked_sequence(
+                frames(),
+                fps=fps,
+                width=width,
+                height=height,
+                runway_id=runway_id,
+                original_filename=original_filename,
+                drone_id=drone_id,
+                angle=angle,
+                start=start,
+                max_frames=max_frames,
+                too_long_message=too_long,
+                empty_message="None of the uploaded images could be read.",
+            )
+
+    def _run_tracked_sequence(
+        self,
+        frames,
+        *,
+        fps: float,
+        width: int,
+        height: int,
+        runway_id: str,
+        original_filename: str,
+        drone_id: str | None,
+        angle: AngleResult,
+        start: float,
+        max_frames: int,
+        too_long_message: str,
+        empty_message: str,
+    ) -> AnalysisPayload:
+        """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
+        ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
+
+        Runs ByteTrack detection per frame, writes the annotated artifact, and aggregates
+        the final per-lamp verdict + temporal transitions by STABLE track identity.
+        ``frames`` yields BGR frames already sized to ``width`` x ``height``.
+        """
+        cv2 = self._require_cv2()
+        base_path = self.settings.exports_dir / f"{uuid4()}_annotated"
+        writer, artifact_path = self._open_video_writer(cv2, base_path, fps, width, height)
+        if writer is None:
             raise RuntimeError("Could not write annotated video artifact.")
 
         history = deque(maxlen=self.settings.video_history_size)
@@ -258,23 +379,16 @@ class InferenceService:
         # so both reference the same stable track identity (not per-frame rank).
         track_observations: dict[int, list[tuple]] = {}
         frame_count = 0
-        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
         last_detections: list[dict] = []
 
         try:
-            while True:
+            for frame in frames:
                 if frame_count >= max_frames:
-                    raise ValueError(
-                        f"Uploaded video is too long. Limit is {max_frames} frames "
-                        f"or {self.settings.max_video_seconds} seconds."
-                    )
-                ok, frame = cap.read()
-                if not ok:
-                    break
+                    raise ValueError(too_long_message)
 
-                # ByteTrack reset on first frame so state from a previous
-                # video request doesn't bleed in (audit B-MAJ-1). Subsequent
-                # frames continue with persist=True for actual tracking.
+                # ByteTrack reset on the first frame so state from a previous
+                # request doesn't bleed in (audit B-MAJ-1). Subsequent frames
+                # continue with persist=True for actual tracking.
                 detections = self._detect_frame(
                     frame,
                     use_tracking=True,
@@ -311,12 +425,11 @@ class InferenceService:
                 last_detections = detections
                 frame_count += 1
         finally:
-            cap.release()
             writer.release()
 
         if frame_count == 0:
             artifact_path.unlink(missing_ok=True)
-            raise ValueError("Uploaded video did not contain readable frames.")
+            raise ValueError(empty_message)
 
         final_lamps = self._aggregate_video_lamps(track_observations)
         global_state = global_state_from_lamps(final_lamps)
@@ -363,7 +476,7 @@ class InferenceService:
         for index in range(1, 5):
             obs = obs_by_index.get(index, [])
             if not obs:
-                final_lamps.append(LampResult(index=index, state="unknown", confidence=0.0))
+                final_lamps.append(LampResult(index=index, state="obscured", confidence=0.0))
                 continue
             state = Counter(o[1] for o in obs).most_common(1)[0][0]
             matching = [o for o in obs if o[1] == state]
@@ -454,6 +567,7 @@ class InferenceService:
         "white": (245, 245, 245),
         "red": (0, 0, 255),
         "transition": (0, 165, 255),
+        "obscured": (90, 90, 90),
         "unknown": (128, 128, 128),
     }
 
