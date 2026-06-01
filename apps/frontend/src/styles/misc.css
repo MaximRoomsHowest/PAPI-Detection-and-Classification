@@ -8,6 +8,21 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Loading placeholder for LazyPlot while the Plotly bundle lazy-loads. Reserves
+   the chart's vertical space so the card doesn't collapse to 0px then jump when
+   the chart mounts (audit ANIM-01 / CSS-14). The .plot-error rule below layers
+   on top for the failure variant (className="plot-loading plot-error"). */
+.plot-loading {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* Visible error state for LazyPlot when the chart bundle fails to load
    (audit SMOKE-CRIT-3). Replaces the previously-silent failure mode where
    the chart area sat blank with `Uncaught (in promise)` in the console. */
@@ -74,4 +89,12 @@
 
 .not-found .cta-button {
   margin-top: 10px;
+}
+
+/* Subtle dim while History refetches after a filter/page change so stale rows
+   visibly signal a load is in flight; aria-busy on the wrapper carries the same
+   to screen readers (audit FB-01). */
+.history-table-wrap.is-refetching {
+  opacity: 0.6;
+  transition: opacity 120ms ease;
 }

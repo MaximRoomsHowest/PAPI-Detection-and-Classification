@@ -121,8 +121,8 @@
   min-height: 48px;
   padding: 0 24px;
   border-radius: 3px;
-  border: 1px solid var(--accent);
-  background: var(--accent);
+  border: 1px solid var(--accent-fill);
+  background: var(--accent-fill);
   color: #ffffff;
   font-weight: 600;
   text-decoration: none;
@@ -134,8 +134,8 @@
 }
 
 .cta-button:hover {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  background: var(--accent-fill-strong);
+  border-color: var(--accent-fill-strong);
 }
 
 .cta-button:focus-visible {

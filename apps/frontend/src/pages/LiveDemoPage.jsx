@@ -43,6 +43,7 @@ export function LiveDemoPage({
               name="file"
               accept="image/*,video/*"
               type="file"
+              aria-label={copy.live.upload}
               onChange={handleMediaChange}
             />
           </label>

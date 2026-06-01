@@ -411,6 +411,19 @@ html[data-theme='dark'] .brand-logo .logo-light {
   transform: translateY(-1px);
 }
 
+/* Press feedback (audit BTN-07 / ANIM-04): cancel the hover lift and dim
+   slightly on press so a tap/click is acknowledged (matters most on touch,
+   where :hover never fires). filter is instant; the global
+   prefers-reduced-motion reset already neutralises the transform. */
+.icon-button:active,
+.primary-button:active,
+.upload-button:active,
+.secondary-button:active,
+.cta-button:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+
 .icon-button:focus-visible,
 .primary-button:focus-visible,
 .upload-button:focus-within {

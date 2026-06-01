@@ -58,6 +58,14 @@ export function useAnalysis(copy) {
     // image, and only fail once the backend returned 400 (regression
     // USERTEST-MAJ-1, papi-user-test-2026-05-28).
     if (!isFolderBatch && !isImageFile(file) && !isVideoFile(file)) {
+      // Clear any prior result so a stale result panel doesn't sit under the
+      // "unsupported file" error as if it belonged to the rejected file (audit FB-03).
+      runIdRef.current += 1
+      setBackendScenario(null)
+      setBackendFrames([])
+      setBackendResults([])
+      setBackendFrameIndex(0)
+      setAnalysisProgress('')
       setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
     }

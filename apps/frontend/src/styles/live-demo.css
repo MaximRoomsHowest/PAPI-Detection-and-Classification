@@ -111,6 +111,11 @@
   border-color: var(--accent);
 }
 
+.frame-nav-controls button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .frame-nav-controls strong {
   min-width: 48px;
   text-align: center;
@@ -140,10 +145,13 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .frame-view-toggle button.active {
-  background: var(--accent);
+  background: var(--accent-fill);
   color: #ffffff;
 }
 

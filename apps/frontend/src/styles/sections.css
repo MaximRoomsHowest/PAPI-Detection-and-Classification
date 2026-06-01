@@ -184,7 +184,9 @@
 
 .secondary-button:disabled {
   opacity: 0.7;
-  cursor: progress;
+  /* not-allowed: most disabled secondary buttons are unavailable (pagination at
+     a boundary, export with 0 rows), not busy (audit BTN-01). */
+  cursor: not-allowed;
 }
 
 .demo-actions {
@@ -243,7 +245,7 @@
 
 .primary-button {
   color: #ffffff;
-  background: var(--accent);
+  background: var(--accent-fill);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;

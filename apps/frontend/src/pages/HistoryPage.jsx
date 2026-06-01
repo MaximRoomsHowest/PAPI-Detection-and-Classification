@@ -46,6 +46,11 @@ export function HistoryPage({ copy }) {
   const [showRaw, setShowRaw] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  // True only while a filter/page refetch is in flight (initial load uses
+  // isLoading, manual refresh uses isRefreshing). Drives aria-busy + the dim
+  // cue + pagination gating so a background refetch isn't invisible and Next/Prev
+  // can't be double-fired against a stale total (audit FB-01/FB-02).
+  const [isFetching, setIsFetching] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState('')
   const [runwayFilter, setRunwayFilter] = useState('')
@@ -115,6 +120,7 @@ export function HistoryPage({ copy }) {
         if (ignore) return
         setIsLoading(false)
         setIsRefreshing(false)
+        setIsFetching(false)
       })
     return () => {
       ignore = true
@@ -130,7 +136,12 @@ export function HistoryPage({ copy }) {
     setRefreshKey((key) => key + 1)
   }
 
+  // Mark a refetch in flight from the handlers that trigger it (filter change,
+  // pagination) rather than inside the effect — keeps the loading cue + pagination
+  // gating without a synchronous setState in the effect body. The effect's
+  // finally() always clears it (audit FB-01/FB-02).
   const handleFilterChange = (setter) => (event) => {
+    setIsFetching(true)
     setPage(0)
     setter(event.target.value)
   }
@@ -140,6 +151,7 @@ export function HistoryPage({ copy }) {
   // Clear filters (audit F18) — reset both selects and return to page 1. A
   // refetch follows automatically because the filter state changed.
   const handleClearFilters = () => {
+    setIsFetching(true)
     setPage(0)
     setRunwayFilter('')
     setStateFilter('')
@@ -160,7 +172,7 @@ export function HistoryPage({ copy }) {
     }
   }
 
-  const isBusy = isLoading || isRefreshing
+  const isBusy = isLoading || isRefreshing || isFetching
   const pageStart = total === 0 ? 0 : page * HISTORY_PAGE_SIZE + 1
   const pageEnd = Math.min(total, (page + 1) * HISTORY_PAGE_SIZE)
 
@@ -296,7 +308,10 @@ export function HistoryPage({ copy }) {
         </button>
       </div>
 
-      <div className="history-table-wrap" aria-busy={isBusy}>
+      <div
+        className={clsx('history-table-wrap', isBusy && !isLoading && 'is-refetching')}
+        aria-busy={isBusy}
+      >
         {isLoading ? (
           <div className="history-empty" role="status" aria-live="polite">
             {copy.history.loading}
@@ -373,8 +388,11 @@ export function HistoryPage({ copy }) {
           <button
             className="secondary-button"
             type="button"
-            disabled={page === 0 || isRefreshing}
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            disabled={page === 0 || isBusy}
+            onClick={() => {
+              setIsFetching(true)
+              setPage((current) => Math.max(0, current - 1))
+            }}
           >
             {copy.history.prev}
           </button>
@@ -382,8 +400,11 @@ export function HistoryPage({ copy }) {
           <button
             className="secondary-button"
             type="button"
-            disabled={pageEnd >= total || isRefreshing}
-            onClick={() => setPage((current) => current + 1)}
+            disabled={pageEnd >= total || isBusy}
+            onClick={() => {
+              setIsFetching(true)
+              setPage((current) => current + 1)
+            }}
           >
             {copy.history.next}
           </button>
@@ -424,7 +445,7 @@ export function HistoryPage({ copy }) {
             <div className="history-detail-grid">
               <div>
                 <span>{copy.history.state}</span>
-                <strong>{selectedLog.global_state.replaceAll('_', ' ')}</strong>
+                <strong>{selectedLog.global_state?.replaceAll('_', ' ') ?? '—'}</strong>
               </div>
               <div>
                 <span>{copy.history.confidence}</span>
@@ -432,7 +453,14 @@ export function HistoryPage({ copy }) {
               </div>
               <div>
                 <span>{copy.history.angle}</span>
-                <strong className="tnum">{formatAngle(selectedLog.angle?.elevation_angle_deg, copy.history.unavailable)}</strong>
+                {/* Mirror the table's honesty guard: only show a reading when the
+                    metadata actually yielded one, else the unavailable fallback —
+                    a stale finite 0 would otherwise read as a real angle (audit FB-04). */}
+                <strong className="tnum">
+                  {selectedLog.angle?.angle_available && selectedLog.angle?.elevation_angle_deg != null
+                    ? formatAngle(selectedLog.angle.elevation_angle_deg)
+                    : copy.history.unavailable}
+                </strong>
               </div>
               <div>
                 <span>{copy.history.processing}</span>
@@ -456,7 +484,7 @@ export function HistoryPage({ copy }) {
               <div>
                 <h4>{copy.history.lamps}</h4>
                 <div className="history-lamps">
-                  {selectedLog.lamps.map((lamp) => (
+                  {(selectedLog.lamps ?? []).map((lamp) => (
                     <span className={clsx('history-lamp', `history-lamp-${lamp.state}`)} key={lamp.index}>
                       <span className="tnum">L{lamp.index}</span> · {lamp.state} · <span className="tnum">{percent(lamp.confidence)}%</span>
                     </span>
@@ -500,7 +528,7 @@ export function HistoryPage({ copy }) {
                   aria-expanded={showRaw}
                   aria-controls="history-raw-detections"
                 >
-                  {copy.history.showRaw}
+                  {showRaw ? copy.history.showRawHide : copy.history.showRaw}
                 </button>
                 {showRaw && (
                   <pre

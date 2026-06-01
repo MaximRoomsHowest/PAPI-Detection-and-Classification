@@ -56,7 +56,7 @@ export function FrameStage({
           </div>
         )}
         {canToggleView && (
-          <div className="frame-view-toggle">
+          <div className="frame-view-toggle" role="group" aria-label={copy.live.viewToggle}>
             <button
               type="button"
               className={clsx(viewerMode === 'annotated' && 'active')}
@@ -76,7 +76,7 @@ export function FrameStage({
           </div>
         )}
         {canNavigateFrames && (
-          <div className="frame-nav-controls" aria-label={copy.live.frameNav}>
+          <div className="frame-nav-controls" role="group" aria-label={copy.live.frameNav}>
             <button
               type="button"
               onClick={() => onBackendFrameChange?.(backendFrameIndex - 1)}

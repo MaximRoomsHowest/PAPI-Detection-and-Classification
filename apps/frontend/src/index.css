@@ -28,11 +28,15 @@
   --text: #131a22;
   --text-strong: #14263a;
   --text-muted: #5c6573;
-  --faint: #9aa3b1;
+  --faint: #6b7280;
   --border: rgba(0, 36, 60, 0.14);
   --border-strong: rgba(0, 36, 60, 0.28);
   --accent: #00426e;
   --accent-strong: #002c4a;
+  /* Filled-button background (white text rides on it). Light theme = the navy
+     accent (passes AA); dark theme overrides to a deepened blue (audit CSS-01/02). */
+  --accent-fill: #00426e;
+  --accent-fill-strong: #002c4a;
   --accent-cyan: #00a8e6;
   --accent-soft: color-mix(in oklab, #00426e 12%, transparent);
   --footer-bg: #245b93;
@@ -68,11 +72,15 @@ html[data-theme='dark'] {
   --text: #e7eef5;
   --text-strong: #ffffff;
   --text-muted: #94a0b1;
-  --faint: #5e6878;
+  --faint: #7b8696;
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: rgba(255, 255, 255, 0.22);
   --accent: #6fb4e6;
   --accent-strong: #9fcef2;
+  /* Deepened blue so white button text passes WCAG AA (~5.4:1) while staying
+     on-brand; --accent stays light for links/borders (audit CSS-01/02). */
+  --accent-fill: #1f6fb0;
+  --accent-fill-strong: #185f98;
   --accent-cyan: #00a8e6;
   --accent-soft: rgba(0, 168, 230, 0.16);
   --footer-bg: #123f6b;
