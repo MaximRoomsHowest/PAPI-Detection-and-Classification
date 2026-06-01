@@ -43,7 +43,7 @@ def test_cors_origins_csv_from_env_does_not_crash_settings(monkeypatch):
 
     Direct ``Settings(...)`` construction goes through the field validator,
     but production reads from ``EnvSettingsSource`` which used to JSON-decode
-    list fields before validators ran -> the comma-separated docker-compose
+    list fields before validators ran -> the comma-separated Compose
     env value crashed the backend container at startup. ``NoDecode`` on
     ``cors_origins`` fixes this; this test pins it.
     """
@@ -92,7 +92,7 @@ def test_database_url_honors_papi_prefixed_env_var(monkeypatch):
 
 
 def test_database_url_honors_unprefixed_env_var(monkeypatch):
-    """DATABASE_URL (used by docker-compose and .env.example) must keep working."""
+    """DATABASE_URL (used by Compose and .env.example) must keep working."""
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/papi_y")
     settings = Settings()
     assert settings.database_url == "postgresql+psycopg://u:p@db:5432/papi_y"

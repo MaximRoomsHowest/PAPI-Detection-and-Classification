@@ -1,12 +1,17 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- build stage ----------------------------------------------------------
-FROM node:20-alpine AS build
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS build
 
 WORKDIR /app
 
 # Vite inlines VITE_* env vars at build time, so the API URL is a build arg.
-ARG VITE_PAPI_API_URL=http://localhost:8000
+# Default empty => the bundle uses relative URLs (/api, /media) served
+# same-origin by this image's nginx reverse proxy (audit DCK-D4). Set an
+# absolute backend URL only for a direct (non-proxied) deployment — which then
+# also needs the backend host added back to nginx.conf's CSP and the backend's
+# CORS allowlist.
+ARG VITE_PAPI_API_URL=
 ENV VITE_PAPI_API_URL=$VITE_PAPI_API_URL
 
 # Lockfile-aware install for reproducible builds.
@@ -22,7 +27,7 @@ COPY . .
 RUN npm run build
 
 # ---- serve stage ----------------------------------------------------------
-FROM nginxinc/nginx-unprivileged:alpine AS serve
+FROM nginxinc/nginx-unprivileged:alpine@sha256:02c985e54bee40c14c6de677226f394d96c661944185d407e77ca73602f15e1b AS serve
 
 # nginx-unprivileged listens on 8080 by default and runs as the ``nginx`` user
 # (uid 101) without needing root for binding. This is the upstream-blessed

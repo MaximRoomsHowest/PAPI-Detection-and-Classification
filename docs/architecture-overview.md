@@ -67,7 +67,7 @@ docs/                Label spec, pipeline doc, user manual,
 models/              Tracked YOLO weights (base, serving, runs/)
 test_videos/         3 small MP4 fixtures for upload smoke tests
 .github/workflows/   CI workflow (Python + Frontend + Docker)
-docker-compose.yml   Root: postgres + backend + frontend
+compose.yaml         Root: postgres + backend + frontend
 pyproject.toml       Editable install for the papi package
 ```
 
@@ -217,9 +217,10 @@ API client lives in `src/lib/api.js` — three functions
 
 ## 7. Deployment & operations
 
-- **Containerised** via `docker-compose.yml`. Three services, one
+- **Containerised** via `compose.yaml`. Three services, one
   named network, two named volumes, three healthchecks, three
-  restart policies (`unless-stopped`).
+  restart policies (`unless-stopped`). The frontend nginx reverse-proxies
+  `/api` + `/media` to the backend, so the browser uses a single origin.
 - **Logs**: JSON file with 10 MB × 5 file rotation per service.
 - **Security floor**:
   - Both runtime containers run as non-root users (`papi`, `nginx`).

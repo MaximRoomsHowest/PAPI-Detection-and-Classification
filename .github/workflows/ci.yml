@@ -36,8 +36,10 @@ jobs:
           python -m pip install --upgrade pip
           # Editable install pulls in numpy/pandas/Pillow/etc. via pyproject.toml.
           pip install -e .[dev]
-          # Backend-specific (FastAPI, SQLAlchemy, ultralytics, opencv).
-          pip install -r apps/backend/requirements.txt
+          # Backend runtime + test deps (FastAPI, SQLAlchemy, ultralytics,
+          # opencv-headless, pytest, httpx). requirements-dev.txt pulls in
+          # requirements.txt via -r so tests get httpx after the split (DCK-D5).
+          pip install -r apps/backend/requirements-dev.txt
 
       - name: Ruff (source only — notebooks intentionally excluded)
         run: ruff check apps/backend packages/papi workflows/scripts

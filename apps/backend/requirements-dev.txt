@@ -1,0 +1,9 @@
+# Development / test dependencies, layered on top of the runtime set.
+#
+# CI and local test runs install this file; the production Docker image installs
+# only requirements.txt, so pytest/httpx never ship in the container (audit DCK-D5).
+-r requirements.txt
+
+pytest==8.3.4
+# httpx backs FastAPI's TestClient (Starlette). Test-only — no runtime import.
+httpx==0.28.1

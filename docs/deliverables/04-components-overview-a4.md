@@ -43,7 +43,7 @@ mainfont: "Calibri"
 | Offline ML pipeline | Calibration + auto-labels + training | Python 3.10, Ultralytics YOLO | `workflows/scripts/` |
 | `papi` package | Pure-Python ML/geom library (no I/O) | Python | `packages/papi/src/papi/` |
 | Backend API | Inference + persistence + endpoints | FastAPI 0.115 + SQLAlchemy 2.0 | `apps/backend/` |
-| Database | Analysis logs (one row / request) | Postgres 16 | `docker-compose.yml` |
+| Database | Analysis logs (one row / request) | Postgres 16 | `compose.yaml` |
 | Frontend SPA | Demo + Insights + History UI | React 19 + Vite 8 + Plotly | `apps/frontend/` |
 | Reverse proxy | TLS termination + SPA fallback | Nginx (unprivileged) | `apps/frontend/Dockerfile` |
 | CI | Lint + tests + Docker build | GitHub Actions | `.github/workflows/ci.yml` |
@@ -66,4 +66,4 @@ mainfont: "Calibri"
 - **React 19 + Vite 8** — team familiarity, fast HMR, mature ecosystem for charts (Plotly) and PDF export (jsPDF).
 - **Docker compose** — single-command `docker compose up -d --build` from a clean machine; reproducible for any jury member.
 
-*Full design rationale, scope limits and open questions in [architecture-overview.md](../architecture-overview.md). Source of truth for components, ports, healthchecks and security floor: [docker-compose.yml](../../docker-compose.yml).*
+*Full design rationale, scope limits and open questions in [architecture-overview.md](../architecture-overview.md). Source of truth for components, ports, healthchecks and security floor: [compose.yaml](../../compose.yaml).*

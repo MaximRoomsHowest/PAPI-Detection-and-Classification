@@ -99,8 +99,9 @@ apps/backend/storage/
 # runs; no commit value.
 audit-screenshots/
 
-# Local docker compose overrides. Convention is that anyone needing a
-# machine-specific tweak drops it here without modifying the canonical
-# docker-compose.yml. The Tier-A CORS workaround that briefly lived here
-# is no longer needed (SMOKE-CRIT-2 is fixed), but the convention stays.
+# Local Compose overrides. Convention is that anyone needing a machine-specific
+# tweak drops it here without modifying the canonical compose.yaml. The Tier-A
+# CORS workaround that briefly lived here is no longer needed (SMOKE-CRIT-2 is
+# fixed), but the convention stays.
+compose.override.yaml
 docker-compose.override.yml

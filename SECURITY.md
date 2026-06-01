@@ -18,8 +18,9 @@ GitHub. Please do not file public issues for security problems.
   from a path-traversal-guarded route behind the same API key.
 - Drone metadata (latitude / longitude / altitude) is range-validated before it
   reaches the geometry math.
-- Postgres is bound to loopback in the bundled `docker-compose.yml`, and the
-  containers run as a non-root user with log rotation enabled.
+- Postgres is bound to loopback in the bundled `compose.yaml`, the backend API
+  port binds to loopback by default, and the containers run as non-root users
+  (with all Linux capabilities dropped) with log rotation enabled.
 - See `docs/architecture-overview.md` for the full request flow.
 
 ## Dependency scanning

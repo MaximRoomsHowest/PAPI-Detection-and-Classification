@@ -1,8 +1,13 @@
-# Full-stack PAPI Detection & Classification compose.
+# Full-stack PAPI Detection & Classification — Compose file.
+#
+# compose.yaml is the modern Compose Specification filename; the obsolete
+# top-level `version:` key is intentionally omitted.
 #
 # Brings up postgres, the FastAPI backend, and the nginx-served frontend
 # bundle. The backend model is bind-mounted from ./models so the image stays
-# code-only and you can swap weights without rebuilding.
+# code-only and you can swap weights without rebuilding. The frontend nginx
+# reverse-proxies /api + /media to the backend, so the browser talks to a
+# single origin (no CORS, tighter CSP — audit DCK-D4).
 #
 # Quick start (local):
 #   cp .env.example .env       # adjust values, especially POSTGRES_PASSWORD
@@ -13,11 +18,12 @@
 #   POSTGRES_PASSWORD          (strong random secret)
 #   PAPI_API_KEY               (required when PAPI_ENV=production)
 #   PAPI_ENV=production        (flips the security floor — see backend main.py)
-#   FRONTEND_PAPI_API_URL      (public hostname the browser reaches the API at)
+#   PAPI_BACKEND_BIND=0.0.0.0  (only if the API must be reached directly, off-host)
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Pinned by digest for reproducible builds (audit DCK-D8); tag = 16-alpine (16.14).
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
     container_name: papi-postgres
     environment:
       POSTGRES_DB: papi_backend
@@ -38,6 +44,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     logging:
       driver: json-file
       options:
@@ -56,7 +66,9 @@ services:
       PAPI_MODEL_PATH: /models/serving/best.pt
       PAPI_STORAGE_DIR: /storage
       # JSON-list form: avoids the pydantic-settings CSV-parse issue that
-      # crashed the container in earlier builds (audit SMOKE-CRIT-2).
+      # crashed the container in earlier builds (audit SMOKE-CRIT-2). Only used
+      # by a direct (non-proxied) frontend such as the Vite dev server — the
+      # bundled frontend is same-origin via its nginx proxy and needs no CORS.
       PAPI_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
       # cpu | cuda | 0 | auto (cuda-if-available). Default cpu; set PAPI_DEVICE=auto
       # in .env to use a GPU when the host and container runtime expose one.
@@ -73,13 +85,24 @@ services:
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}
+      # Optional: cap torch intra-op threads on shared/constrained hosts (audit
+      # DCK-D13). Inference is serialized (one analysis at a time), so the
+      # default (all cores) is fine on a dedicated host. Uncomment + set in .env
+      # to bound it on a shared host:
+      # OMP_NUM_THREADS: ${OMP_NUM_THREADS:-}
     ports:
-      - "8000:8000"
+      # Loopback by default so the unauthenticated local API isn't exposed on
+      # the LAN (audit DCK-D1) — the frontend reaches it via its nginx proxy.
+      # Override PAPI_BACKEND_BIND=0.0.0.0 only for direct off-host API access.
+      - "${PAPI_BACKEND_BIND:-127.0.0.1}:8000:8000"
     volumes:
       # Model weights are git-ignored binaries living on the host. Bind mount
       # them read-only so the container picks up the current checkpoint
       # without a rebuild.
       - ./models:/models:ro
+      # Runway geometry YAML — read-only. Without this the backend silently
+      # falls back to a hardcoded runway copy (audit DCK-D7).
+      - ./configs:/app/configs:ro
       # Uploaded originals + annotated exports persist across container
       # restarts in a named volume.
       - papi_backend_storage:/storage
@@ -92,6 +115,18 @@ services:
       retries: 5
       start_period: 40s
     restart: unless-stopped
+    # Defense in depth: the image already runs as the non-root papi user; also
+    # forbid privilege escalation and drop all Linux capabilities (audit DCK-D12).
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          # Tune to the host; CPU torch inference on a 1280px frame peaks
+          # ~2-3 GB (audit DCK-D6). Override via PAPI_BACKEND_MEM_LIMIT in .env.
+          memory: ${PAPI_BACKEND_MEM_LIMIT:-4g}
     logging:
       driver: json-file
       options:
@@ -102,9 +137,10 @@ services:
     build:
       context: ./apps/frontend
       args:
-        # Browser-side URL — what the user's machine resolves, not what the
-        # container resolves. Override at build time for non-localhost hosts.
-        VITE_PAPI_API_URL: ${FRONTEND_PAPI_API_URL:-http://localhost:8000}
+        # Empty => the bundle uses relative URLs served same-origin by this
+        # image's nginx reverse proxy (audit DCK-D4). Set an absolute backend
+        # URL only for a direct, non-proxied deployment.
+        VITE_PAPI_API_URL: ${FRONTEND_PAPI_API_URL:-}
     container_name: papi-frontend
     depends_on:
       backend:
@@ -114,6 +150,14 @@ services:
       # Host port 5173 keeps frontend reachable at the same URL as before.
       - "5173:8080"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     logging:
       driver: json-file
       options:

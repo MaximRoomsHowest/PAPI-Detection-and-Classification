@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     # ``environment`` flips the security floor. In "production" the startup
     # check in main.py refuses to boot without a non-empty PAPI_API_KEY
     # (audit B-CRIT-5). Use "production" only at real deploy time; local
-    # docker-compose, dev, and CI should stay on the default ("local").
+    # Compose, dev, and CI should stay on the default ("local").
     environment: str = Field(default="local", alias="PAPI_ENV")
-    # Read from DATABASE_URL (docker-compose + .env.example) OR PAPI_DATABASE_URL
+    # Read from DATABASE_URL (Compose + .env.example) OR PAPI_DATABASE_URL
     # (matches every other setting's PAPI_ prefix and the production startup error
     # message). Previously only the bare field name was matched, so a
     # PAPI_DATABASE_URL override was silently ignored (audit backend-tests).

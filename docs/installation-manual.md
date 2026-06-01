@@ -215,8 +215,8 @@ Caddy is the lowest-effort way to get a Let's Encrypt certificate
 in front of the stack. Single binary, automatic HTTPS, automatic
 renewal, no separate certbot cron.
 
-Add a fourth service to `docker-compose.yml` (or a
-`docker-compose.prod.yml` override) and remove the host ports from
+Add a fourth service to `compose.yaml` (or a
+`compose.prod.yaml` override) and remove the host ports from
 the backend + frontend services so only Caddy can reach them:
 
 ```yaml
@@ -277,7 +277,7 @@ needed.
 Verification after bringing up the new stack:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 curl -fsSI https://papi.example.com/
 # Expected: HTTP/2 200 + Strict-Transport-Security header
 curl -fsS https://papi.example.com/api/runways

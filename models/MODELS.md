@@ -28,7 +28,7 @@ Inside every run folder the weights keep Ultralytics' conventional
 
 The **serving slot** is always `models/serving/best.pt` (a copy of the
 chosen run's `best.pt`). The slot filename is intentionally stable — the
-Dockerfile, docker-compose, `.env`, and the promotion procedure (§5) all
+Dockerfile, `compose.yaml`, `.env`, and the promotion procedure (§5) all
 point at it, so swapping models means copying a new file into the slot,
 **not** renaming the slot. Which run is currently in the slot is recorded
 in `models/serving/model_card.json` (`model_id`) and in §3.1 below.

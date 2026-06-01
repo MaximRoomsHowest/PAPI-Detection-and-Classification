@@ -4,8 +4,8 @@ Local-only FastAPI backend trial for immediate PAPI image/video analysis with da
 
 ## Setup
 
-For full-stack local development use the **root** docker-compose, which
-brings up Postgres + this backend + the React frontend together. From
+For full-stack local development use the **root** Compose stack (`compose.yaml`),
+which brings up Postgres + this backend + the React frontend together. From
 the repo root:
 
 ```powershell

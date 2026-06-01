@@ -1,3 +1,8 @@
+# Backend runtime dependencies.
+#
+# Test-only deps (pytest, httpx) live in requirements-dev.txt so the production
+# image never ships test tooling (audit DCK-D5). Install dev/test deps with:
+#   pip install -r requirements-dev.txt
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
@@ -6,9 +11,10 @@ pydantic-settings==2.7.1
 python-multipart==0.0.20
 ultralytics==8.3.58
 lap==0.5.13
-opencv-python==4.10.0.84
+# Headless OpenCV: the backend never opens a GUI window, so the -headless wheel
+# drops the libGL/X11 stack — which also lets the Dockerfile skip the libgl1
+# system package (audit DCK-D2).
+opencv-python-headless==4.10.0.84
 exifread==3.0.0
 onnx==1.17.0
 onnxruntime==1.20.1
-pytest==8.3.4
-httpx==0.28.1
