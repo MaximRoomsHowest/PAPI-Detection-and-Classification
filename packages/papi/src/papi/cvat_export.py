@@ -127,14 +127,12 @@ def build_ultralytics(
         (out_dir / f"{subset}.txt").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
     # data.yaml — Ultralytics convention
+    names = class_names or YOLO_CLASS_NAMES
     yaml_doc = {
         "path": "./",
         "train": "train.txt",
         "val": "val.txt",
-        "names": {
-            i: (class_names or YOLO_CLASS_NAMES)[i]
-            for i in sorted(class_names or YOLO_CLASS_NAMES)
-        },
+        "names": {i: names[i] for i in sorted(names)},
     }
     data_yaml = out_dir / "data.yaml"
     with data_yaml.open("w", encoding="utf-8") as f:

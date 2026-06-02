@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import yaml
+from _pipeline_utils import remap_label_text, source_uses_zero_based_labels
 from PIL import Image
 from ultralytics import YOLO
 
@@ -94,42 +95,13 @@ def _prepare_prediction_images(entries: list[str], raw_dir: Path, image_dir: Pat
 
 
 def _source_uses_zero_based_labels(label_path: Path) -> bool:
-    source_dir = label_path.parents[2]
-    data_yaml = source_dir / "data.yaml"
-    if data_yaml.exists():
-        data = yaml.safe_load(data_yaml.read_text(encoding="utf-8")) or {}
-        names = data.get("names", {})
-        if isinstance(names, dict):
-            normalized = {int(key): value for key, value in names.items()}
-            if normalized.get(0) == CLASS_NAMES[0]:
-                return True
-            if normalized.get(1) == CLASS_NAMES[0]:
-                return False
-    return True
+    return source_uses_zero_based_labels(label_path, CLASS_NAMES)
 
 
 def _manual_label_text(label_path: Path) -> str:
     if not label_path.exists():
         return ""
-
-    rows = [line.split() for line in label_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if not rows:
-        return ""
-
-    already_zero_based = _source_uses_zero_based_labels(label_path)
-
-    lines: list[str] = []
-    for parts in rows:
-        class_id = int(parts[0])
-        if already_zero_based:
-            if class_id not in CLASS_NAMES:
-                raise ValueError(f"Unsupported detector class {class_id} in {label_path}")
-            lines.append(" ".join(parts))
-        elif class_id in MANUAL_REMAP:
-            lines.append(" ".join([str(MANUAL_REMAP[class_id]), *parts[1:]]))
-        else:
-            raise ValueError(f"Unsupported detector class {class_id} in {label_path}")
-    return "\n".join(lines) + ("\n" if lines else "")
+    return remap_label_text(label_path, CLASS_NAMES, MANUAL_REMAP)
 
 
 def _parse_excluded_indices(values: list[str]) -> set[int]:

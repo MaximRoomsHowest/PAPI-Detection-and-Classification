@@ -14,6 +14,28 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+# --- Colour-detection thresholds -------------------------------------------------------
+# Hand-calibrated on DJI Wide/Zoom PAPI frames (PROJECT1-PAPI day + dusk samples). These
+# are deliberately conservative so the pre-annotation pass favours precision over recall;
+# the human CVAT review catches the misses. Tune as a set — they trade off against each
+# other — and re-run test_visual_lamp after any change.
+
+# A pixel is "red" when the red channel is bright AND clearly dominates green and blue.
+_RED_MIN = 150.0  # minimum red-channel value (0-255)
+_RED_DOMINANCE = 1.45  # red must exceed green*this and blue*this
+
+# A pixel is "white" when all channels are bright and the colour is near-neutral (low spread).
+_WHITE_RED_MIN = 190.0
+_WHITE_GREEN_MIN = 160.0
+_WHITE_BLUE_MIN = 110.0
+_WHITE_MAX_SPREAD = 90.0  # max (channel max - channel min); larger => too saturated to be white
+
+# Per-blob state classification from its red/white pixel counts.
+_STATE_MIN_PIXELS = 8  # need at least this many of each colour to call a blob "transition"
+_TRANSITION_RATIO_LOW = 0.45  # red/white ratio band that reads as a half-lit (transition) lamp
+_TRANSITION_RATIO_HIGH = 1.8
+_RED_PIXEL_FRACTION = 0.35  # red pixels >= this fraction of white pixels => "red"
+
 
 @dataclass(frozen=True)
 class VisualLampDetection:
@@ -43,11 +65,11 @@ class _Candidate:
 
     @property
     def state(self) -> str:
-        if self.red_pixels >= 8 and self.white_pixels >= 8:
+        if self.red_pixels >= _STATE_MIN_PIXELS and self.white_pixels >= _STATE_MIN_PIXELS:
             ratio = self.red_pixels / max(1, self.white_pixels)
-            if 0.45 <= ratio <= 1.8:
+            if _TRANSITION_RATIO_LOW <= ratio <= _TRANSITION_RATIO_HIGH:
                 return "transition"
-        if self.red_pixels >= max(8, int(0.35 * self.white_pixels)):
+        if self.red_pixels >= max(_STATE_MIN_PIXELS, int(_RED_PIXEL_FRACTION * self.white_pixels)):
             return "red"
         return "white"
 
@@ -131,8 +153,13 @@ def _lamp_masks(arr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     blue = rgb[:, :, 2]
     spread = rgb.max(axis=2) - rgb.min(axis=2)
 
-    red_mask = (red > 150) & (red > green * 1.45) & (red > blue * 1.45)
-    white_mask = (red > 190) & (green > 160) & (blue > 110) & (spread < 90)
+    red_mask = (red > _RED_MIN) & (red > green * _RED_DOMINANCE) & (red > blue * _RED_DOMINANCE)
+    white_mask = (
+        (red > _WHITE_RED_MIN)
+        & (green > _WHITE_GREEN_MIN)
+        & (blue > _WHITE_BLUE_MIN)
+        & (spread < _WHITE_MAX_SPREAD)
+    )
     return red_mask, white_mask
 
 

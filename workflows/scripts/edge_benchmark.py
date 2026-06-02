@@ -158,30 +158,46 @@ def write_json(path: Path, result: dict[str, Any]) -> None:
 
 
 def append_csv(path: Path, result: dict[str, Any]) -> None:
+    """Append one benchmark result row to a CSV with a deterministic column order.
+
+    Existing columns keep their on-disk order and are only ever extended (never
+    reordered) when ``result`` introduces new keys, so re-reading the file is stable
+    across runs. The file is read exactly once to decide between the fast append path
+    (header unchanged) and a full rewrite (header extended) -- there is no second
+    existence check that could race with the read.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    fields = list(result.keys())
-    rows: list[dict[str, Any]] = []
+
+    existing_fields: list[str] = []
+    existing_rows: list[dict[str, Any]] = []
     if path.exists():
         with path.open("r", newline="", encoding="utf-8") as file:
             reader = csv.DictReader(file)
-            existing_fields = reader.fieldnames or []
-            rows = list(reader)
-        for field in existing_fields:
-            if field not in fields:
-                fields.append(field)
-        if existing_fields != fields:
-            rows.append(result)
-            with path.open("w", newline="", encoding="utf-8") as file:
-                writer = csv.DictWriter(file, fieldnames=fields)
-                writer.writeheader()
-                writer.writerows(rows)
-            return
+            existing_fields = list(reader.fieldnames or [])
+            existing_rows = list(reader)
 
-    exists = path.exists()
-    with path.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fields)
-        if not exists:
-            writer.writeheader()
+    # Deterministic union: keep existing column order, then append any genuinely new
+    # keys from this result in their dict order.
+    fields = list(existing_fields)
+    for field in result:
+        if field not in fields:
+            fields.append(field)
+
+    if existing_fields == fields:
+        # Header is unchanged (or the file is empty/new): append a single row.
+        with path.open("a", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=fields, restval="")
+            if not existing_fields:
+                writer.writeheader()
+            writer.writerow(result)
+        return
+
+    # Header gained new columns: rewrite the whole file under the extended header so
+    # every row -- old and new -- lines up under the same deterministic columns.
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fields, restval="")
+        writer.writeheader()
+        writer.writerows(existing_rows)
         writer.writerow(result)
 
 

@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 import yaml
+from _pipeline_utils import read_label_zip
 from prepare_yolo_seed import (
     CLASS_NAMES,
     ManualSource,
@@ -61,13 +62,13 @@ def _read_assisted_labels(zip_path: Path) -> dict[str, str]:
     if not zip_path.exists():
         return {}
 
-    return _read_label_zip(zip_path)
+    return read_label_zip(zip_path)
 
 
 def _read_existing_batch_labels(batch_root: Path) -> dict[str, str]:
     labels: dict[str, str] = {}
     for zip_path in sorted(batch_root.glob("batch_*/annotations.zip")):
-        labels.update(_read_label_zip(zip_path))
+        labels.update(read_label_zip(zip_path))
     return labels
 
 
@@ -79,19 +80,6 @@ def _available_manual_sources(manual_sources: list[ManualSource]) -> list[Manual
         else:
             print(f"Skipping missing manual source: {source.path}")
     return available
-
-
-def _read_label_zip(zip_path: Path) -> dict[str, str]:
-    labels: dict[str, str] = {}
-    with zipfile.ZipFile(zip_path) as archive:
-        for name in archive.namelist():
-            path = Path(name)
-            if len(path.parts) < 3 or path.parts[-3:-1] != ("labels", "train") or path.suffix != ".txt":
-                continue
-            text = archive.read(name).decode("utf-8")
-            if text.strip():
-                labels[path.stem] = text if text.endswith("\n") else f"{text}\n"
-    return labels
 
 
 def _write_label(label_path: Path, text: str) -> int:

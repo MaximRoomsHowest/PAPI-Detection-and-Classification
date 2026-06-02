@@ -7,7 +7,7 @@ import csv
 import json
 from pathlib import Path
 
-import yaml
+from _pipeline_utils import load_yaml
 from papi.projection import DEFAULT_CONVENTION, ProjectionConvention
 from papi.tracking import (
     TRACK_FIELDNAMES,
@@ -21,15 +21,10 @@ from papi.tracking import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _load_yaml(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
-
-
 def _load_projection(path: Path) -> ProjectionConvention:
     if not path.exists():
         return DEFAULT_CONVENTION
-    return ProjectionConvention.from_dict(_load_yaml(path)["convention"])
+    return ProjectionConvention.from_dict(load_yaml(path)["convention"])
 
 
 def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
@@ -45,7 +40,7 @@ def build_tracking(
     projection_config_path: Path,
     projection_max_distance_px: float,
 ) -> dict:
-    airport_config = _load_yaml(airport_config_path)
+    airport_config = load_yaml(airport_config_path)
     convention = _load_projection(projection_config_path)
     manifest: dict = {
         "dataset_root": str(dataset_root),
@@ -123,7 +118,7 @@ def _merge_totals(totals: dict, summary: dict) -> None:
             totals[key][name] = totals[key].get(name, 0) + count
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--dataset-root",
@@ -150,9 +145,8 @@ def main() -> None:
         projection_max_distance_px=args.projection_max_distance_px,
     )
     print(json.dumps({"error_count": manifest["error_count"], "totals": manifest["totals"]}, indent=2))
-    if manifest["error_count"]:
-        raise SystemExit(1)
+    return 1 if manifest["error_count"] else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

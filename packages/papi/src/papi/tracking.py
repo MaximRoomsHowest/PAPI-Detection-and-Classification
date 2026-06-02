@@ -260,6 +260,10 @@ def _assign_by_projection(
         for lamp_id, (u, v, behind, _in_frame) in projections.items()
         if not behind and u is not None and v is not None
     ]
+    # A rectangular cost matrix with fewer columns (projected points) than rows (detections)
+    # makes linear_sum_assignment return one pair *per column*, silently leaving some
+    # detections unassigned. Reject that here so the caller falls back to left-to-right and
+    # every detection keeps a track instead of being dropped.
     if len(projected_points) < len(detections):
         return None
 
@@ -271,6 +275,10 @@ def _assign_by_projection(
         dtype=float,
     )
     det_indices, projection_indices = linear_sum_assignment(costs)
+    # Defence in depth for the guard above: every detection must have received a projected
+    # point. If not, fall back rather than emit a partial (silently mismatched) assignment.
+    if len(det_indices) < len(detections):
+        return None
     max_cost = float(
         max(
             costs[det_i, proj_i]

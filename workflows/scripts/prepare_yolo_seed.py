@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import yaml
+from _pipeline_utils import remap_label_text, source_uses_zero_based_labels
 from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -52,39 +53,11 @@ def _source_from_flat_name(flat_name: str, raw_dir: Path) -> Path:
 
 
 def _source_uses_zero_based_labels(src: Path) -> bool:
-    source_dir = src.parents[2]
-    data_yaml = source_dir / "data.yaml"
-    if data_yaml.exists():
-        data = yaml.safe_load(data_yaml.read_text(encoding="utf-8")) or {}
-        names = data.get("names", {})
-        if isinstance(names, dict):
-            normalized = {int(key): value for key, value in names.items()}
-            if normalized.get(0) == CLASS_NAMES[0]:
-                return True
-            if normalized.get(1) == CLASS_NAMES[0]:
-                return False
-    return True
+    return source_uses_zero_based_labels(src, CLASS_NAMES)
 
 
 def _remap_label_text(src: Path) -> str:
-    rows = [line.split() for line in src.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if not rows:
-        return ""
-
-    already_zero_based = _source_uses_zero_based_labels(src)
-
-    lines: list[str] = []
-    for parts in rows:
-        class_id = int(parts[0])
-        if already_zero_based:
-            if class_id not in CLASS_NAMES:
-                raise ValueError(f"Unsupported detector class {class_id} in {src}")
-            lines.append(" ".join(parts))
-        elif class_id in CLASS_REMAP:
-            lines.append(" ".join([str(CLASS_REMAP[class_id]), *parts[1:]]))
-        else:
-            raise ValueError(f"Unsupported detector class {class_id} in {src}")
-    return "\n".join(lines) + ("\n" if lines else "")
+    return remap_label_text(src, CLASS_NAMES, CLASS_REMAP)
 
 
 def _write_label_text(text: str, dst: Path) -> int:

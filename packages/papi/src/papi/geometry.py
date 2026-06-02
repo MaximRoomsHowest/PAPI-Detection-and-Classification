@@ -62,7 +62,10 @@ def resolve_papi_for_frame(
         if d < best_dist:
             best_dist = d
             best_runway = str(runway)
-    assert best_runway is not None
+    # Raise rather than `assert`: a bare assert is stripped under `python -O`, which would
+    # let an empty `runways` config fall through to a confusing KeyError below instead.
+    if best_runway is None:
+        raise ValueError("airport_config['runways'] is empty; cannot resolve a PAPI runway")
     flat = dict(airport_config["runways"][best_runway]["papi"])
     flat["faa_default_set_angles_deg"] = airport_config["faa_default_set_angles_deg"]
     flat["transition_half_width_deg"] = airport_config["transition_half_width_deg"]

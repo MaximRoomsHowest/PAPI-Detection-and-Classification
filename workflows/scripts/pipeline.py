@@ -31,6 +31,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+from _pipeline_utils import load_yaml
 from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -75,8 +76,7 @@ STANDOFF_BUCKETS_M = (300, 400, 500, 600, 700, 800, 1000)
 
 
 def _load_yaml(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+    return load_yaml(path)
 
 
 # ---------------------------------------------------------------------------

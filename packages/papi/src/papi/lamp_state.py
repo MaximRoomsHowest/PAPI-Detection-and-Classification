@@ -14,6 +14,11 @@ from .geometry import elevation_angle_deg
 
 LampState = str  # "white" | "red" | "transition"
 
+# A standard PAPI unit is exactly four lamps, indexed 1..4 innermost-to-outermost
+# (config keys ``light_1``..``light_4``). Named so the iteration bound below reads
+# as "for each lamp" rather than a bare ``range(1, 5)``.
+_NUM_LAMPS = 4
+
 
 def _set_angle(papi_config: dict[str, Any], light_no: int) -> float:
     """Return the set-angle for `light_no` (1..4), falling back to FAA defaults."""
@@ -53,17 +58,29 @@ def compute_lamp_state(
 
     states: list[LampState] = []
     min_margin = float("inf")
-    for i in range(1, 5):
-        light = papi_config[f"light_{i}"]
+    for i in range(1, _NUM_LAMPS + 1):
+        # A malformed papi-config (missing a ``light_N`` entry, its lat/lon, or a
+        # fallback default) would otherwise raise a bare KeyError that escapes the
+        # caller's degrade-to-"unknown" handler -- pipeline.py only catches
+        # (AssertionError, TypeError, ValueError) -- and crash the whole offline
+        # run. Convert it to a clear ValueError so a single bad config row is
+        # recorded as unknown, like the non-finite-position guard above.
+        try:
+            light = papi_config[f"light_{i}"]
+            target_lat = float(light["lat"])
+            target_lon = float(light["lon"])
+            target_alt_m = _lamp_alt(papi_config, i)
+            set_angle = _set_angle(papi_config, i)
+        except KeyError as exc:
+            raise ValueError(f"papi_config missing required key {exc}") from exc
         elev = elevation_angle_deg(
             camera_lat=camera_lat,
             camera_lon=camera_lon,
             camera_alt_m=camera_alt_m,
-            target_lat=float(light["lat"]),
-            target_lon=float(light["lon"]),
-            target_alt_m=_lamp_alt(papi_config, i),
+            target_lat=target_lat,
+            target_lon=target_lon,
+            target_alt_m=target_alt_m,
         )
-        set_angle = _set_angle(papi_config, i)
         delta = elev - set_angle
         # margin = absolute distance to the nearest transition edge (set ± halfwidth)
         if delta > half_width:

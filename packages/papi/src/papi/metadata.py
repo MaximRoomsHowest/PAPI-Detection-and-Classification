@@ -123,9 +123,12 @@ def extract_image_metadata(path: Path) -> dict[str, Any]:
     xmp = _parse_xmp(head)
     exif = _extract_exif(path)
 
-    # Prefer XMP-RTK lat/lon; fall back to EXIF GPS.
-    lat = _to_float(xmp.get("GpsLatitude")) if xmp.get("GpsLatitude") else exif["exif_lat"]
-    lon = _to_float(xmp.get("GpsLongitude")) if xmp.get("GpsLongitude") else exif["exif_lon"]
+    # Prefer XMP-RTK lat/lon; fall back to EXIF GPS. The truthiness guard means an
+    # empty/missing XMP value (not just an unparseable one) triggers the EXIF fallback.
+    xmp_lat = xmp.get("GpsLatitude")
+    xmp_lon = xmp.get("GpsLongitude")
+    lat = _to_float(xmp_lat) if xmp_lat else exif["exif_lat"]
+    lon = _to_float(xmp_lon) if xmp_lon else exif["exif_lon"]
 
     return {
         "folder": path.parent.name,

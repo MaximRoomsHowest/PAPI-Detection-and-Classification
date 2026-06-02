@@ -10,11 +10,24 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+REGIMES = ("daytime", "nighttime")
+
+
 def prepare_sequence_dataset(dataset_root: Path, out_dir: Path) -> dict:
+    # Validate the input layout before creating out_dir or writing any config, so a
+    # missing dataset fails cleanly instead of leaving a half-written output dir.
+    if not dataset_root.is_dir():
+        raise FileNotFoundError(f"Dataset root not found: {dataset_root}")
+    missing = [regime for regime in REGIMES if not (dataset_root / regime).is_dir()]
+    if missing:
+        raise FileNotFoundError(
+            f"Dataset root {dataset_root} is missing required regime dir(s): {', '.join(missing)}"
+        )
+
     out_dir.mkdir(parents=True, exist_ok=True)
     splits: dict[str, list[str]] = {"train": [], "val": [], "test": []}
 
-    for regime in ("daytime", "nighttime"):
+    for regime in REGIMES:
         regime_root = dataset_root / regime
         for video_dir in sorted([path for path in regime_root.iterdir() if path.is_dir()]):
             with (video_dir / "metadata.csv").open(newline="", encoding="utf-8") as fh:
