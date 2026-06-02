@@ -28,6 +28,7 @@ from app.api._runways import validate_runway_id
 from app.database import get_session
 from app.repositories import AnalysisLogRepository
 from app.services.media import detect_media_type, save_upload
+from app.services.telemetry import DroneSample, parse_telemetry
 from app.validation.analyze import parse_manual_drone_metadata
 from app.validation.schemas import AnalysisPayload, FrameBatchPayload
 
@@ -66,30 +67,58 @@ def analyze_params(
     return AnalyzeParams(runway_id, drone_id, drone_latitude, drone_longitude, drone_altitude_m)
 
 
+def read_metadata_samples(metadata_file: UploadFile | None) -> list[DroneSample] | None:
+    """Parse an optional uploaded telemetry file (DJI .SRT / CSV / JSON) into drone fixes.
+
+    Returns ``None`` when no file (or an empty file) was sent, so the angle calc falls
+    back to the manual fix / embedded EXIF. A file that can't be parsed into any usable
+    fix raises 400 (``parse_telemetry`` raises ``ValueError``) — surfaced to the user
+    instead of silently degrading to angle-unavailable. Read here, before any media is
+    written to disk, so a bad telemetry file can't leak a saved upload.
+    """
+    if metadata_file is None:
+        return None
+    try:
+        raw = metadata_file.file.read()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="Could not read the telemetry file.") from exc
+    if not raw or not raw.strip():
+        return None
+    try:
+        return parse_telemetry(metadata_file.filename or "", raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/analyze", response_model=AnalysisPayload)
 def analyze_media(
     file: Annotated[UploadFile, File()],
-    params: Annotated[AnalyzeParams, Depends(analyze_params)],
+    metadata_file: Annotated[UploadFile | None, File()] = None,
+    params: Annotated[AnalyzeParams, Depends(analyze_params)] = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> AnalysisPayload:
-    return _analyze_upload(file=file, params=params, db=db, image_only=False)
+    drone_samples = read_metadata_samples(metadata_file)
+    return _analyze_upload(file=file, params=params, db=db, image_only=False, drone_samples=drone_samples)
 
 
 @router.post("/analyze-frame", response_model=AnalysisPayload)
 def analyze_frame(
     file: Annotated[UploadFile, File()],
-    params: Annotated[AnalyzeParams, Depends(analyze_params)],
+    metadata_file: Annotated[UploadFile | None, File()] = None,
+    params: Annotated[AnalyzeParams, Depends(analyze_params)] = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> AnalysisPayload:
-    return _analyze_upload(file=file, params=params, db=db, image_only=True)
+    drone_samples = read_metadata_samples(metadata_file)
+    return _analyze_upload(file=file, params=params, db=db, image_only=True, drone_samples=drone_samples)
 
 
 @router.post("/analyze-frames", response_model=FrameBatchPayload)
 def analyze_frames(
     files: Annotated[list[UploadFile], File()],
-    params: Annotated[AnalyzeParams, Depends(analyze_params)],
+    metadata_file: Annotated[UploadFile | None, File()] = None,
+    params: Annotated[AnalyzeParams, Depends(analyze_params)] = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> FrameBatchPayload:
@@ -117,10 +146,14 @@ def analyze_frames(
     # Reject an unknown runway once, up front, before any per-file disk I/O.
     validate_runway_id(params.runway_id)
 
+    # Parse the optional telemetry file once; the same representative fix applies to
+    # every image in the batch (each frame is analysed independently as a still).
+    drone_samples = read_metadata_samples(metadata_file)
+
     start = perf_counter()
     results: list[AnalysisPayload] = []
     for file in files:
-        payload = _analyze_upload(file=file, params=params, db=db, image_only=True)
+        payload = _analyze_upload(file=file, params=params, db=db, image_only=True, drone_samples=drone_samples)
         results.append(payload)
 
     processing_ms = int((perf_counter() - start) * 1000)
@@ -134,7 +167,8 @@ def analyze_frames(
 @router.post("/analyze-sequence", response_model=AnalysisPayload)
 def analyze_sequence(
     files: Annotated[list[UploadFile], File()],
-    params: Annotated[AnalyzeParams, Depends(analyze_params)],
+    metadata_file: Annotated[UploadFile | None, File()] = None,
+    params: Annotated[AnalyzeParams, Depends(analyze_params)] = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> AnalysisPayload:
@@ -163,10 +197,12 @@ def analyze_sequence(
     validate_runway_id(params.runway_id)
 
     # Validate drone metadata BEFORE writing any upload to disk (same ordering as
-    # _analyze_upload), so an invalid request can't leak saved files.
+    # _analyze_upload), so an invalid request can't leak saved files. A telemetry
+    # file (when supplied) drives a real per-frame angle track for the assembled clip.
     manual_metadata = parse_manual_drone_metadata(
         params.drone_latitude, params.drone_longitude, params.drone_altitude_m
     )
+    drone_samples = read_metadata_samples(metadata_file)
 
     # Capture order: a folder upload arrives via webkitdirectory with names like
     # "flight/frame_000.jpg"; sort so the assembled clip plays in numeric capture order.
@@ -188,6 +224,7 @@ def analyze_sequence(
             original_filename=display_name,
             drone_id=params.drone_id,
             drone_metadata=manual_metadata,
+            drone_samples=drone_samples,
         )
         log = AnalysisLogRepository(db).create_from_payload(payload)
         payload.log_id = log.id
@@ -225,6 +262,7 @@ def _analyze_upload(
     params: AnalyzeParams,
     db: Session,
     image_only: bool,
+    drone_samples: list[DroneSample] | None = None,
 ) -> AnalysisPayload:
     settings = routes.get_settings()
     try:
@@ -253,6 +291,7 @@ def _analyze_upload(
             original_filename=file.filename or saved_path.name,
             drone_id=params.drone_id,
             drone_metadata=manual_metadata,
+            drone_samples=drone_samples,
         )
         log = AnalysisLogRepository(db).create_from_payload(payload)
         payload.log_id = log.id

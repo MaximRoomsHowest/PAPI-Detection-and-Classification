@@ -486,6 +486,70 @@
   line-height: 1.5;
 }
 
+/* Telemetry-file upload row: the file picker (reusing .upload-button) plus a clear
+   control shown once a file is chosen. */
+.drone-telemetry__file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drone-telemetry__file {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.drone-telemetry__file span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drone-telemetry__clear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.drone-telemetry__clear:hover {
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+.drone-telemetry__clear:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* "or enter a position manually" rule between the file picker and the lat/lon/alt fields. */
+.drone-telemetry__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.drone-telemetry__divider::before,
+.drone-telemetry__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .angle-readout {
   display: grid;
   gap: 5px;

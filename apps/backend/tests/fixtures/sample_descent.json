@@ -1,0 +1,16 @@
+{
+  "runway": "papi_24",
+  "note": "Sample drone descent telemetry for the PAPI Live Demo (EDNY runway 24). Absolute (WGS-84) altitudes.",
+  "samples": [
+    { "frame_index": 0, "latitude": 47.679800, "longitude": 9.518100, "altitude_m": 520.0 },
+    { "frame_index": 1, "latitude": 47.679650, "longitude": 9.518110, "altitude_m": 516.0 },
+    { "frame_index": 2, "latitude": 47.679500, "longitude": 9.518120, "altitude_m": 512.0 },
+    { "frame_index": 3, "latitude": 47.679350, "longitude": 9.518130, "altitude_m": 508.0 },
+    { "frame_index": 4, "latitude": 47.679200, "longitude": 9.518140, "altitude_m": 504.0 },
+    { "frame_index": 5, "latitude": 47.679050, "longitude": 9.518150, "altitude_m": 500.0 },
+    { "frame_index": 6, "latitude": 47.678900, "longitude": 9.518160, "altitude_m": 496.0 },
+    { "frame_index": 7, "latitude": 47.678750, "longitude": 9.518170, "altitude_m": 492.0 },
+    { "frame_index": 8, "latitude": 47.678600, "longitude": 9.518180, "altitude_m": 488.0 },
+    { "frame_index": 9, "latitude": 47.678450, "longitude": 9.518190, "altitude_m": 484.0 }
+  ]
+}

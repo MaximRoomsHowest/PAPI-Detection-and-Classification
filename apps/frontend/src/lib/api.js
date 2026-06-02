@@ -334,11 +334,25 @@ function appendMetadata(formData, metadata = {}) {
   }
 }
 
-export async function analyzeFrame(file, metadata) {
+/**
+ * Attach an optional drone-telemetry file (DJI .SRT / CSV / JSON) to the request.
+ * The backend parses it into drone fixes that take priority over manual telemetry
+ * and the media's embedded EXIF — for a video this yields a per-frame angle track.
+ * A falsy `metadataFile` appends nothing, so the existing EXIF/manual paths are
+ * untouched when no file was chosen.
+ */
+function appendMetadataFile(formData, metadataFile) {
+  if (metadataFile) {
+    formData.append('metadata_file', metadataFile, metadataFile.name)
+  }
+}
+
+export async function analyzeFrame(file, metadata, metadataFile) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
   appendMetadata(formData, metadata)
+  appendMetadataFile(formData, metadataFile)
 
   const response = await fetchWithTimeout(
     `${API_BASE_URL}/api/analyze-frame`,
@@ -349,13 +363,14 @@ export async function analyzeFrame(file, metadata) {
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeFrames(files, metadata) {
+export async function analyzeFrames(files, metadata, metadataFile) {
   checkUploadSize(files)
   const formData = new FormData()
   files.forEach((file) => {
     formData.append('files', file, file.webkitRelativePath || file.name)
   })
   appendMetadata(formData, metadata)
+  appendMetadataFile(formData, metadataFile)
 
   const response = await fetchWithTimeout(
     `${API_BASE_URL}/api/analyze-frames`,
@@ -372,13 +387,14 @@ export async function analyzeFrames(files, metadata) {
  * and returns a single AnalysisPayload (not a per-image batch like analyzeFrames).
  * Files keep their folder paths so the backend can order them by capture sequence.
  */
-export async function analyzeSequence(files, metadata) {
+export async function analyzeSequence(files, metadata, metadataFile) {
   checkUploadSize(files)
   const formData = new FormData()
   files.forEach((file) => {
     formData.append('files', file, file.webkitRelativePath || file.name)
   })
   appendMetadata(formData, metadata)
+  appendMetadataFile(formData, metadataFile)
 
   const response = await fetchWithTimeout(
     `${API_BASE_URL}/api/analyze-sequence`,
@@ -389,11 +405,12 @@ export async function analyzeSequence(files, metadata) {
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeMedia(file, metadata) {
+export async function analyzeMedia(file, metadata, metadataFile) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
   appendMetadata(formData, metadata)
+  appendMetadataFile(formData, metadataFile)
 
   const response = await fetchWithTimeout(
     `${API_BASE_URL}/api/analyze`,

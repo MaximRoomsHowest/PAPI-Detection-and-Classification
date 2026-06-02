@@ -212,6 +212,35 @@ describe('analyze* — multipart payload + auth', () => {
   })
 })
 
+describe('analyze* — optional telemetry file', () => {
+  const metadata = { runwayId: '24', droneId: '', droneLatitude: '', droneLongitude: '', droneAltitudeM: '' }
+
+  it('analyzeMedia attaches the telemetry file as metadata_file', async () => {
+    const clip = makeFile('clip.mp4', 1_000_000, 'video/mp4')
+    const srt = makeFile('clip.srt', 2_000, 'application/x-subrip')
+    await analyzeMedia(clip, metadata, srt)
+
+    const [, init] = fetch.mock.calls[0]
+    // FormData wraps the file; its `.name` is the contract the backend reads.
+    expect(init.body.get('metadata_file')?.name).toBe('clip.srt')
+  })
+
+  it('analyzeFrame attaches the telemetry file as metadata_file', async () => {
+    const img = makeFile('frame.jpg', 1_000)
+    const csv = makeFile('track.csv', 500, 'text/csv')
+    await analyzeFrame(img, metadata, csv)
+
+    const [, init] = fetch.mock.calls[0]
+    expect(init.body.get('metadata_file')?.name).toBe('track.csv')
+  })
+
+  it('omits metadata_file entirely when none is provided', async () => {
+    await analyzeMedia(makeFile('clip.mp4', 1_000, 'video/mp4'), metadata)
+    const [, init] = fetch.mock.calls[0]
+    expect(init.body.get('metadata_file')).toBeNull()
+  })
+})
+
 describe('analyze* — error surfacing', () => {
   const tinyFile = () => makeFile('frame.jpg', 1_000)
   const metadata = { runwayId: '24', droneId: '', droneLatitude: '', droneLongitude: '', droneAltitudeM: '' }

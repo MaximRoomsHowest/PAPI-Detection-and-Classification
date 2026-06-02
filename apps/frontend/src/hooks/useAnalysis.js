@@ -50,6 +50,14 @@ export function useAnalysis(copy) {
   // requires lat + lon + altitude together).
   const [droneTelemetry, setDroneTelemetry] = useState({ latitude: '', longitude: '', altitudeM: '' })
 
+  // Optional drone-telemetry FILE (DJI .SRT / CSV / JSON) paired with the upload.
+  // Parsed server-side into drone fixes that take priority over the manual fields
+  // and the media's embedded EXIF; for a video it powers the per-frame angle track
+  // (the red->white sweep on Insights). Like the manual fields it is an INPUT, so it
+  // persists across media changes — the user can pick the file before or after the
+  // media and clears it explicitly.
+  const [metadataFile, setMetadataFile] = useState(null)
+
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -277,9 +285,14 @@ export function useAnalysis(copy) {
           : {}),
       }
 
+      // A telemetry file is sent for a single video or image. A folder of images is
+      // a per-image EXIF sweep (each frame carries its own GPS), so the file is NOT
+      // applied there — it would collapse every image onto one representative fix.
+      const telemetryFile = media.type === 'folder' ? null : metadataFile
+
       if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
-        const result = await analyzeMedia(media.file, metadata)
+        const result = await analyzeMedia(media.file, metadata, telemetryFile)
         rawResults = [result]
         bestScenario = scenarioFromBackendResult(result, {
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
@@ -308,7 +321,7 @@ export function useAnalysis(copy) {
             return
           }
           setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
-          const result = await analyzeFrame(frame.file, metadata)
+          const result = await analyzeFrame(frame.file, metadata, telemetryFile)
           rawResults.push(result)
           const scenario = scenarioFromBackendResult(result, {
             frameLabel: frame.label,
@@ -382,6 +395,8 @@ export function useAnalysis(copy) {
     refetchRunways,
     droneTelemetry,
     setDroneTelemetry,
+    metadataFile,
+    setMetadataFile,
     isAnalyzing,
     isExporting,
     exportError,

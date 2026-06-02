@@ -121,6 +121,34 @@ class FramePoint(BaseModel):
     state: GlobalState
 
 
+class FrameLampState(BaseModel):
+    """One lamp's classified colour at a single frame, by STABLE ByteTrack identity.
+
+    Lighter than ``LampResult`` (no bbox): the per-frame angle track only needs the
+    lamp index, its colour, and the detection confidence for the chart hover.
+    """
+
+    index: int = Field(ge=1, le=4)
+    state: LampState
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class AngleSample(BaseModel):
+    """One point on a video's per-frame elevation-angle track.
+
+    ``elevation_angle_deg`` is the viewing angle to the PAPI midpoint computed from
+    the drone's telemetry fix at this frame; ``lamps`` are the lamps observed at the
+    frame (stable identity). The series of (angle, per-lamp state) points is what
+    lets the Insights chart draw the real red->white transition sweep across a
+    descent — instead of a single point — matching the client's AGL Altitude tool.
+    Only present when a per-frame telemetry track (e.g. a DJI .SRT) was supplied.
+    """
+
+    frame_index: int = Field(ge=0)
+    elevation_angle_deg: float
+    lamps: list[FrameLampState] = Field(default_factory=list)
+
+
 class AnalysisPayload(BaseModel):
     log_id: str | None = None
     media_type: MediaType
@@ -145,6 +173,13 @@ class AnalysisPayload(BaseModel):
     # chart; these are the per-frame values BEFORE the overlay's sliding-window
     # smoothing, so the curve shows the model's true frame-to-frame behaviour.
     per_frame: list[FramePoint] = Field(default_factory=list)
+    # Per-frame elevation-angle track — populated only when a per-frame telemetry
+    # track (DJI .SRT or a multi-row CSV/JSON) was supplied for a video/sequence.
+    # Each entry pairs a frame's viewing angle with the lamps observed at that frame,
+    # so the Insights angle-vs-state chart shows the genuine red<->white sweep across
+    # the descent (a single image / single fix leaves this empty and the chart falls
+    # back to one point per lamp).
+    angle_track: list[AngleSample] = Field(default_factory=list)
 
 
 class FrameBatchPayload(BaseModel):

@@ -1,4 +1,4 @@
-import { FolderOpen, Radar, Upload, Zap } from 'lucide-react'
+import { FolderOpen, Radar, Upload, X, Zap } from 'lucide-react'
 import clsx from 'clsx'
 import { FrameStage } from '../components/FrameStage'
 import { LampCard } from '../components/LampCard'
@@ -34,10 +34,18 @@ export function LiveDemoPage({ copy, plotTheme }) {
     handleMediaChange,
     droneTelemetry,
     setDroneTelemetry,
+    metadataFile,
+    setMetadataFile,
   } = useLiveDemo()
 
   const setDroneField = (field) => (event) =>
     setDroneTelemetry((current) => ({ ...current, [field]: event.target.value }))
+
+  const handleMetadataFileChange = (event) => {
+    setMetadataFile(event.target.files?.[0] ?? null)
+    // Reset the input so re-selecting the same file still fires onChange.
+    event.target.value = ''
+  }
 
   // The Live Demo shows real backend output only. Until an analysis has run the
   // result panel stays empty rather than displaying a canned "demo" preset.
@@ -106,12 +114,38 @@ export function LiveDemoPage({ copy, plotTheme }) {
         </div>
       </div>
 
-      {/* Optional drone position — the elevation angle is pure geometry (drone
-          GPS vs surveyed lamp coordinates), so the model can't infer it from the
-          pixels. Browser uploads usually strip GPS EXIF, so provide it here to
-          compute the PAPI angle. All three fields are required together. */}
+      {/* Optional drone telemetry — the elevation angle is pure geometry (drone GPS
+          vs surveyed lamp coordinates), so the model can't infer it from the pixels.
+          Upload the telemetry file (DJI .SRT / CSV / JSON) — for a video this drives
+          the per-frame angle sweep — or enter a single position manually. A geotagged
+          image folder reads each image's embedded GPS automatically. */}
       <div className="drone-telemetry">
         <span className="drone-telemetry__label">{copy.live.droneTelemetry}</span>
+        <div className="drone-telemetry__file-row">
+          <label className="upload-button drone-telemetry__file">
+            <Upload size={16} />
+            <span>{metadataFile ? metadataFile.name : copy.live.telemetryUpload}</span>
+            <input
+              type="file"
+              accept=".srt,.csv,.json,text/plain,text/csv,application/json"
+              aria-label={copy.live.telemetryUpload}
+              onChange={handleMetadataFileChange}
+            />
+          </label>
+          {metadataFile && (
+            <button
+              type="button"
+              className="drone-telemetry__clear"
+              onClick={() => setMetadataFile(null)}
+              aria-label={copy.live.telemetryClear}
+              title={copy.live.telemetryClear}
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <p className="drone-telemetry__hint">{copy.live.telemetryHint}</p>
+        <span className="drone-telemetry__divider">{copy.live.telemetryOrManual}</span>
         <div className="drone-telemetry__fields">
           <label>
             <span>{copy.live.droneLatitude}</span>

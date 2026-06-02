@@ -75,7 +75,15 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # --- Inference: a stub that returns a fixed payload ---------------------
     fake_service = MagicMock(spec=InferenceService)
 
-    def _fake_analyze(media_path, media_type, runway_id, original_filename, drone_id=None, drone_metadata=None):
+    def _fake_analyze(
+        media_path,
+        media_type,
+        runway_id,
+        original_filename,
+        drone_id=None,
+        drone_metadata=None,
+        drone_samples=None,
+    ):
         return AnalysisPayload(
             media_type=media_type,
             original_filename=original_filename,
@@ -96,7 +104,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             detections=[],
         )
 
-    def _fake_analyze_sequence(image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None):
+    def _fake_analyze_sequence(
+        image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None, drone_samples=None
+    ):
         return AnalysisPayload(
             media_type="video",
             original_filename=original_filename,

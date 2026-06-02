@@ -97,6 +97,38 @@ describe('angleVsStateSeries', () => {
     expect(series[0].points.map((point) => point.angle)).toEqual([2.2, 3.4])
     expect(series[0].points[0].state).toBe('red')
   })
+
+  it('builds a per-lamp sweep from a per-frame angle_track (video telemetry path)', () => {
+    const series = angleVsStateSeries([
+      {
+        original_filename: 'clip.mp4',
+        // A single aggregated angle is also present but MUST be ignored in favour
+        // of the richer per-frame track.
+        angle: { angle_available: true, elevation_angle_deg: 9.9, per_light_angles: [] },
+        lamps: [{ index: 1, state: 'white', confidence: 0.9 }],
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.82 }] },
+          { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.85 }] },
+          { frame_index: 3, elevation_angle_deg: 3.5, lamps: [{ index: 1, state: 'white', confidence: 0.86 }] },
+        ],
+      },
+    ])
+    // Four sweep points for lamp 1 from the track — not a single aggregated point,
+    // and never the 9.9 from the ignored aggregate angle.
+    expect(series[0].points.map((point) => point.angle)).toEqual([2.0, 2.5, 3.0, 3.5])
+    expect(series[0].points.map((point) => point.state)).toEqual(['red', 'red', 'white', 'white'])
+    // The red->white crossing is the midpoint of the 2.5 -> 3.0 step.
+    expect(series[0].transitionAngle).toBeCloseTo(2.75, 5)
+  })
+
+  it('falls back to the single aggregated point when angle_track is empty', () => {
+    const series = angleVsStateSeries([
+      result({ global: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.9 }] }),
+    ])
+    expect(series[0].points).toHaveLength(1)
+    expect(series[0].points[0].angle).toBe(3.0)
+  })
 })
 
 describe('transitionCountSeries', () => {

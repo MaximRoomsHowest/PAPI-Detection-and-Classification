@@ -50,6 +50,41 @@ export function detectTransitionAngle(points) {
 export function angleVsStateSeries(results) {
   const series = [1, 2, 3, 4].map((lampIndex) => ({ lampIndex, points: [] }))
   for (const result of results ?? []) {
+    const label = result?.original_filename ?? (result?.log_id ? `log ${result.log_id.slice(0, 8)}` : '')
+    const track = result?.angle_track
+
+    // Per-frame sweep (video / sequence analysed with a telemetry track): each frame
+    // contributes one (angle, state) point per lamp it was seen in, so the chart shows
+    // the genuine red->white crossing across the descent — the client's AGL tool view.
+    if (Array.isArray(track) && track.length > 0) {
+      for (const sample of track) {
+        const angle = sample?.elevation_angle_deg
+        if (!Number.isFinite(angle)) {
+          continue
+        }
+        for (const lamp of sample.lamps ?? []) {
+          const lampIndex = lamp.index
+          if (!(lampIndex >= 1 && lampIndex <= 4)) {
+            continue
+          }
+          const stateNum = STATE_NUM[lamp.state]
+          if (stateNum === undefined) {
+            continue
+          }
+          series[lampIndex - 1].points.push({
+            angle,
+            stateNum,
+            state: lamp.state,
+            confidence: Math.round((lamp.confidence ?? 0) * 100),
+            label,
+          })
+        }
+      }
+      continue
+    }
+
+    // Fallback: one aggregated (angle, lamps) point per result — a single image, or a
+    // video/sequence whose telemetry was a single fix (no per-frame track to sweep).
     const angleData = result?.angle
     if (!angleData?.angle_available) {
       continue
@@ -72,7 +107,7 @@ export function angleVsStateSeries(results) {
         stateNum,
         state: lamp.state,
         confidence: Math.round((lamp.confidence ?? 0) * 100),
-        label: result.original_filename ?? (result.log_id ? `log ${result.log_id.slice(0, 8)}` : ''),
+        label,
       })
     }
   }

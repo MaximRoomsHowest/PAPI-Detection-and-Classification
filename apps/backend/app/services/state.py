@@ -113,6 +113,7 @@ def lamp_index_by_track(track_observations: dict[int, list[tuple]]) -> dict[int,
 def detect_lamp_transitions(
     track_observations: dict[int, list[tuple]],
     elevation_angle_deg: float | None = None,
+    frame_angles: dict[int, float] | None = None,
 ) -> list[TransitionEvent]:
     """Temporal red<->white transitions per ByteTrack-tracked lamp.
 
@@ -121,10 +122,19 @@ def detect_lamp_transitions(
     transition is a red<->white change between two observations of the same lamp
     at most ``TRANSITION_MAX_FRAME_GAP`` frames apart. Lamps are numbered 1..4
     left-to-right via ``lamp_index_by_track`` (the same identity the final
-    aggregation uses); ``elevation_angle_deg`` (one value per uploaded video) is
-    attached to each event.
+    aggregation uses).
+
+    Each event's viewing angle comes from ``frame_angles[frame_index]`` when a
+    per-frame telemetry track is available (so a lamp that switches at frame 120
+    gets the drone's angle AT frame 120 — the real set angle); otherwise it falls
+    back to ``elevation_angle_deg`` (the single per-video value).
     """
     index_by_track = lamp_index_by_track(track_observations)
+
+    def angle_at(frame_index: int) -> float | None:
+        if frame_angles is not None and frame_index in frame_angles:
+            return frame_angles[frame_index]
+        return elevation_angle_deg
 
     events: list[TransitionEvent] = []
     for tid, obs in track_observations.items():
@@ -144,7 +154,7 @@ def detect_lamp_transitions(
                     from_state=state_a,
                     to_state=state_b,
                     frame_index=frame_b,
-                    elevation_angle_deg=elevation_angle_deg,
+                    elevation_angle_deg=angle_at(frame_b),
                 )
             )
     events.sort(key=lambda event: (event.frame_index, event.lamp_index))

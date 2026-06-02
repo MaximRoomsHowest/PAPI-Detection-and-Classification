@@ -20,9 +20,26 @@ from app.services.state import (
     confidence_from_lamps,
     detect_lamp_transitions,
     global_state_from_lamps,
+    lamp_index_by_track,
     normalize_detections,
 )
-from app.validation.schemas import AnalysisPayload, AngleResult, FramePoint, LampResult, ModelInfo, ValMetrics
+from app.services.telemetry import DroneSample, resample_to_frames
+from app.validation.schemas import (
+    AnalysisPayload,
+    AngleResult,
+    AngleSample,
+    FrameLampState,
+    FramePoint,
+    LampResult,
+    ModelInfo,
+    ValMetrics,
+)
+
+# Cap the per-frame angle track surfaced to the client. The exact red<->white
+# crossing is carried separately by transitions[] (full frame resolution), so the
+# track only needs enough points to draw a smooth sweep; evenly downsampling a long
+# clip keeps the payload lean. Demo videos are usually well under this.
+_MAX_ANGLE_TRACK_POINTS = 240
 
 
 class InferenceService:
@@ -49,14 +66,19 @@ class InferenceService:
         original_filename: str,
         drone_id: str | None = None,
         drone_metadata: tuple[float, float, float] | None = None,
+        drone_samples: list[DroneSample] | None = None,
     ) -> AnalysisPayload:
         # Serialise the whole inference so concurrent threadpool requests never
         # share the YOLO/ByteTrack state mid-stream (audit H1).
         with self._lock:
             if media_type == "image":
-                return self.analyze_image(media_path, runway_id, original_filename, drone_id, drone_metadata)
+                return self.analyze_image(
+                    media_path, runway_id, original_filename, drone_id, drone_metadata, drone_samples
+                )
             if media_type == "video":
-                return self.analyze_video(media_path, runway_id, original_filename, drone_id, drone_metadata)
+                return self.analyze_video(
+                    media_path, runway_id, original_filename, drone_id, drone_metadata, drone_samples
+                )
             raise ValueError(f"Unsupported media type: {media_type}")
 
     @property
@@ -170,6 +192,7 @@ class InferenceService:
         original_filename: str,
         drone_id: str | None,
         drone_metadata: tuple[float, float, float] | None,
+        drone_samples: list[DroneSample] | None = None,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -181,7 +204,7 @@ class InferenceService:
         # A single image yields red/white per lamp; a "transition" requires a
         # red<->white switch across frames, so there are none here. The angle is
         # still computed for display / transition association.
-        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
+        angle = self._angle_for_media(media_path, runway_id, drone_metadata, drone_samples)
         lamps = normalize_detections(detections)
         global_state = global_state_from_lamps(lamps)
         confidence = confidence_from_lamps(lamps)
@@ -214,6 +237,7 @@ class InferenceService:
         original_filename: str,
         drone_id: str | None,
         drone_metadata: tuple[float, float, float] | None,
+        drone_samples: list[DroneSample] | None = None,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -234,7 +258,11 @@ class InferenceService:
             cap.release()
             raise ValueError(too_long)
 
-        angle = self._angle_for_media(media_path, runway_id, drone_metadata)
+        # Resolve the telemetry fixes ONCE up front (file track > manual fix > EXIF)
+        # so the tracked core can both stamp a representative angle on the overlay and
+        # build the per-frame angle track after the frame count is known.
+        resolved_samples, angle_source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
+        angle = self._angle_from_samples(resolved_samples, angle_source, runway_id)
         # Release the capture deterministically even if the core raises mid-stream
         # (e.g. the in-loop too-long guard) — a generator's finally would only run on GC.
         try:
@@ -247,6 +275,7 @@ class InferenceService:
                 original_filename=original_filename,
                 drone_id=drone_id,
                 angle=angle,
+                drone_samples=resolved_samples,
                 start=start,
                 max_frames=max_frames,
                 too_long_message=too_long,
@@ -275,6 +304,7 @@ class InferenceService:
         original_filename: str,
         drone_id: str | None,
         drone_metadata: tuple[float, float, float] | None,
+        drone_samples: list[DroneSample] | None = None,
     ) -> AnalysisPayload:
         """Treat an ordered list of images as consecutive video frames (folder->video).
 
@@ -300,7 +330,13 @@ class InferenceService:
             fps = float(self.settings.sequence_fps)
             max_frames = max(1, self.settings.max_batch_frames)
             too_long = f"Image sequence is too long. Limit is {max_frames} frames."
-            angle = self._angle_for_media(image_paths[0], runway_id, drone_metadata)
+            # A geotagged folder is a descent sweep: prefer an explicit telemetry
+            # track, else the first image's EXIF / the manual fix. The per-frame
+            # track is built from the resolved samples after the frame count is known.
+            resolved_samples, angle_source = self._resolve_drone_samples(
+                image_paths[0], drone_metadata, drone_samples
+            )
+            angle = self._angle_from_samples(resolved_samples, angle_source, runway_id)
 
             def frames():
                 for path in image_paths:
@@ -324,6 +360,7 @@ class InferenceService:
                 original_filename=original_filename,
                 drone_id=drone_id,
                 angle=angle,
+                drone_samples=resolved_samples,
                 start=start,
                 max_frames=max_frames,
                 too_long_message=too_long,
@@ -345,6 +382,7 @@ class InferenceService:
         max_frames: int,
         too_long_message: str,
         empty_message: str,
+        drone_samples: list[DroneSample] | None = None,
     ) -> AnalysisPayload:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
         ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
@@ -438,7 +476,16 @@ class InferenceService:
         final_lamps = self._aggregate_video_lamps(track_observations)
         global_state = global_state_from_lamps(final_lamps)
         confidence = confidence_from_lamps(final_lamps)
-        transitions = detect_lamp_transitions(track_observations, angle.elevation_angle_deg)
+        # Per-frame angle track from the resolved telemetry (empty when no fixes or a
+        # single fix): pairs each frame's viewing angle with the lamps seen there so
+        # the chart can draw the real red<->white sweep. ``frame_angles`` then gives
+        # each transition the angle AT its own frame (its commissioned set angle).
+        angle_track, frame_angles = self._build_angle_track(
+            drone_samples, runway_id, frame_count, track_observations
+        )
+        transitions = detect_lamp_transitions(
+            track_observations, angle.elevation_angle_deg, frame_angles=frame_angles
+        )
         processing_ms = int((perf_counter() - start) * 1000)
 
         return AnalysisPayload(
@@ -456,6 +503,7 @@ class InferenceService:
             detections=last_detections,
             transitions=transitions,
             per_frame=per_frame,
+            angle_track=angle_track,
         )
 
     @staticmethod
@@ -527,21 +575,131 @@ class InferenceService:
             )
         return detections
 
+    @staticmethod
+    def _resolve_drone_samples(
+        media_path: Path,
+        drone_metadata: tuple[float, float, float] | None,
+        drone_samples: list[DroneSample] | None,
+    ) -> tuple[list[DroneSample] | None, str | None]:
+        """Resolve telemetry fixes + a source label for the angle calc.
+
+        Priority: an uploaded telemetry-file track > a manual lat/lon/alt fix on the
+        request > the media's embedded DJI XMP / EXIF GPS. Returns ``(None, None)``
+        when no source carries usable telemetry, so the caller marks the angle
+        unavailable rather than inventing one.
+        """
+        if drone_samples:
+            return drone_samples, "telemetry_file"
+        if drone_metadata:
+            lat, lon, alt = drone_metadata
+            return [DroneSample(lat, lon, alt)], "request_metadata"
+        embedded = extract_gps_metadata(media_path)
+        if embedded is not None:
+            lat, lon, alt = embedded
+            return [DroneSample(lat, lon, alt)], "file_metadata"
+        return None, None
+
+    def _angle_from_samples(
+        self,
+        samples: list[DroneSample] | None,
+        angle_source: str | None,
+        runway_id: str,
+    ) -> AngleResult:
+        """Representative single elevation angle from a telemetry track.
+
+        The MIDDLE fix is the representative position (a descent's mid-point is a fair
+        one-number summary for the overlay / readout / log); the full sweep is carried
+        separately by the per-frame angle track. A single fix is its own representative.
+        """
+        if not samples:
+            return unavailable_angle(
+                "GPS/altitude metadata not available. Browser uploads usually preserve the original file "
+                "bytes, but many exported/compressed videos and images do not contain drone telemetry. "
+                "Upload the drone's telemetry file (DJI .SRT / CSV / JSON) or enter the position manually."
+            )
+        rep = samples[len(samples) // 2]
+        return compute_elevation_angles(
+            rep.latitude, rep.longitude, rep.altitude_m, runway_id, angle_source=angle_source or "metadata"
+        )
+
     def _angle_for_media(
         self,
         media_path: Path,
         runway_id: str,
         drone_metadata: tuple[float, float, float] | None,
+        drone_samples: list[DroneSample] | None = None,
     ) -> AngleResult:
-        angle_source = "request_metadata" if drone_metadata else "file_metadata"
-        metadata = drone_metadata or extract_gps_metadata(media_path)
-        if metadata is None:
-            return unavailable_angle(
-                "GPS/altitude metadata not available. Browser uploads usually preserve the original file bytes, "
-                "but many exported/compressed videos and images do not contain drone telemetry."
+        """Single-fix elevation angle for an image (or any non-tracked media)."""
+        samples, source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
+        return self._angle_from_samples(samples, source, runway_id)
+
+    def _build_angle_track(
+        self,
+        drone_samples: list[DroneSample] | None,
+        runway_id: str,
+        frame_count: int,
+        track_observations: dict[int, list[tuple]],
+    ) -> tuple[list[AngleSample], dict[int, float]]:
+        """Per-frame angle track + a frame_index -> midpoint-angle map.
+
+        Aligns the telemetry track to the processed frames (``resample_to_frames``),
+        computes the PAPI-midpoint elevation angle per frame, and tags each frame with
+        the lamps observed there (stable ByteTrack identity). With fewer than two
+        fixes there is nothing to sweep, so an empty track + map is returned and the
+        single representative angle on the payload covers it. The surfaced track is
+        evenly downsampled to ``_MAX_ANGLE_TRACK_POINTS``; the full-resolution
+        ``frame_angles`` map still tags every transition with the angle at its frame.
+        """
+        if not drone_samples or len(drone_samples) < 2 or frame_count <= 0:
+            return [], {}
+
+        resampled = resample_to_frames(drone_samples, frame_count)
+        # Cache midpoint angle by (lat, lon, alt): nearest-frame resampling reuses the
+        # same fix across several frames, so this avoids recomputing identical angles.
+        cache: dict[tuple[float, float, float], float | None] = {}
+        frame_angles: dict[int, float] = {}
+        for frame_index, sample in enumerate(resampled):
+            key = (sample.latitude, sample.longitude, sample.altitude_m)
+            if key not in cache:
+                cache[key] = compute_elevation_angles(
+                    sample.latitude, sample.longitude, sample.altitude_m, runway_id
+                ).elevation_angle_deg
+            angle_deg = cache[key]
+            if angle_deg is not None:
+                frame_angles[frame_index] = round(angle_deg, 6)
+
+        # Per-frame per-lamp colour by stable identity, so each angle sample lists the
+        # lamps actually seen at that frame.
+        index_by_track = lamp_index_by_track(track_observations)
+        frame_lamps: dict[int, dict[int, tuple[str, float]]] = {}
+        for track_id, observations in track_observations.items():
+            lamp_index = index_by_track.get(track_id)
+            if lamp_index is None:
+                continue
+            for frame_idx, color, _center_x, conf in observations:
+                frame_lamps.setdefault(frame_idx, {})[lamp_index] = (color, float(conf))
+
+        kept = self._evenly_spaced(sorted(frame_angles), _MAX_ANGLE_TRACK_POINTS)
+        track = [
+            AngleSample(
+                frame_index=frame_index,
+                elevation_angle_deg=frame_angles[frame_index],
+                lamps=[
+                    FrameLampState(index=idx, state=state, confidence=round(conf, 4))
+                    for idx, (state, conf) in sorted(frame_lamps.get(frame_index, {}).items())
+                ],
             )
-        latitude, longitude, altitude = metadata
-        return compute_elevation_angles(latitude, longitude, altitude, runway_id, angle_source=angle_source)
+            for frame_index in kept
+        ]
+        return track, frame_angles
+
+    @staticmethod
+    def _evenly_spaced(items: list[int], cap: int) -> list[int]:
+        """Down-sample a sorted list to at most ``cap`` evenly-spaced entries (endpoints kept)."""
+        if cap <= 0 or len(items) <= cap:
+            return items
+        step = (len(items) - 1) / (cap - 1)
+        return [items[index] for index in sorted({round(i * step) for i in range(cap)})]
 
     # Retained on the class so the BGR overlay palette stays reachable via the
     # service surface; the canonical definition lives in ``overlay.LAMP_COLORS``.
