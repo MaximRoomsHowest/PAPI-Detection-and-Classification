@@ -51,20 +51,32 @@ class Settings(BaseSettings):
         alias="PAPI_CORS_ORIGINS",
     )
     confidence_threshold: float = Field(default=0.4, ge=0.0, le=1.0, alias="PAPI_CONFIDENCE_THRESHOLD")
-    video_history_size: int = Field(default=5, alias="PAPI_VIDEO_HISTORY_SIZE")
-    max_upload_mb: int = Field(default=100, alias="PAPI_MAX_UPLOAD_MB")
-    max_video_frames: int = Field(default=600, alias="PAPI_MAX_VIDEO_FRAMES")
-    max_video_seconds: int = Field(default=30, alias="PAPI_MAX_VIDEO_SECONDS")
+    # Sliding-window length backing the per-stream majority vote (deque maxlen
+    # in inference._run_tracked_sequence). Must be >= 1 — maxlen=0 would make the
+    # window drop every frame and break the Counter.most_common aggregation. The
+    # upper bound just guards against an absurd env value pinning memory.
+    video_history_size: int = Field(default=5, ge=1, le=1000, alias="PAPI_VIDEO_HISTORY_SIZE")
+    # Per-file upload ceiling in megabytes (media.save_upload streams and aborts
+    # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
+    # env var from effectively disabling the limit.
+    max_upload_mb: int = Field(default=100, ge=1, le=10000, alias="PAPI_MAX_UPLOAD_MB")
+    # Hard cap on frames decoded from an uploaded video. >= 1; upper bound keeps a
+    # runaway value from holding the worker indefinitely.
+    max_video_frames: int = Field(default=600, ge=1, le=100000, alias="PAPI_MAX_VIDEO_FRAMES")
+    # Duration-based frame cap (combined with max_video_frames, the lower wins).
+    # 0 is a supported sentinel meaning "no duration cap" (inference._video_frame_limit),
+    # so the lower bound stays ge=0 rather than gt=0. Upper bound guards against typos.
+    max_video_seconds: int = Field(default=30, ge=0, le=86400, alias="PAPI_MAX_VIDEO_SECONDS")
     # Aggregate upper bound on a single POST /api/analyze-frames call. The
     # backend processes frames sequentially per request, so an unbounded
     # list would hold the worker for minutes; per-file size is checked,
     # count was not. Configurable via env so the demo can raise it for
     # benchmarking (audit B-MAJ-5).
-    max_batch_frames: int = Field(default=200, ge=1, alias="PAPI_MAX_BATCH_FRAMES")
+    max_batch_frames: int = Field(default=200, ge=1, le=100000, alias="PAPI_MAX_BATCH_FRAMES")
     # FPS assigned to a folder->video sequence: the uploaded images are treated as
     # consecutive video frames, so this sets annotated-playback speed and the
     # transition frame-gap timing. It does not affect detection.
-    sequence_fps: float = Field(default=4.0, gt=0, alias="PAPI_SEQUENCE_FPS")
+    sequence_fps: float = Field(default=4.0, gt=0, le=120.0, alias="PAPI_SEQUENCE_FPS")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

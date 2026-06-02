@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # Per-frame lamp verdict. "obscured" = a lamp position the detector did not find
 # (occluded, too dim/distant, or physically missing) — surfaced as a real category
@@ -23,10 +23,26 @@ GlobalState = Literal[
 
 
 class BoundingBox(BaseModel):
+    """Pixel-space detection box in top-left-origin image coordinates.
+
+    ``(x1, y1)`` is the top-left corner and ``(x2, y2)`` the bottom-right, so a
+    well-formed box always has ``x2 >= x1`` and ``y2 >= y1`` (zero-area boxes are
+    allowed — a single-pixel lamp is legitimate). The validator rejects inverted
+    coordinates early instead of letting them propagate into the crop/overlay math.
+    """
+
     x1: int
     y1: int
     x2: int
     y2: int
+
+    @model_validator(mode="after")
+    def _check_ordering(self) -> "BoundingBox":
+        if self.x2 < self.x1:
+            raise ValueError("x2 must be >= x1")
+        if self.y2 < self.y1:
+            raise ValueError("y2 must be >= y1")
+        return self
 
 
 class Detection(BaseModel):
@@ -54,8 +70,14 @@ class LampResult(BaseModel):
 
 
 class AnglePerLight(BaseModel):
+    """Per-lamp geometry: horizontal ground distance and elevation angle to one lamp.
+
+    ``distance_m`` is a horizontal distance (``math.hypot`` of the ENU east/north
+    components) and is therefore never negative.
+    """
+
     runway_lamp: int
-    distance_m: float
+    distance_m: float = Field(ge=0.0)
     elevation_angle_deg: float
 
 
@@ -92,7 +114,8 @@ class AnalysisPayload(BaseModel):
     drone_id: str | None = None
     global_state: GlobalState
     lamps: list[LampResult]
-    confidence: float
+    # Aggregate detection confidence for the analysis — a probability, so [0, 1].
+    confidence: float = Field(ge=0.0, le=1.0)
     frame_count: int
     processing_ms: int
     angle: AngleResult

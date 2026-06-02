@@ -34,10 +34,19 @@ def _sha256_cached(path_str: str, mtime_ns: int, size: int) -> str:
 
 
 def compute_sha256(path: Path) -> str | None:
-    """Return the SHA-256 hex digest of ``path`` (None if it is not a readable file)."""
-    if not path.is_file():
-        return None
+    """Return the SHA-256 hex digest of ``path``, or ``None`` if it cannot be hashed.
+
+    ``None`` is the agreed sentinel for "no digest" (``ModelInfo.sha256`` is optional
+    and the only caller passes the result straight through). It covers every reason
+    the file is not a readable regular file: absent, a directory, permission-denied,
+    or — the race this guards against — deleted/swapped *between* the existence check
+    and the read. ``is_file()``, ``stat()`` and the ``open()`` inside ``_sha256_cached``
+    are therefore all inside one ``try`` so a TOCTOU disappearance surfaces as the
+    sentinel rather than an uncaught ``FileNotFoundError``.
+    """
     try:
+        if not path.is_file():
+            return None
         stat = path.stat()
         return _sha256_cached(str(path), stat.st_mtime_ns, stat.st_size)
     except OSError:

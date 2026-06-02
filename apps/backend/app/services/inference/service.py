@@ -10,13 +10,16 @@ from uuid import uuid4
 
 from app.config import Settings
 from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
+from app.services.inference.aggregation import aggregate_video_lamps
+from app.services.inference.cv2_loader import require_cv2
+from app.services.inference.overlay import LAMP_COLORS, draw_overlay
+from app.services.inference.video_writer import open_video_writer
 from app.services.model_registry import compute_sha256, load_model_card
 from app.services.state import (
     DETECTION_CLASS_TO_STATE,
     confidence_from_lamps,
     detect_lamp_transitions,
     global_state_from_lamps,
-    lamp_index_by_track,
     normalize_detections,
 )
 from app.validation.schemas import AnalysisPayload, AngleResult, LampResult, ModelInfo, ValMetrics
@@ -86,26 +89,9 @@ class InferenceService:
     def _open_video_writer(
         cv2: Any, base_path: Path, fps: float, width: int, height: int
     ) -> tuple[Any, Path] | tuple[None, None]:
-        """Open an annotated-video writer with a BROWSER-PLAYABLE codec, returning
-        (writer, path) with the file extension matched to the chosen codec
-        (audit IMP-SRV-6 / video-annotation-unplayable).
-
-        Order of preference:
-          1. avc1 (H.264, .mp4) — ideal, but the headless opencv-python wheel ships
-             no H.264 *encoder* (licensing), so this opens only where one is present.
-          2. VP8 (.webm) — the headless build CAN encode this and every modern
-             browser plays it, so it is the working default in the Docker image.
-          3. mp4v (MPEG-4 Part 2, .mp4) — last resort: opens almost everywhere but
-             most browsers refuse to play it ("Unable to play media").
-        Returns (None, None) if no codec opens a writer.
-        """
-        for codec, ext in (("avc1", ".mp4"), ("VP80", ".webm"), ("mp4v", ".mp4")):
-            path = base_path.with_suffix(ext)
-            writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
-            if writer.isOpened():
-                return writer, path
-            writer.release()
-        return None, None
+        """Delegates to ``video_writer.open_video_writer`` (kept as a method so the
+        codec policy stays reachable via the service surface)."""
+        return open_video_writer(cv2, base_path, fps, width, height)
 
     @property
     def model(self) -> Any:
@@ -381,6 +367,11 @@ class InferenceService:
         frame_count = 0
         last_detections: list[dict] = []
 
+        # The annotated artifact is partially written as the loop runs. If the loop
+        # raises (in-loop too-long guard) OR finishes with no readable frames, that
+        # partial file must NOT survive as an orphan: release the writer AND unlink
+        # it before re-raising. A SUCCESSFUL run releases the writer and keeps the
+        # artifact (audit: orphaned-annotated-artifact on max_frames exceeded).
         try:
             for frame in frames:
                 if frame_count >= max_frames:
@@ -424,12 +415,17 @@ class InferenceService:
 
                 last_detections = detections
                 frame_count += 1
-        finally:
-            writer.release()
 
-        if frame_count == 0:
+            if frame_count == 0:
+                raise ValueError(empty_message)
+        except BaseException:
+            # Any failure (too-long mid-loop, empty stream, or an unexpected error)
+            # discards the half-written artifact instead of leaking it to disk.
+            writer.release()
             artifact_path.unlink(missing_ok=True)
-            raise ValueError(empty_message)
+            raise
+        else:
+            writer.release()
 
         final_lamps = self._aggregate_video_lamps(track_observations)
         global_state = global_state_from_lamps(final_lamps)
@@ -459,30 +455,10 @@ class InferenceService:
     ) -> list[LampResult]:
         """Final per-lamp video verdict, aggregated by STABLE ByteTrack identity.
 
-        Each lamp's colour is a majority vote over the frames its track was seen;
-        tracks map to lamp 1..4 left-to-right via ``lamp_index_by_track`` (the same
-        identity the transition detector uses). Keying off track id rather than the
-        per-frame left-to-right rank prevents a dropped/re-ordered frame from mixing
-        observations of different physical lamps. Tuples: (frame, color, center_x, conf).
+        Delegates to ``aggregation.aggregate_video_lamps`` (kept as a static method
+        so unit tests can call ``InferenceService._aggregate_video_lamps`` directly).
         """
-        index_by_track = lamp_index_by_track(track_observations)
-        obs_by_index: dict[int, list[tuple]] = {}
-        for tid, obs in track_observations.items():
-            index = index_by_track.get(tid)
-            if index is not None:
-                obs_by_index[index] = obs
-
-        final_lamps: list[LampResult] = []
-        for index in range(1, 5):
-            obs = obs_by_index.get(index, [])
-            if not obs:
-                final_lamps.append(LampResult(index=index, state="obscured", confidence=0.0))
-                continue
-            state = Counter(o[1] for o in obs).most_common(1)[0][0]
-            matching = [o for o in obs if o[1] == state]
-            confidence = round(sum(o[3] for o in matching) / len(matching), 4)
-            final_lamps.append(LampResult(index=index, state=state, confidence=confidence))
-        return final_lamps
+        return aggregate_video_lamps(track_observations)
 
     def _detect_frame(
         self,
@@ -558,18 +534,9 @@ class InferenceService:
         latitude, longitude, altitude = metadata
         return compute_elevation_angles(latitude, longitude, altitude, runway_id, angle_source=angle_source)
 
-    # BGR color map (cv2 stores BGR, not RGB). At runtime a lamp's per-frame state
-    # is only red/white/unknown (the detector is two-class), so the overlay draws
-    # those; white<->red transitions are reported as temporal events
-    # (detect_lamp_transitions), not per-frame. The amber 'transition' entry is
-    # retained so the overlay is ready should a per-frame transition state be added.
-    _LAMP_COLORS: dict[str, tuple[int, int, int]] = {
-        "white": (245, 245, 245),
-        "red": (0, 0, 255),
-        "transition": (0, 165, 255),
-        "obscured": (90, 90, 90),
-        "unknown": (128, 128, 128),
-    }
+    # Retained on the class so the BGR overlay palette stays reachable via the
+    # service surface; the canonical definition lives in ``overlay.LAMP_COLORS``.
+    _LAMP_COLORS: dict[str, tuple[int, int, int]] = LAMP_COLORS
 
     def _draw_overlay(
         self,
@@ -579,41 +546,18 @@ class InferenceService:
         confidence: float,
         elevation_angle_deg: float | None,
     ) -> Any:
-        cv2 = self._require_cv2()
-        for lamp in lamps:
-            if lamp.bbox is None:
-                continue
-            color = self._LAMP_COLORS.get(lamp.state, self._LAMP_COLORS["unknown"])
-            cv2.rectangle(frame, (lamp.bbox.x1, lamp.bbox.y1), (lamp.bbox.x2, lamp.bbox.y2), color, 2)
-            cv2.putText(
-                frame,
-                f"L{lamp.index}: {lamp.state} {lamp.confidence:.2f}",
-                (lamp.bbox.x1, max(24, lamp.bbox.y1 - 8)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                color,
-                2,
-            )
-
-        angle_text = "angle: unavailable" if elevation_angle_deg is None else f"angle: {elevation_angle_deg:.3f} deg"
-        lines = [
-            f"PAPI: {global_state}",
-            f"confidence: {confidence:.2f}",
-            angle_text,
-        ]
-        y = 40
-        for line in lines:
-            cv2.putText(frame, line, (20, y), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 0), 2)
-            y += 36
-        return frame
+        return draw_overlay(
+            self._require_cv2(),
+            frame,
+            lamps,
+            global_state,
+            confidence,
+            elevation_angle_deg,
+        )
 
     @staticmethod
     def _require_cv2():
-        try:
-            import cv2
-        except ImportError as exc:
-            raise RuntimeError("OpenCV is not installed. Run `pip install -r requirements.txt`.") from exc
-        return cv2
+        return require_cv2()
 
     def _video_frame_limit(self, fps: float) -> int:
         frame_limit = max(1, self.settings.max_video_frames)

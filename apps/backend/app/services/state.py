@@ -19,6 +19,20 @@ DETECTION_CLASS_TO_STATE = {
     1: "white",
 }
 
+# The only per-frame lamp states that represent a real detection the model made.
+# A slot that is "obscured" (detector found nothing) or "unknown" (class fell
+# outside the two-class map) carries no measured confidence, so these are the
+# states that count when averaging confidence or judging a complete 4-lamp unit.
+# Single source of truth shared by ``confidence_from_lamps`` and the obscured pad
+# logic so the two can't drift on what "a real lamp reading" means.
+DETECTED_LAMP_STATES = frozenset({"red", "white"})
+
+# State assigned to a lamp slot the detector did not fill. Distinct from the
+# generic "unknown" so the insights charts can surface "nothing detected here" as
+# its own category instead of silently dropping the lamp. Carries no detection,
+# hence confidence 0.0 and no bbox.
+_OBSCURED_LAMP_STATE = "obscured"
+
 GLOBAL_STATE_LABELS = {
     "far_too_high": "Far too high",
     "too_high": "Too high",
@@ -61,11 +75,14 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
             )
         )
 
-    # Pad missing lamp slots so every verdict has exactly 4 entries. An undetected
-    # slot is "obscured" (not the generic "unknown") so the insights charts can
-    # surface it as a distinct, real category rather than silently dropping the lamp.
+    # Pad missing lamp slots so every verdict has exactly 4 entries. Each empty
+    # slot is "obscured" (see _OBSCURED_LAMP_STATE) rather than the generic
+    # "unknown", giving the insights charts a distinct "nothing detected here"
+    # category instead of silently dropping the lamp.
     while len(lamps) < 4:
-        lamps.append(LampResult(index=len(lamps) + 1, state="obscured", confidence=0.0))
+        lamps.append(
+            LampResult(index=len(lamps) + 1, state=_OBSCURED_LAMP_STATE, confidence=0.0)
+        )
 
     return lamps
 
@@ -160,15 +177,20 @@ def global_state_from_lamps(lamps: list[LampResult]) -> str:
         return "transition"
 
     counts = Counter(lamp.state for lamp in lamps)
-    if counts["white"] + counts["red"] != 4:
+    detected_count = sum(counts[state] for state in DETECTED_LAMP_STATES)
+    if detected_count != 4:
         return "unknown"
     return _WHITE_COUNT_TO_STATE.get(counts["white"], "unknown")
 
 
 def confidence_from_lamps(lamps: list[LampResult]) -> float:
-    # Only actually-detected lamps (red/white) contribute; "obscured"/"unknown"
-    # slots carry no real detection, so they must not dilute the average.
-    known = [lamp.confidence for lamp in lamps if lamp.state in {"white", "red"}]
-    if not known:
+    """Mean detector confidence over the lamps that were actually detected.
+
+    Only red/white lamps (``DETECTED_LAMP_STATES``) carry a real measurement;
+    "obscured"/"unknown" slots have no detection behind them, so averaging them in
+    would dilute the score toward zero. Returns 0.0 when nothing was detected.
+    """
+    detected = [lamp.confidence for lamp in lamps if lamp.state in DETECTED_LAMP_STATES]
+    if not detected:
         return 0.0
-    return round(sum(known) / len(known), 4)
+    return round(sum(detected) / len(detected), 4)

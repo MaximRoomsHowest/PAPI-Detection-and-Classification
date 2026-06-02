@@ -37,6 +37,12 @@ def get_session() -> Generator[Session, None, None]:
     db = get_sessionmaker()()
     try:
         yield db
+    except Exception:
+        # Roll back any partial/uncommitted work before returning the
+        # connection to the pool, so a request that raised mid-transaction
+        # can't leak a dirty session to the next checkout.
+        db.rollback()
+        raise
     finally:
         db.close()
 
