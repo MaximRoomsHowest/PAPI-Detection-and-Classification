@@ -57,7 +57,7 @@ function AngleChart({ lampIndex, points, plotTheme, copy }) {
 
   const layout = {
     autosize: true,
-    height: 220,
+    height: 280,
     margin: { l: 88, r: 14, t: 8, b: 42 },
     paper_bgcolor: plotTheme.paper,
     plot_bgcolor: plotTheme.paper,

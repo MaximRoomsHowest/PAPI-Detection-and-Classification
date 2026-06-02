@@ -38,7 +38,7 @@ function PerLightStateMix({ results, plotTheme, copy }) {
       data={data}
       layout={{
         autosize: true,
-        height: 260,
+        height: 320,
         barmode: 'stack',
         margin: { l: 44, r: 14, t: 10, b: 40 },
         paper_bgcolor: plotTheme.paper,
@@ -76,7 +76,7 @@ function ConfidenceDistribution({ results, plotTheme, copy }) {
       ]}
       layout={{
         autosize: true,
-        height: 260,
+        height: 320,
         bargap: 0.04,
         margin: { l: 44, r: 14, t: 10, b: 42 },
         paper_bgcolor: plotTheme.paper,

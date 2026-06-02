@@ -10,6 +10,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Headings: a little negative tracking tightens the display type so multi-word
+   titles read as one unit. Per-section sizes/weights/colours stay as they are. */
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.018em;
+}
+
+h1 {
+  letter-spacing: -0.024em;
+}
+
 .app-shell {
   min-height: 100vh;
   /* Faint blueprint grid: two repeating gradients in var(--grid) over the
@@ -256,6 +269,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
 .language-trigger:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
 }
 
 .language-menu {
@@ -267,10 +281,10 @@ html[data-theme='dark'] .brand-logo .logo-light {
   gap: 5px;
   min-width: 184px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
-  box-shadow: var(--shadow-soft);
-  padding: 6px;
+  box-shadow: var(--shadow-strong);
+  padding: 8px;
   animation: language-menu-enter 160ms ease-out;
 }
 
@@ -292,7 +306,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
   align-items: center;
   min-height: 42px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -344,7 +358,9 @@ html[data-theme='dark'] .brand-logo .logo-light {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.7px;
-  transition: color 160ms ease;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
 }
 
 .topnav .nav-link:last-child {
@@ -360,6 +376,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
 
 .topnav .nav-link:hover {
   color: var(--accent);
+  background: color-mix(in oklab, var(--accent-cyan) 7%, transparent);
 }
 
 .topnav .nav-link.active {
@@ -373,7 +390,8 @@ html[data-theme='dark'] .brand-logo .logo-light {
   right: 12px;
   bottom: -1px;
   height: 2px;
-  background: var(--accent);
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-cyan));
 }
 
 .topnav .nav-link:focus-visible {
@@ -425,4 +443,29 @@ html[data-theme='dark'] .brand-logo .logo-light {
 .upload-button:focus-within {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
+}
+
+/* Refined scrollbars — slim, brand-tinted, rounded. `scrollbar-color` covers
+   Firefox; the ::-webkit pseudo-elements cover Chromium/WebKit. Cosmetic only. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--accent) 45%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+  background-clip: padding-box;
 }

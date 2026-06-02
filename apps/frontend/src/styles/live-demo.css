@@ -136,9 +136,10 @@
 }
 
 .frame-view-toggle button {
-  padding: 3px 10px;
+  min-height: 32px;
+  padding: 6px 12px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
@@ -560,10 +561,13 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-height: 56vh;
+  /* Taller verification viewport so the PAPI lights read clearly by eye on a
+     high-resolution frame. The box overlays are ratio-based (see LampCropZoom),
+     so a larger clamp never shifts them off the lamps. */
+  max-height: clamp(320px, 62vh, 560px);
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: #05080c;
 }
 

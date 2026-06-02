@@ -23,9 +23,24 @@
 }
 
 .section-heading h2 {
+  position: relative;
   max-width: 780px;
+  padding-left: 14px;
   font-size: 30px;
   line-height: 1.12;
+}
+
+/* Thin navy→cyan rule to the left of each section title — a small flight-strip
+   accent that anchors the heading without changing its size. */
+.section-heading h2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.18em;
+  bottom: 0.18em;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-cyan));
 }
 
 .source-note {
@@ -62,6 +77,7 @@
 
 /* Site footer (ported from New_frontend; uses the merged palette tokens). */
 .site-footer {
+  position: relative;
   margin-top: 48px;
   color: #ffffff;
   background: linear-gradient(
@@ -69,6 +85,21 @@
     color-mix(in srgb, var(--footer-bg-deep) 94%, #000000) 0%,
     var(--footer-bg) 54%,
     color-mix(in srgb, var(--accent) 70%, var(--footer-bg)) 100%
+  );
+}
+
+/* Faint luminous hairline along the top edge — a clean seam between the page
+   content above and the footer. */
+.site-footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
   );
 }
 
@@ -189,6 +220,17 @@
   cursor: not-allowed;
 }
 
+/* Soft elevation on hover for the outline / upload buttons (the filled primary
+   button has its own deeper lift defined above). */
+.secondary-button:hover:not(:disabled),
+.upload-button:hover {
+  box-shadow: var(--shadow-elev);
+}
+
+.upload-button:hover {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+}
+
 .demo-actions {
   display: grid;
   /* auto-fit so the runway selector + the three action buttons wrap cleanly
@@ -283,13 +325,24 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  box-shadow: var(--shadow-soft);
+  /* Inset top highlight + a soft navy key shadow so the filled button reads as
+     gently raised against the surface. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 20px -10px color-mix(in oklab, var(--accent-fill) 70%, transparent);
+}
+
+.primary-button:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 12px 24px -12px color-mix(in oklab, var(--accent-fill) 75%, transparent);
 }
 
 .primary-button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
   transform: none;
+  box-shadow: none;
 }
 
 .analysis-status {

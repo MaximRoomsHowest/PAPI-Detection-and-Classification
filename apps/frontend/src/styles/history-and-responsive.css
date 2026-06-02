@@ -221,6 +221,7 @@
 .secondary-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
 }
 
 /* A detected lamp under 50% confidence is flagged amber (plus a ⚠ glyph in the
@@ -229,7 +230,10 @@
   border-color: var(--warn);
 }
 .lamp-card.is-low-confidence small {
-  color: var(--warn);
+  /* The amber card border + the ⚠ glyph already flag low confidence, so keep the
+     text itself at full-strength colour: amber-on-tint fails WCAG AA as body
+     text, and this also stops the warning being conveyed by colour alone. */
+  color: var(--text-strong);
   font-weight: 700;
 }
 
@@ -254,7 +258,7 @@
   max-height: min(86vh, 900px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-strong);
   padding: 18px;
@@ -658,6 +662,12 @@
   .frame-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  /* Larger frame-step buttons on touch viewports (closer to the 44px target). */
+  .frame-nav-controls button {
+    width: 36px;
+    height: 36px;
   }
 
   .lamp-card {

@@ -68,7 +68,7 @@ function TransitionTimeline({ transitions, plotTheme, copy }) {
       ]}
       layout={{
         autosize: true,
-        height: 300,
+        height: 360,
         margin: { l: 78, r: 16, t: 10, b: 42 },
         paper_bgcolor: plotTheme.paper,
         plot_bgcolor: plotTheme.paper,
@@ -116,7 +116,7 @@ function TransitionCountBar({ transitions, plotTheme, copy }) {
       ]}
       layout={{
         autosize: true,
-        height: 260,
+        height: 320,
         margin: { l: 48, r: 16, t: 10, b: 40 },
         paper_bgcolor: plotTheme.paper,
         plot_bgcolor: plotTheme.paper,

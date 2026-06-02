@@ -57,7 +57,7 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
       ]}
       layout={{
         autosize: true,
-        height: 280,
+        height: 340,
         margin: { l: 46, r: 14, t: 10, b: 70 },
         paper_bgcolor: plotTheme.paper,
         plot_bgcolor: plotTheme.paper,
