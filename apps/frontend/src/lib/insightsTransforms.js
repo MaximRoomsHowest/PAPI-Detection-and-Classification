@@ -16,8 +16,10 @@ export function resolveAngle(angle, lampIndex) {
   if (!angle?.angle_available) {
     return null
   }
-  const perLight = angle.per_light_angles?.find((entry) => entry.runway_lamp === lampIndex)
-  const value = perLight?.elevation_angle_deg ?? angle.elevation_angle_deg
+  const perLightEntry = angle.per_light_angles?.find((entry) => entry.runway_lamp === lampIndex)
+  // ?? (not ||) so a legitimate 0 deg per-light angle is kept; only a
+  // null/undefined per-light value falls through to the frame-level angle.
+  const value = perLightEntry?.elevation_angle_deg ?? angle.elevation_angle_deg
   return Number.isFinite(value) ? value : null
 }
 
@@ -77,14 +79,20 @@ export function transitionCountSeries(transitions) {
 
 // --- Session distributions ---------------------------------------------------
 
+// One zeroed tally per countable lamp state. The exact key set also acts as the
+// allow-list below: a lamp whose state isn't one of these keys is ignored.
+const emptyStateBucket = () => ({ white: 0, red: 0, transition: 0, obscured: 0, unknown: 0 })
+
 // Per-light state counts across the session's results (real lamps[].state).
 export function perLightStateSeries(results) {
-  const counts = [1, 2, 3, 4].map(() => ({ white: 0, red: 0, transition: 0, obscured: 0, unknown: 0 }))
+  const counts = [1, 2, 3, 4].map(emptyStateBucket)
   for (const result of results ?? []) {
     for (const lamp of result?.lamps ?? []) {
-      const index = lamp.index
-      if (index >= 1 && index <= 4 && counts[index - 1][lamp.state] !== undefined) {
-        counts[index - 1][lamp.state] += 1
+      const bucket = lamp.index >= 1 && lamp.index <= 4 ? counts[lamp.index - 1] : null
+      // The `!== undefined` check keeps an unexpected state from creating a
+      // stray key (which would skew totals and change the bucket shape).
+      if (bucket && bucket[lamp.state] !== undefined) {
+        bucket[lamp.state] += 1
       }
     }
   }

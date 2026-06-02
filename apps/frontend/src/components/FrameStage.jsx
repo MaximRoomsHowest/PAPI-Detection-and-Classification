@@ -110,7 +110,16 @@ export function FrameStage({
           // key on the URL so toggling annotated<->original remounts the <video>
           // and actually loads the new source (changing src alone does not reload
           // a media element per the HTML spec) (audit H3).
-          <video key={displayMedia.url} src={displayMedia.url} autoPlay muted loop playsInline controls />
+          <video
+            key={displayMedia.url}
+            src={displayMedia.url}
+            aria-label={copy.live.frameAlt}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+          />
         ) : displayMedia?.type === 'image' ? (
           <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />
         ) : (

@@ -17,8 +17,13 @@ export function useModalA11y(ref, isOpen, onClose) {
       }
       // Trap focus inside the dialog (WCAG 2.4.3) so Tab can't reach the page behind it.
       if (event.key !== 'Tab') return
-      const focusable = ref.current?.querySelectorAll(focusableSelector)
-      if (!focusable || focusable.length === 0) return
+      const nodeList = ref.current?.querySelectorAll(focusableSelector)
+      if (!nodeList || nodeList.length === 0) return
+      // Skip disabled controls (input/select/textarea can match the selector while
+      // being :disabled and thus unfocusable) so Tab / Shift-Tab wrap to a real
+      // focusable element instead of stranding focus on a disabled button.
+      const focusable = Array.from(nodeList).filter((node) => !node.disabled)
+      if (focusable.length === 0) return
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
       if (event.shiftKey && document.activeElement === first) {

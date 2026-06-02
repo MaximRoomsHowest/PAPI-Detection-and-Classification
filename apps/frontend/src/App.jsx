@@ -16,6 +16,8 @@ import { translateScenario, translateState } from './i18n/translate'
 import { useAnalysis } from './hooks/useAnalysis'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { LiveDemoProvider } from './context/LiveDemoProvider'
 import { IntroductionPage } from './pages/IntroductionPage'
 import { LiveDemoPage } from './pages/LiveDemoPage'
 import { InsightsPage } from './pages/InsightsPage'
@@ -69,6 +71,15 @@ function App() {
         copy,
       ),
     [activeScenario, copy],
+  )
+
+  // Bundle the full useAnalysis() value with the two App-derived display objects
+  // into a single context value for the Live Demo subtree. Spreading `analysis`
+  // preserves every field name the page used to receive as a prop, so the page
+  // consumes the exact same data — just via context instead of ~16 drilled props.
+  const liveDemoValue = useMemo(
+    () => ({ ...analysis, activeScenario, activeState }),
+    [analysis, activeScenario, activeState],
   )
 
   const plotTheme = useMemo(
@@ -156,50 +167,42 @@ function App() {
       />
 
       <main id="main-content">
-        <Routes>
-        <Route path="/" element={<IntroductionPage copy={copy} />} />
-        <Route
-          path="/live-demo"
-          element={
-            <LiveDemoPage
-              activeScenario={activeScenario}
-              activeState={activeState}
-              isAnalyzing={analysis.isAnalyzing}
-              media={analysis.media}
-              runways={analysis.runways}
-              selectedRunwayId={analysis.selectedRunwayId}
-              onSelectRunway={analysis.setSelectedRunwayId}
-              backendScenario={analysis.backendScenario}
-              backendFrames={analysis.backendFrames}
-              backendFrameIndex={analysis.backendFrameIndex}
-              analysisError={analysis.analysisError}
-              analysisProgress={analysis.analysisProgress}
-              handleMediaFiles={analysis.handleMediaFiles}
-              runBackendInference={analysis.runBackendInference}
-              selectBackendFrame={analysis.selectBackendFrame}
-              handleMediaChange={analysis.handleMediaChange}
-              copy={copy}
-            />
-          }
-        />
-        <Route
-          path="/insights"
-          element={
-            <InsightsPage
-              backendResults={analysis.backendResults}
-              plotTheme={plotTheme}
-              insightsRef={analysis.insightsRef}
-              isExporting={analysis.isExporting}
-              exportError={analysis.exportError}
-              onDownloadCharts={analysis.handleDownloadCharts}
-              copy={copy}
-            />
-          }
-        />
-        <Route path="/history" element={<HistoryPage copy={copy} />} />
-        <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
-        <Route path="*" element={<NotFound copy={copy} />} />
-        </Routes>
+        {/* Route-level boundary: a render crash in any single page is caught here
+            so the shell (Topbar / Footer / Toaster) survives and shows a
+            recover-by-reload fallback in place of the routed view, instead of
+            the whole app blanking. Complements the top-level boundary in main.jsx. */}
+        <ErrorBoundary>
+          <Routes>
+          <Route path="/" element={<IntroductionPage copy={copy} />} />
+          <Route
+            path="/live-demo"
+            element={
+              // The Live Demo subtree reads the analysis state + display objects
+              // from context (see LiveDemoContext) instead of ~16 drilled props.
+              <LiveDemoProvider value={liveDemoValue}>
+                <LiveDemoPage copy={copy} />
+              </LiveDemoProvider>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <InsightsPage
+                backendResults={analysis.backendResults}
+                plotTheme={plotTheme}
+                insightsRef={analysis.insightsRef}
+                isExporting={analysis.isExporting}
+                exportError={analysis.exportError}
+                onDownloadCharts={analysis.handleDownloadCharts}
+                copy={copy}
+              />
+            }
+          />
+          <Route path="/history" element={<HistoryPage copy={copy} />} />
+          <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
+          <Route path="*" element={<NotFound copy={copy} />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
 
       <AppFooter copy={copy} />

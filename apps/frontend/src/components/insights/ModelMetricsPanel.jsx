@@ -7,6 +7,7 @@ import { fetchModelInfo, fetchStats } from '../../lib/api'
 import { plotlyConfig } from '../../catalog/plotly'
 import { backendStateId, stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
+import { percent } from '../../lib/format'
 
 // Aggregate model/dataset panel. All values come from the backend:
 //   /api/stats  -> logged global-state distribution + throughput
@@ -135,7 +136,7 @@ export function ModelMetricsPanel({ plotTheme, copy }) {
             <InlineMetric label={copy.insights.statsSamples} value={stats.data.total_analyses ?? 0} />
             <InlineMetric
               label={copy.insights.statsAvgConfidence}
-              value={stats.data.avg_confidence != null ? Math.round(stats.data.avg_confidence * 100) : '—'}
+              value={stats.data.avg_confidence != null ? percent(stats.data.avg_confidence) : '—'}
               suffix={stats.data.avg_confidence != null ? '%' : ''}
             />
             <InlineMetric

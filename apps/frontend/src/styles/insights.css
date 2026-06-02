@@ -112,7 +112,7 @@
   padding: 2px 8px;
   border-radius: 8px;
   background: var(--accent-fill);
-  color: #fff;
+  color: #ffffff;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.5px;
@@ -156,8 +156,8 @@
   font-size: 13px;
 }
 
-/* Plotly chart sizing + modebar theming (moved here from decoder-ribbon.css
-   when the dead decoder/ribbon UI was removed — audit dead-CSS cleanup). */
+/* Plotly chart sizing + modebar theming (moved here when the dead decoder/
+   ribbon UI was removed — audit dead-CSS cleanup). */
 .plotly-chart {
   width: 100%;
 }
@@ -209,12 +209,24 @@
   color: var(--text-muted);
 }
 
+/* Single shared base for every `.state-pill` (Insights transition table here +
+   the History table in history-and-responsive.css). Previously each file
+   declared its own conflicting base; the later import silently won for both, so
+   this carries the values that actually rendered. The per-context variants layer
+   on top: `.is-white` / `.is-red` below (Insights), `.state-pill-*` tints in
+   history-and-responsive.css (History). */
 .state-pill {
-  display: inline-block;
-  padding: 1px 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 9px;
   border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text-strong);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
+  text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .state-pill.is-white {

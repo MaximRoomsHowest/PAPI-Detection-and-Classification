@@ -24,15 +24,36 @@ async function seekVideo(video, timeSeconds) {
   await seeked
 }
 
-function canvasToJpeg(canvas, fileName) {
+// canvas.toBlob is async with no built-in timeout; on some browsers/codecs the
+// callback can simply never fire. Race it against a timer so a hung encode
+// rejects cleanly instead of blocking extractFrameImages (and its caller) forever.
+const CANVAS_TO_BLOB_TIMEOUT_MS = 15_000
+
+function canvasToJpeg(canvas, fileName, timeoutMs = CANVAS_TO_BLOB_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error('Timed out encoding a video frame.'))
+    }, timeoutMs)
+
+    const finish = (fn) => (value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn(value)
+    }
+    const succeed = finish(resolve)
+    const fail = finish(reject)
+
     canvas.toBlob(
       (blob) => {
         if (!blob) {
-          reject(new Error('Could not extract a video frame.'))
+          fail(new Error('Could not extract a video frame.'))
           return
         }
-        resolve(new File([blob], fileName, { type: 'image/jpeg' }))
+        succeed(new File([blob], fileName, { type: 'image/jpeg' }))
       },
       'image/jpeg',
       0.92,

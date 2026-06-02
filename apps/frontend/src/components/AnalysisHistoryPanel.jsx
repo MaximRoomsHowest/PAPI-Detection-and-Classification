@@ -90,19 +90,20 @@ export function AnalysisHistoryPanel({ activeScenario, backendFrames, backendFra
             )
 
             return (
-              <button
-                className={clsx('history-row', index === backendFrameIndex && 'active')}
-                key={`${frame.logId ?? frame.frame}-${index}`}
-                type="button"
-                aria-current={index === backendFrameIndex}
-                onClick={() => onSelectFrame(index)}
-              >
-                <span className="history-frame">{frame.frame}</span>
-                <span className="history-pattern">{formatLampCounts(frame.lamps, copy)}</span>
-                <span className="history-state">{state.label}</span>
-                <span className="history-angle">{frameAngle(frame, copy)}</span>
-                <span className="history-confidence">{frame.metrics.boxConfidence}%</span>
-              </button>
+              <div className="history-row-item" role="listitem" key={frame.logId ?? frame.frame}>
+                <button
+                  className={clsx('history-row', index === backendFrameIndex && 'active')}
+                  type="button"
+                  aria-current={index === backendFrameIndex}
+                  onClick={() => onSelectFrame(index)}
+                >
+                  <span className="history-frame">{frame.frame}</span>
+                  <span className="history-pattern">{formatLampCounts(frame.lamps, copy)}</span>
+                  <span className="history-state">{state.label}</span>
+                  <span className="history-angle">{frameAngle(frame, copy)}</span>
+                  <span className="history-confidence">{frame.metrics.boxConfidence}%</span>
+                </button>
+              </div>
             )
           })}
         </div>

@@ -28,7 +28,17 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
   const [clock, setClock] = useState(() => formatUtcClock())
   const languageMenuRef = useRef(null)
   const languageTriggerRef = useRef(null)
-  const languageOptionRefs = useRef([])
+  // Stable ref store keyed by the language code (not a render-time array index),
+  // so the ref callback never mutates an array during render. Each option's
+  // callback sets its own entry on mount and clears it on unmount.
+  const languageOptionRefs = useRef(new Map())
+  // Resolve an option's DOM node by its position in LANGUAGE_OPTIONS. Reads only
+  // the (stable) ref Map and the module-level option list, so it's safe to keep
+  // referentially stable and list as a hook dependency.
+  const optionNodeAt = useCallback(
+    (index) => languageOptionRefs.current.get(LANGUAGE_OPTIONS[index]) ?? null,
+    [],
+  )
 
   const closeLanguageMenu = useCallback(() => setLanguageMenuOpen(false), [])
   useClickOutside(languageMenuRef, closeLanguageMenu, languageMenuOpen)
@@ -47,8 +57,8 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
       return
     }
     const checkedIndex = Math.max(0, LANGUAGE_OPTIONS.indexOf(language))
-    languageOptionRefs.current[checkedIndex]?.focus()
-  }, [languageMenuOpen, language])
+    optionNodeAt(checkedIndex)?.focus()
+  }, [languageMenuOpen, language, optionNodeAt])
 
   // Language menu keyboard support (audit F24): Escape closes and returns focus
   // to the trigger; ArrowUp/ArrowDown roves between the menuitemradio options
@@ -63,7 +73,9 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
     }
 
     const lastIndex = LANGUAGE_OPTIONS.length - 1
-    const currentIndex = languageOptionRefs.current.indexOf(event.target)
+    const currentIndex = LANGUAGE_OPTIONS.findIndex(
+      (option) => languageOptionRefs.current.get(option) === event.target,
+    )
     let nextIndex = null
 
     if (key === 'ArrowDown') {
@@ -78,9 +90,9 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
 
     if (nextIndex !== null) {
       event.preventDefault()
-      languageOptionRefs.current[nextIndex]?.focus()
+      optionNodeAt(nextIndex)?.focus()
     }
-  }, [])
+  }, [optionNodeAt])
 
   const navItems = [
     { to: '/', label: copy.nav.introduction, end: true },
@@ -161,7 +173,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
               tabIndex={-1}
               onKeyDown={handleLanguageMenuKeyDown}
             >
-              {LANGUAGE_OPTIONS.map((option, index) => (
+              {LANGUAGE_OPTIONS.map((option) => (
                 <button
                   className={clsx(option === language && 'active')}
                   key={option}
@@ -170,7 +182,11 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
                   aria-checked={option === language}
                   tabIndex={option === language ? 0 : -1}
                   ref={(node) => {
-                    languageOptionRefs.current[index] = node
+                    if (node) {
+                      languageOptionRefs.current.set(option, node)
+                    } else {
+                      languageOptionRefs.current.delete(option)
+                    }
                   }}
                   onClick={() => {
                     onSelectLanguage(option)

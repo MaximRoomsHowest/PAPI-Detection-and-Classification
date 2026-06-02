@@ -86,6 +86,21 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
   }
 }
 
+/**
+ * Parse a successful response body, turning a malformed/truncated payload into a
+ * clean, actionable rejection instead of an opaque "Unexpected end of JSON input"
+ * (or similar) escaping as an unhandled throw. Callers have already checked
+ * `response.ok`, so a parse failure here means the backend sent a 2xx with a body
+ * we can't read — surface that distinctly (audit: guard the ok-path parse).
+ */
+async function parseJsonBody(response, label) {
+  try {
+    return await response.json()
+  } catch (error) {
+    throw new Error(`${label} returned a malformed response body.`, { cause: error })
+  }
+}
+
 export function mediaUrl(path) {
   if (!path) {
     return null
@@ -103,7 +118,7 @@ export async function fetchRunways() {
   if (!response.ok) {
     throw new Error(`Could not load runways (${response.status})`)
   }
-  return response.json()
+  return parseJsonBody(response, 'Runways')
 }
 
 export async function fetchModelInfo() {
@@ -113,7 +128,7 @@ export async function fetchModelInfo() {
   if (!response.ok) {
     throw new Error(`Could not load model info (${response.status})`)
   }
-  return response.json()
+  return parseJsonBody(response, 'Model info')
 }
 
 export async function fetchStats() {
@@ -123,7 +138,7 @@ export async function fetchStats() {
   if (!response.ok) {
     throw new Error(`Could not load inference stats (${response.status})`)
   }
-  return response.json()
+  return parseJsonBody(response, 'Inference stats')
 }
 
 /**
@@ -159,7 +174,7 @@ export async function fetchLogs(options = {}) {
   if (!response.ok) {
     throw new Error(`Could not load analysis history (${response.status})`)
   }
-  const data = await response.json()
+  const data = await parseJsonBody(response, 'Analysis history')
   const items = Array.isArray(data) ? data : []
   // X-Total-Count lets the History page show "page N of M" (audit IMP-BE-3).
   // Guard for stubbed responses (tests) that have no headers object.
@@ -182,7 +197,12 @@ export async function downloadLogsCsv(options = {}, filename = 'papi_analysis_lo
   if (!response.ok) {
     throw new Error(`Could not export logs (${response.status})`)
   }
-  const blob = await response.blob()
+  let blob
+  try {
+    blob = await response.blob()
+  } catch (error) {
+    throw new Error('Log export returned a malformed response body.', { cause: error })
+  }
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -200,7 +220,7 @@ export async function fetchLogDetail(logId) {
   if (!response.ok) {
     throw new Error(`Could not load analysis ${logId} (${response.status})`)
   }
-  return response.json()
+  return parseJsonBody(response, `Analysis ${logId}`)
 }
 
 export async function fetchSystem() {
@@ -210,7 +230,7 @@ export async function fetchSystem() {
   if (!response.ok) {
     throw new Error(`Could not load system info (${response.status})`)
   }
-  return response.json()
+  return parseJsonBody(response, 'System info')
 }
 
 /**
@@ -242,7 +262,7 @@ async function parseAnalysisResponse(response) {
     throw new Error(detail)
   }
 
-  return response.json()
+  return parseJsonBody(response, 'Analysis')
 }
 
 /**

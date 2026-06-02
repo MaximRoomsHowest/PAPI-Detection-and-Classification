@@ -260,6 +260,12 @@ export function useAnalysis(copy) {
         let bestScore = -1
 
         for (const [index, frame] of frames.entries()) {
+          // A newer upload bumped runIdRef while we were mid-loop — stop now so a
+          // superseded run can't keep pushing stale "Analyzing frame X" progress
+          // (or further analyzeFrame calls) onto the media the user replaced.
+          if (runIdRef.current !== runId) {
+            return
+          }
           setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
           const result = await analyzeFrame(frame.file, metadata)
           rawResults.push(result)

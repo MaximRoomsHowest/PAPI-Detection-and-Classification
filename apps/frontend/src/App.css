@@ -8,5 +8,11 @@
 @import './styles/sections.css';
 @import './styles/live-demo.css';
 @import './styles/insights.css';
-@import './styles/decoder-ribbon.css';
+/* History page + global @keyframes (pulse/spin/cue-bounce) + the responsive
+   @media breakpoints. (Formerly misnamed 'decoder-ribbon.css' — the decoder/
+   ribbon UI it was named for is long gone, but this slice is very much live:
+   it owns the History table, the keyframes referenced from base/live-demo/intro,
+   and every max-width breakpoint. Renamed for clarity; contents unchanged so the
+   cascade order is byte-for-byte preserved.) */
+@import './styles/history-and-responsive.css';
 @import './styles/misc.css';

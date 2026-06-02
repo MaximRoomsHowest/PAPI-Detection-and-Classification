@@ -10,7 +10,11 @@ export function useClickOutside(ref, onClose, active) {
         onClose()
       }
     }
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
+    // Capture phase: fire before any element-level pointerdown handler that might
+    // call stopPropagation(), so an outside click always closes the menu even if
+    // a parent in the tree swallows the bubbling event. The contains() check
+    // keeps clicks inside `ref` from closing it, so behavior is otherwise identical.
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true)
   }, [ref, onClose, active])
 }

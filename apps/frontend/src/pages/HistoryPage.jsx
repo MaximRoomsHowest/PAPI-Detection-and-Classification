@@ -418,13 +418,30 @@ export function HistoryPage({ copy }) {
       )}
 
       {selectedLog && (
-        <div
-          className="history-modal-backdrop"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setSelectedLog(null)
-          }}
-        >
+        <div className="history-modal-backdrop">
+          {/* Click-the-backdrop-to-dismiss as a real, keyboard-focusable control
+              instead of an onClick on a non-interactive <div> (which had no
+              keyboard path). It sits behind the dialog as a full-bleed layer;
+              Escape also closes via useModalA11y, and the focus trap keeps Tab
+              inside the dialog. Inline-positioned because CSS for this overlay
+              lives elsewhere and this component owns no stylesheet. */}
+          <button
+            type="button"
+            className="history-modal-dismiss"
+            aria-label={copy.history.close}
+            onClick={closeModal}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              border: 0,
+              padding: 0,
+              margin: 0,
+              background: 'transparent',
+              cursor: 'default',
+            }}
+          />
           <section
             className="history-modal"
             role="dialog"
@@ -432,6 +449,11 @@ export function HistoryPage({ copy }) {
             aria-labelledby="history-detail-title"
             ref={modalRef}
             tabIndex={-1}
+            // position:relative so the dialog paints above the absolutely-
+            // positioned backdrop-dismiss button (which would otherwise stack on
+            // top and swallow clicks). The .history-modal CSS sets no position,
+            // so this is purely additive.
+            style={{ position: 'relative' }}
           >
             <div className="history-modal-heading">
               <div>

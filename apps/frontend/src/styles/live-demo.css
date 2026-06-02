@@ -287,7 +287,14 @@
   border-bottom: 1px solid var(--border);
 }
 
-.status-dot {
+/* Scoped to the result panel's summary so it no longer collides with the
+   topbar backend-status badge, which is also `.status-dot` but smaller and
+   colour-driven by its own `--online/--offline/--checking` modifiers in
+   base.css. Before scoping, this (later-imported) rule leaked onto the topbar
+   dot — forcing it to 18px and `background: var(--dot-color)`, which is unset
+   there, so the badge rendered transparent. Descendant scope keeps this dot
+   pixel-identical while freeing the topbar badge to use its base.css size. */
+.state-summary .status-dot {
   width: 18px;
   height: 18px;
   margin-top: 4px;

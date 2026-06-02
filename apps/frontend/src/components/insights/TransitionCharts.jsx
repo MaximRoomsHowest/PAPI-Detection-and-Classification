@@ -82,6 +82,10 @@ function TransitionTimeline({ transitions, plotTheme, copy }) {
           tickfont: { color: plotTheme.muted },
         },
         yaxis: {
+          // Plotly's y-axis is bottom-up: categoryarray[0] sits at the bottom.
+          // Reverse so the lanes read Light 1 (top) → Light 4 (bottom), matching
+          // the transition table's row order and the rest of the app's "Light 1
+          // first" convention.
           categoryorder: 'array',
           categoryarray: [...laneLabels].reverse(),
           fixedrange: true,

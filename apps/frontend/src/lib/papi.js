@@ -21,7 +21,10 @@ export function lampPattern(lamps) {
   return labels.join(' + ')
 }
 
-export function scenarioFromBackendResult(result, context) {
+// `angleUnavailableLabel` is additive (defaults to the original English string)
+// so existing callers and papi.test.js are unaffected, while a future caller can
+// pass a localized label to remove the hardcoding from the rendered `condition`.
+export function scenarioFromBackendResult(result, context, angleUnavailableLabel = 'Angle unavailable') {
   const stateId = backendStateId[result.global_state] ?? 'unknown'
   const activeState = stateCatalog.find((state) => state.id === stateId) ?? stateCatalog[stateCatalog.length - 1]
   const lamps = result.lamps.map((lamp) => ({
@@ -35,7 +38,7 @@ export function scenarioFromBackendResult(result, context) {
   const hasAngle = result.angle?.angle_available && result.angle.elevation_angle_deg != null
   const angle = hasAngle
     ? `${result.angle.elevation_angle_deg.toFixed(3)} deg`
-    : 'Angle unavailable'
+    : angleUnavailableLabel
   const angleSummary = hasAngle
     ? {
         available: true,

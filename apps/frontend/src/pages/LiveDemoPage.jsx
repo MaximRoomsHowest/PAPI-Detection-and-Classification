@@ -7,26 +7,32 @@ import { LampCropZoom } from '../components/LampCropZoom'
 import { AnalysisHistoryPanel } from '../components/AnalysisHistoryPanel'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
 import { formatDurationMs } from '../lib/format'
+import { useLiveDemo } from '../context/liveDemoContext'
 
-export function LiveDemoPage({
-  activeScenario,
-  activeState,
-  isAnalyzing,
-  media,
-  runways,
-  selectedRunwayId,
-  onSelectRunway,
-  backendScenario,
-  backendFrames,
-  backendFrameIndex,
-  analysisError,
-  analysisProgress,
-  handleMediaFiles,
-  runBackendInference,
-  selectBackendFrame,
-  handleMediaChange,
-  copy,
-}) {
+export function LiveDemoPage({ copy }) {
+  // Analysis state + the App-derived display objects come from context now
+  // (previously ~16 drilled props). The destructured names match useAnalysis()'s
+  // return exactly, so every reference below is unchanged. `onSelectRunway` /
+  // `selectBackendFrame` keep their old local names by aliasing the hook fields.
+  const {
+    activeScenario,
+    activeState,
+    isAnalyzing,
+    media,
+    runways,
+    selectedRunwayId,
+    setSelectedRunwayId: onSelectRunway,
+    backendScenario,
+    backendFrames,
+    backendFrameIndex,
+    analysisError,
+    analysisProgress,
+    handleMediaFiles,
+    runBackendInference,
+    selectBackendFrame,
+    handleMediaChange,
+  } = useLiveDemo()
+
   // The Live Demo shows real backend output only. Until an analysis has run the
   // result panel stays empty rather than displaying a canned "demo" preset.
   const hasResult = Boolean(backendScenario)
