@@ -156,7 +156,7 @@ export async function deleteRunway(runwayId) {
     method: 'DELETE',
     headers: buildHeaders(),
   })
-  if (!response.ok && response.status !== 204) {
+  if (!response.ok) {
     let detail = `Could not delete runway (${response.status})`
     try {
       const body = await response.json()

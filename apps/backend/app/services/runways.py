@@ -122,7 +122,9 @@ def _runways() -> dict[str, dict[str, Any]]:
 # endpoints (validate_runway_id -> get_runway) and the ENU angle solver, exactly
 # like the built-in surveyed runways. Built-in ids are reserved and never shadowed.
 
-_custom_lock = threading.Lock()
+# Re-entrant so add_runway/delete_runway can call the self-locking _load_custom
+# while already holding the lock (double-checked-locking, like the model load).
+_custom_lock = threading.RLock()
 _custom_cache: dict[str, dict[str, Any]] | None = None
 
 
@@ -131,20 +133,29 @@ def _custom_path() -> Path:
 
 
 def _load_custom() -> dict[str, dict[str, Any]]:
+    # Self-locking: get_runway()/list_runways() reach here from the analyze
+    # threadpool with no lock of their own, so guard the lazy cache init against a
+    # concurrent add/delete (which would otherwise read a half-replaced dict).
     global _custom_cache
-    if _custom_cache is None:
-        try:
-            raw = json.loads(_custom_path().read_text(encoding="utf-8"))
-            _custom_cache = raw if isinstance(raw, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            _custom_cache = {}
-    return _custom_cache
+    with _custom_lock:
+        if _custom_cache is None:
+            try:
+                raw = json.loads(_custom_path().read_text(encoding="utf-8"))
+                _custom_cache = raw if isinstance(raw, dict) else {}
+            except (OSError, json.JSONDecodeError):
+                _custom_cache = {}
+        return _custom_cache
 
 
 def _persist_custom(store: dict[str, dict[str, Any]]) -> None:
+    # Atomic write: serialise to a temp sibling then replace, so a crash mid-write
+    # can't truncate custom_runways.json — a truncated file silently resets to {}
+    # on the next load and would lose every registered runway.
     path = _custom_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    tmp.replace(path)
 
 
 def _slugify(value: str) -> str:

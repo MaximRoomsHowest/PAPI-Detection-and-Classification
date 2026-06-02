@@ -9,9 +9,15 @@ import { translateState } from '../i18n/translate'
 // mirroring the Insights panels so the chart hover reads the same as the rest of
 // the app (the per-frame `state` is a backend GlobalState, not a frontend id).
 function stateLabel(rawState, copy) {
-  const id = backendStateId[rawState] ?? 'unknown'
-  const entry = stateCatalog.find((state) => state.id === id)
-  return entry ? translateState(entry, copy).label : rawState
+  const id = backendStateId[rawState]
+  if (id) {
+    const entry = stateCatalog.find((state) => state.id === id)
+    if (entry) return translateState(entry, copy).label
+  }
+  // Backend global states without a glidepath-catalog entry (e.g. "transition")
+  // fall back to the localized status label, then a prettified raw value — so a
+  // transition frame's hover never silently reads "Unknown".
+  return copy.status?.[rawState] ?? rawState.replace(/_/g, ' ')
 }
 
 // Frame-by-frame detection confidence for a video / folder-sequence analysis.

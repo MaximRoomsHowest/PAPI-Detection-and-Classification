@@ -18,7 +18,9 @@
 
 .runways-layout {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  /* The form (12 coordinate inputs) is the content-dense column, so it gets the
+     larger share; the runway cards on the right read fine in the smaller one. */
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 18px;
   align-items: start;
 }
@@ -70,6 +72,9 @@
 }
 
 .runway-form input {
+  /* min-width: 0 lets the 1fr grid tracks shrink the inputs to fit their column
+     instead of overflowing (inputs have an intrinsic min-width otherwise). */
+  min-width: 0;
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -94,10 +99,6 @@
 }
 
 .runway-lamps-fieldset legend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   width: 100%;
   padding: 0 4px;
   color: var(--text-muted);
@@ -105,6 +106,17 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.4px;
+}
+
+/* Flex lives on an inner wrapper, not the <legend> itself — a legend's own
+   display is unreliable across browsers, which left the template button
+   misaligned. */
+.runway-lamps-legend__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
 
 .runway-template-button {

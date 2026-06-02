@@ -22,8 +22,10 @@ const emptyForm = () => ({
   lights: [1, 2, 3, 4].map(emptyLamp),
 })
 
+// Accept a dot or comma decimal separator (a de/nl/fr user may type "47,67").
+const toNumber = (value) => Number(String(value).trim().replace(',', '.'))
 const inRange = (value, min, max) => {
-  const n = Number(value)
+  const n = toNumber(value)
   return Number.isFinite(n) && n >= min && n <= max
 }
 
@@ -71,9 +73,9 @@ export function RunwaysPage({ copy }) {
       designation: form.designation.trim() || undefined,
       lights: form.lights.map((lamp) => ({
         point: lamp.point,
-        latitude: Number(lamp.latitude),
-        longitude: Number(lamp.longitude),
-        altitude_m: Number(lamp.altitude_m),
+        latitude: toNumber(lamp.latitude),
+        longitude: toNumber(lamp.longitude),
+        altitude_m: toNumber(lamp.altitude_m),
       })),
     }
     setSubmitting(true)
@@ -155,10 +157,12 @@ export function RunwaysPage({ copy }) {
 
           <fieldset className="runway-lamps-fieldset">
             <legend>
-              {t.lampsLegend}
-              <button type="button" className="runway-template-button" onClick={fillTemplate}>
-                {t.useTemplate}
-              </button>
+              <span className="runway-lamps-legend__inner">
+                <span>{t.lampsLegend}</span>
+                <button type="button" className="runway-template-button" onClick={fillTemplate}>
+                  {t.useTemplate}
+                </button>
+              </span>
             </legend>
             <div className="runway-lamp-grid runway-lamp-grid--head" aria-hidden="true">
               <span />
