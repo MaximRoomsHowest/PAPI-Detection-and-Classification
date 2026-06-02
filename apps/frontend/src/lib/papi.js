@@ -73,6 +73,9 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
     logId: result.log_id,
     angle: result.angle,
     transitions: result.transitions ?? [],
+    // Raw per-frame confidence + verdict series for video / folder analyses
+    // (empty for single images). Drives the Live Demo frame-by-frame chart.
+    perFrame: result.per_frame ?? [],
     angleSummary,
     // Keep the raw AnalysisPayload so result-driven views (crop/zoom overlays,
     // angle-vs-state charts) can read bbox/per-light angles without re-deriving

@@ -520,10 +520,6 @@
     justify-content: center;
   }
 
-  .intro-diagram {
-    width: min(640px, 100%);
-  }
-
   .history-summary-grid,
   .history-detail-grid,
   .history-modal-columns {

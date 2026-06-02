@@ -97,6 +97,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
   const navItems = [
     { to: '/', label: copy.nav.introduction, end: true },
     { to: '/live-demo', label: copy.nav.liveDemo },
+    { to: '/runways', label: copy.nav.runways },
     { to: '/insights', label: copy.nav.insights },
     { to: '/history', label: copy.nav.history },
   ]

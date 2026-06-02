@@ -106,6 +106,21 @@ class TransitionEvent(BaseModel):
     elevation_angle_deg: float | None = None
 
 
+class FramePoint(BaseModel):
+    """One sample in a video's per-frame confidence/verdict series.
+
+    ``confidence`` is the raw per-frame detection confidence (a probability) and
+    ``state`` the per-frame global verdict, both computed for every frame inside
+    the tracked-sequence loop. They are the inputs to the sliding-window smoothing
+    used for the annotated overlay; surfaced here so the UI can draw a real
+    frame-by-frame confidence curve instead of only the single aggregate score.
+    """
+
+    frame_index: int = Field(ge=0)
+    confidence: float = Field(ge=0.0, le=1.0)
+    state: GlobalState
+
+
 class AnalysisPayload(BaseModel):
     log_id: str | None = None
     media_type: MediaType
@@ -125,6 +140,11 @@ class AnalysisPayload(BaseModel):
     # single images, which can't show a switch). Each carries the associated
     # viewing angle when drone telemetry was supplied.
     transitions: list[TransitionEvent] = Field(default_factory=list)
+    # Raw per-frame confidence + verdict for video / folder-sequence analyses
+    # (empty for single images). Drives the Live Demo frame-by-frame confidence
+    # chart; these are the per-frame values BEFORE the overlay's sliding-window
+    # smoothing, so the curve shows the model's true frame-to-frame behaviour.
+    per_frame: list[FramePoint] = Field(default_factory=list)
 
 
 class FrameBatchPayload(BaseModel):
@@ -239,4 +259,43 @@ class RunwayResponse(BaseModel):
     id: str
     label: str
     lights: list[RunwayLight]
+    # Display-only metadata + provenance. ``source`` is "config" for the built-in
+    # surveyed runways from configs/papi_edny.yaml and "custom" for ones registered
+    # at runtime via POST /api/runways. All optional/defaulted so the existing
+    # built-in dicts (which omit these keys) still validate unchanged.
+    airport: str | None = None
+    designation: str | None = None
+    source: str = "config"
+
+
+class RunwayLightInput(BaseModel):
+    """One PAPI lamp position in a create-runway request, WGS-84 and range-checked
+    so a typo can't push a nonsense coordinate into the ENU elevation-angle solver
+    (mirrors the bounds enforced on drone GPS in services/angle.py)."""
+
+    point: int = Field(ge=1, le=4)
+    latitude: float = Field(ge=-90.0, le=90.0)
+    longitude: float = Field(ge=-180.0, le=180.0)
+    altitude_m: float = Field(ge=-500.0, le=15_000.0)
+
+
+class RunwayCreate(BaseModel):
+    """Body for POST /api/runways — registers a runway the model can actually score
+    against. The four lamp positions are required because the elevation-angle solver
+    needs per-lamp WGS-84 geometry; without distinct coordinates the per-lamp angles
+    would be meaningless."""
+
+    label: str = Field(min_length=1, max_length=120)
+    id: str | None = Field(default=None, max_length=80)
+    airport: str | None = Field(default=None, max_length=120)
+    designation: str | None = Field(default=None, max_length=40)
+    lights: list[RunwayLightInput]
+
+    @model_validator(mode="after")
+    def _check_lights(self) -> "RunwayCreate":
+        if len(self.lights) != 4:
+            raise ValueError("A runway must have exactly 4 PAPI lamps.")
+        if sorted(light.point for light in self.lights) != [1, 2, 3, 4]:
+            raise ValueError("Lamp points must be 1, 2, 3 and 4 (one of each).")
+        return self
 

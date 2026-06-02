@@ -22,7 +22,7 @@ from app.services.state import (
     global_state_from_lamps,
     normalize_detections,
 )
-from app.validation.schemas import AnalysisPayload, AngleResult, LampResult, ModelInfo, ValMetrics
+from app.validation.schemas import AnalysisPayload, AngleResult, FramePoint, LampResult, ModelInfo, ValMetrics
 
 
 class InferenceService:
@@ -366,6 +366,9 @@ class InferenceService:
         track_observations: dict[int, list[tuple]] = {}
         frame_count = 0
         last_detections: list[dict] = []
+        # Raw per-frame verdict + confidence series (one entry per processed frame),
+        # surfaced on the payload so the Live Demo can chart frame-by-frame confidence.
+        per_frame: list[FramePoint] = []
 
         # The annotated artifact is partially written as the loop runs. If the loop
         # raises (in-loop too-long guard) OR finishes with no readable frames, that
@@ -401,6 +404,11 @@ class InferenceService:
                     )
                 frame_state = global_state_from_lamps(lamps)
                 frame_confidence = confidence_from_lamps(lamps)
+                # Raw per-frame sample (before the sliding-window smoothing used for
+                # the overlay) — the genuine frame-to-frame confidence the UI plots.
+                per_frame.append(
+                    FramePoint(frame_index=frame_count, confidence=frame_confidence, state=frame_state)
+                )
 
                 history.append(frame_state)
                 smoothed_state = Counter(history).most_common(1)[0][0]
@@ -447,6 +455,7 @@ class InferenceService:
             artifact_url=f"/media/{artifact_path.name}",
             detections=last_detections,
             transitions=transitions,
+            per_frame=per_frame,
         )
 
     @staticmethod

@@ -15,4 +15,7 @@
    and every max-width breakpoint. Renamed for clarity; contents unchanged so the
    cascade order is byte-for-byte preserved.) */
 @import './styles/history-and-responsive.css';
+/* Runways page styles — imported after the responsive partial so the page's own
+   button modifier (.runway-delete) wins over the shared .ghost-button base. */
+@import './styles/runways.css';
 @import './styles/misc.css';

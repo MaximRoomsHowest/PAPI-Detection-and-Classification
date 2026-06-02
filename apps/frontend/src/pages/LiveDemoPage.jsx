@@ -5,11 +5,12 @@ import { LampCard } from '../components/LampCard'
 import { InlineMetric } from '../components/InlineMetric'
 import { LampCropZoom } from '../components/LampCropZoom'
 import { AnalysisHistoryPanel } from '../components/AnalysisHistoryPanel'
+import { VideoConfidenceChart } from '../components/VideoConfidenceChart'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
 import { formatDurationMs } from '../lib/format'
 import { useLiveDemo } from '../context/liveDemoContext'
 
-export function LiveDemoPage({ copy }) {
+export function LiveDemoPage({ copy, plotTheme }) {
   // Analysis state + the App-derived display objects come from context now
   // (previously ~16 drilled props). The destructured names match useAnalysis()'s
   // return exactly, so every reference below is unchanged. `onSelectRunway` /
@@ -222,6 +223,14 @@ export function LiveDemoPage({ copy }) {
           copy={copy}
         />
       )}
+
+      {/* Frame-by-frame detection confidence — video + folder uploads only, where
+          the backend returns a per-frame series. Images collapse to one frame. */}
+      {hasResult &&
+        (media?.type === 'video' || media?.type === 'folder') &&
+        activeScenario.perFrame?.length > 0 && (
+          <VideoConfidenceChart perFrame={activeScenario.perFrame} plotTheme={plotTheme} copy={copy} />
+        )}
     </section>
   )
 }

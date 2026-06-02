@@ -1,0 +1,321 @@
+/* Runways page — runway configuration: an add-runway form (left) and the list of
+   configured runways (right). Two columns on desktop; stacks on tablet/mobile.
+   Reuses the shared tokens, buttons, and focus rings from base/sections. */
+
+.runways-section {
+  width: min(1180px, calc(100% - 32px));
+  margin: 34px auto 0;
+  padding: 20px 0 16px;
+}
+
+.runways-intro {
+  max-width: 780px;
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.runways-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* ---------- Add-runway form ---------- */
+.runway-form {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  padding: 18px;
+}
+
+.runway-form h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.runway-form__intro {
+  margin: -6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.runway-form__row {
+  display: grid;
+  gap: 12px;
+}
+
+.runway-form__row--split {
+  grid-template-columns: 1fr 1fr;
+}
+
+.runway-form label {
+  display: grid;
+  gap: 5px;
+}
+
+.runway-form label > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.runway-form input {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.runway-form input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.runway-lamps-fieldset {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.runway-lamps-fieldset legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.runway-template-button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.runway-template-button:hover {
+  border-color: var(--accent);
+}
+
+.runway-template-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.runway-lamp-grid {
+  display: grid;
+  grid-template-columns: 64px repeat(3, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.runway-lamp-grid--head span {
+  color: var(--faint);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.runway-lamp-grid input {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+.runway-lamp-no {
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runway-form__error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.runway-form .primary-button {
+  justify-self: start;
+}
+
+/* ---------- Configured-runway list ---------- */
+.runway-list {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.runway-list__title {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.runway-list__empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.runway-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 16px;
+}
+
+.runway-card.active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
+}
+
+.runway-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runway-card__header strong {
+  color: var(--text-strong);
+  font-size: 15px;
+}
+
+.runway-card__id {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.runway-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.runway-badge.is-builtin {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.runway-badge.is-custom {
+  background: var(--accent-fill);
+  color: #ffffff;
+}
+
+.runway-card__meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.runway-card__lamps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.runway-card__lamps li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.runway-card__alt {
+  color: var(--text-muted);
+}
+
+.runway-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.runway-active-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.runway-delete {
+  color: var(--danger);
+}
+
+.runway-delete:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+@media (max-width: 880px) {
+  .runways-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .runway-form__row--split {
+    grid-template-columns: 1fr;
+  }
+  .runway-lamp-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .runway-lamp-grid--head {
+    display: none;
+  }
+  .runway-lamp-no {
+    grid-column: 1 / -1;
+  }
+}

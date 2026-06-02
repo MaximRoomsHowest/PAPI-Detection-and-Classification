@@ -10,11 +10,11 @@ from __future__ import annotations
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 import app.api.routes as routes
-from app.services.runways import list_runways
-from app.validation.schemas import ModelInfo, RunwayResponse, SystemInfo
+from app.services.runways import add_runway, delete_runway, list_runways
+from app.validation.schemas import ModelInfo, RunwayCreate, RunwayResponse, SystemInfo
 
 router = APIRouter(prefix="/api")
 
@@ -22,6 +22,41 @@ router = APIRouter(prefix="/api")
 @router.get("/runways", response_model=list[RunwayResponse])
 def get_runways() -> list[RunwayResponse]:
     return list_runways()
+
+
+@router.post("/runways", response_model=RunwayResponse, status_code=status.HTTP_201_CREATED)
+def create_runway(
+    payload: RunwayCreate,
+    _auth: Annotated[None, Depends(routes.require_api_key)] = None,
+) -> RunwayResponse:
+    """Register a runway the model can actually score against.
+
+    The four lamp coordinates feed the same ENU elevation-angle solver and
+    ``validate_runway_id`` gate as the built-in runways, so an analysis sent with
+    the new ``runway_id`` works end-to-end. Pydantic rejects malformed bodies
+    (wrong lamp count, out-of-range coords) as 422; an id collision is 409.
+    """
+    try:
+        runway = add_runway(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return RunwayResponse(**runway)
+
+
+@router.delete("/runways/{runway_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_runway(
+    runway_id: str,
+    _auth: Annotated[None, Depends(routes.require_api_key)] = None,
+) -> Response:
+    """Delete a custom runway. Built-in surveyed runways are protected (400);
+    an unknown id is 404."""
+    try:
+        delete_runway(runway_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown runway_id: {runway_id}") from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/model", response_model=ModelInfo)

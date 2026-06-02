@@ -22,6 +22,7 @@ import { IntroductionPage } from './pages/IntroductionPage'
 import { LiveDemoPage } from './pages/LiveDemoPage'
 import { InsightsPage } from './pages/InsightsPage'
 import { HistoryPage } from './pages/HistoryPage'
+import { RunwaysPage } from './pages/RunwaysPage'
 
 // Real minimal 404 (audit F01): replaces the old catch-all that silently
 // rendered Introduction. Copy comes from i18n; the only literal is the mono
@@ -172,36 +173,35 @@ function App() {
             recover-by-reload fallback in place of the routed view, instead of
             the whole app blanking. Complements the top-level boundary in main.jsx. */}
         <ErrorBoundary>
-          <Routes>
-          <Route path="/" element={<IntroductionPage copy={copy} />} />
-          <Route
-            path="/live-demo"
-            element={
-              // The Live Demo subtree reads the analysis state + display objects
-              // from context (see LiveDemoContext) instead of ~16 drilled props.
-              <LiveDemoProvider value={liveDemoValue}>
-                <LiveDemoPage copy={copy} />
-              </LiveDemoProvider>
-            }
-          />
-          <Route
-            path="/insights"
-            element={
-              <InsightsPage
-                backendResults={analysis.backendResults}
-                plotTheme={plotTheme}
-                insightsRef={analysis.insightsRef}
-                isExporting={analysis.isExporting}
-                exportError={analysis.exportError}
-                onDownloadCharts={analysis.handleDownloadCharts}
-                copy={copy}
+          {/* Runway state (list + active selection + add/delete) plus the Live
+              Demo analysis state are shared app-wide through this one provider, so
+              the Runways page and the Live Demo runway selector stay in sync. Only
+              the route matched by react-router mounts, so the value still drives a
+              single page at a time. */}
+          <LiveDemoProvider value={liveDemoValue}>
+            <Routes>
+              <Route path="/" element={<IntroductionPage copy={copy} />} />
+              <Route path="/live-demo" element={<LiveDemoPage copy={copy} plotTheme={plotTheme} />} />
+              <Route path="/runways" element={<RunwaysPage copy={copy} />} />
+              <Route
+                path="/insights"
+                element={
+                  <InsightsPage
+                    backendResults={analysis.backendResults}
+                    plotTheme={plotTheme}
+                    insightsRef={analysis.insightsRef}
+                    isExporting={analysis.isExporting}
+                    exportError={analysis.exportError}
+                    onDownloadCharts={analysis.handleDownloadCharts}
+                    copy={copy}
+                  />
+                }
               />
-            }
-          />
-          <Route path="/history" element={<HistoryPage copy={copy} />} />
-          <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
-          <Route path="*" element={<NotFound copy={copy} />} />
-          </Routes>
+              <Route path="/history" element={<HistoryPage copy={copy} />} />
+              <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
+              <Route path="*" element={<NotFound copy={copy} />} />
+            </Routes>
+          </LiveDemoProvider>
         </ErrorBoundary>
       </main>
 

@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { analyzeFrame, analyzeMedia, analyzeSequence, fetchRunways } from '../lib/api'
+import {
+  analyzeFrame,
+  analyzeMedia,
+  analyzeSequence,
+  createRunway,
+  deleteRunway as deleteRunwayRequest,
+  fetchRunways,
+} from '../lib/api'
 import { useFetch } from './useFetch'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { loadPlotlyBundle } from '../lib/plotlyBundle'
@@ -16,9 +23,26 @@ export function useAnalysis(copy) {
   // Runway selection: the list comes from the backend (/api/runways); the chosen
   // id is sent as `runway_id` so the analysis scores against the right PAPI unit's
   // surveyed geometry. Defaults to papi_24 to match the backend's own default.
-  const { data: runwayData } = useFetch(fetchRunways, [])
+  const { data: runwayData, refetch: refetchRunways } = useFetch(fetchRunways, [])
   const runways = runwayData ?? []
   const [selectedRunwayId, setSelectedRunwayId] = useState('papi_24')
+
+  // Runway management, shared app-wide via context so the Runways page and the
+  // Live Demo selector stay in sync. A newly added runway is persisted server-side
+  // and immediately usable for analysis, so refetch the list and make it active;
+  // deleting the active runway falls back to the backend default (papi_24).
+  async function addRunway(payload) {
+    const created = await createRunway(payload)
+    refetchRunways()
+    setSelectedRunwayId(created.id)
+    return created
+  }
+
+  async function removeRunway(runwayId) {
+    await deleteRunwayRequest(runwayId)
+    refetchRunways()
+    setSelectedRunwayId((current) => (current === runwayId ? 'papi_24' : current))
+  }
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -336,6 +360,9 @@ export function useAnalysis(copy) {
     runways,
     selectedRunwayId,
     setSelectedRunwayId,
+    addRunway,
+    removeRunway,
+    refetchRunways,
     isAnalyzing,
     isExporting,
     exportError,

@@ -121,6 +121,53 @@ export async function fetchRunways() {
   return parseJsonBody(response, 'Runways')
 }
 
+/**
+ * Register a runway the model can score against. ``payload`` is
+ * { label, id?, airport?, designation?, lights: [{point, latitude, longitude, altitude_m} x4] }.
+ * Surfaces the backend's validation message (422 detail can be a list) so the
+ * Runways form can show "A runway must have exactly 4 PAPI lamps." etc.
+ */
+export async function createRunway(payload) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/runways`, {
+    method: 'POST',
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    let detail = `Could not create runway (${response.status})`
+    try {
+      const body = await response.json()
+      if (Array.isArray(body.detail)) {
+        detail = body.detail.map((entry) => entry.msg ?? String(entry)).join('; ')
+      } else if (body.detail) {
+        detail = body.detail
+      }
+    } catch {
+      detail = response.statusText || detail
+    }
+    throw new Error(detail)
+  }
+  return parseJsonBody(response, 'Runway')
+}
+
+/** Delete a custom runway (built-ins are 400, unknown ids 404). 204 on success. */
+export async function deleteRunway(runwayId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/runways/${encodeURIComponent(runwayId)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+  if (!response.ok && response.status !== 204) {
+    let detail = `Could not delete runway (${response.status})`
+    try {
+      const body = await response.json()
+      detail = body.detail ?? detail
+    } catch {
+      detail = response.statusText || detail
+    }
+    throw new Error(detail)
+  }
+}
+
 export async function fetchModelInfo() {
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/model`, {
     headers: buildHeaders(),

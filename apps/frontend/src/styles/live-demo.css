@@ -555,6 +555,12 @@
   min-height: 0;
 }
 
+/* Per-frame confidence chart (video / folder analyses). Reuses the viz-card
+   chrome; just spaced from the result grid above. */
+.video-confidence-card {
+  margin-top: 16px;
+}
+
 .crop-zoom__viewport {
   position: relative;
   display: flex;
