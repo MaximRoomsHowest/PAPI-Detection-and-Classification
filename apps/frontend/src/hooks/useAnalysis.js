@@ -42,6 +42,14 @@ export function useAnalysis(copy) {
     refetchRunways()
     setSelectedRunwayId((current) => (current === runwayId ? 'papi_24' : current))
   }
+
+  // Optional manual drone telemetry for the elevation-angle calc, used when an
+  // uploaded image carries no GPS EXIF (browser uploads usually strip it). Empty
+  // strings mean "not provided": the backend then falls back to the file's EXIF,
+  // then to angle-unavailable. Sent only when all three are present (the backend
+  // requires lat + lon + altitude together).
+  const [droneTelemetry, setDroneTelemetry] = useState({ latitude: '', longitude: '', altitudeM: '' })
+
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -250,7 +258,24 @@ export function useAnalysis(copy) {
       let rawResults = []
       // Telemetry sent with every analyze call. runway_id selects which PAPI
       // unit's geometry the backend scores + computes elevation angles against.
-      const metadata = { runwayId: selectedRunwayId }
+      // Manual drone lat/lon/altitude is included only when ALL three are filled
+      // (the backend rejects a partial set); empty fields are omitted by api.js so
+      // the backend falls back to the image's EXIF, then to angle-unavailable.
+      const hasDroneTelemetry = Boolean(
+        droneTelemetry.latitude.trim() &&
+          droneTelemetry.longitude.trim() &&
+          droneTelemetry.altitudeM.trim(),
+      )
+      const metadata = {
+        runwayId: selectedRunwayId,
+        ...(hasDroneTelemetry
+          ? {
+              droneLatitude: droneTelemetry.latitude.trim(),
+              droneLongitude: droneTelemetry.longitude.trim(),
+              droneAltitudeM: droneTelemetry.altitudeM.trim(),
+            }
+          : {}),
+      }
 
       if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
@@ -355,6 +380,8 @@ export function useAnalysis(copy) {
     addRunway,
     removeRunway,
     refetchRunways,
+    droneTelemetry,
+    setDroneTelemetry,
     isAnalyzing,
     isExporting,
     exportError,

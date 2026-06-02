@@ -422,6 +422,70 @@
   margin-top: 12px;
 }
 
+/* Optional drone-position input (lat/lon/altitude) for the elevation-angle calc.
+   Sits between the action row and the result; fields wrap on narrow viewports. */
+.drone-telemetry {
+  margin: -3px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.drone-telemetry__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.drone-telemetry__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.drone-telemetry__fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.drone-telemetry__fields label > span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.drone-telemetry__fields input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 13px;
+}
+
+.drone-telemetry__fields input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.drone-telemetry__hint {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .angle-readout {
   display: grid;
   gap: 5px;

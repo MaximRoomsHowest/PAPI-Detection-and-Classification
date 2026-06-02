@@ -32,7 +32,12 @@ export function LiveDemoPage({ copy, plotTheme }) {
     runBackendInference,
     selectBackendFrame,
     handleMediaChange,
+    droneTelemetry,
+    setDroneTelemetry,
   } = useLiveDemo()
+
+  const setDroneField = (field) => (event) =>
+    setDroneTelemetry((current) => ({ ...current, [field]: event.target.value }))
 
   // The Live Demo shows real backend output only. Until an analysis has run the
   // result panel stays empty rather than displaying a canned "demo" preset.
@@ -99,6 +104,50 @@ export function LiveDemoPage({ copy, plotTheme }) {
             {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
           </button>
         </div>
+      </div>
+
+      {/* Optional drone position — the elevation angle is pure geometry (drone
+          GPS vs surveyed lamp coordinates), so the model can't infer it from the
+          pixels. Browser uploads usually strip GPS EXIF, so provide it here to
+          compute the PAPI angle. All three fields are required together. */}
+      <div className="drone-telemetry">
+        <span className="drone-telemetry__label">{copy.live.droneTelemetry}</span>
+        <div className="drone-telemetry__fields">
+          <label>
+            <span>{copy.live.droneLatitude}</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="mono"
+              value={droneTelemetry.latitude}
+              onChange={setDroneField('latitude')}
+              placeholder="47.673521"
+            />
+          </label>
+          <label>
+            <span>{copy.live.droneLongitude}</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="mono"
+              value={droneTelemetry.longitude}
+              onChange={setDroneField('longitude')}
+              placeholder="9.518154"
+            />
+          </label>
+          <label>
+            <span>{copy.live.droneAltitude}</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="mono"
+              value={droneTelemetry.altitudeM}
+              onChange={setDroneField('altitudeM')}
+              placeholder="520"
+            />
+          </label>
+        </div>
+        <p className="drone-telemetry__hint">{copy.live.droneHint}</p>
       </div>
 
       {(analysisError || analysisProgress) && (
@@ -171,6 +220,27 @@ export function LiveDemoPage({ copy, plotTheme }) {
                   value={formatDurationMs(activeScenario.metrics.latency).value}
                   suffix={formatDurationMs(activeScenario.metrics.latency).suffix}
                 />
+              </div>
+
+              {/* PAPI elevation angle — real WGS-84 geometry from the drone GPS /
+                  manual telemetry vs the runway's surveyed lamps. "Unavailable"
+                  when no drone position was supplied or read from EXIF. */}
+              <div className={clsx('angle-readout', !activeScenario.angleSummary?.available && 'unavailable')}>
+                <span>{copy.live.elevationAngle}</span>
+                {activeScenario.angleSummary?.available ? (
+                  <>
+                    <strong className="tnum">
+                      {activeScenario.angleSummary.value}
+                      <small>°</small>
+                    </strong>
+                    <p>{copy.live.angleComputed}</p>
+                  </>
+                ) : (
+                  <>
+                    <strong>{copy.live.angleUnavailable}</strong>
+                    <p>{copy.live.angleHint}</p>
+                  </>
+                )}
               </div>
 
               {activeScenario.transitions?.length > 0 && (
