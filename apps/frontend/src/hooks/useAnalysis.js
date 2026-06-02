@@ -3,7 +3,6 @@ import { toast } from 'sonner'
 import {
   analyzeFrame,
   analyzeMedia,
-  analyzeSequence,
   createRunway,
   deleteRunway as deleteRunwayRequest,
   fetchRunways,
@@ -253,24 +252,7 @@ export function useAnalysis(copy) {
       // unit's geometry the backend scores + computes elevation angles against.
       const metadata = { runwayId: selectedRunwayId }
 
-      if (media.type === 'folder') {
-        const folderImages = media.files ?? []
-        if (!folderImages.length) {
-          throw new Error(copy.live.noFolderImages)
-        }
-
-        setAnalysisProgress(copy.live.uploadingFolder.replace('{count}', folderImages.length))
-        // Folder -> one time-sequenced video: the backend stitches the frames
-        // through the same ByteTrack + transition pipeline as a real video and
-        // returns a single aggregated payload, so treat the result like the video
-        // branch (one annotated artifact + verdict, no per-image frame nav).
-        const result = await analyzeSequence(folderImages, metadata)
-        rawResults = [result]
-        bestScenario = scenarioFromBackendResult(result, {
-          frameLabel: `${result.frame_count ?? folderImages.length} sequenced frames`,
-          totalFrames: 1,
-        })
-      } else if (media.type === 'video') {
+      if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
         const result = await analyzeMedia(media.file, metadata)
         rawResults = [result]
@@ -279,14 +261,24 @@ export function useAnalysis(copy) {
           totalFrames: 1,
         })
       } else {
-        setAnalysisProgress(copy.live.extractingFrames)
-        const frames = await extractFrameImages(media.file)
+        // Image OR geotagged folder: analyze each image individually so every frame
+        // carries its OWN GPS-derived viewing angle. A folder of geotagged images is
+        // a descent sweep — per-image analysis is what powers the per-lamp
+        // angle-vs-state charts and each lamp's detected red->white transition angle
+        // (a single sequenced video would collapse to one angle for the whole clip).
+        const frames =
+          media.type === 'folder'
+            ? (media.files ?? []).map((file) => ({ file, label: fileDisplayPath(file) }))
+            : await extractFrameImages(media.file)
+        if (!frames.length) {
+          throw new Error(copy.live.noFolderImages)
+        }
         let bestScore = -1
 
         for (const [index, frame] of frames.entries()) {
           // A newer upload bumped runIdRef while we were mid-loop — stop now so a
-          // superseded run can't keep pushing stale "Analyzing frame X" progress
-          // (or further analyzeFrame calls) onto the media the user replaced.
+          // superseded run can't keep pushing stale progress (or further analyze
+          // calls) onto the media the user replaced.
           if (runIdRef.current !== runId) {
             return
           }
@@ -302,9 +294,9 @@ export function useAnalysis(copy) {
             bestScore = score
             bestScenario = scenario
           }
-          // Keep every per-image scenario (in upload order) so the history
-          // panel can list each frame's lamp state, angle, and confidence and
-          // let the user step through them.
+          // Keep every per-image scenario (in upload order) so the frame-history
+          // panel can list each frame's lamp state, angle, and confidence and let
+          // the user step through them.
           nextBackendFrames.push(scenario)
         }
       }

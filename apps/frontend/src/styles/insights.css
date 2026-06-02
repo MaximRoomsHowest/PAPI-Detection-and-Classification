@@ -72,10 +72,11 @@
 }
 
 /* ---------- Angle vs. light state ---------- */
-.angle-grid {
+/* One full-width chart per lamp, stacked (PAPI A-D), like the client's tool. */
+.angle-stack {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 
 .angle-chart {

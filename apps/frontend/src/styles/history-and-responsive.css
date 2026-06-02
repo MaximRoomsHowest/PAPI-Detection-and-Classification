@@ -472,7 +472,11 @@
   }
 }
 
-@media (max-width: 1040px) {
+/* Five nav items + brand + the util/clock/lang/theme cluster need ~1450px on a
+   single row. Below that, drop the nav to its own full-width second row — the same
+   clean two-row layout used at tablet/mobile widths — so the topbar never overflows
+   on a laptop (regression after the Runways nav item was added). */
+@media (max-width: 1450px) {
   .topbar {
     grid-template-columns: 1fr auto;
   }
@@ -493,7 +497,9 @@
     grid-column: 2;
     grid-row: 1;
   }
+}
 
+@media (max-width: 1040px) {
   .live-grid {
     grid-template-columns: 1fr;
   }

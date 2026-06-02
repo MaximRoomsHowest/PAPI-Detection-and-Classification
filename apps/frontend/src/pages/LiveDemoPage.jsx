@@ -224,13 +224,13 @@ export function LiveDemoPage({ copy, plotTheme }) {
         />
       )}
 
-      {/* Frame-by-frame detection confidence — video + folder uploads only, where
-          the backend returns a per-frame series. Images collapse to one frame. */}
-      {hasResult &&
-        (media?.type === 'video' || media?.type === 'folder') &&
-        activeScenario.perFrame?.length > 0 && (
-          <VideoConfidenceChart perFrame={activeScenario.perFrame} plotTheme={plotTheme} copy={copy} />
-        )}
+      {/* Frame-by-frame detection confidence — video uploads only, where the
+          backend returns a per-frame series. A geotagged image folder is instead
+          analyzed per-image (each with its own angle) and surfaced as the per-lamp
+          angle-vs-state + transition-angle charts on the Insights page. */}
+      {hasResult && media?.type === 'video' && activeScenario.perFrame?.length > 0 && (
+        <VideoConfidenceChart perFrame={activeScenario.perFrame} plotTheme={plotTheme} copy={copy} />
+      )}
     </section>
   )
 }

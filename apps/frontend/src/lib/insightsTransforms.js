@@ -23,6 +23,26 @@ export function resolveAngle(angle, lampIndex) {
   return Number.isFinite(value) ? value : null
 }
 
+// Estimate the angle at which a lamp switches red -> white (its PAPI transition
+// angle): the midpoint of the first adjacent (red|transition) -> white crossing in
+// the angle-sorted samples. As a drone climbs the approach a PAPI lamp goes red
+// (below set angle) -> white (above), so the crossing is the commissioned set
+// angle of that lamp. Returns null when the lamp never crosses to white in the
+// captured range. Pure detection from the real classified states — nothing modelled.
+export function detectTransitionAngle(points) {
+  const colored = (points ?? [])
+    .filter((point) => point.state === 'red' || point.state === 'white' || point.state === 'transition')
+    .sort((a, b) => a.angle - b.angle)
+  for (let i = 1; i < colored.length; i += 1) {
+    const previous = colored[i - 1]
+    const current = colored[i]
+    if (current.state === 'white' && previous.state !== 'white') {
+      return (previous.angle + current.angle) / 2
+    }
+  }
+  return null
+}
+
 // Build per-light (angle, state) point series from raw AnalysisPayload[]. Only
 // results with `angle.angle_available` contribute. "obscured" lamps DO appear (on
 // their own tier below red) so non-detections show up against angle; a bare
@@ -56,9 +76,11 @@ export function angleVsStateSeries(results) {
       })
     }
   }
-  // Sort by angle so the optional step line reads left-to-right.
+  // Sort by angle so the step line reads left-to-right, then detect each lamp's
+  // red->white transition angle from its own sorted samples.
   for (const lamp of series) {
     lamp.points.sort((a, b) => a.angle - b.angle)
+    lamp.transitionAngle = detectTransitionAngle(lamp.points)
   }
   return series
 }
