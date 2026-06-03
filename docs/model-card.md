@@ -1,4 +1,4 @@
-# Model Card — PAPI Vision Detector
+# Model Card — PAPI Lights Detection and Classification Detector
 
 A concise, honest model card (audit IMP-DOC-8). The full lineage, promotion
 procedure and run-by-run metrics live in [`models/MODELS.md`](../models/MODELS.md);
@@ -45,9 +45,12 @@ in `MODELS.md §3.1.1`.
 
 - **Daytime is the hard case** — sun glare and washed-out red/white separation; report
   day vs night metrics separately rather than letting strong night performance hide it.
-- **Geometry inputs are provisional** — the rwy-06 installation height, the height datum
-  for 461.37 m, the lamp-numbering convention and the commissioned set-angles are
-  unconfirmed by the client; transition-boundary labels shift once they are bound.
+- **Geometry inputs still carry calibration risk** — rwy-24 uses the validated
+  `461.37 m` reference. Rwy-06 uses the data-analysis branch's `461.37 m` lamp
+  reference; the competing `464.988 m` notebook value is a minimum client drone
+  EXIF/MRK altitude floor proxy, not the runtime lamp height. Lamp numbering and
+  commissioned set-angles remain unbound; transition-boundary labels shift once
+  they are bound.
 - **ZoomCamera** frames are degraded until `calibrated_focal_px` is supplied.
 - **Throughput** — ~0.4 fps on a laptop CPU; far from the "real-time on a
   resource-constrained device" requirement. That figure was measured on the previous

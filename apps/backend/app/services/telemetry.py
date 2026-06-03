@@ -60,6 +60,11 @@ class DroneSample:
     altitude_m: float
     frame_index: int | None = None
     time_s: float | None = None
+    # RTK 1-sigma position std (m), carried only for fixes that have it (the embedded
+    # DJI-XMP path). Horizontal combines lat/lon; vertical is height. Used to put a
+    # 1-sigma band on the elevation angle; ``None`` for manual + telemetry-file fixes.
+    sigma_horizontal_m: float | None = None
+    sigma_vertical_m: float | None = None
 
 
 class TelemetryError(ValueError):
@@ -74,6 +79,12 @@ class TelemetryError(ValueError):
 
 _NUMBER = r"[+-]?\d+(?:\.\d+)?"
 
+# Hard cap on parsed telemetry fixes. A real DJI descent track is hundreds to a few
+# thousand cues; anything far above this is pathological (or hostile) input, so we
+# bound it to keep both memory and the per-frame resample (O(frame_count x n_samples))
+# in check (audit: telemetry sample-count DoS).
+MAX_TELEMETRY_SAMPLES = 50_000
+
 
 def _coerce_float(value: object) -> float | None:
     if value is None:
@@ -86,6 +97,13 @@ def _coerce_float(value: object) -> float | None:
     if out != out or out in (float("inf"), float("-inf")):
         return None
     return out
+
+
+def _coerce_frame_index(value: object) -> int | None:
+    out = _coerce_float(value)
+    if out is None or out < 0 or not out.is_integer():
+        return None
+    return int(out)
 
 
 def _in_range(lat: float, lon: float, alt: float) -> bool:
@@ -237,7 +255,17 @@ def _parse_csv(text: str) -> list[DroneSample]:
     except csv.Error:
         delimiter = ","
 
-    rows = [row for row in csv.reader(io.StringIO(text), delimiter=delimiter) if any(c.strip() for c in row)]
+    try:
+        rows = [
+            row
+            for row in csv.reader(io.StringIO(text), delimiter=delimiter)
+            if any(c.strip() for c in row)
+        ]
+    except csv.Error:
+        # A malformed CSV (e.g. a field above csv's 128 KB field-size limit) raises
+        # csv.Error, which is not a ValueError; degrade to the "no usable fixes" path
+        # so the endpoint returns a clean 400 instead of a leaked 500 (audit).
+        return []
     if not rows:
         return []
 
@@ -264,8 +292,14 @@ def _parse_csv(text: str) -> list[DroneSample]:
         lat = _coerce_float(row[lat_i])
         lon = _coerce_float(row[lon_i])
         alt = _coerce_float(row[alt_i])
-        frame_raw = _coerce_float(row[frame_i]) if frame_i is not None and len(row) > frame_i else None
-        frame_index = int(frame_raw) if frame_raw is not None else order
+        if frame_i is None:
+            frame_index = order
+        elif len(row) > frame_i:
+            frame_index = _coerce_frame_index(row[frame_i])
+            if frame_index is None:
+                continue
+        else:
+            continue
         time_s = _coerce_float(row[time_i]) if time_i is not None and len(row) > time_i else None
         sample = _make_sample(lat, lon, alt, frame_index=frame_index, time_s=time_s)
         if sample is not None:
@@ -301,7 +335,10 @@ def _pick(entry: dict, keys: tuple[str, ...]) -> object | None:
 def _parse_json(text: str) -> list[DroneSample]:
     try:
         data = json.loads(text)
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError, RecursionError):
+        # RecursionError (deeply-nested array/object) subclasses RuntimeError, not
+        # ValueError, so without it here the exception escapes as an unhandled HTTP 500
+        # with a stack trace on the unauthenticated analyze path (audit blocker).
         return []
 
     if isinstance(data, dict):
@@ -323,8 +360,13 @@ def _parse_json(text: str) -> list[DroneSample]:
         lat = _coerce_float(_pick(entry, _JSON_LAT_KEYS))
         lon = _coerce_float(_pick(entry, _JSON_LON_KEYS))
         alt = _coerce_float(_pick(entry, _JSON_ALT_KEYS))
-        frame_raw = _coerce_float(_pick(entry, _JSON_FRAME_KEYS))
-        frame_index = int(frame_raw) if frame_raw is not None else order
+        frame_raw = _pick(entry, _JSON_FRAME_KEYS)
+        if frame_raw is None:
+            frame_index = order
+        else:
+            frame_index = _coerce_frame_index(frame_raw)
+            if frame_index is None:
+                continue
         time_s = _coerce_float(_pick(entry, _JSON_TIME_KEYS))
         sample = _make_sample(lat, lon, alt, frame_index=frame_index, time_s=time_s)
         if sample is not None:
@@ -375,6 +417,13 @@ def parse_telemetry(filename: str, raw: bytes) -> list[DroneSample]:
     kind = _detect_kind(filename or "", text)
     parser = {"srt": _parse_srt, "csv": _parse_csv, "json": _parse_json}[kind]
     samples = parser(text)
+
+    if len(samples) > MAX_TELEMETRY_SAMPLES:
+        # Pathologically long track: uniformly downsample to the cap so the per-frame
+        # resample stays bounded (audit: sample-count / O(n*m) resample DoS). Uniform
+        # striding preserves the track's span rather than truncating the descent.
+        stride = len(samples) / MAX_TELEMETRY_SAMPLES
+        samples = [samples[int(i * stride)] for i in range(MAX_TELEMETRY_SAMPLES)]
 
     if not samples:
         raise TelemetryError(

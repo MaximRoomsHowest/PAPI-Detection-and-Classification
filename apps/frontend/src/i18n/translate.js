@@ -20,12 +20,23 @@ export function translateScenario(scenario, copy) {
     summary: translated[2] ?? scenario.summary,
     condition: translated[3] ?? scenario.condition,
     angle: scenario.angle === translations.en.live.angleUnavailable ? copy.live.angleUnavailable : scenario.angle,
-    angleSummary:
-      scenario.angleSummary && !scenario.angleSummary.available
-        ? {
-            ...scenario.angleSummary,
-            source: copy.live.missingMetadata,
-          }
-        : scenario.angleSummary,
+    angleSummary: translateAngleSummary(scenario.angleSummary, copy),
+  }
+}
+
+// Localize the angle provenance label. When unavailable, the source slot carries the
+// "missing metadata" message; when available, the backend enum (request_metadata,
+// file_metadata, telemetry_file, metadata) is mapped to a human-readable, localized
+// string, falling back to the raw value if the locale has no entry.
+function translateAngleSummary(angleSummary, copy) {
+  if (!angleSummary) {
+    return angleSummary
+  }
+  if (!angleSummary.available) {
+    return { ...angleSummary, source: copy.live.missingMetadata }
+  }
+  return {
+    ...angleSummary,
+    source: copy.live.angleSource?.[angleSummary.source] ?? angleSummary.source,
   }
 }

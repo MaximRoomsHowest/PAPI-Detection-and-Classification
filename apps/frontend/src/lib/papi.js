@@ -45,6 +45,14 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
         value: result.angle.elevation_angle_deg.toFixed(3),
         source: result.angle.angle_source ?? 'metadata',
         note: result.angle.angle_note,
+        // Runway<->metadata sanity: false when the drone fix is implausibly far from
+        // the selected runway (wrong runway / datum). All ??-guarded so an older
+        // payload without these fields stays available + plausible (back-compat).
+        plausible: result.angle.plausible ?? true,
+        plausibilityNote: result.angle.plausibility_note ?? null,
+        nearestLampDistanceM: result.angle.nearest_lamp_distance_m ?? null,
+        // First-order 1-sigma band (deg) from DJI RTK std; null unless the file had it.
+        uncertainty: result.angle.elevation_angle_uncertainty_deg ?? null,
       }
     : {
         available: false,
@@ -68,7 +76,7 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
       boxConfidence: percent(result.confidence),
     },
     environmentClass: 'clear',
-    artifactUrl: mediaUrl(result.artifact_url),
+    artifactUrl: context.artifactUrl ?? mediaUrl(result.artifact_url),
     artifactType: result.media_type,
     logId: result.log_id,
     angle: result.angle,

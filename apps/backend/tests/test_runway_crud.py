@@ -9,13 +9,16 @@ registered runway into the other suites running in the same process.
 
 from __future__ import annotations
 
+import json
 from io import BytesIO
 
-import pytest
-
 import app.services.runways as runways
+import pytest
 from app.validation.schemas import AnalysisPayload, AngleResult, FramePoint
-from test_integration import client  # noqa: F401  (reused pytest fixture: mocked inference + in-memory DB)
+from pydantic import ValidationError
+from test_integration import (
+    client,  # noqa: F401  (reused pytest fixture: mocked inference + in-memory DB)
+)
 
 
 @pytest.fixture
@@ -96,6 +99,52 @@ def test_delete_unknown_runway_is_404(client, isolated_runways):
     assert client.delete("/api/runways/custom_does_not_exist").status_code == 404
 
 
+def test_corrupt_custom_runway_sidecar_entries_are_ignored(isolated_runways):
+    invalid_lights = _valid_lights()
+    invalid_lights[0] = {**invalid_lights[0], "latitude": 999.0}
+    isolated_runways.write_text(
+        json.dumps(
+            {
+                "custom_valid": {
+                    "id": "custom_valid",
+                    "label": "Valid PAPI",
+                    "source": "custom",
+                    "lights": _valid_lights(),
+                },
+                "custom_wrong_lamp_count": {
+                    "id": "custom_wrong_lamp_count",
+                    "label": "Wrong Lamp Count",
+                    "source": "custom",
+                    "lights": _valid_lights()[:3],
+                },
+                "custom_bad_coordinate": {
+                    "id": "custom_bad_coordinate",
+                    "label": "Bad Coordinate",
+                    "source": "custom",
+                    "lights": invalid_lights,
+                },
+                "papi_24": {
+                    "id": "papi_24",
+                    "label": "Attempted Shadow",
+                    "source": "custom",
+                    "lights": _valid_lights(),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    runways._custom_cache = None
+
+    listed = runways.list_runways()
+    ids = {runway.id for runway in listed}
+
+    assert "custom_valid" in ids
+    assert "custom_wrong_lamp_count" not in ids
+    assert "custom_bad_coordinate" not in ids
+    assert "papi_24" in ids
+    assert next(runway for runway in listed if runway.id == "papi_24").source == "config"
+
+
 def test_frame_point_and_per_frame_contract():
     base = dict(
         media_type="video",
@@ -117,5 +166,5 @@ def test_frame_point_and_per_frame_contract():
     )
     assert payload.per_frame[0].frame_index == 0
     # confidence is a probability in [0, 1].
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         FramePoint(frame_index=0, confidence=1.5, state="unknown")

@@ -1,4 +1,4 @@
-# PAPI Vision — Design Document
+# PAPI Lights Detection and Classification — Design Document
 
 > **Audience**: jury, supervisors, future maintainers. Companion to
 > [user-manual.md](../user-manual.md) (how to *use* the app) and
@@ -56,7 +56,7 @@ underlying packages (see [architecture-overview.md §6](../architecture-overview
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Top nav (persistent)                                     │
-│  PAPI Vision logo │ Intro │ Live Demo │ Insights │ Hist. │
+│  PAPI Lights Detection and Classification logo │ Intro │ Live Demo │ Insights │ Hist. │
 │                                       │ Lang │ Theme    │
 └──────────────────────────────────────────────────────────┘
                               │
@@ -216,7 +216,7 @@ audio off. No surprise tooltips, no first-launch overlays.
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                                                          │
-│   PAPI Vision                                            │
+│   PAPI Lights Detection and Classification                                            │
 │   ─────────────                                          │
 │   AI-assisted approach-light verification                │
 │                                                          │
@@ -440,7 +440,8 @@ critical from Round 1 verified resolved. Two remaining minors
 documented but not yet shipped:
 
 - Form-control `id`/`name` missing on metadata inputs (a11y).
-- PAPI 06 geometry shows provisional angle pending client confirmation.
+- PAPI 06 geometry uses the data-analysis branch's `461.37 m` reference; lamp
+  order and commissioned set angles still need binding.
 
 The rerun PDF is the headline evidence for the LR1A 16+ "user-feedback
 integrated and iterated on" band claim — same-day round-trip with

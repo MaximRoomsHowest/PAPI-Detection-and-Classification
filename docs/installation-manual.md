@@ -1,4 +1,4 @@
-# PAPI Vision — Installation Manual
+# PAPI Lights Detection and Classification — Installation Manual
 
 How to install and run the PAPI Detection & Classification system
 from a fresh machine. Two supported paths:

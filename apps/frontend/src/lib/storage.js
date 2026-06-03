@@ -5,6 +5,7 @@ import { SUPPORTED_LANGUAGES } from '../i18n/translations'
 export const STORAGE_KEYS = {
   theme: 'papi.theme',
   language: 'papi.language',
+  runway: 'papi.runway',
 }
 
 // Write a localStorage key, swallowing failures. Some browsers (Safari
@@ -54,4 +55,24 @@ export function initialLanguage() {
   if (typeof navigator === 'undefined') return 'en'
   const detected = (navigator.language || '').slice(0, 2).toLowerCase()
   return SUPPORTED_LANGUAGES.includes(detected) ? detected : 'en'
+}
+
+// Read a localStorage string WITHOUT an allowlist — for values whose valid set is
+// dynamic (runway ids: custom runways can't be enumerated here). Still guarded for
+// read errors / empty values; the live runway list is the real validator.
+export function readStoredString(key, fallback) {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const value = window.localStorage.getItem(key)
+    return value || fallback
+  } catch {
+    return fallback
+  }
+}
+
+// Initial runway selection: persisted id -> backend default ('papi_24'). The id is
+// reconciled against the fetched runway list at runtime (a custom runway may have
+// been deleted in another tab), so no static allowlist is applied here.
+export function initialRunwayId() {
+  return readStoredString(STORAGE_KEYS.runway, 'papi_24')
 }

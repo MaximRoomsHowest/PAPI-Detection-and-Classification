@@ -30,7 +30,8 @@ const inRange = (value, min, max) => {
 }
 
 export function RunwaysPage({ copy }) {
-  const { runways, selectedRunwayId, setSelectedRunwayId, addRunway, removeRunway } = useLiveDemo()
+  const { runways, selectedRunwayId, selectedRunway, setSelectedRunwayId, addRunway, removeRunway } =
+    useLiveDemo()
   const t = copy.runways
 
   const [form, setForm] = useState(emptyForm)
@@ -107,7 +108,9 @@ export function RunwaysPage({ copy }) {
           <p className="eyebrow">{t.eyebrow}</p>
           <h2>{t.title}</h2>
         </div>
-        <span className="source-note">{t.activeNote.replace('{id}', selectedRunwayId)}</span>
+        <span className="source-note">
+          {t.activeNote.replace('{id}', selectedRunway?.label ?? selectedRunwayId)}
+        </span>
       </div>
 
       <p className="runways-intro">{t.intro}</p>

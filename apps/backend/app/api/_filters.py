@@ -8,8 +8,27 @@ two routes can never drift on, e.g., how ``created_after`` is validated.
 from __future__ import annotations
 
 from datetime import datetime
+from math import isfinite
+from typing import get_args
 
 from fastapi import HTTPException
+
+from app.validation.schemas import GlobalState, MediaType
+
+_MEDIA_TYPES = set(get_args(MediaType))
+_GLOBAL_STATES = set(get_args(GlobalState))
+_MAX_TEXT_FILTER_LENGTH = 120
+
+
+def _clean_optional_text(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if len(cleaned) > _MAX_TEXT_FILTER_LENGTH:
+        raise HTTPException(status_code=400, detail=f"{field_name} is too long.")
+    return cleaned
 
 
 def parse_log_filters(
@@ -21,14 +40,32 @@ def parse_log_filters(
 ) -> dict:
     """Validate + normalise the shared log query filters (audit IMP-BE-3).
 
-    ``created_after`` is the only field that needs parsing: it arrives as a
-    free-text query string and must be ISO 8601. Everything else is passed
-    through verbatim to the repository.
+    Values are validated before they hit the repository so the list and CSV
+    endpoints reject the same malformed filters instead of silently returning
+    empty result sets for impossible states or out-of-range confidence values.
     """
+    runway_id = _clean_optional_text(runway_id, "runway_id")
+    media_type = _clean_optional_text(media_type, "media_type")
+    global_state = _clean_optional_text(global_state, "global_state")
+    created_after = _clean_optional_text(created_after, "created_after")
+
+    if media_type is not None and media_type not in _MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail="media_type must be one of: image, video.")
+
+    if global_state is not None and global_state not in _GLOBAL_STATES:
+        allowed = ", ".join(sorted(_GLOBAL_STATES))
+        raise HTTPException(status_code=400, detail=f"global_state must be one of: {allowed}.")
+
+    if min_confidence is not None and (
+        not isfinite(min_confidence) or not 0.0 <= min_confidence <= 1.0
+    ):
+        raise HTTPException(status_code=400, detail="min_confidence must be between 0 and 1.")
+
     parsed_after = None
     if created_after:
+        iso_value = created_after[:-1] + "+00:00" if created_after.endswith("Z") else created_after
         try:
-            parsed_after = datetime.fromisoformat(created_after)
+            parsed_after = datetime.fromisoformat(iso_value)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,

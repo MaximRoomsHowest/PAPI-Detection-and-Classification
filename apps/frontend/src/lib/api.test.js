@@ -32,6 +32,7 @@ import {
   fetchSystem,
   logsCsvUrl,
   mediaUrl,
+  resolveMediaUrl,
 } from './api.js'
 
 /** Helper: build a Response-like object the way fetch resolves to one. */
@@ -83,6 +84,7 @@ describe('mediaUrl', () => {
   it('passes absolute URLs through unchanged', () => {
     expect(mediaUrl('https://example.test/x.jpg')).toBe('https://example.test/x.jpg')
     expect(mediaUrl('http://example.test/x.jpg')).toBe('http://example.test/x.jpg')
+    expect(mediaUrl('blob:http://example.test/artifact')).toBe('blob:http://example.test/artifact')
   })
 
   it('prepends API_BASE_URL to relative paths', () => {
@@ -92,6 +94,12 @@ describe('mediaUrl', () => {
 
   it('inserts the slash when the path is missing one', () => {
     expect(mediaUrl('media/foo.jpg')).toMatch(/\/media\/foo\.jpg$/)
+  })
+
+  it('resolveMediaUrl leaves object URLs untouched for media tag rendering', async () => {
+    const url = 'blob:http://example.test/artifact'
+    await expect(resolveMediaUrl(url)).resolves.toBe(url)
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
 

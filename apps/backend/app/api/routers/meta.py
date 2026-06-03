@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/runways", response_model=list[RunwayResponse])
-def get_runways() -> list[RunwayResponse]:
+def get_runways(_auth: Annotated[None, Depends(routes.require_api_key)] = None) -> list[RunwayResponse]:
     return list_runways()
 
 

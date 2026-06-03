@@ -87,6 +87,22 @@ class AngleResult(BaseModel):
     per_light_angles: list[AnglePerLight] = Field(default_factory=list)
     angle_source: str | None = None
     angle_note: str
+    # Sanity check on the runway<->metadata relationship: the angle is always
+    # geometrically computable, but if the drone fix is implausibly far from the
+    # selected runway's nearest lamp it almost certainly means the wrong runway was
+    # chosen (or the coordinates are in a different datum). ``plausible`` stays True
+    # for every existing path (incl. the not-available one — no geometry to judge),
+    # so the field is purely additive; the angle is NEVER withheld, only flagged.
+    plausible: bool = True
+    plausibility_note: str | None = None
+    # Horizontal ground distance to the closest lamp (m). Surfaced so the UI can
+    # show "how far the drone was" and back the plausibility flag with a number.
+    nearest_lamp_distance_m: float | None = None
+    # First-order 1-sigma uncertainty (deg) on the midpoint elevation angle,
+    # propagated from the DJI RTK reported standard deviations (RtkStdLat/Lon/Hgt);
+    # surveyed lamp coordinates are treated as exact. Only set when the fix carries
+    # RTK std (the embedded-XMP path) — None elsewhere, so no fabricated confidence.
+    elevation_angle_uncertainty_deg: float | None = None
 
 
 class TransitionEvent(BaseModel):
@@ -328,9 +344,21 @@ class RunwayCreate(BaseModel):
 
     @model_validator(mode="after")
     def _check_lights(self) -> "RunwayCreate":
+        # Reject a blank-after-strip label and persist the stripped value: min_length=1
+        # still admits "   ", which the store later strips to "" so the runway silently
+        # vanishes on the next reload (audit). Stripping here makes both paths agree.
+        stripped = self.label.strip()
+        if not stripped:
+            raise ValueError("Runway label must not be blank.")
+        self.label = stripped
         if len(self.lights) != 4:
             raise ValueError("A runway must have exactly 4 PAPI lamps.")
         if sorted(light.point for light in self.lights) != [1, 2, 3, 4]:
             raise ValueError("Lamp points must be 1, 2, 3 and 4 (one of each).")
+        # Reject degenerate geometry: identical lamp coordinates make the per-lamp
+        # elevation angles meaningless (audit). ~1e-6 deg rounding (~0.1 m).
+        positions = {(round(lamp.latitude, 6), round(lamp.longitude, 6)) for lamp in self.lights}
+        if len(positions) < 4:
+            raise ValueError("Lamp coordinates must be 4 distinct positions.")
         return self
 

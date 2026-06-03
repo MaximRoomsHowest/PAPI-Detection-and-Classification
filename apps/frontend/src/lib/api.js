@@ -105,10 +105,40 @@ export function mediaUrl(path) {
   if (!path) {
     return null
   }
-  if (path.startsWith('http://') || path.startsWith('https://')) {
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:')) {
     return path
   }
   return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+/**
+ * Resolve a backend artifact URL for display. When an API key is configured,
+ * browser media tags cannot add X-API-Key, so fetch the artifact once and render
+ * it through an object URL instead of a bare /media src.
+ */
+export async function resolveMediaUrl(path) {
+  const url = mediaUrl(path)
+  if (!url || !API_KEY || url.startsWith('blob:')) {
+    return url
+  }
+
+  const response = await fetchWithTimeout(url, { headers: buildHeaders() })
+  if (!response.ok) {
+    throw new Error(`Could not load media artifact (${response.status})`)
+  }
+
+  try {
+    const blob = await response.blob()
+    return URL.createObjectURL(blob)
+  } catch (error) {
+    throw new Error('Media artifact returned a malformed response body.', { cause: error })
+  }
+}
+
+export function revokeMediaUrl(url) {
+  if (url?.startsWith('blob:')) {
+    URL.revokeObjectURL(url)
+  }
 }
 
 export async function fetchRunways() {

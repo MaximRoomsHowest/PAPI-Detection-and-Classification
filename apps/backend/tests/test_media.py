@@ -2,7 +2,7 @@ from io import BytesIO
 
 import pytest
 from app.config import Settings
-from app.services.media import detect_media_type, save_upload
+from app.services.media import detect_media_type, media_url_for_path, save_upload
 from starlette.datastructures import UploadFile
 
 
@@ -34,4 +34,16 @@ def test_save_upload_enforces_size_limit(tmp_path):
         save_upload(upload, settings)
 
     assert list(settings.uploads_dir.iterdir()) == []
+
+
+def test_media_url_for_path_requires_exports_dir(tmp_path):
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=tmp_path / "models" / "best.pt",
+    )
+    settings.ensure_storage()
+
+    assert media_url_for_path(str(settings.exports_dir / "clip.webm"), settings) == "/media/clip.webm"
+    assert media_url_for_path(str(settings.uploads_dir / "clip.webm"), settings) is None
+    assert media_url_for_path(str(settings.exports_dir / ".." / "uploads" / "clip.webm"), settings) is None
 

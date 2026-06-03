@@ -16,6 +16,7 @@ resolves from the same patched namespace.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Annotated
@@ -36,6 +37,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
+_NATURAL_PART_RE = re.compile(r"(\d+)")
+
+
+def _natural_upload_key(upload: UploadFile) -> tuple[tuple[int, int | str], ...]:
+    """Sort folder frames by numeric capture order, not plain lexicographic order."""
+    filename = upload.filename or ""
+    return tuple(
+        # Cap the digit-run length: int() on a >4300-digit string raises ValueError
+        # under Python 3.11+ (int-str conversion limit), which would 500 the upload.
+        # Real frame numbers are short; longer runs fall back to string sort (audit).
+        (1, int(part)) if part.isdigit() and len(part) <= 18 else (0, part.casefold())
+        for part in _NATURAL_PART_RE.split(filename)
+    )
+
 
 @dataclass(frozen=True)
 class AnalyzeParams:
@@ -54,10 +69,10 @@ class AnalyzeParams:
 
 
 def analyze_params(
-    # Default to papi_24 (client-provided lamp altitude 461.37 m) rather than
-    # papi_06 whose installation height is still unconfirmed by Intersoft
-    # (audit B-CRIT-2 + open question carried forward). The frontend dropdown
-    # still lets the user pick papi_06 explicitly.
+    # Default to papi_24: its 461.37 m reference was validated against the client's
+    # angle tool. papi_06 is selectable and uses the data_analysis-branch 461.37 m
+    # reference; its client image/MRK metadata is present, but commissioned
+    # set-angles/lamp-order mapping are still not bound into runtime config.
     runway_id: Annotated[str, Form()] = "papi_24",
     drone_id: Annotated[str | None, Form()] = None,
     drone_latitude: Annotated[float | None, Form()] = None,
@@ -78,10 +93,17 @@ def read_metadata_samples(metadata_file: UploadFile | None) -> list[DroneSample]
     """
     if metadata_file is None:
         return None
+    settings = routes.get_settings()
+    max_bytes = settings.max_upload_mb * 1024 * 1024
     try:
-        raw = metadata_file.file.read()
+        raw = metadata_file.file.read(max_bytes + 1)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail="Could not read the telemetry file.") from exc
+    if len(raw) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Telemetry file exceeds the {settings.max_upload_mb} MB limit.",
+        )
     if not raw or not raw.strip():
         return None
     try:
@@ -205,8 +227,8 @@ def analyze_sequence(
     drone_samples = read_metadata_samples(metadata_file)
 
     # Capture order: a folder upload arrives via webkitdirectory with names like
-    # "flight/frame_000.jpg"; sort so the assembled clip plays in numeric capture order.
-    ordered = sorted(files, key=lambda upload: upload.filename or "")
+    # "flight/frame_000.jpg"; natural-sort so frame_10 never plays before frame_2.
+    ordered = sorted(files, key=_natural_upload_key)
     first_name = ordered[0].filename or "sequence"
     folder = first_name.split("/")[0] if "/" in first_name else None
     display_name = f"{folder} ({len(ordered)} frames)" if folder else f"sequence ({len(ordered)} frames)"

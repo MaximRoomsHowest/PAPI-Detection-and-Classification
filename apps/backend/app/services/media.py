@@ -63,9 +63,10 @@ def save_upload(upload: UploadFile, settings: Settings) -> Path:
 def media_url_for_path(path: str | None, settings: Settings) -> str | None:
     if not path:
         return None
-    artifact = Path(path)
+    artifact = Path(path).resolve()
+    exports_dir = settings.exports_dir.resolve()
     try:
-        relative = artifact.relative_to(settings.exports_dir)
+        relative = artifact.relative_to(exports_dir)
     except ValueError:
         return None
     return f"/media/{relative.as_posix()}"

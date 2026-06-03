@@ -9,7 +9,12 @@ from typing import Any
 from uuid import uuid4
 
 from app.config import Settings
-from app.services.angle import compute_elevation_angles, extract_gps_metadata, unavailable_angle
+from app.services.angle import (
+    compute_elevation_angles,
+    extract_gps_metadata,
+    extract_gps_uncertainty,
+    unavailable_angle,
+)
 from app.services.inference.aggregation import aggregate_video_lamps
 from app.services.inference.cv2_loader import require_cv2
 from app.services.inference.overlay import LAMP_COLORS, draw_overlay
@@ -247,7 +252,13 @@ class InferenceService:
 
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 15
+        # cap.get(FPS) can return 0, a negative, or NaN for some containers; `NaN or 15`
+        # keeps the NaN (NaN is truthy), which then poisons the frame-limit math and
+        # surfaces as a leaked 500. Reject all three and clamp an absurd upper bound.
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if not (fps and fps > 0 and fps == fps):  # `fps == fps` is False only for NaN
+            fps = 15.0
+        fps = min(fps, 240.0)
         max_frames = self._video_frame_limit(fps)
         too_long = (
             f"Uploaded video is too long. Limit is {max_frames} frames "
@@ -596,7 +607,13 @@ class InferenceService:
         embedded = extract_gps_metadata(media_path)
         if embedded is not None:
             lat, lon, alt = embedded
-            return [DroneSample(lat, lon, alt)], "file_metadata"
+            # Attach the RTK std when the file carries it, so the angle gets a 1-sigma
+            # band; manual + telemetry-file fixes have no std and stay unbanded.
+            uncertainty = extract_gps_uncertainty(media_path)
+            sigma_h, sigma_v = uncertainty if uncertainty is not None else (None, None)
+            return [
+                DroneSample(lat, lon, alt, sigma_horizontal_m=sigma_h, sigma_vertical_m=sigma_v)
+            ], "file_metadata"
         return None, None
 
     def _angle_from_samples(
@@ -619,7 +636,13 @@ class InferenceService:
             )
         rep = samples[len(samples) // 2]
         return compute_elevation_angles(
-            rep.latitude, rep.longitude, rep.altitude_m, runway_id, angle_source=angle_source or "metadata"
+            rep.latitude,
+            rep.longitude,
+            rep.altitude_m,
+            runway_id,
+            angle_source=angle_source or "metadata",
+            sigma_horizontal_m=rep.sigma_horizontal_m,
+            sigma_vertical_m=rep.sigma_vertical_m,
         )
 
     def _angle_for_media(

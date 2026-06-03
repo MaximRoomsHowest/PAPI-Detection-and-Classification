@@ -594,6 +594,115 @@
   color: var(--text-muted);
 }
 
+/* Implausible angle (runway<->metadata mismatch): the angle is still shown, but the
+   readout is tinted amber to signal "geometrically computed, probably not meaningful"
+   — mirrors the .analysis-status.error treatment, with the --warn token. */
+.angle-readout.implausible {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--border));
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface-muted));
+}
+
+/* RTK 1-sigma band, inline after the degree value, de-emphasised. */
+.angle-readout small.angle-readout__band {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.angle-readout p.angle-readout__context {
+  font-size: 12px;
+}
+
+.angle-readout p.angle-readout__warning {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* Selected-runway summary on the Live Demo — the geometric frame of reference the
+   angle is scored against, shown beside the drone-position inputs. */
+.runway-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.runway-summary svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.runway-summary__label {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.runway-summary__meta {
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.folder-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.folder-mode__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.folder-mode__options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.folder-mode__options button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.folder-mode__options button.active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
+  color: var(--text-strong);
+}
+
+.folder-mode__options button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.folder-mode p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* PDF export feedback banner (audit F06/F07): mirrors the Live Demo
    .analysis-status.error pattern so a failed or empty export is visible
    (aria-live) instead of console-only. */

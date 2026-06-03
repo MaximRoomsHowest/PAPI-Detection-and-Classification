@@ -1,13 +1,13 @@
-# PAPI Vision — User Manual
+# PAPI Lights Detection and Classification — User Manual
 
-For end users of the PAPI Vision demo application: drone operators,
+For end users of the PAPI Lights Detection and Classification demo application: drone operators,
 review engineers, and the jury. If you want to install the system
 from scratch, see [installation-manual.md](installation-manual.md)
 instead.
 
 ## 1. What this application does
 
-PAPI Vision analyses drone footage of a four-light **PAPI**
+PAPI Lights Detection and Classification analyses drone footage of a four-light **PAPI**
 (Precision Approach Path Indicator) installation and reports:
 
 - The state of each of the four lamps (white / red / transition).
@@ -77,15 +77,28 @@ annotated video artifact.
 **Limits**: 100 MB maximum per upload, 600 frames maximum per
 video, 30 seconds maximum duration (whichever cap is lower).
 
-### 3.3 Folder upload (batch images)
+### 3.3 Folder upload (image sequence → one video)
 
 1. Click **Upload folder** instead.
 2. Pick a directory containing multiple image files. The browser
-   uploads every image in the folder as one batch.
-3. The metadata fields apply to **all** images in the batch.
+   uploads every image in the folder as one request.
+3. The metadata fields apply to the whole sequence (the viewing
+   angle is read once, from the first image's GPS metadata or the
+   values you enter).
 4. Click **Run backend model**.
-5. The first image's result appears; use the **frame navigation**
-   arrows above the central panel to step through each image.
+5. The folder is analysed as a **single time-sequenced video**: the
+   images are ordered by filename and treated as consecutive frames
+   of one clip, so the lamps are tracked across frames and red↔white
+   transitions are detected over time. You get **one aggregated
+   result** plus one annotated video — not a separate result per
+   image, so there is no per-image frame stepping here. (Name the
+   files in capture order, e.g. `frame_000.jpg … frame_NNN.jpg`, so
+   the sequence plays correctly.)
+
+If you instead want an independent result for every image (one row
+per frame, no tracking), that batch mode is still available on the
+backend at `POST /api/analyze-frames` via the API docs; the folder
+button in the UI uses the time-sequenced video path described above.
 
 ## 4. Reading the results
 
@@ -129,29 +142,43 @@ live data.
 
 ## 5. The Insights page
 
-Click **Insights** in the top navigation. This page shows two
-visualisations:
+Click **Insights** in the top navigation. Every chart here is built
+from **real backend output** of your most recent analysis — there is
+no synthetic data. The page is split into two tabs:
 
-- **PAPI state decoder**: a horizontal bar chart with all five
-  legal global states. The bar length is the model's evidence for
-  each state given the active scenario.
-- **Transition ribbon**: a heatmap showing per-lamp state over
-  consecutive frames. White / red / amber cells make the
-  transition events visible at a glance.
+- **Current analysis** — visualisations of the run you just executed
+  on the Live Demo page:
+  - **Angle vs. light state** — how each lamp's state relates to the
+    computed elevation angle.
+  - **Light transitions** — the red↔white transition events detected
+    across the analysed frames.
+  - **Session summary** — aggregate counts / breakdown for the run.
+- **Model & dataset** — the live model and dataset facts (identity,
+  classes, and validation metrics) read from the backend.
 
-Both charts honour the currently-active scenario from the Live
-Demo page. Use **Download charts (PDF)** in the top right to export
-the page as a multi-page PDF for inclusion in reports.
+Use **Download charts (PDF)** in the top right to export the rendered
+charts as a multi-page PDF for inclusion in reports. If you have not
+run an analysis yet, the Current-analysis charts stay empty and ask
+you to upload geotagged imagery and run the model first.
+
+## 5a. The History page
+
+Click **History** in the top navigation to review past analyses. It
+lists recent backend runs (newest first) with their verdict, runway,
+confidence, and annotated artifact, and reflects the backend's
+persisted analysis log. It is read straight from the backend, so it
+populates only when the backend is running.
 
 ## 6. Theme and language
 
 Top-right corner:
 
-- **EN / NL / FR** language picker. Changes UI text on the fly.
-  Note: the choice does not persist across page reloads (carry-over
-  item from the audit).
+- **EN / DE / NL / FR** language picker. Changes UI text on the fly.
+  The choice is remembered across page reloads (and an unset choice
+  follows the browser language on first visit).
 - **Moon / Sun icon**: toggles between light and dark mode. Useful
-  during presentations in dark rooms.
+  during presentations in dark rooms. The choice is also remembered
+  across reloads.
 
 ## 7. Troubleshooting
 
@@ -163,7 +190,7 @@ Top-right corner:
 | Backend returns 413 / "Upload exceeds 100 MB" | Input file too large | Compress / trim, or raise `PAPI_MAX_UPLOAD_MB` in `.env` |
 | "Angle unavailable" on the result | The uploaded file had no GPS / altitude metadata | Supply the values manually in the metadata fields |
 | Folder upload only shows one image | Browser couldn't read the directory | Try a different browser (Firefox & Edge both support `webkitdirectory`) |
-| Page title shows "frontend" not "PAPI Vision" | Old browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |
+| Page title shows "frontend" not "PAPI Lights Detection and Classification" | Old browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |
 | Cookie consent popup keeps appearing | Stale cached bundle | The popup was removed; refresh to load the new build |
 
 If you need to inspect what the backend actually received: the

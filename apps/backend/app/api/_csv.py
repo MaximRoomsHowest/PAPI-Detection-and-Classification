@@ -33,7 +33,7 @@ def csv_safe(value) -> str:
     set, but escaped defensively in case validation is ever relaxed).
     """
     text = "" if value is None else str(value)
-    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else text
 
 
 def stream_log_rows(rows: Iterable) -> Iterator[str]:

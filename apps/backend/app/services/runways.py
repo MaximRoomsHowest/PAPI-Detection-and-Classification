@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import ValidationError
 
 from app.config import REPO_ROOT, get_settings
 from app.validation.schemas import RunwayCreate, RunwayResponse
@@ -28,9 +29,11 @@ from app.validation.schemas import RunwayCreate, RunwayResponse
 CONFIG_PATH: Path = REPO_ROOT / "configs" / "papi_edny.yaml"
 
 # Last-resort fallback when configs/papi_edny.yaml is unavailable. Values
-# pinned from the YAML at the time of the 2026-05-28 improvement pass. If you change
-# the YAML, the runtime path picks it up automatically — these stay only
-# for environments where the configs directory is not present.
+# mirror the YAML: both built-ins use 461.37 m. For papi_06 this is the
+# data_analysis-branch lamp reference, not the rejected 464.988 m minimum
+# client-drone-MRK altitude floor proxy. If you change the YAML, the runtime path
+# picks it up automatically — these stay only for environments where configs/ is
+# missing.
 _FALLBACK_RUNWAYS: dict[str, dict[str, Any]] = {
     "papi_06": {
         "id": "papi_06",
@@ -132,6 +135,49 @@ def _custom_path() -> Path:
     return get_settings().storage_dir / "custom_runways.json"
 
 
+def _normalise_custom_store(raw: Any) -> dict[str, dict[str, Any]]:
+    """Validate the persisted custom-runway sidecar before trusting it."""
+    if not isinstance(raw, dict):
+        return {}
+
+    store: dict[str, dict[str, Any]] = {}
+    for runway_key, runway in raw.items():
+        if not isinstance(runway_key, str) or not runway_key.startswith("custom_"):
+            continue
+        if not isinstance(runway, dict):
+            continue
+
+        candidate = {**runway, "id": runway_key, "source": "custom"}
+        try:
+            validated = RunwayCreate(
+                id=runway_key,
+                label=candidate.get("label"),
+                airport=candidate.get("airport"),
+                designation=candidate.get("designation"),
+                lights=candidate.get("lights"),
+            )
+        except (TypeError, ValidationError, ValueError):
+            continue
+
+        store[runway_key] = RunwayResponse(
+            id=runway_key,
+            label=validated.label.strip(),
+            airport=(validated.airport or "").strip() or None,
+            designation=(validated.designation or "").strip() or None,
+            source="custom",
+            lights=[
+                {
+                    "point": light.point,
+                    "latitude": light.latitude,
+                    "longitude": light.longitude,
+                    "altitude_m": light.altitude_m,
+                }
+                for light in sorted(validated.lights, key=lambda lamp: lamp.point)
+            ],
+        ).model_dump()
+    return store
+
+
 def _load_custom() -> dict[str, dict[str, Any]]:
     # Self-locking: get_runway()/list_runways() reach here from the analyze
     # threadpool with no lock of their own, so guard the lazy cache init against a
@@ -141,7 +187,7 @@ def _load_custom() -> dict[str, dict[str, Any]]:
         if _custom_cache is None:
             try:
                 raw = json.loads(_custom_path().read_text(encoding="utf-8"))
-                _custom_cache = raw if isinstance(raw, dict) else {}
+                _custom_cache = _normalise_custom_store(raw)
             except (OSError, json.JSONDecodeError):
                 _custom_cache = {}
         return _custom_cache
@@ -180,6 +226,12 @@ def get_runway(runway_id: str) -> dict[str, Any]:
         raise ValueError(f"Unknown runway_id: {runway_id}") from exc
 
 
+# Cap on stored custom runways. The store is unauthenticated by default and is
+# rewritten in full on every registration (O(n) JSON dump), so an unbounded create
+# loop is a slow-growth DoS; 200 is far above any realistic demo need (audit).
+MAX_CUSTOM_RUNWAYS = 200
+
+
 def add_runway(payload: RunwayCreate) -> dict[str, Any]:
     """Register a runtime runway from a validated ``RunwayCreate`` and persist it.
 
@@ -197,6 +249,11 @@ def add_runway(payload: RunwayCreate) -> dict[str, Any]:
             raise ValueError(f"Runway id '{runway_id}' is reserved by a built-in runway.")
         if runway_id in store:
             raise ValueError(f"Runway '{runway_id}' already exists.")
+        if len(store) >= MAX_CUSTOM_RUNWAYS:
+            raise ValueError(
+                f"Custom-runway limit reached ({MAX_CUSTOM_RUNWAYS}). "
+                "Delete an existing custom runway before adding another."
+            )
         runway = {
             "id": runway_id,
             "label": payload.label.strip(),

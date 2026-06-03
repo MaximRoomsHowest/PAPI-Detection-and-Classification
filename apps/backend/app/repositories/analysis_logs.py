@@ -22,7 +22,10 @@ class AnalysisLogRepository:
             media_type=payload.media_type,
             runway_id=payload.runway_id,
             drone_id=payload.drone_id,
-            original_filename=payload.original_filename,
+            # Cap at the column width (VARCHAR(512)): a pathologically long upload name
+            # otherwise raises a StringDataRightTruncation 503 on Postgres while orphaning
+            # the just-written artifact (SQLite tests don't enforce width) — audit.
+            original_filename=(payload.original_filename or "")[:512],
             artifact_path=artifact_path,
             global_state=payload.global_state,
             lamp_1_state=lamp_state.get(1, "unknown"),

@@ -1,4 +1,4 @@
-# PAPI Vision — Edge Benchmark
+# PAPI Lights Detection and Classification — Edge Benchmark
 
 > ⚠ **Template — fill in measurements after running on actual hardware.**
 > Placeholders are marked `[TODO]`. This document is intentionally a
@@ -6,7 +6,7 @@
 > before numbers are produced (avoids cherry-picking and gives the
 > rubric grader a defensible audit trail).
 
-Reproducible methodology for benchmarking PAPI Vision on
+Reproducible methodology for benchmarking PAPI Lights Detection and Classification on
 resource-constrained hardware. Required for rubric LR1B (real-time
 inference, edge deployment, scalability).
 

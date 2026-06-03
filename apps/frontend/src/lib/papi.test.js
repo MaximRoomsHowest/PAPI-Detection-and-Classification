@@ -44,6 +44,7 @@ describe('scenarioFromBackendResult', () => {
     const correct = scenarioFromBackendResult(makeResult({ global_state: 'correct_glidepath' }), context)
     expect(correct.stateId).toBe('correct')
     expect(correct.summary).toContain('correct glidepath')
+    expect(scenarioFromBackendResult(makeResult({ global_state: 'transition' }), context).stateId).toBe('transition')
   })
 
   it('falls back to unknown for an unrecognised global_state', () => {
@@ -63,6 +64,42 @@ describe('scenarioFromBackendResult', () => {
     expect(s.condition).toBe('-2.500 deg')
     expect(s.angleSummary).toMatchObject({ available: true, value: '-2.500', source: 'file_metadata' })
     expect(s.metrics.boxConfidence).toBe(61)
+  })
+
+  it('defaults the new angle fields when the payload omits them (back-compat)', () => {
+    const s = scenarioFromBackendResult(makeResult(), context)
+    expect(s.angleSummary).toMatchObject({
+      plausible: true,
+      plausibilityNote: null,
+      nearestLampDistanceM: null,
+      uncertainty: null,
+    })
+  })
+
+  it('surfaces plausibility, nearest-lamp distance and RTK uncertainty from the angle', () => {
+    const s = scenarioFromBackendResult(
+      makeResult({
+        angle: {
+          angle_available: true,
+          elevation_angle_deg: -2.5,
+          angle_source: 'request_metadata',
+          angle_note: 'ok',
+          plausible: false,
+          plausibility_note: 'too far from runway',
+          nearest_lamp_distance_m: 530000,
+          elevation_angle_uncertainty_deg: 0.04,
+        },
+      }),
+      context,
+    )
+    expect(s.angleSummary).toMatchObject({
+      available: true,
+      source: 'request_metadata',
+      plausible: false,
+      plausibilityNote: 'too far from runway',
+      nearestLampDistanceM: 530000,
+      uncertainty: 0.04,
+    })
   })
 
   it('treats angle_available with a null elevation as unavailable (guards toFixed)', () => {
@@ -93,11 +130,28 @@ describe('scenarioFromBackendResult', () => {
     expect(scenarioFromBackendResult(makeResult(), { frameLabel: 'Frame 2', totalFrames: 5 }).frame).toBe('Frame 2 of 5')
   })
 
+  it('uses a resolved artifact URL when the caller provides one', () => {
+    const s = scenarioFromBackendResult(makeResult(), { ...context, artifactUrl: 'blob:http://example.test/a' })
+    expect(s.artifactUrl).toBe('blob:http://example.test/a')
+  })
+
   it('defaults transitions to an empty array and keeps the raw payload', () => {
     const result = makeResult({ transitions: undefined })
     const s = scenarioFromBackendResult(result, context)
     expect(s.transitions).toEqual([])
     expect(s.rawResult).toBe(result)
     expect(s.artifactType).toBe('image')
+  })
+
+  it('preserves per-frame backend series for video and folder-sequence charts', () => {
+    const perFrame = [
+      { frame_index: 0, global_state: 'transition', confidence: 0.8 },
+      { frame_index: 1, global_state: 'correct_glidepath', confidence: 0.9 },
+    ]
+
+    const s = scenarioFromBackendResult(makeResult({ media_type: 'video', per_frame: perFrame }), context)
+
+    expect(s.perFrame).toBe(perFrame)
+    expect(s.artifactType).toBe('video')
   })
 })

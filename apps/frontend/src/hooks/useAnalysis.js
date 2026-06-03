@@ -1,17 +1,32 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   analyzeFrame,
   analyzeMedia,
+  analyzeSequence,
   createRunway,
   deleteRunway as deleteRunwayRequest,
   fetchRunways,
+  resolveMediaUrl,
+  revokeMediaUrl,
 } from '../lib/api'
 import { useFetch } from './useFetch'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { loadPlotlyBundle } from '../lib/plotlyBundle'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
 import { scenarioFromBackendResult } from '../lib/papi'
+import { resolveRunwayId } from '../lib/runwaySelection'
+import { STORAGE_KEYS, safeLocalStorageSet, initialRunwayId } from '../lib/storage'
+import {
+  FOLDER_MODE_ANGLE_SWEEP,
+  metadataFileForAnalysis,
+  shouldAnalyzeFolderAsSequence,
+  shouldKeepFrameScenarios,
+} from '../lib/analysisMode'
+
+// Client-side mirror of the backend PAPI_MAX_BATCH_FRAMES cap so an oversized folder is
+// rejected up front instead of uploading the whole batch only to be 413'd (audit).
+const MAX_BATCH_FRAMES = Number(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES) || 200
 
 // Owns the Live-Demo upload + backend-inference state and the handlers that drive
 // it — extracted from App.jsx so the App component is just the route shell. `copy`
@@ -19,12 +34,39 @@ import { scenarioFromBackendResult } from '../lib/papi'
 export function useAnalysis(copy) {
   const [activeId, setActiveId] = useState('clean')
   const [media, setMedia] = useState(null)
+  const [folderMode, setFolderMode] = useState(FOLDER_MODE_ANGLE_SWEEP)
   // Runway selection: the list comes from the backend (/api/runways); the chosen
   // id is sent as `runway_id` so the analysis scores against the right PAPI unit's
-  // surveyed geometry. Defaults to papi_24 to match the backend's own default.
+  // surveyed geometry. The id is persisted across reloads (localStorage) and
+  // reconciled against the live list, so a stored/selected id that no longer exists
+  // (custom runway deleted in another tab) self-heals to a safe default instead of
+  // silently breaking the selector and the analyze call.
   const { data: runwayData, refetch: refetchRunways } = useFetch(fetchRunways, [])
-  const runways = runwayData ?? []
-  const [selectedRunwayId, setSelectedRunwayId] = useState('papi_24')
+  // Memoised so its identity is stable across renders — an inline `?? []` makes a
+  // new array every render, which would churn the dependent memo/effect below.
+  const runways = useMemo(() => runwayData ?? [], [runwayData])
+  const [selectedRunwayId, setSelectedRunwayId] = useState(initialRunwayId)
+
+  // Effective selection: the stored id reconciled against the live list. A
+  // stale/deleted id (e.g. a custom runway removed in another tab) transparently
+  // resolves to a safe default — DERIVED, not stored, so we never setState in an
+  // effect (which cascades renders). Before the list loads we keep the raw id so the
+  // persisted choice isn't clobbered by the empty-list fallback.
+  const effectiveRunwayId =
+    runways.length > 0 ? resolveRunwayId(selectedRunwayId, runways) : selectedRunwayId
+
+  // Persist the effective id (best-effort; safe in private-mode / SSR) so a stale
+  // stored id self-heals on disk too once the live list is known.
+  useEffect(() => {
+    safeLocalStorageSet(STORAGE_KEYS.runway, effectiveRunwayId)
+  }, [effectiveRunwayId])
+
+  // The full record for the selected runway, shared app-wide so the Live Demo and
+  // Runways page can show its label + geometry (not just the id).
+  const selectedRunway = useMemo(
+    () => runways.find((runway) => runway.id === effectiveRunwayId) ?? null,
+    [runways, effectiveRunwayId],
+  )
 
   // Runway management, shared app-wide via context so the Runways page and the
   // Live Demo selector stay in sync. A newly added runway is persisted server-side
@@ -40,7 +82,14 @@ export function useAnalysis(copy) {
   async function removeRunway(runwayId) {
     await deleteRunwayRequest(runwayId)
     refetchRunways()
-    setSelectedRunwayId((current) => (current === runwayId ? 'papi_24' : current))
+    // Fall off the deleted runway to a still-valid one. papi_24 is a built-in
+    // (undeletable), so resolveRunwayId always yields a valid id; the reconciliation
+    // effect is the backstop once the refetched list arrives.
+    setSelectedRunwayId((current) =>
+      current === runwayId
+        ? resolveRunwayId(null, runways.filter((runway) => runway.id !== runwayId))
+        : current,
+    )
   }
 
   // Optional manual drone telemetry for the elevation-angle calc, used when an
@@ -76,6 +125,7 @@ export function useAnalysis(copy) {
   // mid-flight discards its (now stale) result instead of painting it onto the new
   // upload (audit frontend-bugs: mid-analysis file swap).
   const runIdRef = useRef(0)
+  const resolvedArtifactUrlsRef = useRef([])
 
   useEffect(() => {
     return () => {
@@ -84,6 +134,50 @@ export function useAnalysis(copy) {
       }
     }
   }, [media?.url])
+
+  useEffect(() => {
+    return () => {
+      resolvedArtifactUrlsRef.current.forEach(revokeMediaUrl)
+      resolvedArtifactUrlsRef.current = []
+    }
+  }, [])
+
+  function clearResolvedArtifactUrls() {
+    resolvedArtifactUrlsRef.current.forEach(revokeMediaUrl)
+    resolvedArtifactUrlsRef.current = []
+  }
+
+  async function resolveResultArtifactUrls(results, runId) {
+    const createdUrls = []
+    const urls = []
+
+    try {
+      for (const result of results) {
+        if (runIdRef.current !== runId) {
+          createdUrls.forEach(revokeMediaUrl)
+          return null
+        }
+
+        const url = await resolveMediaUrl(result.artifact_url)
+
+        if (runIdRef.current !== runId) {
+          revokeMediaUrl(url)
+          createdUrls.forEach(revokeMediaUrl)
+          return null
+        }
+
+        if (url?.startsWith('blob:')) {
+          createdUrls.push(url)
+        }
+        urls.push(url)
+      }
+    } catch (error) {
+      createdUrls.forEach(revokeMediaUrl)
+      throw error
+    }
+
+    return { urls, createdUrls }
+  }
 
   function handleMediaFiles(files) {
     const selectedFiles = Array.from(files ?? [])
@@ -107,6 +201,8 @@ export function useAnalysis(copy) {
       // Clear any prior result so a stale result panel doesn't sit under the
       // "unsupported file" error as if it belonged to the rejected file (audit FB-03).
       runIdRef.current += 1
+      clearResolvedArtifactUrls()
+      setIsAnalyzing(false)
       setBackendScenario(null)
       setBackendFrames([])
       setBackendResults([])
@@ -137,6 +233,8 @@ export function useAnalysis(copy) {
     // Invalidate any in-flight analysis so its result is not applied to this
     // newly selected media.
     runIdRef.current += 1
+    clearResolvedArtifactUrls()
+    setIsAnalyzing(false)
     setBackendScenario(null)
     setBackendFrames([])
     setBackendResults([])
@@ -256,14 +354,11 @@ export function useAnalysis(copy) {
 
     try {
       let bestScenario = null
-      // Per-image scenarios for the frame-history panel + FrameStage prev/next
-      // nav. Stays empty for folders/videos, which collapse to a single
-      // aggregated result (no per-frame stepping).
-      const nextBackendFrames = []
-      // Raw payloads retained for the result-driven charts. A folder is now
-      // analysed as one sequenced video, so (like a video) it yields a single
-      // aggregated payload; a single image yields its one payload.
+      let bestIndex = 0
       let rawResults = []
+      const frameContexts = []
+      const currentFolderMode = folderMode
+      const keepsFrameScenarios = shouldKeepFrameScenarios(media.type, currentFolderMode)
       // Telemetry sent with every analyze call. runway_id selects which PAPI
       // unit's geometry the backend scores + computes elevation angles against.
       // Manual drone lat/lon/altitude is included only when ALL three are filled
@@ -275,7 +370,7 @@ export function useAnalysis(copy) {
           droneTelemetry.altitudeM.trim(),
       )
       const metadata = {
-        runwayId: selectedRunwayId,
+        runwayId: effectiveRunwayId,
         ...(hasDroneTelemetry
           ? {
               droneLatitude: droneTelemetry.latitude.trim(),
@@ -285,17 +380,34 @@ export function useAnalysis(copy) {
           : {}),
       }
 
-      // A telemetry file is sent for a single video or image. A folder of images is
-      // a per-image EXIF sweep (each frame carries its own GPS), so the file is NOT
-      // applied there — it would collapse every image onto one representative fix.
-      const telemetryFile = media.type === 'folder' ? null : metadataFile
+      // A telemetry file is sent for videos, single images, and folder-as-video
+      // sequences. In angle-sweep folder mode each image carries its own EXIF GPS,
+      // so applying one telemetry file would collapse the whole sweep onto one fix.
+      const telemetryFile = metadataFileForAnalysis(media.type, currentFolderMode, metadataFile)
 
       if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
         const result = await analyzeMedia(media.file, metadata, telemetryFile)
         rawResults = [result]
-        bestScenario = scenarioFromBackendResult(result, {
+        frameContexts.push({
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
+          totalFrames: 1,
+        })
+      } else if (shouldAnalyzeFolderAsSequence(media.type, currentFolderMode)) {
+        const files = media.files ?? []
+        if (!files.length) {
+          throw new Error(copy.live.noFolderImages)
+        }
+        if (files.length > MAX_BATCH_FRAMES) {
+          throw new Error(
+            copy.live.tooManyImages.replace('{count}', files.length).replace('{max}', MAX_BATCH_FRAMES),
+          )
+        }
+        setAnalysisProgress(copy.live.uploadingSequence.replace('{count}', files.length))
+        const result = await analyzeSequence(files, metadata, telemetryFile)
+        rawResults = [result]
+        frameContexts.push({
+          frameLabel: `${result.frame_count ?? files.length} sequenced frames`,
           totalFrames: 1,
         })
       } else {
@@ -311,6 +423,11 @@ export function useAnalysis(copy) {
         if (!frames.length) {
           throw new Error(copy.live.noFolderImages)
         }
+        if (frames.length > MAX_BATCH_FRAMES) {
+          throw new Error(
+            copy.live.tooManyImages.replace('{count}', frames.length).replace('{max}', MAX_BATCH_FRAMES),
+          )
+        }
         let bestScore = -1
 
         for (const [index, frame] of frames.entries()) {
@@ -323,31 +440,53 @@ export function useAnalysis(copy) {
           setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
           const result = await analyzeFrame(frame.file, metadata, telemetryFile)
           rawResults.push(result)
-          const scenario = scenarioFromBackendResult(result, {
+          frameContexts.push({
             frameLabel: frame.label,
             totalFrames: frames.length,
           })
           const score = result.global_state === 'unknown' ? result.confidence : result.confidence + 1
           if (score >= bestScore) {
             bestScore = score
-            bestScenario = scenario
+            bestIndex = index
           }
-          // Keep every per-image scenario (in upload order) so the frame-history
-          // panel can list each frame's lamp state, angle, and confidence and let
-          // the user step through them.
-          nextBackendFrames.push(scenario)
         }
       }
 
+      if (!rawResults.length) {
+        throw new Error(copy.live.noMediaAnalyzed)
+      }
+
+      const resolvedArtifacts = await resolveResultArtifactUrls(rawResults, runId)
+      if (resolvedArtifacts == null) {
+        return
+      }
+
+      const scenarios = rawResults.map((result, index) =>
+        scenarioFromBackendResult(result, {
+          ...(frameContexts[index] ?? { frameLabel: 'Result', totalFrames: rawResults.length }),
+          artifactUrl: resolvedArtifacts.urls[index],
+        }),
+      )
+      bestScenario = scenarios[bestIndex] ?? scenarios[0] ?? null
+
       if (!bestScenario) {
+        resolvedArtifacts.createdUrls.forEach(revokeMediaUrl)
         throw new Error(copy.live.noMediaAnalyzed)
       }
 
       // A newer upload replaced the media while this run was in flight — discard
       // this now-stale result rather than applying it to the new media.
       if (runIdRef.current !== runId) {
+        resolvedArtifacts.createdUrls.forEach(revokeMediaUrl)
         return
       }
+
+      clearResolvedArtifactUrls()
+      resolvedArtifactUrlsRef.current = resolvedArtifacts.createdUrls
+      // Keep every per-image scenario (in upload order) for still-image and
+      // angle-sweep folder runs so the frame-history panel can drive navigation.
+      // Videos and folder-as-video sequences collapse to one tracked payload.
+      const nextBackendFrames = keepsFrameScenarios ? scenarios : []
 
       setBackendFrames(nextBackendFrames)
       setBackendResults(rawResults)
@@ -380,15 +519,22 @@ export function useAnalysis(copy) {
       setAnalysisProgress('')
       toast.error(error.message)
     } finally {
-      setIsAnalyzing(false)
+      if (runIdRef.current === runId) {
+        setIsAnalyzing(false)
+      }
     }
   }
 
   return {
     activeId,
     media,
+    folderMode,
+    setFolderMode,
     runways,
-    selectedRunwayId,
+    // Expose the reconciled id so the selector value, the active-card highlight and
+    // the analyze call all agree even when the raw stored id is stale.
+    selectedRunwayId: effectiveRunwayId,
+    selectedRunway,
     setSelectedRunwayId,
     addRunway,
     removeRunway,

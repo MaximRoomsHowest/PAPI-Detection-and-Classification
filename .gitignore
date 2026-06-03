@@ -108,3 +108,33 @@ audit-screenshots/
 # fixed), but the convention stays.
 compose.override.yaml
 docker-compose.override.yml
+
+# Rendered deliverable artifacts (Word/PDF) built from the Markdown sources
+# under docs/deliverables/. The .md files are the source of truth; these
+# binaries are produced on demand for Leho upload and should not be tracked.
+docs/deliverables/_build/
+
+# --------------------------------------------------------------------------
+# Local dev / generated artefacts (added 2026-06-03 in the pre-merge cleanup).
+# --------------------------------------------------------------------------
+
+# Local SQLite dev DB used by a host `uvicorn` run (outside Docker/Postgres). The
+# canonical store is Postgres; this file is per-machine and must never be committed.
+*.db
+
+# Generated charts produced on demand (workflows/scripts/plot_angle_distribution.py
+# and the project-management burndown tooling) — regenerated, not source.
+/angle_distribution.png
+docs/deliverables/charts/
+
+# Personal per-member time-tracking exports (not a project deliverable).
+docs/timetrack-*.pdf
+
+# Experimental redesigned-frontend extraction, kept on disk for reference only. It is a
+# full alternate SPA (its own port/build) and must NOT be merged into apps/frontend — it
+# would collide. Keep it out of the tracked tree entirely.
+apps/frontend-redesigned-extracted/
+
+# A root-level node_modules is not part of this monorepo (the frontend's deps live under
+# apps/frontend/). Ignore a stray root install so it can never be staged by accident.
+/node_modules/

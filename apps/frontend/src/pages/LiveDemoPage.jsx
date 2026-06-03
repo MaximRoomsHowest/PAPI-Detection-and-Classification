@@ -1,4 +1,4 @@
-import { FolderOpen, Radar, Upload, X, Zap } from 'lucide-react'
+import { FolderOpen, MapPin, Radar, Upload, X, Zap } from 'lucide-react'
 import clsx from 'clsx'
 import { FrameStage } from '../components/FrameStage'
 import { LampCard } from '../components/LampCard'
@@ -9,6 +9,13 @@ import { VideoConfidenceChart } from '../components/VideoConfidenceChart'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
 import { formatDurationMs } from '../lib/format'
 import { useLiveDemo } from '../context/liveDemoContext'
+import { FOLDER_MODE_ANGLE_SWEEP, FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
+
+// Human-readable horizontal distance: metres under 1 km, else kilometres.
+function formatDistanceM(meters) {
+  if (meters == null) return ''
+  return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`
+}
 
 export function LiveDemoPage({ copy, plotTheme }) {
   // Analysis state + the App-derived display objects come from context now
@@ -20,8 +27,11 @@ export function LiveDemoPage({ copy, plotTheme }) {
     activeState,
     isAnalyzing,
     media,
+    folderMode,
+    setFolderMode,
     runways,
     selectedRunwayId,
+    selectedRunway,
     setSelectedRunwayId: onSelectRunway,
     backendScenario,
     backendFrames,
@@ -50,6 +60,13 @@ export function LiveDemoPage({ copy, plotTheme }) {
   // The Live Demo shows real backend output only. Until an analysis has run the
   // result panel stays empty rather than displaying a canned "demo" preset.
   const hasResult = Boolean(backendScenario)
+
+  // The runway the *displayed* result was scored against — the backend echoes
+  // runway_id on the payload, so this reflects what was actually analysed (not a
+  // selector change made afterwards), mapped to its label.
+  const usedRunwayId = activeScenario?.rawResult?.runway_id ?? selectedRunwayId
+  const usedRunwayLabel =
+    runways.find((runway) => runway.id === usedRunwayId)?.label ?? usedRunwayId
 
   return (
     <section className="demo-section">
@@ -114,11 +131,56 @@ export function LiveDemoPage({ copy, plotTheme }) {
         </div>
       </div>
 
+      {/* Selected runway — the geometric frame of reference the angle is scored
+          against. Shown next to the drone position so the runway<->metadata pairing
+          that produces the elevation angle is explicit. */}
+      {selectedRunway && (
+        <div className="runway-summary" aria-live="polite">
+          <MapPin size={15} aria-hidden="true" />
+          <span className="runway-summary__label">{selectedRunway.label}</span>
+          {(selectedRunway.airport || selectedRunway.designation) && (
+            <span className="runway-summary__meta">
+              {[selectedRunway.airport, selectedRunway.designation].filter(Boolean).join(' · ')}
+            </span>
+          )}
+          {selectedRunway.lights?.length > 0 && (
+            <span className="runway-summary__meta">
+              {copy.live.runwayLampsCount.replace('{n}', selectedRunway.lights.length)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {media?.type === 'folder' && (
+        <div className="folder-mode" aria-live="polite">
+          <span className="folder-mode__label">{copy.live.folderMode}</span>
+          <div className="folder-mode__options" role="group" aria-label={copy.live.folderMode}>
+            <button
+              type="button"
+              className={clsx(folderMode === FOLDER_MODE_ANGLE_SWEEP && 'active')}
+              aria-pressed={folderMode === FOLDER_MODE_ANGLE_SWEEP}
+              onClick={() => setFolderMode(FOLDER_MODE_ANGLE_SWEEP)}
+            >
+              {copy.live.folderAngleSweep}
+            </button>
+            <button
+              type="button"
+              className={clsx(folderMode === FOLDER_MODE_SEQUENCE && 'active')}
+              aria-pressed={folderMode === FOLDER_MODE_SEQUENCE}
+              onClick={() => setFolderMode(FOLDER_MODE_SEQUENCE)}
+            >
+              {copy.live.folderVideoSequence}
+            </button>
+          </div>
+          <p>{copy.live.folderModeHint}</p>
+        </div>
+      )}
+
       {/* Optional drone telemetry — the elevation angle is pure geometry (drone GPS
           vs surveyed lamp coordinates), so the model can't infer it from the pixels.
           Upload the telemetry file (DJI .SRT / CSV / JSON) — for a video this drives
-          the per-frame angle sweep — or enter a single position manually. A geotagged
-          image folder reads each image's embedded GPS automatically. */}
+          the per-frame angle sweep; folder sequence mode uses it the same way. Angle
+          sweep folders read each image's embedded GPS automatically. */}
       <div className="drone-telemetry">
         <span className="drone-telemetry__label">{copy.live.droneTelemetry}</span>
         <div className="drone-telemetry__file-row">
@@ -259,15 +321,47 @@ export function LiveDemoPage({ copy, plotTheme }) {
               {/* PAPI elevation angle — real WGS-84 geometry from the drone GPS /
                   manual telemetry vs the runway's surveyed lamps. "Unavailable"
                   when no drone position was supplied or read from EXIF. */}
-              <div className={clsx('angle-readout', !activeScenario.angleSummary?.available && 'unavailable')}>
+              <div
+                className={clsx(
+                  'angle-readout',
+                  !activeScenario.angleSummary?.available && 'unavailable',
+                  activeScenario.angleSummary?.available &&
+                    activeScenario.angleSummary?.plausible === false &&
+                    'implausible',
+                )}
+              >
                 <span>{copy.live.elevationAngle}</span>
                 {activeScenario.angleSummary?.available ? (
                   <>
                     <strong className="tnum">
                       {activeScenario.angleSummary.value}
                       <small>°</small>
+                      {/* RTK 1-sigma band — only present when the file carried DJI
+                          RTK std, so it never fabricates a confidence figure. */}
+                      {activeScenario.angleSummary.uncertainty != null && (
+                        <small className="angle-readout__band">
+                          ± {activeScenario.angleSummary.uncertainty}° {copy.live.angleUncertainty}
+                        </small>
+                      )}
                     </strong>
-                    <p>{copy.live.angleComputed}</p>
+                    {/* Provenance of the position, localized in translateScenario:
+                        "from your input" / "from image GPS" / "from telemetry file". */}
+                    <p>{activeScenario.angleSummary.source}</p>
+                    {/* Which runway the angle was scored against + how far the drone
+                        was from it — the runway<->metadata relationship, made explicit. */}
+                    <p className="angle-readout__context">
+                      {copy.live.runwayUsed.replace('{runway}', usedRunwayLabel)}
+                      {activeScenario.angleSummary.nearestLampDistanceM != null &&
+                        ` · ${copy.live.nearestLampDistance.replace(
+                          '{distance}',
+                          formatDistanceM(activeScenario.angleSummary.nearestLampDistanceM),
+                        )}`}
+                    </p>
+                    {activeScenario.angleSummary.plausible === false && (
+                      <p className="angle-readout__warning" role="alert">
+                        {copy.live.angleImplausible}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <>
@@ -328,11 +422,10 @@ export function LiveDemoPage({ copy, plotTheme }) {
         />
       )}
 
-      {/* Frame-by-frame detection confidence — video uploads only, where the
-          backend returns a per-frame series. A geotagged image folder is instead
-          analyzed per-image (each with its own angle) and surfaced as the per-lamp
-          angle-vs-state + transition-angle charts on the Insights page. */}
-      {hasResult && media?.type === 'video' && activeScenario.perFrame?.length > 0 && (
+      {/* Frame-by-frame detection confidence — shown for any backend payload with
+          a per-frame series: videos and folder-as-video sequences. Angle-sweep
+          folders are surfaced as per-image history + angle-vs-state charts. */}
+      {hasResult && activeScenario.perFrame?.length > 0 && (
         <VideoConfidenceChart perFrame={activeScenario.perFrame} plotTheme={plotTheme} copy={copy} />
       )}
     </section>

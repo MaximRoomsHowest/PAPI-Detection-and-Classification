@@ -40,6 +40,14 @@ export const stateCatalog = [
     color: '#ff6b6b',
   },
   {
+    id: 'transition',
+    label: 'Transition',
+    short: 'T',
+    pattern: 'Changing lamp state',
+    description: 'At least one lamp is switching between red and white',
+    color: '#ffb11f',
+  },
+  {
     id: 'unknown',
     label: 'Unknown',
     short: 'N/A',
@@ -55,5 +63,6 @@ export const backendStateId = {
   correct_glidepath: 'correct',
   too_low: 'too-low',
   far_too_low: 'far-low',
+  transition: 'transition',
   unknown: 'unknown',
 }

@@ -1,12 +1,12 @@
 ---
-title: "PAPI Vision — Technical Components Overview"
+title: "PAPI Lights Detection and Classification — Technical Components Overview"
 subtitle: "Howest Industry Project · Intersoft Electronics Services BV · 2026"
 geometry: "a4paper, margin=1.5cm"
 fontsize: 10pt
 mainfont: "Calibri"
 ---
 
-# PAPI Vision — Technical Components Overview
+# PAPI Lights Detection and Classification — Technical Components Overview
 
 > One A4 page (Leho deliverable #8). Distil of [architecture-overview.md](../architecture-overview.md) for the final-submission packet.
 

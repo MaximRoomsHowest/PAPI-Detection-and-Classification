@@ -192,6 +192,18 @@ def test_runways_endpoint_returns_seeded_runways(client):
         assert len(runway["lights"]) == 4
 
 
+def test_runways_endpoint_returns_papi06_data_analysis_reference_altitude(client):
+    """PAPI 06 uses the data-analysis 461.37 m reference, not the 464.988 m drone floor proxy."""
+    response = client.get("/api/runways")
+    assert response.status_code == 200
+
+    papi_06 = next(runway for runway in response.json() if runway["id"] == "papi_06")
+    altitudes = [light["altitude_m"] for light in papi_06["lights"]]
+
+    assert altitudes == [461.37, 461.37, 461.37, 461.37]
+    assert all(altitude != pytest.approx(464.988) for altitude in altitudes)
+
+
 def test_request_id_header_is_echoed_back(client):
     """RequestIdMiddleware should always set X-Request-ID on responses (audit B-IMP-4)."""
     response = client.get("/health")
@@ -247,6 +259,27 @@ def test_analyze_frame_with_partial_drone_metadata_returns_400(client):
         },
     )
     assert response.status_code == 400
+
+
+def test_analyze_frame_rejects_oversized_telemetry_file(client, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setenv("PAPI_MAX_UPLOAD_MB", "1")
+    get_settings.cache_clear()
+    try:
+        response = client.post(
+            "/api/analyze-frame",
+            files=[
+                ("file", ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")),
+                ("metadata_file", ("track.csv", BytesIO(b"x" * (1024 * 1024 + 1)), "text/csv")),
+            ],
+            data={"runway_id": "papi_24"},
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 413
+    assert "telemetry file exceeds" in response.json()["detail"].lower()
 
 
 def test_analyze_frame_end_to_end_writes_log_row(client):
@@ -310,6 +343,25 @@ def test_logs_total_count_header_and_filters(client):
     # Malformed created_after -> 400 (audit IMP-BE-3 validation).
     bad = client.get("/api/logs", params={"created_after": "not-a-date"})
     assert bad.status_code == 400
+
+
+def test_logs_reject_invalid_filter_values(client):
+    invalid_list_filters = [
+        {"media_type": "audio"},
+        {"global_state": "landed"},
+        {"min_confidence": -0.1},
+        {"min_confidence": 1.1},
+    ]
+
+    for params in invalid_list_filters:
+        assert client.get("/api/logs", params=params).status_code == 400
+
+    assert client.get("/api/logs/export.csv", params={"global_state": "landed"}).status_code == 400
+
+
+def test_logs_accept_zulu_created_after_filter(client):
+    response = client.get("/api/logs", params={"created_after": "2026-05-01T12:00:00Z"})
+    assert response.status_code == 200
 
 
 def test_logs_limit_out_of_range_returns_422(client):
@@ -438,6 +490,32 @@ def test_analyze_sequence_returns_single_video_payload(client):
     assert body["frame_count"] == 3
     assert body["original_filename"].endswith("(3 frames)")
     assert body["log_id"]
+
+
+def test_analyze_sequence_orders_numbered_frames_naturally(client, monkeypatch):
+    """frame_10 must not be stitched before frame_2."""
+    import app.api.routers.analyze as analyze_router
+
+    saved_names = []
+
+    def fake_save_upload(upload, settings):
+        saved_names.append(upload.filename)
+        path = settings.uploads_dir / Path(upload.filename.replace("/", "_")).name
+        path.write_bytes(b"saved")
+        return path
+
+    monkeypatch.setattr(analyze_router, "save_upload", fake_save_upload)
+
+    files = [
+        ("files", ("flight/frame_10.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")),
+        ("files", ("flight/frame_2.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")),
+        ("files", ("flight/frame_1.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")),
+    ]
+
+    response = client.post("/api/analyze-sequence", files=files, data={"runway_id": "papi_24"})
+
+    assert response.status_code == 200
+    assert saved_names == ["flight/frame_1.jpg", "flight/frame_2.jpg", "flight/frame_10.jpg"]
 
 
 def test_analyze_sequence_rejects_empty_list(client):

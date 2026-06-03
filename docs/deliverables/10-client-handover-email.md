@@ -6,7 +6,7 @@ fontsize: 10pt
 geometry: "a4paper, margin=2cm"
 ---
 
-# Client Handover Email — PAPI Vision
+# Client Handover Email — PAPI Lights Detection and Classification
 
 > Template for the handover email to Daoud Uahabi at Intersoft
 > Electronics Services BV. **Send by Tue 2026-06-17** so the
@@ -38,11 +38,11 @@ To:      Daoud Uahabi <daoud.uahabi@intersoft-electronics.com>
 Cc:      Chekhun Maksym, Kattan Hamzzah, Rooms Maxim,
          <!-- TEAM: supervisor email -->
 Bcc:     (none)
-Subject: PAPI Vision — Howest Industry Project handover
+Subject: PAPI Lights Detection and Classification — Howest Industry Project handover
 
 Hi Daoud,
 
-A short message to formally hand PAPI Vision over to Intersoft
+A short message to formally hand PAPI Lights Detection and Classification over to Intersoft
 Electronics Services BV. We've reached the end of the Howest
 Industry Project (final presentation Friday 19/06), and the
 codebase, model and documentation are now yours to use, extend or
@@ -75,10 +75,12 @@ To start the application from a clean machine:
 
 Five things worth flagging:
 
-  1. The PAPI 06 installation height and the WGS84-vs-AMSL datum
-     for 461.37 are bound in configs/papi_edny.yaml as you
-     confirmed on 2026-06-01. If those need to change for a
-     re-survey, that is the single file to update.
+  1. `configs/papi_edny.yaml` binds the current runway geometry:
+     rwy 24 uses the validated 461.37 m reference, and rwy 06 uses
+     the data-analysis branch's 461.37 m working reference. The
+     464.988 m value in that branch is client drone EXIF/MRK altitude
+     metadata, not lamp height. Lamp order and commissioned set angles
+     still need binding.
 
   2. The detector is YOLO 26<!-- TEAM: n / s / m, per slide 7 of
      the final deck -->, fine-tuned on the EDNY dataset only.
@@ -115,7 +117,7 @@ meetings, and the dataset. It was a great five weeks.
 Best regards,
 
 Sousa Rodrigo
-on behalf of the PAPI Vision team
+on behalf of the PAPI Lights Detection and Classification team
 Sousa Rodrigo · Chekhun Maksym · Kattan Hamzzah · Rooms Maxim
 Howest CTAI, Bachelor 2025-2026
 ```
@@ -130,11 +132,11 @@ Howest CTAI, Bachelor 2025-2026
 ```
 From:    Sousa Rodrigo <rodrigo.sousa@student.howest.be>
 To:      Daoud Uahabi <daoud.uahabi@intersoft-electronics.com>
-Subject: PAPI Vision — Overdracht Howest Industry Project
+Subject: PAPI Lights Detection and Classification — Overdracht Howest Industry Project
 
 Beste Daoud,
 
-Met dit bericht dragen we PAPI Vision formeel over aan
+Met dit bericht dragen we PAPI Lights Detection and Classification formeel over aan
 Intersoft Electronics Services BV. De code, het model en alle
 documentatie staan vanaf vandaag tot uw beschikking — om te
 gebruiken, uit te breiden of te archiveren naar eigen inzicht.
@@ -169,7 +171,7 @@ om u te helpen bij het deployen op Intersoft-hardware.
 Met vriendelijke groet,
 
 Sousa Rodrigo
-namens het PAPI Vision-team
+namens het PAPI Lights Detection and Classification-team
 ```
 
 ## Acknowledgement to capture

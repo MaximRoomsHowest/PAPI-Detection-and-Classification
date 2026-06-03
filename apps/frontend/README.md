@@ -40,8 +40,13 @@ Stop-Process -Id $pid
 Set `VITE_PAPI_API_URL` in `.env` if the backend is not running on
 `http://127.0.0.1:8000`. Backend API mode calls:
 
-- `POST /api/analyze-frame` for uploaded images.
-- `POST /api/analyze` for uploaded videos.
+- `POST /api/analyze-frame` for a single uploaded image.
+- `POST /api/analyze` for an uploaded video (the whole clip is uploaded and the
+  backend decodes and analyses its frames).
+- `POST /api/analyze-sequence` for a folder of images (`Upload folder`): the
+  whole folder is uploaded in one request and analysed as one time-sequenced
+  video — a single aggregated result plus one annotated video artifact, not a
+  per-image batch.
 
 The UI maps the backend response into the dashboard cards:
 

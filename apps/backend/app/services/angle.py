@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from app.services.runways import get_runway
+from app.validation.analyze import ALTITUDE_MAX_M
 from app.validation.schemas import AnglePerLight, AngleResult
 
 # WGS-84 ellipsoid — the datum the DJI GPS metadata and the surveyed lamp
@@ -28,6 +29,13 @@ from app.validation.schemas import AnglePerLight, AngleResult
 _WGS84_A = 6_378_137.0  # semi-major axis (m)
 _WGS84_F = 1.0 / 298.257223563  # flattening
 _WGS84_E2 = _WGS84_F * (2.0 - _WGS84_F)  # first eccentricity squared
+
+# Past this nearest-lamp horizontal distance the drone is almost certainly not on an
+# approach to the selected PAPI. A usable PAPI signal reaches ~5 NM (~9.3 km); this
+# leaves margin so a legitimate long final never trips it, while a wrong-runway or
+# wrong-datum selection (off by 10x-100x) always does. A SANITY bound for honesty,
+# NOT a certification limit — the angle is flagged implausible, never withheld.
+PLAUSIBILITY_MAX_NEAREST_LAMP_M = 15_000.0
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -94,18 +102,52 @@ def _elevation_from_enu(east: float, north: float, up: float) -> tuple[float, fl
     return horizontal, angle
 
 
+def _angle_uncertainty_deg(
+    horizontal_m: float,
+    up_m: float,
+    sigma_horizontal_m: float | None,
+    sigma_vertical_m: float | None,
+) -> float | None:
+    """First-order 1-sigma uncertainty (deg) on ``alpha = atan2(up, horizontal)``.
+
+    Propagates the drone-position standard deviations through the elevation-angle
+    partials (the surveyed lamp is treated as exact):
+        d(alpha)/d(up)         =  horizontal / r^2
+        d(alpha)/d(horizontal) = -up / r^2          with r^2 = horizontal^2 + up^2
+    ``sigma_vertical`` feeds the up partial, ``sigma_horizontal`` the horizontal one.
+    Returns None when no std is supplied or the geometry is degenerate (r == 0), so a
+    band is shown only when it is genuinely measured.
+    """
+    if sigma_horizontal_m is None or sigma_vertical_m is None:
+        return None
+    r2 = horizontal_m * horizontal_m + up_m * up_m
+    if r2 <= 0.0:
+        return None
+    d_up = horizontal_m / r2
+    d_horizontal = -up_m / r2
+    sigma_rad = math.hypot(d_up * sigma_vertical_m, d_horizontal * sigma_horizontal_m)
+    return round(math.degrees(sigma_rad), 4)
+
+
 def compute_elevation_angles(
     drone_latitude: float,
     drone_longitude: float,
     drone_altitude_m: float,
     runway_id: str,
     angle_source: str = "metadata",
+    sigma_horizontal_m: float | None = None,
+    sigma_vertical_m: float | None = None,
 ) -> AngleResult:
     """Elevation angle(s) from the drone to a PAPI installation via WGS-84 ENU.
 
     ``elevation_angle_deg`` is the client's primary metric — the angle to the PAPI
     **midpoint** (centroid of the lamp row). ``per_light_angles`` gives one angle
     per lamp (each lamp as its own ENU origin), preserving the existing per-lamp chart.
+
+    When the drone fix carries RTK standard deviations (``sigma_horizontal_m`` /
+    ``sigma_vertical_m``), a first-order 1-sigma band is propagated onto the midpoint
+    angle. The result is also flagged ``plausible=False`` when the nearest lamp is
+    implausibly far away (wrong runway / datum) — the angle is still returned.
     """
     runway = get_runway(runway_id)
     lights = runway["lights"]
@@ -137,7 +179,22 @@ def compute_elevation_angles(
     east, north, up = _geodetic_to_enu(
         drone_latitude, drone_longitude, drone_altitude_m, mid_lat, mid_lon, mid_alt
     )
-    _, midpoint_angle = _elevation_from_enu(east, north, up)
+    mid_horizontal, midpoint_angle = _elevation_from_enu(east, north, up)
+
+    # Plausibility: the closest lamp's horizontal distance. Past the sanity bound the
+    # drone fix and the runway don't belong together (wrong runway / datum) — flag it
+    # but still return the geometrically-correct angle so the demo is never blocked.
+    nearest_m = min((light.distance_m for light in per_light), default=None)
+    plausible = True
+    plausibility_note: str | None = None
+    if nearest_m is not None and nearest_m > PLAUSIBILITY_MAX_NEAREST_LAMP_M:
+        plausible = False
+        plausibility_note = (
+            f"Drone fix is {nearest_m / 1000:.1f} km from the nearest lamp of "
+            f"'{runway_id}', far beyond a usable PAPI approach distance — likely the "
+            f"wrong runway was selected or the coordinates use a different datum. The "
+            f"angle is geometrically computed but probably not meaningful."
+        )
 
     return AngleResult(
         angle_available=True,
@@ -147,6 +204,12 @@ def compute_elevation_angles(
         angle_note=(
             "Elevation from the PAPI midpoint via a WGS-84 LLA->ECEF->ENU transform "
             "(client method); per-lamp angles are relative to each lamp."
+        ),
+        plausible=plausible,
+        plausibility_note=plausibility_note,
+        nearest_lamp_distance_m=(round(nearest_m, 1) if nearest_m is not None else None),
+        elevation_angle_uncertainty_deg=_angle_uncertainty_deg(
+            mid_horizontal, up, sigma_horizontal_m, sigma_vertical_m
         ),
     )
 
@@ -206,10 +269,17 @@ def _extract_dji_xmp_pose(raw_head: bytes) -> dict[str, float]:
         "abs_alt": "AbsoluteAltitude",
         "rel_alt": "RelativeAltitude",
         "rtk_flag": "RtkFlag",
+        # RTK per-axis standard deviations (m). DJI writes these next to the pose on
+        # an RTK fix; they feed the 1-sigma band on the elevation angle. Additive —
+        # existing callers ignore the extra keys. Tag names verified in
+        # packages/papi/src/papi/metadata.py (RtkStdLat / RtkStdLon / RtkStdHgt).
+        "rtk_std_lat": "RtkStdLat",
+        "rtk_std_lon": "RtkStdLon",
+        "rtk_std_hgt": "RtkStdHgt",
     }
     pose: dict[str, float] = {}
     for key, name in fields.items():
-        match = re.search(rf'drone-dji:{name}(?:="?|>)\s*([+-]?\d+(?:\.\d+)?)', text)
+        match = re.search(rf'drone-dji:{name}(?:="?|>)\s*([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)', text)
         if match:
             try:
                 pose[key] = float(match.group(1))
@@ -232,7 +302,7 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
     xmp = _extract_dji_xmp_pose(head) if head else {}
     if all(field in xmp for field in ("lat", "lon", "abs_alt")):
         lat, lon, alt = xmp["lat"], xmp["lon"], xmp["abs_alt"]
-        if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0 and -500.0 <= alt <= 15_000.0:
+        if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0 and -500.0 <= alt <= ALTITUDE_MAX_M:
             return lat, lon, alt
 
     # Fallback: EXIF GPSAltitude (no RTK XMP present) — less accurate vertically.
@@ -282,7 +352,37 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
     # extract_gps_metadata had no bounds check while the manual path did).
     if not (-90.0 <= latitude <= 90.0) or not (-180.0 <= longitude <= 180.0):
         return None
-    if not (-500.0 <= altitude <= 15_000.0):
+    if not (-500.0 <= altitude <= ALTITUDE_MAX_M):
         return None
 
     return latitude, longitude, altitude
+
+
+def extract_gps_uncertainty(media_path: Path) -> tuple[float, float] | None:
+    """RTK ``(sigma_horizontal_m, sigma_vertical_m)`` from a file's DJI XMP, or None.
+
+    Reads the same bounded head as ``extract_gps_metadata`` and pulls the per-axis RTK
+    standard deviations DJI writes alongside the pose. Horizontal sigma combines the
+    lat/lon components (``hypot``); vertical sigma is the height std. Returns None when
+    the file carries no RTK std (manual + telemetry-file fixes never do), so the
+    angle's uncertainty band is shown only when it is genuinely measured.
+    """
+    try:
+        with media_path.open("rb") as file:
+            head = file.read(262_144)  # 256 KB covers the XMP packet (matches above)
+    except Exception:
+        return None
+    if not head:
+        return None
+
+    pose = _extract_dji_xmp_pose(head)
+    std_lat = pose.get("rtk_std_lat")
+    std_lon = pose.get("rtk_std_lon")
+    std_hgt = pose.get("rtk_std_hgt")
+    if std_lat is None or std_lon is None or std_hgt is None:
+        return None
+    # Reject negative/garbage std — a standard deviation is non-negative.
+    if std_lat < 0.0 or std_lon < 0.0 or std_hgt < 0.0:
+        return None
+
+    return math.hypot(std_lat, std_lon), std_hgt

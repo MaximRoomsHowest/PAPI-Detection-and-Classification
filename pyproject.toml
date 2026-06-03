@@ -57,6 +57,12 @@ target-version = "py310"
 select = ["E", "F", "I", "W", "UP", "B"]
 ignore = ["E501"]  # line-length handled by formatter; allow exceptions
 
+[tool.ruff.lint.per-file-ignores]
+# Test modules import a shared pytest fixture by name (e.g. `from test_integration
+# import client`) and then take it as a fixture parameter; pyflakes reads the
+# parameter as redefining the import (F811). That is the intended pytest pattern.
+"apps/backend/tests/*" = ["F811"]
+
 [tool.pytest.ini_options]
 testpaths = ["packages/papi/tests"]
 addopts = "-ra -q"

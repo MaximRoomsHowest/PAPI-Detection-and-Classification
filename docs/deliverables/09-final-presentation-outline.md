@@ -41,7 +41,7 @@ but adjusted for the final's longer runtime. Five sections × ~4 min.
 ### Slide 1 — Title
 
 ```
-PAPI Vision
+PAPI Lights Detection and Classification
 Safer landings, seen from the sky.
 
 Final delivery · Industry Project 2026
@@ -292,7 +292,7 @@ client" requirement; doubles as a closing punctuation mark.
 ### Slide 15 — Close + Q&A
 
 ```
-PAPI Vision — Delivered
+PAPI Lights Detection and Classification — Delivered
 
 ✔  Drone → web app → traceable verdict in ~ 2-3 s per frame (CPU)
 ✔  Two-class detector + geometric transition (one source of truth)

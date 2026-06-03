@@ -82,10 +82,18 @@ follow the step-by-step path in
 Open `http://127.0.0.1:5173/live-demo`, keep **Backend API** selected, and pick
 one of three upload paths:
 
-- **Single image**: frontend calls `POST /api/analyze-frame`.
-- **Video**: frontend calls `POST /api/analyze`.
-- **Folder of images**: frontend extracts files client-side and calls
-  `POST /api/analyze-frames` to batch-analyze every image in one request.
+- **Single image** (`Upload media`): frontend calls `POST /api/analyze-frame`.
+- **Video** (`Upload media`): frontend uploads the whole clip to `POST /api/analyze`;
+  the backend decodes the frames and returns one annotated video.
+- **Folder of images** (`Upload folder`): frontend uploads every image in one
+  request to `POST /api/analyze-sequence`, which treats the folder as an ordered
+  image sequence — consecutive frames of a single clip — and returns **one
+  time-sequenced annotated video** plus an aggregated verdict (the same tracked
+  pipeline as a real video upload, not an independent-frame batch). Images are
+  ordered by filename so a `frame_000.jpg … frame_NNN.jpg` capture sequence plays
+  in order; playback speed is set by `PAPI_SEQUENCE_FPS` (default 4 fps). The
+  batch endpoint `POST /api/analyze-frames` (independent per-image results) is
+  still served for callers that want one row per image.
 
 All endpoints accept optional drone metadata fields (`runway_id`, `drone_id`,
 `drone_latitude`, `drone_longitude`, `drone_altitude_m`) and respect

@@ -1,13 +1,16 @@
 import math
 
+import app.services.angle as angle_module
 import pytest
 from app.services.angle import (
+    PLAUSIBILITY_MAX_NEAREST_LAMP_M,
     _elevation_from_enu,
     _extract_dji_xmp_pose,
     _geodetic_to_ecef,
     _geodetic_to_enu,
     compute_elevation_angles,
     extract_gps_metadata,
+    extract_gps_uncertainty,
     haversine,
     unavailable_angle,
 )
@@ -19,6 +22,8 @@ NOTEBOOK_REFERENCE_RANGES = {
     "papi_06": {"min": 0.6796213080756719, "max": 3.232287681153522},
     "papi_24": {"min": 0.9525530371962151, "max": 4.580270954977426},
 }
+DATA_ANALYSIS_ASSIGNED_LAMP_ALTITUDE_M = 461.37
+DATA_ANALYSIS_DRONE_FLOOR_PROXY_ALTITUDE_M = 464.988
 
 _WGS84_B = 6_378_137.0 * (1.0 - 1.0 / 298.257223563)  # semi-minor axis ~6356752.314
 
@@ -127,7 +132,42 @@ def test_haversine_matches_notebook_example_distance():
 def test_runway_altitudes_use_461_37_reference_height():
     for runway_id in ("papi_06", "papi_24"):
         runway = get_runway(runway_id)
-        assert [light["altitude_m"] for light in runway["lights"]] == [461.37] * 4
+        assert [light["altitude_m"] for light in runway["lights"]] == [DATA_ANALYSIS_ASSIGNED_LAMP_ALTITUDE_M] * 4
+
+
+def test_papi_06_data_analysis_floor_proxy_is_not_runtime_lamp_height():
+    runway = get_runway("papi_06")
+
+    assert [light["altitude_m"] for light in runway["lights"]] == [DATA_ANALYSIS_ASSIGNED_LAMP_ALTITUDE_M] * 4
+    assert all(
+        light["altitude_m"] != pytest.approx(DATA_ANALYSIS_DRONE_FLOOR_PROXY_ALTITUDE_M)
+        for light in runway["lights"]
+    )
+
+
+def test_papi_06_candidate_height_delta_is_material(monkeypatch):
+    """The data-analysis drone floor proxy would shift a representative rwy-06 frame by ~0.68 deg."""
+    drone = (47.667486, 9.500453, 465.147)
+    base_runway = get_runway("papi_06")
+    runtime = compute_elevation_angles(*drone, "papi_06")
+
+    def fake_get_runway(runway_id: str):
+        if runway_id != "papi_06":
+            return get_runway(runway_id)
+        return {
+            **base_runway,
+            "lights": [
+                {**light, "altitude_m": DATA_ANALYSIS_DRONE_FLOOR_PROXY_ALTITUDE_M}
+                for light in base_runway["lights"]
+            ],
+        }
+
+    monkeypatch.setattr(angle_module, "get_runway", fake_get_runway)
+    floor_proxy = compute_elevation_angles(*drone, "papi_06")
+
+    assert runtime.per_light_angles[0].elevation_angle_deg == pytest.approx(0.711, abs=0.02)
+    assert floor_proxy.per_light_angles[0].elevation_angle_deg == pytest.approx(0.0285, abs=0.005)
+    assert runtime.elevation_angle_deg - floor_proxy.elevation_angle_deg == pytest.approx(0.679738, abs=0.001)
 
 
 def test_reference_angle_ranges_from_data_analysis_notebook_are_pinned():
@@ -189,3 +229,87 @@ def test_extract_gps_returns_none_without_pose(tmp_path):
     path = tmp_path / "nometa.jpg"
     path.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 256)
     assert extract_gps_metadata(path) is None
+
+
+# --- Plausibility: flag a wrong-runway / wrong-datum selection, never block ----
+
+def test_implausible_distance_flags_but_still_returns_angle():
+    """A drone over Paris scored against EDNY is geometrically valid but meaningless."""
+    result = compute_elevation_angles(48.8566, 2.3522, 500.0, "papi_24")
+    # The angle is STILL computed and returned — the warning never withholds it.
+    assert result.angle_available is True
+    assert result.elevation_angle_deg is not None
+    # ...but it is flagged implausible, with a reason and the (huge) distance.
+    assert result.plausible is False
+    assert result.plausibility_note
+    assert result.nearest_lamp_distance_m > PLAUSIBILITY_MAX_NEAREST_LAMP_M
+    assert result.nearest_lamp_distance_m > 400_000  # Paris->EDNY is ~540 km
+
+
+def test_near_runway_fix_is_plausible():
+    result = compute_elevation_angles(47.667486, 9.500453, 465.147, "papi_06")
+    assert result.plausible is True
+    assert result.plausibility_note is None
+    # The notebook cross-check distance at this fix is ~300 m — well under the bound.
+    assert result.nearest_lamp_distance_m < 1_000
+
+
+def test_unavailable_angle_defaults_to_plausible_with_no_distance():
+    """Back-compat: the not-available path has no geometry to judge."""
+    result = unavailable_angle("metadata missing")
+    assert result.plausible is True
+    assert result.nearest_lamp_distance_m is None
+    assert result.elevation_angle_uncertainty_deg is None
+
+
+# --- RTK uncertainty: a 1-sigma band only when std is supplied ----------------
+
+def test_rtk_std_propagates_to_uncertainty_band():
+    result = compute_elevation_angles(
+        47.667486, 9.500453, 465.147, "papi_06",
+        sigma_horizontal_m=0.02, sigma_vertical_m=0.03,
+    )
+    band = result.elevation_angle_uncertainty_deg
+    assert band is not None
+    assert band > 0.0
+    # A few cm of RTK std at a few hundred metres baseline is a sub-degree band.
+    assert band < 1.0
+
+
+def test_no_rtk_std_means_no_band():
+    result = compute_elevation_angles(47.667486, 9.500453, 465.147, "papi_06")
+    assert result.elevation_angle_uncertainty_deg is None
+
+
+# --- RTK std extraction from DJI XMP ------------------------------------------
+
+_XMP_WITH_RTK_STD = (
+    b'<x:xmpmeta xmlns:drone-dji="http://www.dji.com/drone-dji/1.0/" '
+    b'drone-dji:GpsLatitude="47.668810" drone-dji:GpsLongitude="9.504007" '
+    b'drone-dji:AbsoluteAltitude="+476.20" '
+    b'drone-dji:RtkStdLat="0.012" drone-dji:RtkStdLon="0.016" drone-dji:RtkStdHgt="0.025">'
+    b"</x:xmpmeta>"
+)
+
+
+def test_dji_xmp_pose_parses_rtk_std():
+    pose = _extract_dji_xmp_pose(_XMP_WITH_RTK_STD)
+    assert pose["rtk_std_lat"] == pytest.approx(0.012)
+    assert pose["rtk_std_lon"] == pytest.approx(0.016)
+    assert pose["rtk_std_hgt"] == pytest.approx(0.025)
+
+
+def test_extract_gps_uncertainty_combines_horizontal(tmp_path):
+    path = tmp_path / "rtk.jpg"
+    path.write_bytes(b"\xff\xd8\xff\xe1" + _XMP_WITH_RTK_STD + b"\x00" * 64)
+    uncertainty = extract_gps_uncertainty(path)
+    assert uncertainty is not None
+    sigma_h, sigma_v = uncertainty
+    assert sigma_h == pytest.approx(math.hypot(0.012, 0.016))
+    assert sigma_v == pytest.approx(0.025)
+
+
+def test_extract_gps_uncertainty_none_without_std(tmp_path):
+    path = tmp_path / "nostd.jpg"
+    path.write_bytes(b"\xff\xd8\xff\xe1" + _XMP_SAMPLE + b"\x00" * 64)
+    assert extract_gps_uncertainty(path) is None

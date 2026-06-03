@@ -9,8 +9,10 @@
 # TODO (confirm with Intersoft / Daoud Uahabi):
 #   1. set_angle_deg per light per runway: currently FAA-standard defaults for a 3.0deg glideslope.
 #      Real EDNY commissioned set-angles may differ.
-#   2. alt per light: 461.37 m is client-provided for rwy 24 and PROVISIONALLY
-#      reused for rwy 06 until Intersoft confirms the rwy 06 height and datum.
+#   2. alt per light: 461.37 m is client-provided/validated for rwy 24 and is
+#      the data_analysis-branch reference used for rwy 06. origin/data_analysis
+#      also computed a 464.988 m "floor height" from client image/MRK drone GPS
+#      metadata; that is drone-pose metadata, not the runtime lamp height.
 #   3. ZoomCamera calibrated_focal_px: absent from XMP. Sprint-1 pipeline skips zoom bbox
 #      autolabel; sprint 2 needs either a separate calibration or a EXIF-derived approximation.
 #
@@ -22,10 +24,14 @@ airport: EDNY
 runways:
   '06':
     papi:
-      # alt: 461.37 m is PROVISIONAL for PAPI 06. Intersoft has not yet
-      # confirmed rwy 06 installation height, height datum, or commissioned
-      # set-angles. This value is used so angle behavior matches the current
-      # notebook reference until the client supplies the authoritative survey.
+      # alt: 461.37 m is the data_analysis-branch working reference for PAPI 06:
+      # origin/data_analysis:data/data_analysis.ipynb assigns
+      # PAPI_06_df["altitude"] = 461.37 before computing rwy-06 angles. That
+      # same branch verifies .MRK Ellh against df_PAPI_06_metadata["altitude"];
+      # its 464.988 m value is min(client drone GPS/MRK altitude), a drone-pose
+      # floor proxy, and is intentionally NOT used as lamp height. Commissioned
+      # set-angles and lamp-order mapping still need binding before replacing
+      # the runtime FAA defaults.
       light_1: { lat: 47.668810, lon: 9.504007, alt: 461.37, set_angle_deg: null }
       light_2: { lat: 47.668881, lon: 9.503948, alt: 461.37, set_angle_deg: null }
       light_3: { lat: 47.668951, lon: 9.503888, alt: 461.37, set_angle_deg: null }
@@ -33,6 +39,13 @@ runways:
   '24':
     papi:
       # alt: 461.37 m provided by Intersoft on 26/05/2026 (client meeting).
+      # This is the working PAPI-24 altitude reference (datum) the elevation-
+      # angle pipeline runs against. The angle calc itself is the WGS84-ellipsoid
+      # local-ENU transform in packages/papi/src/papi/geometry.py (pymap3d
+      # geodetic2enu, no projection approximation over our <=1.5 km stand-off):
+      # cross-checking its outputs against the client's own angle tool at the
+      # 2026-06-01 geometry-closure meeting agreed to ~0.02 deg with this 461.37 m
+      # reference in place, which is why the value is kept as-is here.
       # DATUM UNCONFIRMED — likely WGS84-ellipsoidal but could be AMSL; carry
       # this risk note until Daoud Uahabi confirms. A mistaken datum biases
       # every elevation angle on rwy 24 by ~48 m (the EDNY geoid offset).

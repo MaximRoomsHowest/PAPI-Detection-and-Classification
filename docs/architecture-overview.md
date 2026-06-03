@@ -1,4 +1,4 @@
-# PAPI Vision — Technical Architecture Overview
+# PAPI Lights Detection and Classification — Technical Architecture Overview
 
 For graders, reviewers, and new contributors. Explains how the
 pieces fit together and why specific design choices were made.
@@ -47,12 +47,15 @@ pieces fit together and why specific design choices were made.
 ```
 apps/
   backend/           FastAPI service, SQLAlchemy ORM, ultralytics
-                     YOLO inference, OpenCV media handling
-  frontend/         Vite/React SPA, Plotly charts, jsPDF export
+                     YOLO inference, OpenCV media handling. HTTP layer
+                     split into app/api/routers/ (analyze/logs/stats/meta);
+                     inference engine in app/services/inference/
+  frontend/         Vite/React SPA (route shell + pages/, LiveDemo state
+                     via React context), Plotly charts, jsPDF export
 packages/
   papi/             Reusable ML/data library — pure Python, no I/O,
     src/papi/         no FastAPI / SQLAlchemy dependency
-    tests/          15 pytest tests, idempotent
+    tests/          pytest suite, idempotent
 workflows/
   scripts/          Runnable CLI entry points for the data pipeline
   notebooks/        8 Jupyter notebooks (training + evaluation)
@@ -109,7 +112,29 @@ pyproject.toml       Editable install for the papi package
 
 The same shape applies to `/api/analyze` (image or video — branches
 internally on file extension) and `/api/analyze-frames` (a folder
-batch — loops the single-image path).
+batch — loops the single-image path, one independent result per image).
+
+`/api/analyze-sequence` (the folder→video feature) takes the same
+multipart image list but treats the files as **consecutive frames of
+one clip**: it orders them by filename and runs them through the same
+ByteTrack-tracked core as a real video upload, so per-lamp identity
+carries across frames and temporal red↔white transitions are detected.
+The response is a single `AnalysisPayload` with one aggregated verdict
+and one annotated WebM artifact; a synthetic FPS (`PAPI_SEQUENCE_FPS`,
+default 4) drives playback/transition-gap timing, not detection. The
+viewing angle is read once from the first image. Both the batch and
+sequence endpoints are bounded by `PAPI_MAX_BATCH_FRAMES`.
+
+The HTTP layer is split by concern under `apps/backend/app/api/`:
+`routes.py` is the public import surface that assembles four
+sub-routers in `app/api/routers/` — `analyze` (the four upload/inference
+endpoints above), `logs` (list / CSV export / detail), `stats`
+(aggregate stats), and `meta` (runways / model info / system info).
+The inference engine lives in the `app/services/inference/` package: a
+`service.py` facade (`InferenceService`: model load, image / video /
+sequence) over leaf modules `aggregation` (per-lamp video verdict by
+track identity), `overlay` (annotated-frame drawing), `video_writer`
+(the annotated-video codec policy) and `cv2_loader` (lazy OpenCV import).
 
 ## 5. Key design decisions
 
@@ -137,6 +162,38 @@ Implementation: `apps/backend/app/services/state.py:normalize_detections`
 consumes the same algorithm that lives in
 `packages/papi/src/papi/lamp_state.py:compute_lamp_state`
 (used by the offline pipeline). One source of truth.
+
+### 5.1a Elevation-angle method and transition-angle validation
+
+The `elevation_deg = angle(camera, lamp)` above is computed with the
+**client's** geometry, in `apps/backend/app/services/angle.py`: both
+the drone and the PAPI are converted from WGS-84 LLA → ECEF → ENU (a
+local East-North-Up tangent frame at the PAPI), then
+`elevation = atan2(Up, hypot(East, North))`. The primary
+`elevation_angle_deg` is the angle to the **PAPI midpoint** (centroid
+of the lamp row); a per-lamp angle (each lamp as its own ENU origin)
+is also returned for the per-lamp charts. This replaces an earlier
+haversine + raw-altitude-subtraction approximation — the two agree to
+~0.01° internally at the 300-1000 m baselines in this dataset, but ENU
+is the geodetically correct transform the client specified, and its
+output was validated to **~0.02°** against the client's own tool.
+(Altitude accuracy matters here: GPS extraction prefers the
+RTK-corrected DJI XMP `AbsoluteAltitude` over EXIF `GPSAltitude`, whose
+non-RTK vertical error would otherwise drag the angle out of the true
+band.)
+
+The client's tool reports the per-lamp red→white transition set-angles
+as approximately **2.32° / 2.55° / 3.12° / 3.6°** (the four lamps).
+These are **not yet bound into the runtime**: `configs/papi_edny.yaml`
+still carries `set_angle_deg: null` per lamp and falls back to FAA
+defaults (`[2.50, 2.83, 3.17, 3.50]` for a 3.0° glideslope) with a
+`transition_half_width_deg` of 0.10. So the geometric transition logic
+is wired and validated, but the *exact* commissioned boundaries shift
+once the client's set-angles are confirmed and entered. PAPI 06 uses
+the data-analysis branch's `461.37 m` lamp reference; the competing
+`464.988 m` notebook value is a minimum client drone EXIF/MRK altitude
+floor proxy, not runtime lamp height. See the geometry caveat in the
+model card.
 
 ### 5.2 Geometry-driven auto-labelling
 
@@ -200,21 +257,29 @@ recent results for analysis.
 
 ## 6. Frontend application structure
 
-`apps/frontend/src/App.jsx` (currently a single large file —
-modularisation deferred to a design pass) defines three routes:
+`apps/frontend/src/App.jsx` is now just the route shell + theme /
+language / backend-status. The upload + inference state and its
+handlers were extracted into the `useAnalysis` hook, and the Live
+Demo subtree receives that state through a React context
+(`LiveDemoProvider` / `useLiveDemo`) instead of ~16 drilled props;
+each view is its own component under `src/pages/`. The routes:
 
 | Route | Component | Purpose |
 | --- | --- | --- |
 | `/` | `IntroductionPage` | Hero, project context, airport map |
-| `/live-demo` | `LiveDemoPage` | Three upload paths, scenario tabs, frame-stage + analysis panel |
-| `/insights` | `InsightsPage` | PAPI state decoder bar chart, transition ribbon heatmap, PDF export |
+| `/live-demo` | `LiveDemoPage` | Upload (media / folder) paths, frame-stage + analysis panel; reads state from `LiveDemoProvider` context |
+| `/insights` | `InsightsPage` | Tabbed charts (angle-vs-state, transitions, session summary) + model/dataset metrics, all from real backend output; PDF export |
+| `/history` | `HistoryPage` | Recent persisted analyses, artifacts, and model runtime status |
 
 Theme is driven by CSS custom properties on `html[data-theme]`.
 Brand identity: Intersoft navy (`#00426e`), Poppins typography,
 restrained palette.
 
-API client lives in `src/lib/api.js` — three functions
-(`analyzeMedia`, `analyzeFrame`, `analyzeFrames`) wrap `fetch`.
+API client lives in `src/lib/api.js` — the analyze calls
+(`analyzeMedia`, `analyzeFrame`, `analyzeFrames`, `analyzeSequence`)
+plus the log / stats / model / runway / readiness fetchers all wrap
+`fetch` (with a per-call timeout). `analyzeSequence` posts the folder
+to `/api/analyze-sequence` for the folder→video path.
 
 ## 7. Deployment & operations
 

@@ -26,7 +26,7 @@ each. Cue cards are in §"Per-slide content" below.
 ### Slide 1 — Title
 
 ```
-PAPI Vision
+PAPI Lights Detection and Classification
 AI-assisted approach-light verification
 
 Howest Industry Project · Sprint review #1
@@ -251,7 +251,7 @@ reward "we know what's left" over "we're done already."
 ### Slide 13 — Close + Q&A
 
 ```
-PAPI Vision — Interim review
+PAPI Lights Detection and Classification — Interim review
 
 ✔  PAPI detection + classification pipeline (edge real-time target in progress)
 ✔  Geometry-driven transition state (one source of truth)
@@ -292,9 +292,9 @@ Four PDFs uploaded separately on Leho:
 1. This deck → PDF.
 2. `05-project-management-summary.md` → PDF.
 3. `meeting-reports/2026-05-18-kickoff.md`,
-   `meeting-reports/2026-05-19-dataset-confirmation.md`,
-   `meeting-reports/2026-05-26-geometry.md` → 3 separate PDFs (or
-   bundled into one — Leho accepts both).
+   `meeting-reports/2026-05-26-geometry-sync.md`,
+   `meeting-reports/2026-06-01-scope-and-features.md` → 3 reports
+   bundled into one PDF (Leho accepts a single combined file).
 4. *Not applicable for CTAI* — MCT-only functional analysis.
 
 ## Pre-Q&A briefings — who answers what

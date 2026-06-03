@@ -13,6 +13,12 @@ geometry: "a4paper, margin=2cm"
 
 # Client Meeting Report #2 — Geometry Sync (2026-05-26)
 
+Second client sync. We showed the current build — the detection
+output and the Results page — and Daoud gave feedback. The main
+points were the graphs being too small, the demo scope for the
+interim (images first), and the geometry data we needed to fix the
+angle calculation.
+
 ## Attendees
 
 - **Client (Intersoft Electronics Services BV)**: Daoud Uahabi
@@ -22,7 +28,7 @@ geometry: "a4paper, margin=2cm"
 
 ## Agenda
 
-1. Walk-through of the current frontend Results page.
+1. Demo of the current build (Results page walk-through).
 2. Demo scope for the 03/06 interim (images vs videos).
 3. Transition-detection methodology — colour classifier vs
    detector tracking.
@@ -137,10 +143,20 @@ the next client meeting.
 | A5 | Prepare the four open questions above as agenda for 2026-06-01 | Rodrigo | 2026-05-29 |
 | A6 | Schedule client meeting #3 — confirmed 2026-06-01 14:30 | Rodrigo | 2026-05-26 ✓ |
 
+## 2026-06-02 audit addendum
+
+This report preserves the 2026-05-26 decision wording. The current runtime
+status is more specific after checking `origin/data_analysis`: PAPI 06 uses
+that branch's `461.37 m` lamp reference from `data/data_analysis.ipynb`, and
+the same notebook verifies `.MRK` `Ellh` values against
+`df_PAPI_06_metadata["altitude"]`. The competing `464.988 m` notebook value is
+a minimum client drone EXIF/MRK altitude floor proxy and is not used as lamp
+height. Commissioned set angles and lamp-order mapping still need binding.
+
 ## Cross-references
 
 - BigBrain summary: `02-courses/industry-project/intersoft-client-meeting-2026-05-26-summary.md`
-- Affected config: `configs/papi_edny.yaml` (lamp coords bound; height + datum + set-angle TODOs documented)
+- Affected config: `configs/papi_edny.yaml` (lamp coords/height bound; set-angle and lamp-order TODOs documented)
 - Pipeline doc: `docs/pipeline.md` (calibration result, dual-runway resolution)
 
 ## Sign-off

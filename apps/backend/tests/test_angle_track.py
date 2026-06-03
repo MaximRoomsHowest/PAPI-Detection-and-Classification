@@ -19,18 +19,17 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
-import pytest
-from fastapi import HTTPException, UploadFile
-
 # Import app.main first so the api.routes <-> api.routers import order is fully
 # resolved before we pull a symbol straight out of the analyze router module
 # (importing it cold otherwise hits a partially-initialised-package cycle).
 import app.main  # noqa: F401  (bootstraps the router package import order)
+import pytest
 from app.api.routers.analyze import read_metadata_samples
 from app.config import get_settings
 from app.services.inference import InferenceService
 from app.services.state import detect_lamp_transitions
 from app.services.telemetry import DroneSample
+from fastapi import HTTPException, UploadFile
 
 RUNWAY = "papi_24"
 

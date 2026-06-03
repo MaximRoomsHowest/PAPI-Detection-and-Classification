@@ -45,9 +45,11 @@ train / val from mixed flights, with specific regimes (e.g. a 500 m night-wide f
 ## Provenance & known issues
 
 - Coordinates come from `PROJECT1-PAPI/PAPI_Coords_Fred_DE.xlsx` (Intersoft).
-- **Unconfirmed by the client** (carry as risk): rwy-06 installation height; the height
-  datum for the 461.37 m figure (WGS84-ellipsoidal vs AMSL — a ~48 m geoid offset);
-  the lamp-numbering convention; the commissioned set-angles (FAA defaults used meanwhile).
+- **Geometry caveat**: rwy-24 uses the validated `461.37 m` reference. Rwy-06 also
+  uses `461.37 m` from the data-analysis branch
+  (`PAPI_06_df["altitude"] = 461.37`). The branch's `464.988 m` value is a minimum
+  client drone EXIF/MRK altitude floor proxy and is not used as lamp height.
+  Lamp numbering and commissioned set-angles still need binding.
 - The training-split git SHA should be recorded per run in `models/MODELS.md`.
 
 ## Biases & limitations

@@ -158,7 +158,7 @@ def test_media_404s_on_missing_file(client, monkeypatch: pytest.MonkeyPatch, tmp
 # ---------------------------------------------------------------------------
 
 
-_AUTH_GATED_GET_ROUTES = ["/api/logs", "/api/stats", "/api/model", "/api/system"]
+_AUTH_GATED_GET_ROUTES = ["/api/logs", "/api/stats", "/api/model", "/api/system", "/api/runways"]
 
 
 @pytest.mark.parametrize("route", _AUTH_GATED_GET_ROUTES)

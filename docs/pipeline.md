@@ -106,7 +106,7 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 |---|---|---|
 | ZoomCamera auto-labels (no `CalibratedFocalLength` in XMP) | **Skipped in sprint 1**; all 818 zoom frames are flagged for manual verification | sprint 2 |
 | EDNY commissioned set-angles (both runways) | **Placeholder** (FAA defaults 2.50°/2.83°/3.17°/3.50°) | confirm with Intersoft |
-| WGS84 altitude of the PAPI lamps (both runways) | **Placeholder** (`default_alt_wgs84_m = 465.0`) | confirm with Intersoft |
+| WGS84 altitude of the PAPI lamps (both runways) | **Runtime-bound** to `461.37 m` for both built-ins. Rwy-24 is validated; rwy-06 comes from the data-analysis branch. The `464.988 m` notebook value is a client drone EXIF/MRK altitude floor proxy, not lamp height. | bind commissioned set-angles and lamp-order mapping |
 | RTK-Single frames (842 images, flag=16) | Auto-labels still produced, but flagged for verification (`rtk_uncertain` reason) | reviewer judgement |
 | Per-lamp tight bboxes | Sprint 1 only emits one installation-level bbox | sprint 2 |
 | Auto-vs-human agreement reporting | Not yet implemented (will add as `pipeline.py agreement` subcommand) | sprint 2 |

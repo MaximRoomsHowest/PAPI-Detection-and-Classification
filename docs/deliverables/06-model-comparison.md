@@ -1,6 +1,6 @@
 ---
 title: "Alternative-Model Comparison — yolo26n vs 26s vs 26m"
-subtitle: "PAPI Vision · Howest Industry Project 2026"
+subtitle: "PAPI Lights Detection and Classification · Howest Industry Project 2026"
 mainfont: "Calibri"
 fontsize: 10pt
 geometry: "a4paper, margin=2cm"

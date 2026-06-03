@@ -13,8 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from app.services.telemetry import (
+    MAX_TELEMETRY_SAMPLES,
     DroneSample,
     TelemetryError,
     parse_telemetry,
@@ -132,6 +132,19 @@ def test_csv_drops_out_of_range_row_keeps_valid() -> None:
     assert samples[0].latitude == pytest.approx(47.6)
 
 
+def test_csv_drops_invalid_explicit_frame_indices_keeps_valid() -> None:
+    text = (
+        "frame,latitude,longitude,altitude_m\n"
+        "-1,47.6,9.5,520\n"
+        "2.5,47.6,9.5,521\n"
+        "3,47.7,9.6,522\n"
+    )
+    samples = parse_telemetry("frames.csv", text.encode("utf-8"))
+    assert len(samples) == 1
+    assert samples[0].frame_index == 3
+    assert samples[0].altitude_m == pytest.approx(522)
+
+
 def test_csv_missing_altitude_column_is_unusable() -> None:
     text = "latitude,longitude\n47.6,9.5\n"
     with pytest.raises(TelemetryError):
@@ -161,6 +174,20 @@ def test_json_samples_container() -> None:
     samples = parse_telemetry("c.json", text.encode("utf-8"))
     assert len(samples) == 1
     assert samples[0].frame_index == 4
+
+
+def test_json_drops_invalid_explicit_frame_indices_keeps_valid() -> None:
+    text = (
+        '{"samples":['
+        '{"lat":47.6,"lon":9.5,"alt":520,"frame_index":-1},'
+        '{"lat":47.6,"lon":9.5,"alt":521,"frame_index":2.5},'
+        '{"lat":47.7,"lon":9.6,"alt":522,"frame_index":3}'
+        "]}"
+    )
+    samples = parse_telemetry("frames.json", text.encode("utf-8"))
+    assert len(samples) == 1
+    assert samples[0].frame_index == 3
+    assert samples[0].altitude_m == pytest.approx(522)
 
 
 # --- auto-detect + errors ----------------------------------------------------
@@ -219,6 +246,34 @@ def test_resample_single_frame_takes_middle() -> None:
     samples = [DroneSample(47.0, 9.0, a, frame_index=i) for i, a in enumerate([500.0, 520.0, 540.0])]
     out = resample_to_frames(samples, frame_count=1)
     assert len(out) == 1 and out[0].altitude_m == 520.0
+
+
+# --- malformed-input crash regressions (audit: bad input -> clean 400, never 500) ----
+
+
+def test_deeply_nested_json_raises_telemetry_error_not_recursionerror() -> None:
+    # A deeply-nested JSON array makes json.loads raise RecursionError (a RuntimeError,
+    # NOT a ValueError). The parser must degrade to the clean TelemetryError 400 path
+    # rather than letting a 500 + stack trace escape on the analyze endpoint (audit blocker).
+    payload = (b"[" * 60_000) + (b"]" * 60_000)
+    with pytest.raises(TelemetryError):
+        parse_telemetry("evil.json", payload)
+
+
+def test_oversized_csv_field_raises_telemetry_error_not_csverror() -> None:
+    # A CSV field above csv's 128 KB field-size limit raises csv.Error (not a ValueError);
+    # it must be funnelled into TelemetryError instead of surfacing as a 500 (audit).
+    payload = b"latitude,longitude,altitude\n" + (b"x" * 200_000)
+    with pytest.raises(TelemetryError):
+        parse_telemetry("big.csv", payload)
+
+
+def test_sample_count_is_capped_to_the_hard_limit() -> None:
+    # A pathologically long track is downsampled to the cap so the per-frame resample
+    # stays bounded (audit: sample-count / O(frame_count x n_samples) resample DoS).
+    body = b"latitude,longitude,altitude\n" + (b"47.6,9.5,500\n" * (MAX_TELEMETRY_SAMPLES + 1_000))
+    samples = parse_telemetry("huge.csv", body)
+    assert len(samples) == MAX_TELEMETRY_SAMPLES
 
 
 def test_resample_empty_inputs() -> None:

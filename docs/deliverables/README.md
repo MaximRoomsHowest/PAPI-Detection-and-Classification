@@ -1,4 +1,4 @@
-# PAPI Vision — Deliverables Index
+# PAPI Lights Detection and Classification — Deliverables Index
 
 > Canonical "what's left for submission" board. Each row maps a Leho
 > upload slot to (a) the source file in this folder, (b) the rubric
@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | 1 | Interim presentation | `03-interim-presentation-outline.md` (content) → team styles into slides | LR3 + LR2 | drafting |
 | 2 | Project-management summary | `05-project-management-summary.md` | LR2 (required artifact) | template + team to fill |
-| 3 | Meeting reports (3-4 PDFs) | `meeting-reports/*.md` | LR3 (required artifact) | drafting from BigBrain notes |
+| 3 | Meeting reports (1 PDF, 3 reports) | `meeting-reports/*.md` | LR3 (required artifact) | ready — kickoff (05-18) / geometry sync (05-26) / scope & features (06-01) |
 | 4 | MCT functional analysis | N/A (team is CTAI) | — | not applicable |
 
 ## Final — Fri 2026-06-19 by 08:30 (Leho upload, 8 items)
