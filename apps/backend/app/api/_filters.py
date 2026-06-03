@@ -7,7 +7,7 @@ two routes can never drift on, e.g., how ``created_after`` is validated.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from math import isfinite
 from typing import get_args
 
@@ -71,6 +71,11 @@ def parse_log_filters(
                 status_code=400,
                 detail="created_after must be ISO 8601, e.g. 2026-05-01 or 2026-05-01T12:00:00.",
             ) from exc
+        if parsed_after.tzinfo is None:
+            # A date-only or naive timestamp is read as UTC, matching the stored-UTC
+            # convention; otherwise Postgres compares it in the server's session TimeZone
+            # and silently shifts the filter boundary vs SQLite (audit).
+            parsed_after = parsed_after.replace(tzinfo=timezone.utc)
     return {
         "runway_id": runway_id,
         "media_type": media_type,

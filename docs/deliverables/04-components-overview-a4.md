@@ -53,7 +53,7 @@ mainfont: "Calibri"
 1. Browser uploads frame(s) + drone metadata to `POST /api/analyze*`.
 2. FastAPI saves bytes to `/storage/uploads/`, computes per-lamp elevation angles from drone GPS + surveyed lamp coords in `configs/papi_edny.yaml`.
 3. YOLO predicts → `[Detection]` with class (red / white) + bbox + conf.
-4. `state.normalize_detections` promotes borderline lamps to *transition* via geometry (no learned transition class).
+4. `state.normalize_detections` maps each lamp to red / white / unknown / obscured (per-frame only — never *transition*). For video / sequence, `state.detect_lamp_transitions` derives *transition* events temporally from red↔white flips on ByteTrack-tracked lamps (no learned transition class; the drone angle annotates each event, it does not decide it).
 5. `global_state_from_lamps` derives one of five PAPI patterns.
 6. Annotated artifact written to `/storage/exports/`; one row to `analysis_logs`; upload bytes deleted; JSON returned.
 7. `/insights` reads aggregated stats from `GET /api/stats`; `/history` reads `GET /api/logs`.

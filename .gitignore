@@ -138,3 +138,10 @@ apps/frontend-redesigned-extracted/
 # A root-level node_modules is not part of this monorepo (the frontend's deps live under
 # apps/frontend/). Ignore a stray root install so it can never be staged by accident.
 /node_modules/
+
+# Stray doc artefacts that drifted into the working tree (pre-merge docs cleanup). These
+# are generated/transient, not deliverable sources; the height-audit decision record lives
+# in BigBrain ([[papi-06-height-audit-2026-06-02]]). Keep them out of the tracked tree.
+docs/papi-06-height-audit.md
+docs/papi_burndown_data.csv
+docs/**/*.pptx

@@ -9,8 +9,14 @@ this card adds the intended-use, limitations and ethics framing a registry omits
 - **Name / run**: `yolo26s-fulldata-1280` (serving slot `models/serving/best.pt`; promoted
   2026-05-31, superseding the yolo26n sequence model).
 - **Architecture**: Ultralytics YOLO26s (~9.1 M params), object detection.
-- **Classes**: 2 — `PAPI-Red` (0), `PAPI-White` (1). The third per-lamp
-  state, *transition*, is derived geometrically from the viewing angle, not learned.
+- **Classes**: 2 — the served weights expose them as `PAPI-Red` (0) and
+  `PAPI-White` (1) (the names returned by `GET /api/model` and
+  `models/serving/model_card.json`); the dataset / labelling convention
+  names the same two classes `papi_light_red` / `papi_light_white`. The
+  third per-lamp state, *transition*, is **not** a learned class and is
+  **not** decided per frame — it is derived temporally for video /
+  sequence inputs from red↔white flips on tracked lamps (the drone viewing
+  angle annotates each transition, it does not decide it).
 - **Inputs**: a single image / video frame (plus optional drone GPS + altitude supplied
   by the surrounding software — the angle is **not** inferred from pixels).
 - **Outputs**: per-lamp bounding boxes + state, a five-state global glidepath verdict,
@@ -75,5 +81,5 @@ the repository's licensing with Intersoft before distributing the trained weight
 
 - [`models/MODELS.md`](../models/MODELS.md) — registry, lineage, promotion/rollback.
 - [`docs/label_spec.md`](label_spec.md) — class semantics.
-- [`docs/architecture-overview.md`](architecture-overview.md) — why two classes + geometric transition.
+- [`docs/architecture-overview.md`](architecture-overview.md) — why two classes + temporal transition.
 - [`docs/data-card.md`](data-card.md) — dataset details.

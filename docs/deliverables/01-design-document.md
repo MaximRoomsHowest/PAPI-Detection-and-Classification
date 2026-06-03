@@ -380,7 +380,7 @@ browser standards."
 | Reduced motion | All animations disabled when `prefers-reduced-motion: reduce` | Manual via OS toggle |
 
 **Known a11y gap (open):** form-control `id`/`name` are missing on
-the metadata inputs. Caught in `docs/user-testing-papi-vision-rerun-2026-05-28.md`.
+the metadata inputs. Caught in the round-2 user-testing rerun (§10).
 Fix is mechanical and slated for the next polish pass.
 
 ## 8. Responsive design
@@ -411,18 +411,17 @@ French speakers; English is the engineering lingua franca.
 **Persistence**: locale + theme are stored in `localStorage` and
 restored on next visit. Locale persistence specifically was caught
 as "not persistent across reloads" in the first user-testing round
-and fixed in the rerun (`docs/user-testing-papi-vision-rerun-2026-05-28.md`).
+and fixed in the rerun (§10).
 
 ## 10. Iteration log — user testing and feedback
 
 LR1A 16+ marker: "user-feedback integrated and iterated on."
-Two rounds, same day (2026-05-28), recorded as standalone QA PDFs.
+Two rounds, same day (2026-05-28), recorded inline below.
 
 ### Round 1 — initial demo (2026-05-28 morning)
 
-Source: `docs/user-testing-papi-vision-2026-05-28.md`. Six blockers
-identified during a structured walk through the four user journeys
-of §5:
+Six blockers identified during a structured walk through the four user
+journeys of §5:
 
 | # | Finding | Severity | Fix landed |
 |---|---|---|---|
@@ -435,17 +434,16 @@ of §5:
 
 ### Round 2 — rerun after fixes (2026-05-28 afternoon)
 
-Source: `docs/user-testing-papi-vision-rerun-2026-05-28.md`. Every
-critical from Round 1 verified resolved. Two remaining minors
+Every critical from Round 1 verified resolved. Two remaining minors
 documented but not yet shipped:
 
 - Form-control `id`/`name` missing on metadata inputs (a11y).
 - PAPI 06 geometry uses the data-analysis branch's `461.37 m` reference; lamp
   order and commissioned set angles still need binding.
 
-The rerun PDF is the headline evidence for the LR1A 16+ "user-feedback
-integrated and iterated on" band claim — same-day round-trip with
-documented before/after.
+The round-2 rerun (above) is the headline evidence for the LR1A 16+
+"user-feedback integrated and iterated on" band claim — same-day
+round-trip with documented before/after.
 
 ## 11. Where this maps in the rubric
 
@@ -456,7 +454,7 @@ documented before/after.
 | LR1A 16+: performance focus | Lazy-loaded Plotly, chunk split, self-hosted fonts |
 | LR1A 16+: semantic HTML | §7 landmark structure |
 | LR1A 16+: thoughtful naming | Routes named after mental tasks, not URLs (§3) |
-| LR1A 16+: user-feedback integrated and iterated on | §10 iteration log + two QA PDFs |
+| LR1A 16+: user-feedback integrated and iterated on | §10 iteration log (round 1 + round 2, 2026-05-28) |
 | LR1A 16+: proper input validation | Pending — see §12 |
 | LR1A 13-15: consistent house style | §4 design system tokens |
 | LR1A 13-15: user-friendly responsive design | §8 responsive design |
@@ -467,15 +465,17 @@ documented before/after.
 
 Honest list of what's missing or wrong, for the next iteration:
 
-1. **Drone-metadata form validation** — the manual drone lat/lon/alt
-   inputs were removed from the Live Demo; the backend still range-checks
-   any drone metadata sent via the API (`parse_manual_drone_metadata`).
-   Re-introducing the inputs would mean restoring client-side validation.
+1. **Drone-metadata form validation** — the Live Demo exposes manual
+   drone Latitude / Longitude / Altitude (m) inputs (`LiveDemoPage.jsx`),
+   but client-side range validation on them is still thin; the backend
+   range-checks any drone metadata sent via the API
+   (`parse_manual_drone_metadata`). Tightening the in-form validation to
+   mirror the backend bounds is the open item.
 2. **App.jsx modularised** — the former ~2 469-line `App.jsx` is now a
-   thin route shell (~480 lines): pages in `src/pages/*.jsx`, the header
+   thin route shell (~220 lines): pages in `src/pages/*.jsx`, the header
    in `src/components/Topbar.jsx`, shared logic in `src/lib/` + `src/hooks/`.
-   Remaining: extract a `useAnalysis` hook for the upload/inference state
-   still held in `App.jsx`.
+   The upload/inference state was extracted into the `useAnalysis` hook
+   (`src/hooks/useAnalysis.js`), so this modularisation is complete.
 3. **Frontend unit tests** — Vitest covers `src/lib/` (api, cropRect,
    insightsTransforms, papi) with 54 tests; component-level tests
    (React Testing Library) are the next coverage step.
@@ -489,5 +489,5 @@ Honest list of what's missing or wrong, for the next iteration:
 - Codebase: `apps/frontend/src/` (App.jsx, App.css, components/, lib/)
 - Companion docs: [architecture-overview.md](../architecture-overview.md),
   [user-manual.md](../user-manual.md), [installation-manual.md](../installation-manual.md)
-- User-testing reports: [user-testing-papi-vision-2026-05-28.md](../user-testing-papi-vision-2026-05-28.md),
-  [user-testing-papi-vision-rerun-2026-05-28.md](../user-testing-papi-vision-rerun-2026-05-28.md)
+- User-testing rounds: the round-1 and round-2 findings (2026-05-28) are
+  recorded inline in §10 above.

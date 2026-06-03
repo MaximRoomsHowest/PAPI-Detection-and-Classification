@@ -49,7 +49,7 @@ python workflows/scripts/pipeline.py export --limit 300
 
 For active-learning preprocessing and training workflows, use the notebooks:
 
-- `workflows/notebooks/02_active_learning_preprocessing_template.ipynb`
+- `workflows/notebooks/02_model_assisted_labelling.ipynb`
 - `workflows/notebooks/03_yolov26n_detection_tracking_training.ipynb`
 - `workflows/notebooks/04_yolov26n_sequence_model_evaluation.ipynb`
 
@@ -117,7 +117,7 @@ Start here when looking for a part of the project:
 | Path | Purpose |
 |---|---|
 | `apps/backend/` | FastAPI backend for upload analysis, result logs, and annotated artifact serving. |
-| `apps/frontend/` | Vite/React dashboard with Backend API mode and Mock mode. |
+| `apps/frontend/` | Vite/React dashboard that calls the FastAPI backend for upload analysis, insights, and history. |
 | `packages/papi/src/papi/` | Python package: metadata, geometry, projection, lamp-state, sampling, CVAT export, YOLO I/O. |
 | `packages/papi/tests/` | Root `pytest` suite for ML/data code. |
 | `workflows/scripts/` | Runnable ML/data entrypoints. |

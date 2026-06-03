@@ -6,6 +6,7 @@ import pytest
 from app.database import Base
 from app.models import AnalysisLog
 from app.repositories import AnalysisLogRepository
+from app.validation.schemas import AnalysisPayload, AngleResult
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -92,3 +93,23 @@ def test_iter_filtered_for_csv_export(session):
 
     assert len(repo.iter_filtered()) == 2
     assert len(repo.iter_filtered(runway_id="papi_24")) == 1
+
+
+def test_create_from_payload_truncates_overlong_drone_id(session):
+    """An unbounded client drone_id is capped to the VARCHAR(128) column width so the
+    Postgres write can't raise StringDataRightTruncation (503) and orphan the artifact
+    (SQLite ignores column width, so the cap is what protects production) — audit."""
+    payload = AnalysisPayload(
+        media_type="image",
+        original_filename="frame.jpg",
+        runway_id="papi_24",
+        drone_id="x" * 300,
+        global_state="unknown",
+        lamps=[],
+        confidence=0.5,
+        frame_count=1,
+        processing_ms=1,
+        angle=AngleResult(angle_available=False, angle_note="no metadata"),
+    )
+    log = AnalysisLogRepository(session).create_from_payload(payload)
+    assert log.drone_id == "x" * 128

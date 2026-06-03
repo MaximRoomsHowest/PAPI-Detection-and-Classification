@@ -9,6 +9,9 @@ sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 pydantic-settings==2.7.1
 python-multipart==0.0.20
+# Imported directly by app/services/runways.py to load the runway-geometry YAML;
+# pinned explicitly instead of relying on ultralytics to provide it transitively (audit).
+PyYAML==6.0.2
 ultralytics==8.3.58
 lap==0.5.13
 # Headless OpenCV: the backend never opens a GUI window, so the -headless wheel

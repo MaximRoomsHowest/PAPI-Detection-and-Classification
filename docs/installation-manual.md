@@ -29,29 +29,32 @@ cd PAPI-Detection-and-Classification
 git checkout v1.0
 ```
 
-## 3. Provide the model weights
+## 3. Model weights (already in the repo)
 
-The model file is not in the repo. Drop a trained checkpoint at:
+The trained serving checkpoint ships **committed** in the repo at:
 
 ```
 models/serving/best.pt
 ```
 
-If you only want to smoke-test the API, copy the base weights into
-the serving slot:
+It is whitelisted in `.gitignore`, so a normal clone already has it
+and **no action is required here** — skip to §4.
+
+Only if `models/serving/best.pt` is missing or you deliberately want to
+fall back to the untrained base weight, seed the slot from the base
+checkpoint. Note this **overwrites the trained checkpoint** with the
+untrained base weight, so restore the trained `best.pt` (e.g. via
+`git checkout models/serving/best.pt`) before any demo:
 
 ```powershell
-# Windows PowerShell
-Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
+# Windows PowerShell — explicit base-weight fallback only
+Copy-Item models\base\yolo26s.pt models\serving\best.pt -Force
 ```
 
 ```bash
-# Linux / macOS / Git Bash
-cp models/base/yolo26n.pt models/serving/best.pt
+# Linux / macOS / Git Bash — explicit base-weight fallback only
+cp models/base/yolo26s.pt models/serving/best.pt
 ```
-
-The trained PAPI checkpoint should replace this file before any
-demo.
 
 ## 4. Path 1 — Docker compose (recommended)
 

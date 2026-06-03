@@ -21,7 +21,11 @@ class AnalysisLogRepository:
         log = AnalysisLog(
             media_type=payload.media_type,
             runway_id=payload.runway_id,
-            drone_id=payload.drone_id,
+            # Cap at the column width (VARCHAR(128)), like original_filename below: an
+            # unbounded client-supplied drone_id otherwise raises StringDataRightTruncation
+            # (503) on Postgres and orphans the just-written artifact (SQLite tests don't
+            # enforce width) — audit.
+            drone_id=(payload.drone_id[:128] if payload.drone_id else None),
             # Cap at the column width (VARCHAR(512)): a pathologically long upload name
             # otherwise raises a StringDataRightTruncation 503 on Postgres while orphaning
             # the just-written artifact (SQLite tests don't enforce width) — audit.

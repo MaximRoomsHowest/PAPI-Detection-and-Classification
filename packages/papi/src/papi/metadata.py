@@ -127,8 +127,11 @@ def extract_image_metadata(path: Path) -> dict[str, Any]:
     # empty/missing XMP value (not just an unparseable one) triggers the EXIF fallback.
     xmp_lat = xmp.get("GpsLatitude")
     xmp_lon = xmp.get("GpsLongitude")
-    lat = _to_float(xmp_lat) if xmp_lat else exif["exif_lat"]
-    lon = _to_float(xmp_lon) if xmp_lon else exif["exif_lon"]
+    # Use .get() (like every other EXIF field below): a JPEG whose EXIF fails to parse
+    # returns an empty dict, so a bare subscript here KeyErrors and crashes the whole
+    # pipeline pass on one corrupt frame instead of degrading its lat/lon to None (audit).
+    lat = _to_float(xmp_lat) if xmp_lat else exif.get("exif_lat")
+    lon = _to_float(xmp_lon) if xmp_lon else exif.get("exif_lon")
 
     return {
         "folder": path.parent.name,

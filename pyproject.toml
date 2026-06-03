@@ -19,8 +19,6 @@ dependencies = [
     "scipy>=1.11",
     "PyYAML>=6.0",
     "tqdm>=4.66",
-    "lxml>=5.0",
-    "openpyxl>=3.1",
     "ultralytics>=8.3",
 ]
 
@@ -39,6 +37,8 @@ notebooks = [
     "albumentations>=1.4",
     "matplotlib>=3.8",
     "jupyter>=1.0",
+    # Only the data-analysis notebook (05) reads .xlsx via pandas; not a core dep.
+    "openpyxl>=3.1",
 ]
 # Optional dependency used by workflows/scripts/edge_benchmark.py for RSS memory
 # sampling; it degrades gracefully to None when absent (audit IMP-WF-7).

@@ -266,3 +266,15 @@ def test_extract_metadata_empty_xmp_latlon_falls_back_to_exif(tmp_path: Path) ->
     # Empty XMP -> EXIF GPS used instead.
     assert meta["lat"] == pytest.approx(47.0 + 40.0 / 60.0, abs=1e-6)
     assert meta["lon"] == pytest.approx(9.0 + 30.0 / 60.0, abs=1e-6)
+
+
+def test_extract_metadata_unreadable_jpeg_without_xmp_degrades_to_none(tmp_path: Path) -> None:
+    """A file PIL cannot open (corrupt/truncated) makes _extract_exif return {}; with no
+    XMP GPS the lat/lon fallback must degrade to None, not KeyError on the empty EXIF dict
+    (which crashed the whole ~4000-frame pipeline pass on one bad frame) — audit."""
+    bad = tmp_path / "DJI_corrupt.JPG"
+    bad.write_bytes(b"not a decodable image \x00\xff and no drone-dji xmp packet")
+    meta = extract_image_metadata(bad)
+    assert meta["lat"] is None
+    assert meta["lon"] is None
+    assert meta["file"] == "DJI_corrupt.JPG"

@@ -96,9 +96,10 @@ services:
       # Override PAPI_BACKEND_BIND=0.0.0.0 only for direct off-host API access.
       - "${PAPI_BACKEND_BIND:-127.0.0.1}:8000:8000"
     volumes:
-      # Model weights are git-ignored binaries living on the host. Bind mount
-      # them read-only so the container picks up the current checkpoint
-      # without a rebuild.
+      # The trained serving weight ships committed at models/serving/best.pt
+      # (whitelisted in .gitignore), so a clone already has it. Bind mount
+      # ./models read-only so you can swap the checkpoint on the host and have
+      # the container pick it up without a rebuild.
       - ./models:/models:ro
       # Runway geometry YAML — read-only. Without this the backend silently
       # falls back to a hardcoded runway copy (audit DCK-D7).

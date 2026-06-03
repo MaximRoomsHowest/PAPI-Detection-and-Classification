@@ -37,7 +37,7 @@ will be added as a sixth subcommand once `data/labels/verified/` is populated.
 CVAT Online rejects uploads above 4 GiB. Use normal-only batches instead of one
 large mixed export:
 
-Run `workflows/notebooks/02_active_learning_preprocessing_template.ipynb`; it is the
+Run `workflows/notebooks/02_model_assisted_labelling.ipynb`; it is the
 single human-facing entrypoint for preprocessing, YOLOv26m training, assisted
 annotation, and CVAT batch generation.
 
@@ -125,7 +125,7 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 ## Verification gates (run before declaring sprint-1 done)
 
 - [ ] `pip install -e .[dev]` succeeds from a clean venv.
-- [ ] `pytest` runs and all tests pass (LRF round-trip skipped if calibration not yet run).
+- [ ] `pytest packages/papi/tests` runs and all tests pass (LRF round-trip skipped if calibration not yet run). A bare `pytest` from the repo root skips the backend suite under `apps/backend/tests`.
 - [ ] `python workflows/scripts/pipeline.py extract` writes a CSV with 4,058 rows.
 - [ ] `python workflows/scripts/pipeline.py calibrate` writes `configs/projection.yaml` with median residual ≤ 100 px.
 - [ ] `python workflows/scripts/pipeline.py autolabel` writes ~3,240 YOLO `.txt` files (WideCamera count) + `lamp_state.csv` with 4,058 rows.

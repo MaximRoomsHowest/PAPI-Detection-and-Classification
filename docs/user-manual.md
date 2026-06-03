@@ -55,10 +55,10 @@ matches your data.
 
 1. Click **Upload media**.
 2. Choose an image file (`.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`).
-3. Optionally fill in the **Drone ID**, **Latitude**, **Longitude**,
-   **Altitude m** fields. These enable the per-lamp elevation-angle
-   calculation and transition-state detection — leaving them blank
-   produces a result without those values.
+3. Optionally fill in the **Latitude**, **Longitude**, and
+   **Altitude (m)** fields. These enable the per-lamp elevation-angle
+   calculation — leaving them blank produces a result without the
+   viewing angle.
 4. Make sure the **Runway** dropdown matches the runway the drone
    was facing. The default is `PAPI 24` (Friedrichshafen runway 24
    — the lamp altitudes are confirmed). Switch to `PAPI 06` if the

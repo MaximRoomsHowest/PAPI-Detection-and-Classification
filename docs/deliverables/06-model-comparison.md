@@ -9,9 +9,10 @@ geometry: "a4paper, margin=2cm"
 # Alternative-Model Comparison
 
 > **Rubric**: LR1D **16+** band marker — *"alternative AI models
-> implemented when they add value"*. The serving model is yolo26n;
-> this document justifies that choice on the record by training
-> larger variants (26s, optionally 26m) on the same split and
+> implemented when they add value"*. The serving model is **yolo26s**
+> (run `yolo26s-fulldata-1280`), promoted over the smaller yolo26n;
+> this document justifies that yolo26n→yolo26s choice on the record by
+> training variants (26n, 26s, optionally 26m) on the same split and
 > comparing accuracy × latency × cost.
 >
 > Source data: `workflows/notebooks/04_yolov26n_sequence_model_evaluation.ipynb`
@@ -118,14 +119,18 @@ Failing any of (1)–(4), the smaller model wins by default.
 
 ## 5. Verdict
 
-**Chosen model**: **<!-- TEAM: yolo26n / yolo26s / yolo26m --></sub>**.
+**Chosen model**: **yolo26s** (run `yolo26s-fulldata-1280`), serving at
+`models/serving/best.pt` since 2026-05-31, superseding the yolo26n
+sequence model.
 
-**Reasoning**: **<!-- TEAM: 2-3 sentences. Cite the rows in §3
-above — e.g. "yolo26s improves aggregate detection F1 by 1.8 pp,
-which is below our 2 pp threshold (criterion 2). It also costs
-~ 35 ms additional latency at p50 on Jetson INT8, pushing us to
-~ 14 fps. Given the rubric's real-time pressure and the marginal
-accuracy gain, we stay on yolo26n for v1.0." --></sub>**
+**Reasoning**: **<!-- TEAM: 2-3 sentences justifying the yolo26n→yolo26s
+upgrade against the §4 criteria. Cite the §3 rows — e.g. "yolo26s lifts
+validation mAP@0.5:0.95 from 0.474 (yolo26n) to 0.679, a large
+detection-quality gain. The cost is throughput: yolo26s is ~3.5× the
+params, so CPU fps drops and the real-time target (criterion 1) now leans
+on the GPU / INT8-ONNX path. We judged the accuracy gain to justify the
+upgrade for v1.0; edge-tier latency is tracked in docs/edge-benchmark.md."
+--></sub>**
 
 **What we would change if we had another sprint**: **<!-- TEAM:
 e.g. "Train a distilled student of yolo26m on the EDNY split —

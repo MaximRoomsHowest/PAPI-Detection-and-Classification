@@ -58,7 +58,7 @@ async def lifespan(_app: FastAPI):
     # B-CRIT-5: hard fail at startup if the operator forgot to set the API key
     # in a real deployment. ``PAPI_ENV=production`` is the explicit opt-in.
     if settings.environment.lower() == "production":
-        if not settings.api_key:
+        if not settings.api_key or not settings.api_key.strip():
             raise RuntimeError(
                 "PAPI_API_KEY must be set when PAPI_ENV=production. "
                 "Refusing to start an unauthenticated public-facing instance."

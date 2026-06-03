@@ -16,7 +16,7 @@ pieces fit together and why specific design choices were made.
 ┌──────────────────────────────────────────────────────────────────┐
 │  OFFLINE  (workflows/scripts/pipeline.py + notebooks)            │
 │                                                                  │
-│  extract → calibrate → autolabel → sample → export → train       │
+│  extract → calibrate → autolabel → sample → export              │
 │                                                                  │
 │  Outputs: configs/projection.yaml, data/labels/auto/,            │
 │           data/interim/lamp_state.csv, CVAT bundle,              │
@@ -100,10 +100,14 @@ pyproject.toml       Editable install for the papi package
    via a WGS-84 LLA->ECEF->ENU transform (client method; app/services/angle.py)
 5. inference_service.model.predict(frame, conf=0.4)
    → list[Detection] with class_id (0=red, 1=white) + bbox + confidence
-6. normalize_detections(detections, per_light_angles=angle.per_light_angles)
-   → list[LampResult]; per-lamp state promoted to "transition" when
-     |elevation - set_angle| <= 0.10°  (audit B-CRIT-1)
-7. global_state_from_lamps(lamps) → "transition" / "4W" / "2W2R" / etc.
+6. normalize_detections(detections) → list[LampResult]; each lamp's
+   per-frame state is red / white / unknown / obscured only — a single
+   image cannot show a "transition". (Temporal red↔white transitions are
+   detected separately for video / sequence by state.detect_lamp_transitions
+   over ByteTrack-tracked frames; see §5.1 and §5.4.)
+7. global_state_from_lamps(lamps) → "4W" / "2W2R" / etc. (a white-count
+   lookup over the four lamps; "transition" only when a lamp is already
+   mid-transition, which a single frame never is)
 8. _draw_overlay(frame, lamps, ...) → annotated JPG at /storage/exports/
 9. AnalysisLogRepository.create_from_payload(payload) → row in
    analysis_logs (Postgres)
@@ -138,35 +142,44 @@ track identity), `overlay` (annotated-frame drawing), `video_writer`
 
 ## 5. Key design decisions
 
-### 5.1 Two classes, transition inferred post-hoc
+### 5.1 Two classes, transition inferred temporally
 
-The YOLO model has only two output classes: `papi_light_red` (0) and
-`papi_light_white` (1). The third state the client requested —
-`transition` — is not a learned class. Instead, the backend
-recomputes it geometrically at response time:
+The YOLO model has only two output classes: `PAPI-Red` (0) and
+`PAPI-White` (1) (named `papi_light_red` / `papi_light_white` in the
+dataset / labelling taxonomy). The third state the client requested —
+`transition` — is **not** a learned class, and it is **not** a per-frame
+verdict at all: a single image can only show a lamp as red, white,
+unknown, or obscured.
+
+`apps/backend/app/services/state.py:normalize_detections` maps the
+detector's per-frame boxes to those four states only. A `transition` is
+instead a red↔white *change observed over time*:
+`state.detect_lamp_transitions` walks each ByteTrack-tracked lamp across
+consecutive frames (numbered 1..4 left-to-right via `lamp_index_by_track`)
+and emits a transition event whenever a lamp flips between red and white
+within `TRANSITION_MAX_FRAME_GAP` frames.
 
 ```
-elevation_deg = angle(camera, lamp)
-if |elevation_deg - set_angle_deg| <= transition_half_width_deg:
-    state = "transition"
+for each ByteTrack-tracked lamp:
+    for consecutive observations (frame_a, state_a), (frame_b, state_b):
+        if {state_a, state_b} == {"red", "white"}:
+            emit TransitionEvent(lamp, frame_b, angle_at(frame_b))
 ```
 
-This pushes the boundary decision from the ML model (where labelled
-transition data is scarce and the boundary is a near-degenerate
-class) to a deterministic geometric computation (where the ground
-truth is exact). The trade-off: the system needs valid drone GPS +
-altitude metadata to emit transition state. When that's absent the
-fall-back is `white` / `red` from the detector.
-
-Implementation: `apps/backend/app/services/state.py:normalize_detections`
-consumes the same algorithm that lives in
-`packages/papi/src/papi/lamp_state.py:compute_lamp_state`
-(used by the offline pipeline). One source of truth.
+The drone-metadata elevation angle does **not** decide a transition — it
+only *annotates* each event (the viewing angle at the frame where the flip
+was seen), so a per-frame telemetry track records the angle a lamp
+actually switched at. This pushes the boundary decision off the ML model
+(where labelled transition data is scarce and the boundary is a
+near-degenerate class) and onto the temporal tracker, which only fires on
+an observed colour flip. Consequently transitions exist only for video /
+sequence uploads (§5.4); a still image never carries a transition state.
 
 ### 5.1a Elevation-angle method and transition-angle validation
 
-The `elevation_deg = angle(camera, lamp)` above is computed with the
-**client's** geometry, in `apps/backend/app/services/angle.py`: both
+The viewing angle that annotates each transition event (and drives the
+per-lamp angle charts) is computed with the **client's** geometry, in
+`apps/backend/app/services/angle.py`: both
 the drone and the PAPI are converted from WGS-84 LLA → ECEF → ENU (a
 local East-North-Up tangent frame at the PAPI), then
 `elevation = atan2(Up, hypot(East, North))`. The primary
@@ -184,12 +197,16 @@ band.)
 
 The client's tool reports the per-lamp red→white transition set-angles
 as approximately **2.32° / 2.55° / 3.12° / 3.6°** (the four lamps).
-These are **not yet bound into the runtime**: `configs/papi_edny.yaml`
-still carries `set_angle_deg: null` per lamp and falls back to FAA
-defaults (`[2.50, 2.83, 3.17, 3.50]` for a 3.0° glideslope) with a
-`transition_half_width_deg` of 0.10. So the geometric transition logic
-is wired and validated, but the *exact* commissioned boundaries shift
-once the client's set-angles are confirmed and entered. PAPI 06 uses
+These are **not yet bound**: `configs/papi_edny.yaml` still carries
+`set_angle_deg: null` per lamp and falls back to FAA defaults
+(`[2.50, 2.83, 3.17, 3.50]` for a 3.0° glideslope) with a
+`transition_half_width_deg` of 0.10. These set-angles parametrise the
+**offline** lamp-state labelling
+(`packages/papi/src/papi/lamp_state.py:compute_lamp_state`, used by the
+auto-labelling pipeline), not a runtime per-frame transition — the served
+app derives `transition` temporally from observed colour flips (§5.1), so
+the angle here is validated and the *offline* boundaries simply shift once
+the client's set-angles are confirmed and entered. PAPI 06 uses
 the data-analysis branch's `461.37 m` lamp reference; the competing
 `464.988 m` notebook value is a minimum client drone EXIF/MRK altitude
 floor proxy, not runtime lamp height. See the geometry caveat in the

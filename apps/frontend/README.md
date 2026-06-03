@@ -1,18 +1,20 @@
-# PAPI Vision Frontend Prototype
+# PAPI Lights Detection and Classification Frontend
 
 React prototype for the Industry Project assignment: AI model for PAPI detection and
 classification.
 
 ## What is included
 
-- Media upload for image or video test input.
-- Backend API mode that calls the FastAPI inference service.
-- Mock mode that switches to a transition-frame example for demo fallback.
+- Media upload for image, video, or folder-of-images test input, analysed
+  by the FastAPI inference service.
 - Detected PAPI bounding box overlay.
-- Four individual lamp statuses: white, red, transition, or occluded.
+- Four individual lamp statuses: white, red, transition, or obscured.
 - Five-state global glidepath result.
-- FPS, latency, confidence, transition recall, and edge memory metrics.
-- Scenario presets for clean, transition, hard-case, and limited-hardware demos.
+- Model & dataset metrics: served-model provenance plus validation-split
+  detection metrics (precision, recall, mAP@0.5, mAP@0.5:0.95, confidence
+  threshold) from `GET /api/model`, and the logged global-state
+  distribution + average confidence + average processing time from
+  `GET /api/stats`.
 - Plotly-powered interactive insight views for state evidence and transition timeline.
 - Dark and light mode.
 
@@ -38,7 +40,7 @@ Stop-Process -Id $pid
 ## Backend integration
 
 Set `VITE_PAPI_API_URL` in `.env` if the backend is not running on
-`http://127.0.0.1:8000`. Backend API mode calls:
+`http://127.0.0.1:8000`. The frontend calls:
 
 - `POST /api/analyze-frame` for a single uploaded image.
 - `POST /api/analyze` for an uploaded video (the whole clip is uploaded and the
