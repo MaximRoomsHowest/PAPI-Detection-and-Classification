@@ -45,6 +45,8 @@ export function IntroductionPage({ copy }) {
               playsInline
               autoPlay={!PREFERS_REDUCED_MOTION}
               preload="metadata"
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
             />
             <span className="intro-band__scrim" />
           </div>

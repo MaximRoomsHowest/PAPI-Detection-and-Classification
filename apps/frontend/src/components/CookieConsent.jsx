@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Cookie, Frown, Smile } from 'lucide-react'
 import clsx from 'clsx'
+import { STORAGE_KEYS, readStoredChoice, safeLocalStorageSet } from '../lib/storage'
 
 export function CookieConsent({ copy }) {
   const [answer, setAnswer] = useState(null)
-  const [dismissed, setDismissed] = useState(false)
+  // Persist the choice so the banner doesn't reappear on every reload. The lazy
+  // initializer reads localStorage once at mount; a stored accepted/declined starts
+  // the component dismissed, so it renders nothing (no banner flash) on return visits.
+  const [dismissed, setDismissed] = useState(() =>
+    Boolean(readStoredChoice(STORAGE_KEYS.cookie, ['accepted', 'declined'], null)),
+  )
   const cookieCopy = copy.cookie ?? {
     title: 'Would you like a cookie?',
     message: 'A small welcome moment before you start exploring PAPI Vision.',
@@ -22,6 +28,11 @@ export function CookieConsent({ copy }) {
     const timeoutId = window.setTimeout(() => setDismissed(true), 1800)
     return () => window.clearTimeout(timeoutId)
   }, [answer])
+
+  const respond = (value) => {
+    safeLocalStorageSet(STORAGE_KEYS.cookie, value)
+    setAnswer(value)
+  }
 
   if (dismissed) {
     return null
@@ -48,10 +59,10 @@ export function CookieConsent({ copy }) {
         <p>{cookieCopy.message}</p>
       </div>
       <div className="cookie-card__actions">
-        <button type="button" onClick={() => setAnswer('accepted')}>
+        <button type="button" onClick={() => respond('accepted')}>
           {cookieCopy.accept}
         </button>
-        <button type="button" onClick={() => setAnswer('declined')}>
+        <button type="button" onClick={() => respond('declined')}>
           {cookieCopy.decline}
         </button>
       </div>

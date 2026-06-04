@@ -213,6 +213,8 @@ export function FrameStage({
             loop
             playsInline
             controls
+            onPlay={() => setIsPaused(false)}
+            onPause={() => setIsPaused(true)}
           />
         ) : displayMedia?.type === 'image' ? (
           <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />

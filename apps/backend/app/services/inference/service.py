@@ -403,10 +403,6 @@ class InferenceService:
         ``frames`` yields BGR frames already sized to ``width`` x ``height``.
         """
         cv2 = self._require_cv2()
-        base_path = self.settings.exports_dir / f"{uuid4()}_annotated"
-        writer, artifact_path = self._open_video_writer(cv2, base_path, fps, width, height)
-        if writer is None:
-            raise RuntimeError("Could not write annotated video artifact.")
 
         history = deque(maxlen=self.settings.video_history_size)
         # ByteTrack id -> [(frame_index, color_state, center_x, confidence)].
@@ -418,6 +414,14 @@ class InferenceService:
         # Raw per-frame verdict + confidence series (one entry per processed frame),
         # surfaced on the payload so the Live Demo can chart frame-by-frame confidence.
         per_frame: list[FramePoint] = []
+
+        # Open the writer LAST before the try below, so nothing fallible runs between
+        # acquiring it and the try/except that releases it (avoids a writer leak on an
+        # init error between creation and the loop).
+        base_path = self.settings.exports_dir / f"{uuid4()}_annotated"
+        writer, artifact_path = self._open_video_writer(cv2, base_path, fps, width, height)
+        if writer is None:
+            raise RuntimeError("Could not write annotated video artifact.")
 
         # The annotated artifact is partially written as the loop runs. If the loop
         # raises (in-loop too-long guard) OR finishes with no readable frames, that

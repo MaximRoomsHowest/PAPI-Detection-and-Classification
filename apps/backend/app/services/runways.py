@@ -238,8 +238,13 @@ def add_runway(payload: RunwayCreate) -> dict[str, Any]:
     Returns the stored, RunwayResponse-shaped dict. Raises ``ValueError`` if the
     derived id collides with a built-in or an existing custom runway.
     """
+    global _custom_cache
     with _custom_lock:
-        store = _load_custom()
+        # Mutate a COPY and only swap the live cache in after the disk write
+        # succeeds, so a failed _persist_custom (e.g. disk full) can't leave the
+        # in-memory cache claiming a runway that was never saved. The copy also
+        # gives concurrent readers a stable snapshot instead of a half-mutated dict.
+        store = dict(_load_custom())
         raw_id = (payload.id or "").strip() or _slugify(payload.designation or payload.label)
         runway_id = _slugify(raw_id)
         # Namespace every custom runway so it can never collide with papi_06 / papi_24.
@@ -272,17 +277,22 @@ def add_runway(payload: RunwayCreate) -> dict[str, Any]:
         }
         store[runway_id] = runway
         _persist_custom(store)
+        _custom_cache = store
         return runway
 
 
 def delete_runway(runway_id: str) -> None:
     """Remove a custom runway. Raises ``ValueError`` for a built-in id and
     ``KeyError`` for an unknown id."""
+    global _custom_cache
     with _custom_lock:
         if runway_id in _runways():
             raise ValueError("Built-in runways cannot be deleted.")
-        store = _load_custom()
+        # Mutate a COPY; only swap the live cache in after the disk write succeeds, so
+        # a failed _persist_custom can't drop a runway from memory that is still on disk.
+        store = dict(_load_custom())
         if runway_id not in store:
             raise KeyError(runway_id)
         del store[runway_id]
         _persist_custom(store)
+        _custom_cache = store
