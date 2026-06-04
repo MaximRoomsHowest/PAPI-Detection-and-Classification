@@ -739,14 +739,14 @@
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface-strong);
+  background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
 }
 
 .folder-mode__options button.active {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface-strong));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-raised));
   color: var(--text-strong);
 }
 

@@ -126,8 +126,6 @@ def build_batches(
                     shutil.rmtree(child)
                 else:
                     child.unlink()
-    else:
-        out_root.mkdir(parents=True)
     out_root.mkdir(parents=True, exist_ok=True)
 
     totals = {

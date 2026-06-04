@@ -13,7 +13,7 @@ help:
 
 install:
 	pip install -e .[dev]
-	pip install -r apps/backend/requirements.txt
+	pip install -r apps/backend/requirements-dev.txt
 	cd apps/frontend && npm install
 	pre-commit install
 

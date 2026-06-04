@@ -31,13 +31,16 @@ export function readStoredChoice(key, allowed, fallback) {
   }
 }
 
-// Initial theme: persisted value -> dark. Computed
+// Initial theme: persisted value -> system preference -> light. Computed
 // once via lazy initializer so the App doesn't re-read localStorage on
 // every render.
 export function initialTheme() {
   const stored = readStoredChoice(STORAGE_KEYS.theme, ['light', 'dark'], null)
   if (stored) return stored
-  return 'dark'
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
 }
 
 // Initial language: persisted -> navigator.language two-letter prefix

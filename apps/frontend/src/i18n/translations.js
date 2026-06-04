@@ -360,6 +360,14 @@ export const translations = {
       notice: 'Bildungsprototyp. Nicht für den operativen Flughafenbetrieb zertifiziert.',
       copyright: 'Copyright © 2026 PAPI Vision Studentenprojekt.',
     },
+    cookie: {
+      title: 'Möchten Sie einen Cookie?',
+      message: 'Ein kleiner Willkommensmoment, bevor Sie PAPI Vision erkunden.',
+      accept: 'Ja, gerne',
+      decline: 'Nein, danke',
+      accepted: 'Viel Freude mit dem Cookie',
+      declined: 'Vielleicht beim nächsten Mal',
+    },
     brand: {
       subtitle: 'PAPI-Erkennung v1.0',
       company: 'Intersoft Electronics',
@@ -1391,4 +1399,4 @@ export const translations = {
   },
 }
 
-export const SUPPORTED_LANGUAGES = ['en', 'nl', 'fr']
+export const SUPPORTED_LANGUAGES = ['en', 'de', 'nl', 'fr']

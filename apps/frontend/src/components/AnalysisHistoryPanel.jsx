@@ -33,7 +33,7 @@ function formatLampCounts(lamps, copy) {
 
 function frameAngle(scenario, copy) {
   return scenario.angleSummary?.available
-    ? `${scenario.angleSummary.value} deg`
+    ? `${scenario.angleSummary.value}°`
     : copy.live.angleUnavailable
 }
 
@@ -45,7 +45,7 @@ function frameAngle(scenario, copy) {
 export function AnalysisHistoryPanel({ activeScenario, backendFrames, backendFrameIndex, onSelectFrame, copy }) {
   const history = backendFrames.length ? backendFrames : []
   const selected = history[backendFrameIndex] ?? activeScenario
-  const lampCounts = countLampStates(selected.lamps)
+  const lampCounts = countLampStates(selected?.lamps ?? [])
   const selectedAngle = frameAngle(selected, copy)
 
   return (
@@ -65,7 +65,7 @@ export function AnalysisHistoryPanel({ activeScenario, backendFrames, backendFra
       <div className="history-stat-grid">
         <div className="history-stat">
           <span>{copy.live.selectedFrame}</span>
-          <strong>{selected.frame}</strong>
+          <strong>{selected?.frame}</strong>
         </div>
         <div className="history-stat history-stat--white">
           <span>{copy.status.white}</span>
@@ -101,7 +101,7 @@ export function AnalysisHistoryPanel({ activeScenario, backendFrames, backendFra
                   <span className="history-pattern">{formatLampCounts(frame.lamps, copy)}</span>
                   <span className="history-state">{state.label}</span>
                   <span className="history-angle">{frameAngle(frame, copy)}</span>
-                  <span className="history-confidence">{frame.metrics.boxConfidence}%</span>
+                  <span className="history-confidence">{frame.metrics?.boxConfidence ?? '—'}%</span>
                 </button>
               </div>
             )

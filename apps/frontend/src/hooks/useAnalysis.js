@@ -120,7 +120,7 @@ export function useAnalysis(copy) {
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
-  const [autoRunRequested, setAutoRunRequested] = useState(false)
+  const autoRunRequestedRef = useRef(false)
   const [folderVideo, setFolderVideo] = useState(null)
   const [isTransformingFolderVideo, setIsTransformingFolderVideo] = useState(false)
   const insightsRef = useRef(null)
@@ -264,7 +264,7 @@ export function useAnalysis(copy) {
     clearFolderVideo()
     setAnalysisError('')
     setAnalysisProgress('')
-    setAutoRunRequested(true)
+    autoRunRequestedRef.current = true
 
     // Read the intrinsic pixel size of a single image up front so the
     // crop/zoom verification view can map the backend's bbox coordinates
@@ -294,17 +294,25 @@ export function useAnalysis(copy) {
   }
 
   useEffect(() => {
-    if (!autoRunRequested || !media?.file || isAnalyzing) {
+    if (!autoRunRequestedRef.current || !media?.file || isAnalyzing) {
       return
     }
 
-    setAutoRunRequested(false)
+    // One-shot auto-run after a new upload commits. The request flag is a ref (not
+    // state) so clearing it here is not a setState-in-effect (eslint error) and adds no
+    // render; the effect still fires because media?.file changed in the same handler
+    // that set the flag.
+    autoRunRequestedRef.current = false
     const timeoutId = window.setTimeout(() => {
       runBackendInference()
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
-  }, [autoRunRequested, media?.file, isAnalyzing])
+    // runBackendInference is intentionally omitted: it is re-created every render, so
+    // listing it would re-run this effect on every render. The 0ms timer fires on the
+    // next tick with an up-to-date closure, so there is no stale-closure risk.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media?.file, isAnalyzing])
 
   function selectBackendFrame(index) {
     if (!backendFrames.length) {

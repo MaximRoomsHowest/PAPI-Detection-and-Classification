@@ -2,10 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Globe, Moon, Sun } from 'lucide-react'
 import clsx from 'clsx'
-import { LANGUAGE_LABELS } from '../i18n/translations'
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../i18n/translations'
 import { useClickOutside } from '../hooks/useClickOutside'
-
-const LANGUAGE_OPTIONS = ['en', 'nl', 'fr']
 
 // The sticky application header: brand, primary nav, language menu and theme
 // toggle. Extracted from App.jsx so the App component stays as the route shell.
@@ -17,11 +15,11 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
   // so the ref callback never mutates an array during render. Each option's
   // callback sets its own entry on mount and clears it on unmount.
   const languageOptionRefs = useRef(new Map())
-  // Resolve an option's DOM node by its position in LANGUAGE_OPTIONS. Reads only
+  // Resolve an option's DOM node by its position in SUPPORTED_LANGUAGES. Reads only
   // the (stable) ref Map and the module-level option list, so it's safe to keep
   // referentially stable and list as a hook dependency.
   const optionNodeAt = useCallback(
-    (index) => languageOptionRefs.current.get(LANGUAGE_OPTIONS[index]) ?? null,
+    (index) => languageOptionRefs.current.get(SUPPORTED_LANGUAGES[index]) ?? null,
     [],
   )
 
@@ -34,7 +32,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
     if (!languageMenuOpen) {
       return
     }
-    const checkedIndex = Math.max(0, LANGUAGE_OPTIONS.indexOf(language))
+    const checkedIndex = Math.max(0, SUPPORTED_LANGUAGES.indexOf(language))
     optionNodeAt(checkedIndex)?.focus()
   }, [languageMenuOpen, language, optionNodeAt])
 
@@ -50,8 +48,8 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
       return
     }
 
-    const lastIndex = LANGUAGE_OPTIONS.length - 1
-    const currentIndex = LANGUAGE_OPTIONS.findIndex(
+    const lastIndex = SUPPORTED_LANGUAGES.length - 1
+    const currentIndex = SUPPORTED_LANGUAGES.findIndex(
       (option) => languageOptionRefs.current.get(option) === event.target,
     )
     let nextIndex = null
@@ -140,7 +138,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
               tabIndex={-1}
               onKeyDown={handleLanguageMenuKeyDown}
             >
-              {LANGUAGE_OPTIONS.map((option) => (
+              {SUPPORTED_LANGUAGES.map((option) => (
                 <button
                   className={clsx(option === language && 'active')}
                   key={option}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -54,10 +54,15 @@ export function FrameStage({
   const canZoom = displayMedia?.type === 'image' || displayMedia?.type === 'video'
   const canControlVideo = displayMedia?.type === 'video'
 
-  useEffect(() => {
-    setIsZoomed(false)
-    setIsPaused(false)
-  }, [displayMedia?.url])
+  // Reset zoom/pause when the displayed media changes. Done during render (guarded by
+  // the previous url) instead of in an effect — an effect here cascades an extra render
+  // and trips react-hooks/set-state-in-effect (eslint error).
+  const prevDisplayUrl = useRef(displayMedia?.url)
+  if (prevDisplayUrl.current !== displayMedia?.url) {
+    prevDisplayUrl.current = displayMedia?.url
+    if (isZoomed) setIsZoomed(false)
+    if (isPaused) setIsPaused(false)
+  }
 
   const toggleVideoPlayback = () => {
     const video = videoRef.current

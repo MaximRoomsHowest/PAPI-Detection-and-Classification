@@ -24,7 +24,13 @@ from .io import (
     write_yolo_labels,
 )
 from .lamp_state import compute_lamp_state
-from .tracking import detect_transitions, summarize_tracking
+from .tracking import (
+    YoloDetection,
+    assign_frame_tracks,
+    detect_transitions,
+    read_yolo_detections,
+    summarize_tracking,
+)
 
 __version__ = "0.1.0"
 __author__ = "Howest Industry-Project Team"
@@ -52,4 +58,7 @@ __all__ = [
     # per-lamp tracking + transition extraction
     "detect_transitions",
     "summarize_tracking",
+    "assign_frame_tracks",
+    "read_yolo_detections",
+    "YoloDetection",
 ]

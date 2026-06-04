@@ -33,16 +33,6 @@ DETECTED_LAMP_STATES = frozenset({"red", "white"})
 # hence confidence 0.0 and no bbox.
 _OBSCURED_LAMP_STATE = "obscured"
 
-GLOBAL_STATE_LABELS = {
-    "far_too_high": "Far too high",
-    "too_high": "Too high",
-    "correct_glidepath": "Correct glidepath",
-    "too_low": "Too low",
-    "far_too_low": "Far too low",
-    "transition": "Transition",
-    "unknown": "Unknown",
-}
-
 
 def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
     """Build per-lamp results (red/white) sorted left-to-right.

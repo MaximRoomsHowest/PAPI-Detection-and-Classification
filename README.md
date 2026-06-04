@@ -64,7 +64,7 @@ from a base weight only if it is missing:
 
 ```powershell
 # from the repo root, only if models/serving/best.pt is absent
-Copy-Item models\base\yolo26n.pt models\serving\best.pt -Force
+Copy-Item models\base\yolo26s.pt models\serving\best.pt -Force
 ```
 
 **Full stack with Docker (recommended)** — Postgres + backend + frontend in one go:

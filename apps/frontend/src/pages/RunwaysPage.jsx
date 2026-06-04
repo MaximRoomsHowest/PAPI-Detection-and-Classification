@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import clsx from 'clsx'
 import { Check, ChevronRight, MapPin, Trash2 } from 'lucide-react'
@@ -67,12 +67,6 @@ export function RunwaysPage({ copy }) {
       null,
     [openRunwayId, runways, selectedRunway],
   )
-
-  useEffect(() => {
-    if (!openRunway && selectedRunwayId) {
-      setOpenRunwayId(selectedRunwayId)
-    }
-  }, [openRunway, selectedRunwayId])
 
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const setLamp = (index, key, value) =>

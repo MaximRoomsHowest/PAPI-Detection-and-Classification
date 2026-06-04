@@ -22,7 +22,7 @@ def aggregate_video_lamps(
     for tid, obs in track_observations.items():
         index = index_by_track.get(tid)
         if index is not None:
-            obs_by_index[index] = obs
+            obs_by_index.setdefault(index, []).extend(obs)
 
     final_lamps: list[LampResult] = []
     for index in range(1, 5):

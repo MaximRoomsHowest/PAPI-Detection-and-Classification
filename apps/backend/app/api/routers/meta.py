@@ -8,6 +8,8 @@ namespace reach them (see the note in ``routers.analyze``).
 from __future__ import annotations
 
 import os
+import platform as platform_module
+from importlib.metadata import PackageNotFoundError, version
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -67,9 +69,6 @@ def get_model_info(_auth: Annotated[None, Depends(routes.require_api_key)] = Non
 @router.get("/system", response_model=SystemInfo)
 def get_system(_auth: Annotated[None, Depends(routes.require_api_key)] = None) -> SystemInfo:
     """Host + runtime facts (audit IMP-BE-7) — every value read from the running host."""
-    import platform as platform_module
-    from importlib.metadata import PackageNotFoundError, version
-
     settings = routes.get_settings()
     torch_available = cuda_available = False
     cuda_device_count = 0
