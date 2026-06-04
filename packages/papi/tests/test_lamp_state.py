@@ -86,3 +86,10 @@ def test_derive_global_state_basic():
     assert derive_global_state(("white", "red", "red", "red")) == "1W3R"
     assert derive_global_state(("red", "red", "red", "red")) == "4R"
     assert derive_global_state(("white", "transition", "red", "red")) == "TRANSITION"
+
+
+def test_derive_global_state_raises_on_unexpected_states():
+    """A lamp set that isn't a full white+red count of 4 (e.g. an 'unknown' lamp) must
+    raise rather than silently mislabel the glidepath via a missing dict key."""
+    with pytest.raises(ValueError, match="unexpected lamp states"):
+        derive_global_state(("white", "white", "white", "unknown"))
