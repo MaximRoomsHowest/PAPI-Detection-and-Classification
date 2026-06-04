@@ -19,13 +19,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "apps" / "backend"))
 
+import matplotlib  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-
 from app.services.angle import _elevation_from_enu, _geodetic_to_enu  # noqa: E402
 from app.services.runways import get_runway  # noqa: E402
 
@@ -60,7 +59,7 @@ def main(dataset_dir: Path, out_png: Path) -> None:
         if not needed.issubset(df.columns):
             continue
         for lat, lon, alt, rwy in zip(
-            df["lat"], df["lon"], df["alt_ellipsoidal_m"], df["nearer_runway"]
+            df["lat"], df["lon"], df["alt_ellipsoidal_m"], df["nearer_runway"], strict=True
         ):
             s = str(rwy).strip()
             key = "24" if s in ("24", "papi_24") else ("06" if s in ("6", "06", "papi_06") else None)
