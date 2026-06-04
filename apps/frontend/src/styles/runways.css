@@ -49,6 +49,13 @@
   line-height: 1.5;
 }
 
+.runway-form__hint {
+  margin: -4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .runway-form__row {
   display: grid;
   gap: 12px;
@@ -183,11 +190,29 @@
   justify-self: start;
 }
 
-/* ---------- Configured-runway list ---------- */
+/* ---------- Configured-runway browser ---------- */
+.runway-browser {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+  height: min(68dvh, 640px);
+  min-height: 420px;
+}
+
 .runway-list {
   display: grid;
-  gap: 12px;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  padding: 12px;
 }
 
 .runway-list__title {
@@ -202,9 +227,88 @@
   font-size: 14px;
 }
 
+.runway-list__items {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.runway-list-item {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.runway-list-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 30%, var(--surface));
+}
+
+.runway-list-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.runway-list-item.open {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 44%, var(--surface));
+}
+
+.runway-list-item.active {
+  color: var(--text-strong);
+}
+
+.runway-list-item__main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.runway-list-item__main strong {
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.runway-list-item__main span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runway-list-item__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+}
+
+.runway-list-item.open .runway-list-item__status > svg:last-child {
+  transform: rotate(90deg);
+}
+
 .runway-card {
   display: grid;
   gap: 10px;
+  align-content: start;
+  max-height: 100%;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
@@ -225,8 +329,19 @@
 }
 
 .runway-card__header strong {
+  display: block;
   color: var(--text-strong);
   font-size: 15px;
+}
+
+.runway-card__kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .runway-card__id {
@@ -314,6 +429,21 @@
 @media (max-width: 880px) {
   .runways-layout {
     grid-template-columns: 1fr;
+  }
+  .runway-browser {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+  .runway-list {
+    height: auto;
+  }
+  .runway-list__items {
+    max-height: 320px;
+  }
+  .runway-card {
+    max-height: none;
+    overflow: visible;
   }
 }
 

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
-import { fetchReady } from './lib/api'
 import {
   STORAGE_KEYS,
   initialLanguage,
@@ -17,6 +16,7 @@ import { useAnalysis } from './hooks/useAnalysis'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { CookieConsent } from './components/CookieConsent'
 import { LiveDemoProvider } from './context/LiveDemoProvider'
 import { IntroductionPage } from './pages/IntroductionPage'
 import { LiveDemoPage } from './pages/LiveDemoPage'
@@ -43,7 +43,6 @@ function NotFound({ copy }) {
 function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [language, setLanguage] = useState(initialLanguage)
-  const [backendStatus, setBackendStatus] = useState('checking')
   const copy = translations[language]
 
   // Live-Demo upload + backend-inference state and handlers live in this hook
@@ -126,28 +125,6 @@ function App() {
     safeLocalStorageSet(STORAGE_KEYS.language, language)
   }, [language])
 
-  // Backend status badge (audit F17 / IMP-FE-17): probe the real readiness
-  // endpoint on mount and every ~20s. fetchReady never throws — it returns
-  // { ok: false } when the backend is down — so a probe failure just flips
-  // the dot to "offline" instead of crashing the shell.
-  useEffect(() => {
-    let active = true
-
-    async function probe() {
-      const result = await fetchReady()
-      if (active) {
-        setBackendStatus(result.ok ? 'online' : 'offline')
-      }
-    }
-
-    probe()
-    const intervalId = window.setInterval(probe, 20_000)
-    return () => {
-      active = false
-      window.clearInterval(intervalId)
-    }
-  }, [])
-
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -164,7 +141,6 @@ function App() {
           // Drop any stale PDF-export banner so it never lingers in the previous language.
           analysis.setExportError('')
         }}
-        backendStatus={backendStatus}
       />
 
       <main id="main-content">
@@ -206,6 +182,8 @@ function App() {
       </main>
 
       <AppFooter copy={copy} />
+
+      <CookieConsent copy={copy} />
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

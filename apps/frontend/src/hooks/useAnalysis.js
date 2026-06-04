@@ -17,6 +17,7 @@ import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
 import { scenarioFromBackendResult } from '../lib/papi'
 import { resolveRunwayId } from '../lib/runwaySelection'
 import { STORAGE_KEYS, safeLocalStorageSet, initialRunwayId } from '../lib/storage'
+import { createFolderVideo } from '../lib/folderVideo'
 import {
   FOLDER_MODE_ANGLE_SWEEP,
   metadataFileForAnalysis,
@@ -119,6 +120,9 @@ export function useAnalysis(copy) {
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
+  const [autoRunRequested, setAutoRunRequested] = useState(false)
+  const [folderVideo, setFolderVideo] = useState(null)
+  const [isTransformingFolderVideo, setIsTransformingFolderVideo] = useState(false)
   const insightsRef = useRef(null)
   // Monotonic analysis run id: bumped whenever new media is selected and captured
   // at the start of each run, so a slow in-flight analysis whose media was replaced
@@ -137,6 +141,14 @@ export function useAnalysis(copy) {
 
   useEffect(() => {
     return () => {
+      if (folderVideo?.url) {
+        URL.revokeObjectURL(folderVideo.url)
+      }
+    }
+  }, [folderVideo?.url])
+
+  useEffect(() => {
+    return () => {
       resolvedArtifactUrlsRef.current.forEach(revokeMediaUrl)
       resolvedArtifactUrlsRef.current = []
     }
@@ -145,6 +157,15 @@ export function useAnalysis(copy) {
   function clearResolvedArtifactUrls() {
     resolvedArtifactUrlsRef.current.forEach(revokeMediaUrl)
     resolvedArtifactUrlsRef.current = []
+  }
+
+  function clearFolderVideo() {
+    setFolderVideo((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url)
+      }
+      return null
+    })
   }
 
   async function resolveResultArtifactUrls(results, runId) {
@@ -207,6 +228,7 @@ export function useAnalysis(copy) {
       setBackendFrames([])
       setBackendResults([])
       setBackendFrameIndex(0)
+      clearFolderVideo()
       setAnalysisProgress('')
       setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
@@ -239,8 +261,10 @@ export function useAnalysis(copy) {
     setBackendFrames([])
     setBackendResults([])
     setBackendFrameIndex(0)
+    clearFolderVideo()
     setAnalysisError('')
     setAnalysisProgress('')
+    setAutoRunRequested(true)
 
     // Read the intrinsic pixel size of a single image up front so the
     // crop/zoom verification view can map the backend's bbox coordinates
@@ -269,6 +293,19 @@ export function useAnalysis(copy) {
     event.target.value = ''
   }
 
+  useEffect(() => {
+    if (!autoRunRequested || !media?.file || isAnalyzing) {
+      return
+    }
+
+    setAutoRunRequested(false)
+    const timeoutId = window.setTimeout(() => {
+      runBackendInference()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [autoRunRequested, media?.file, isAnalyzing])
+
   function selectBackendFrame(index) {
     if (!backendFrames.length) {
       return
@@ -278,6 +315,54 @@ export function useAnalysis(copy) {
     setBackendFrameIndex(nextIndex)
     setBackendScenario(backendFrames[nextIndex])
     setActiveId('backend')
+  }
+
+  async function transformFolderToVideo() {
+    if (media?.type !== 'folder' || isTransformingFolderVideo) {
+      return
+    }
+
+    const annotatedSources = backendFrames
+      .map((frame, index) =>
+        frame.artifactUrl
+          ? {
+              url: frame.artifactUrl,
+              label: frame.frame ?? `${copy.live.frameAxis} ${index + 1}`,
+            }
+          : null,
+      )
+      .filter(Boolean)
+
+    const originalSources = (media.files ?? []).map((file) => ({
+      file,
+      label: fileDisplayPath(file),
+    }))
+
+    const sources = annotatedSources.length > 1 ? annotatedSources : originalSources
+
+    if (sources.length < 2) {
+      toast.error(copy.live.folderVideoNeedsImages)
+      return
+    }
+
+    setIsTransformingFolderVideo(true)
+    try {
+      const result = await createFolderVideo(sources)
+      clearFolderVideo()
+      setFolderVideo({
+        url: result.url,
+        type: 'video',
+        name: copy.live.folderVideoName.replace('{count}', String(result.frameCount)),
+        frameCount: result.frameCount,
+        fps: result.fps,
+        source: annotatedSources.length > 1 ? 'annotated' : 'original',
+      })
+      toast.success(copy.live.folderVideoReady)
+    } catch (error) {
+      toast.error(error.message || copy.live.folderVideoFailed)
+    } finally {
+      setIsTransformingFolderVideo(false)
+    }
   }
 
   async function handleDownloadCharts() {
@@ -551,6 +636,8 @@ export function useAnalysis(copy) {
     backendFrames,
     backendResults,
     backendFrameIndex,
+    folderVideo,
+    isTransformingFolderVideo,
     analysisError,
     analysisProgress,
     insightsRef,
@@ -559,5 +646,6 @@ export function useAnalysis(copy) {
     selectBackendFrame,
     handleDownloadCharts,
     runBackendInference,
+    transformFolderToVideo,
   }
 }

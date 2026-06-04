@@ -2,31 +2,29 @@ import { useMemo } from 'react'
 import { Compass } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { plotlyConfig, plotlyPalette } from '../../catalog/plotly'
-import { angleVsStateSeries } from '../../lib/insightsTransforms'
+import { plotlyConfig } from '../../catalog/plotly'
+import { angleBrightnessSeries } from '../../lib/insightsTransforms'
 
-// THE client-critical chart (modelled on the client's AGL Altitude tool): for each
-// PAPI lamp, the lamp's classified state plotted against the elevation angle (from
-// each image's GPS EXIF) across a geotagged descent sequence, with a dashed line at
-// the detected red->white transition angle. One stacked chart per lamp (PAPI A-D).
-// The angle is real backend data; the state is the model's classification; the
-// transition angle is derived from the real samples (lib/insightsTransforms.js).
-// Nothing is fabricated — with no geotagged sweep the honest empty-state shows.
-
-const LAMP_LETTERS = ['A', 'B', 'C', 'D']
-// Per-lamp line colours (theme-agnostic, readable in light + dark). PAPI D uses the
-// theme's strong colour so it reads dark on light / light on dark, like the client tool.
+// Client-critical chart modelled on the AGL Altitude tool: one stacked
+// brightness/visibility curve per lamp, plotted against real elevation angle.
 const lampColor = (lampIndex, plotTheme) =>
   ['#2f6fed', '#e23b3b', '#1f9d57', plotTheme.strong][lampIndex - 1]
-// Consistent dashed transition-angle marker colour across all four charts.
-const TRANSITION_COLOR = plotlyPalette.red
+const THRESHOLD_COLOR = '#2e8d46'
+const TRANSITION_COLOR = '#b04cc8'
 
-function lampName(lampIndex) {
-  return `PAPI ${LAMP_LETTERS[lampIndex - 1] ?? lampIndex}`
+function lampName(lampIndex, copy) {
+  return `${copy.live.light} ${lampIndex}`
 }
 
-function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
-  const name = lampName(lampIndex)
+function intersectionLabel(transitionAngle, copy) {
+  if (!Number.isFinite(transitionAngle)) {
+    return ''
+  }
+  return `${copy.insights.intersectionLabel}: ${transitionAngle.toFixed(2)}°`
+}
+
+function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, copy }) {
+  const name = lampName(lampIndex, copy)
   if (!points.length) {
     return (
       <div className="angle-chart angle-chart--empty">
@@ -38,6 +36,11 @@ function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
 
   const color = lampColor(lampIndex, plotTheme)
   const transitionName = copy.insights.transitionAngleName.replace('{lamp}', name)
+  const angles = points.map((point) => point.angle)
+  const minAngle = Math.min(...angles)
+  const maxAngle = Math.max(...angles)
+  const axisMin = minAngle === maxAngle ? minAngle - 0.5 : minAngle
+  const axisMax = minAngle === maxAngle ? maxAngle + 0.5 : maxAngle
 
   const data = [
     {
@@ -45,9 +48,9 @@ function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
       mode: 'lines+markers',
       name,
       x: points.map((point) => point.angle),
-      y: points.map((point) => point.stateNum),
-      line: { color, shape: 'hv', width: 2 },
-      marker: { size: 6, color },
+      y: points.map((point) => point.brightness),
+      line: { color, shape: 'spline', smoothing: 0.45, width: 2.3 },
+      marker: { size: 4, color },
       customdata: points.map((point) => [
         copy.status?.[point.state] ?? point.state,
         point.confidence,
@@ -55,8 +58,18 @@ function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
       ]),
       hovertemplate:
         `${copy.insights.angleAxis}: %{x:.3f}<br>` +
+        `${copy.insights.brightnessAxis}: %{y:.0f}%<br>` +
         `${copy.insights.stateAxis}: %{customdata[0]}<br>` +
         `${copy.insights.angleConfidence}: %{customdata[1]}%<extra>%{customdata[2]}</extra>`,
+    },
+    {
+      type: 'scatter',
+      mode: 'lines',
+      name: copy.insights.visibilityThreshold,
+      x: [axisMin, axisMax],
+      y: [threshold, threshold],
+      line: { color: THRESHOLD_COLOR, dash: 'dash', width: 1.4 },
+      hovertemplate: `${copy.insights.visibilityThreshold}: %{y:.0f}%<extra></extra>`,
     },
   ]
 
@@ -66,7 +79,7 @@ function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
       mode: 'lines',
       name: transitionName,
       x: [transitionAngle, transitionAngle],
-      y: [-1.4, 2.4],
+      y: [0, 100],
       line: { color: TRANSITION_COLOR, dash: 'dash', width: 1.6 },
       hovertemplate: `${transitionName}: %{x:.3f}°<extra></extra>`,
     })
@@ -90,19 +103,32 @@ function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
     },
     xaxis: {
       title: { text: copy.insights.angleAxis, font: { color: plotTheme.muted, size: 11 } },
+      range: [axisMin, axisMax],
       gridcolor: plotTheme.grid,
       zeroline: false,
       fixedrange: true,
       tickfont: { color: plotTheme.muted },
     },
     yaxis: {
-      tickvals: [-1, 0, 1, 2],
-      ticktext: [copy.status.obscured, copy.status.red, copy.status.transition, copy.status.white],
-      range: [-1.4, 2.4],
+      title: { text: copy.insights.brightnessAxis, font: { color: plotTheme.muted, size: 11 } },
+      range: [0, 105],
       fixedrange: true,
       gridcolor: plotTheme.grid,
       tickfont: { color: plotTheme.muted },
     },
+    annotations: Number.isFinite(transitionAngle)
+      ? [
+          {
+            x: transitionAngle,
+            y: 100,
+            xanchor: 'center',
+            yanchor: 'bottom',
+            text: intersectionLabel(transitionAngle, copy),
+            showarrow: false,
+            font: { color: TRANSITION_COLOR, size: 11 },
+          },
+        ]
+      : [],
     showlegend: true,
   }
 
@@ -115,7 +141,7 @@ function AngleChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
 }
 
 export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
-  const series = useMemo(() => angleVsStateSeries(backendResults), [backendResults])
+  const series = useMemo(() => angleBrightnessSeries(backendResults), [backendResults])
   const hasAny = series.some((lamp) => lamp.points.length > 0)
 
   return (
@@ -137,6 +163,7 @@ export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
               lampIndex={lamp.lampIndex}
               points={lamp.points}
               transitionAngle={lamp.transitionAngle}
+              threshold={lamp.threshold}
               plotTheme={plotTheme}
               copy={copy}
             />

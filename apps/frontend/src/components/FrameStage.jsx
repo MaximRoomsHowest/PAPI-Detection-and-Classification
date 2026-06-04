@@ -1,5 +1,16 @@
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Radar, Upload } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Film,
+  Pause,
+  Play,
+  Radar,
+  RotateCcw,
+  Upload,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react'
 import clsx from 'clsx'
 
 export function FrameStage({
@@ -10,10 +21,20 @@ export function FrameStage({
   backendFrames,
   backendFrameIndex,
   onBackendFrameChange,
+  folderVideo,
+  canTransformFolderToVideo,
+  transformingFolderVideo,
+  onTransformFolderToVideo,
+  onRestart,
+  canRestart,
+  restarting,
   copy,
 }) {
   const [isDragActive, setIsDragActive] = useState(false)
   const [viewerMode, setViewerMode] = useState('annotated')
+  const [isZoomed, setIsZoomed] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const videoRef = useRef(null)
   const annotatedSource = scenario.artifactUrl
     ? { type: scenario.artifactType ?? 'image', url: scenario.artifactUrl }
     : media?.annotatedUrl
@@ -24,10 +45,31 @@ export function FrameStage({
   // Only offer the toggle when both an original upload and an annotated export exist.
   const canToggleView = Boolean(annotatedSource && originalSource)
   const displayMedia =
-    canToggleView && viewerMode === 'original'
+    folderVideo
+      ? folderVideo
+      : canToggleView && viewerMode === 'original'
       ? originalSource
       : annotatedSource ?? originalSource ?? media
   const canNavigateFrames = backendFrames.length > 1
+  const canZoom = displayMedia?.type === 'image' || displayMedia?.type === 'video'
+  const canControlVideo = displayMedia?.type === 'video'
+
+  useEffect(() => {
+    setIsZoomed(false)
+    setIsPaused(false)
+  }, [displayMedia?.url])
+
+  const toggleVideoPlayback = () => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.paused) {
+      video.play().then(() => setIsPaused(false)).catch(() => {})
+    } else {
+      video.pause()
+      setIsPaused(true)
+    }
+  }
 
   const handleDrop = (event) => {
     event.preventDefault()
@@ -75,6 +117,52 @@ export function FrameStage({
             </button>
           </div>
         )}
+        <div className="frame-tool-controls" role="group" aria-label={copy.live.frameNav}>
+          {canTransformFolderToVideo && (
+            <button
+              type="button"
+              className={clsx('frame-transform-button', folderVideo && 'active')}
+              onClick={onTransformFolderToVideo}
+              disabled={transformingFolderVideo}
+              aria-label={copy.live.transformFolderVideo}
+              title={copy.live.transformFolderVideo}
+            >
+              <Film size={16} />
+              <span>{transformingFolderVideo ? copy.live.folderVideoBuilding : copy.live.transformFolderVideo}</span>
+            </button>
+          )}
+          {canControlVideo && (
+            <button
+              type="button"
+              onClick={toggleVideoPlayback}
+              aria-label={isPaused ? copy.live.playVideo : copy.live.pauseVideo}
+              title={isPaused ? copy.live.playVideo : copy.live.pauseVideo}
+            >
+              {isPaused ? <Play size={16} /> : <Pause size={16} />}
+            </button>
+          )}
+          {canZoom && (
+            <button
+              type="button"
+              className={clsx(isZoomed && 'active')}
+              aria-pressed={isZoomed}
+              onClick={() => setIsZoomed((current) => !current)}
+              aria-label={isZoomed ? copy.live.zoomOut : copy.live.zoomIn}
+              title={isZoomed ? copy.live.zoomOut : copy.live.zoomIn}
+            >
+              {isZoomed ? <ZoomOut size={16} /> : <ZoomIn size={16} />}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRestart}
+            disabled={!canRestart || restarting}
+            aria-label={copy.live.restartAnalysis}
+            title={copy.live.restartAnalysis}
+          >
+            <RotateCcw size={16} />
+          </button>
+        </div>
         {canNavigateFrames && (
           <div className="frame-nav-controls" role="group" aria-label={copy.live.frameNav}>
             <button
@@ -101,7 +189,7 @@ export function FrameStage({
       </div>
 
       <div
-        className="video-surface"
+        className={clsx('video-surface', isZoomed && 'video-surface--zoomed')}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -111,6 +199,7 @@ export function FrameStage({
           // and actually loads the new source (changing src alone does not reload
           // a media element per the HTML spec) (audit H3).
           <video
+            ref={videoRef}
             key={displayMedia.url}
             src={displayMedia.url}
             aria-label={copy.live.frameAlt}
@@ -122,6 +211,8 @@ export function FrameStage({
           />
         ) : displayMedia?.type === 'image' ? (
           <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />
+        ) : analyzing ? (
+          <div className="processing-placeholder" aria-hidden="true" />
         ) : (
           <DropzonePlaceholder
             isDragActive={isDragActive}

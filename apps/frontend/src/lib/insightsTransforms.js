@@ -7,6 +7,7 @@
 // still plotted against the viewing angle (client ask: surface non-detections in
 // the graphs). A bare "unknown" has no tier and is intentionally dropped.
 const STATE_NUM = { obscured: -1, red: 0, transition: 1, white: 2 }
+const VISIBILITY_THRESHOLD = 25
 
 // --- Angle vs. light state ---------------------------------------------------
 
@@ -41,6 +42,102 @@ export function detectTransitionAngle(points) {
     }
   }
   return null
+}
+
+function detectThresholdIntersection(points, threshold = VISIBILITY_THRESHOLD) {
+  const sorted = (points ?? [])
+    .filter((point) => Number.isFinite(point.angle) && Number.isFinite(point.brightness))
+    .sort((a, b) => a.angle - b.angle)
+
+  for (let i = 1; i < sorted.length; i += 1) {
+    const previous = sorted[i - 1]
+    const current = sorted[i]
+    const previousDelta = previous.brightness - threshold
+    const currentDelta = current.brightness - threshold
+
+    if (previousDelta === 0) {
+      return previous.angle
+    }
+    if (currentDelta === 0) {
+      return current.angle
+    }
+    if (previousDelta * currentDelta < 0) {
+      const brightnessSpan = current.brightness - previous.brightness
+      if (brightnessSpan === 0) {
+        return (previous.angle + current.angle) / 2
+      }
+      const ratio = (threshold - previous.brightness) / brightnessSpan
+      return previous.angle + ratio * (current.angle - previous.angle)
+    }
+  }
+
+  return null
+}
+
+function brightnessPoint({ angle, lamp, label }) {
+  const confidence = Math.round((lamp.confidence ?? 0) * 100)
+  return {
+    angle,
+    brightness: confidence,
+    state: lamp.state,
+    confidence,
+    label,
+  }
+}
+
+// Build the client-style brightness-vs-angle curves. The backend currently sends
+// classification confidence rather than a raw photometric intensity, so the graph
+// uses confidence as a visibility/brightness score proxy and labels it as such.
+export function angleBrightnessSeries(results) {
+  const series = [1, 2, 3, 4].map((lampIndex) => ({
+    lampIndex,
+    points: [],
+    threshold: VISIBILITY_THRESHOLD,
+  }))
+
+  for (const result of results ?? []) {
+    const label = result?.original_filename ?? (result?.log_id ? `log ${result.log_id.slice(0, 8)}` : '')
+    const track = result?.angle_track
+
+    if (Array.isArray(track) && track.length > 0) {
+      for (const sample of track) {
+        const angle = sample?.elevation_angle_deg
+        if (!Number.isFinite(angle)) {
+          continue
+        }
+        for (const lamp of sample.lamps ?? []) {
+          const lampIndex = lamp.index
+          if (lampIndex >= 1 && lampIndex <= 4) {
+            series[lampIndex - 1].points.push(brightnessPoint({ angle, lamp, label }))
+          }
+        }
+      }
+      continue
+    }
+
+    const angleData = result?.angle
+    if (!angleData?.angle_available) {
+      continue
+    }
+    for (const lamp of result.lamps ?? []) {
+      const lampIndex = lamp.index
+      if (!(lampIndex >= 1 && lampIndex <= 4)) {
+        continue
+      }
+      const angle = resolveAngle(angleData, lampIndex)
+      if (angle === null) {
+        continue
+      }
+      series[lampIndex - 1].points.push(brightnessPoint({ angle, lamp, label }))
+    }
+  }
+
+  for (const lamp of series) {
+    lamp.points.sort((a, b) => a.angle - b.angle)
+    lamp.transitionAngle = detectTransitionAngle(lamp.points) ?? detectThresholdIntersection(lamp.points)
+  }
+
+  return series
 }
 
 // Build per-light (angle, state) point series from raw AnalysisPayload[]. Only

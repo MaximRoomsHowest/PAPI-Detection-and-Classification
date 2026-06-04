@@ -6,6 +6,10 @@
   padding: 20px 0 16px;
 }
 
+.demo-section {
+  width: min(1740px, calc(100% - 48px));
+}
+
 .section-heading {
   display: flex;
   justify-content: space-between;
@@ -78,7 +82,7 @@
 /* Site footer (ported from New_frontend; uses the merged palette tokens). */
 .site-footer {
   position: relative;
-  margin-top: 48px;
+  margin-top: 0;
   color: #ffffff;
   background: linear-gradient(
     120deg,
@@ -232,23 +236,22 @@
 }
 
 .demo-actions {
-  display: grid;
-  /* auto-fit so the runway selector + the three action buttons wrap cleanly
-     instead of overflowing a fixed 3-column track (a 4th control was added). */
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  align-items: stretch;
+  align-items: center;
   justify-content: end;
 }
 
 .demo-actions .upload-button,
 .demo-actions .primary-button {
-  width: 100%;
+  width: auto;
   justify-content: center;
 }
 
 .demo-actions .upload-button {
-  max-width: none;
+  min-width: 180px;
+  max-width: 280px;
 }
 
 /* Runway selector — a bordered control matching the upload buttons (same height,
@@ -363,4 +366,71 @@
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
   background: color-mix(in srgb, var(--danger) 12%, var(--surface));
   color: var(--danger);
+}
+
+.metadata-prompt {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 28%, var(--border));
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-fill) 11%, transparent), transparent 54%),
+    var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.metadata-prompt__copy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.metadata-prompt__copy svg {
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.metadata-prompt h3,
+.metadata-prompt p {
+  margin: 0;
+}
+
+.metadata-prompt h3 {
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.metadata-prompt p {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.metadata-prompt__controls {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.38fr) minmax(240px, 0.62fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.metadata-prompt .runway-select,
+.metadata-prompt .upload-button {
+  width: 100%;
+  max-width: none;
+}
+
+.metadata-prompt__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.metadata-prompt__apply {
+  min-width: 170px;
+  justify-content: center;
 }

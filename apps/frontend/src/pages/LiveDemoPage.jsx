@@ -1,4 +1,4 @@
-import { FolderOpen, MapPin, Radar, Upload, X, Zap } from 'lucide-react'
+import { FolderOpen, MapPin, Radar, Upload, X } from 'lucide-react'
 import clsx from 'clsx'
 import { FrameStage } from '../components/FrameStage'
 import { LampCard } from '../components/LampCard'
@@ -31,15 +31,17 @@ export function LiveDemoPage({ copy, plotTheme }) {
     setFolderMode,
     runways,
     selectedRunwayId,
-    selectedRunway,
     setSelectedRunwayId: onSelectRunway,
     backendScenario,
     backendFrames,
     backendFrameIndex,
+    folderVideo,
+    isTransformingFolderVideo,
     analysisError,
     analysisProgress,
     handleMediaFiles,
     runBackendInference,
+    transformFolderToVideo,
     selectBackendFrame,
     handleMediaChange,
     droneTelemetry,
@@ -67,6 +69,13 @@ export function LiveDemoPage({ copy, plotTheme }) {
   const usedRunwayId = activeScenario?.rawResult?.runway_id ?? selectedRunwayId
   const usedRunwayLabel =
     runways.find((runway) => runway.id === usedRunwayId)?.label ?? usedRunwayId
+  const hasMissingAngleMetadata = hasResult && !activeScenario.angleSummary?.available
+  const hasManualDroneTelemetry = Boolean(
+    droneTelemetry.latitude.trim() &&
+      droneTelemetry.longitude.trim() &&
+      droneTelemetry.altitudeM.trim(),
+  )
+  const canApplyMetadata = Boolean(media && (metadataFile || hasManualDroneTelemetry))
 
   return (
     <section className="demo-section">
@@ -76,23 +85,6 @@ export function LiveDemoPage({ copy, plotTheme }) {
           <h2>{copy.live.title}</h2>
         </div>
         <div className="demo-actions">
-          <label className="runway-select">
-            <span>{copy.live.runway}</span>
-            <select
-              value={selectedRunwayId}
-              onChange={(event) => onSelectRunway(event.target.value)}
-              aria-label={copy.live.runway}
-            >
-              {/* Keep the chosen id selectable before the list loads so the
-                  control never renders blank on first paint. */}
-              {runways.length === 0 && <option value={selectedRunwayId}>{selectedRunwayId}</option>}
-              {runways.map((runway) => (
-                <option key={runway.id} value={runway.id}>
-                  {runway.label ?? runway.id}
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="upload-button">
             <Upload size={18} />
             <span>{media ? media.name : copy.live.upload}</span>
@@ -119,37 +111,8 @@ export function LiveDemoPage({ copy, plotTheme }) {
               onChange={handleMediaChange}
             />
           </label>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={runBackendInference}
-            disabled={!media || isAnalyzing}
-          >
-            <Zap size={18} />
-            {isAnalyzing ? copy.live.analyzing : copy.live.runModel}
-          </button>
         </div>
       </div>
-
-      {/* Selected runway — the geometric frame of reference the angle is scored
-          against. Shown next to the drone position so the runway<->metadata pairing
-          that produces the elevation angle is explicit. */}
-      {selectedRunway && (
-        <div className="runway-summary" aria-live="polite">
-          <MapPin size={15} aria-hidden="true" />
-          <span className="runway-summary__label">{selectedRunway.label}</span>
-          {(selectedRunway.airport || selectedRunway.designation) && (
-            <span className="runway-summary__meta">
-              {[selectedRunway.airport, selectedRunway.designation].filter(Boolean).join(' · ')}
-            </span>
-          )}
-          {selectedRunway.lights?.length > 0 && (
-            <span className="runway-summary__meta">
-              {copy.live.runwayLampsCount.replace('{n}', selectedRunway.lights.length)}
-            </span>
-          )}
-        </div>
-      )}
 
       {media?.type === 'folder' && (
         <div className="folder-mode" aria-live="polite">
@@ -176,76 +139,6 @@ export function LiveDemoPage({ copy, plotTheme }) {
         </div>
       )}
 
-      {/* Optional drone telemetry — the elevation angle is pure geometry (drone GPS
-          vs surveyed lamp coordinates), so the model can't infer it from the pixels.
-          Upload the telemetry file (DJI .SRT / CSV / JSON) — for a video this drives
-          the per-frame angle sweep; folder sequence mode uses it the same way. Angle
-          sweep folders read each image's embedded GPS automatically. */}
-      <div className="drone-telemetry">
-        <span className="drone-telemetry__label">{copy.live.droneTelemetry}</span>
-        <div className="drone-telemetry__file-row">
-          <label className="upload-button drone-telemetry__file">
-            <Upload size={16} />
-            <span>{metadataFile ? metadataFile.name : copy.live.telemetryUpload}</span>
-            <input
-              type="file"
-              accept=".srt,.csv,.json,text/plain,text/csv,application/json"
-              aria-label={copy.live.telemetryUpload}
-              onChange={handleMetadataFileChange}
-            />
-          </label>
-          {metadataFile && (
-            <button
-              type="button"
-              className="drone-telemetry__clear"
-              onClick={() => setMetadataFile(null)}
-              aria-label={copy.live.telemetryClear}
-              title={copy.live.telemetryClear}
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-        <p className="drone-telemetry__hint">{copy.live.telemetryHint}</p>
-        <span className="drone-telemetry__divider">{copy.live.telemetryOrManual}</span>
-        <div className="drone-telemetry__fields">
-          <label>
-            <span>{copy.live.droneLatitude}</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="mono"
-              value={droneTelemetry.latitude}
-              onChange={setDroneField('latitude')}
-              placeholder="47.673521"
-            />
-          </label>
-          <label>
-            <span>{copy.live.droneLongitude}</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="mono"
-              value={droneTelemetry.longitude}
-              onChange={setDroneField('longitude')}
-              placeholder="9.518154"
-            />
-          </label>
-          <label>
-            <span>{copy.live.droneAltitude}</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="mono"
-              value={droneTelemetry.altitudeM}
-              onChange={setDroneField('altitudeM')}
-              placeholder="520"
-            />
-          </label>
-        </div>
-        <p className="drone-telemetry__hint">{copy.live.droneHint}</p>
-      </div>
-
       {(analysisError || analysisProgress) && (
         <div
           className={clsx('analysis-status', analysisError && 'error')}
@@ -253,6 +146,110 @@ export function LiveDemoPage({ copy, plotTheme }) {
           aria-live={analysisError ? 'assertive' : 'polite'}
         >
           {analysisError || analysisProgress}
+        </div>
+      )}
+
+      {hasMissingAngleMetadata && (
+        <div className="metadata-prompt" role="region" aria-labelledby="metadata-prompt-title">
+          <div className="metadata-prompt__copy">
+            <MapPin size={18} aria-hidden="true" />
+            <div>
+              <h3 id="metadata-prompt-title">{copy.live.metadataMissingTitle}</h3>
+              <p>{copy.live.metadataMissingText}</p>
+            </div>
+          </div>
+
+          <div className="metadata-prompt__controls">
+            <label className="runway-select">
+              <span>{copy.live.runway}</span>
+              <select
+                value={selectedRunwayId}
+                onChange={(event) => onSelectRunway(event.target.value)}
+                aria-label={copy.live.runway}
+              >
+                {runways.length === 0 && <option value={selectedRunwayId}>{selectedRunwayId}</option>}
+                {runways.map((runway) => (
+                  <option key={runway.id} value={runway.id}>
+                    {runway.label ?? runway.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="drone-telemetry__file-row">
+              <label className="upload-button drone-telemetry__file">
+                <Upload size={16} />
+                <span>{metadataFile ? metadataFile.name : copy.live.telemetryUpload}</span>
+                <input
+                  type="file"
+                  accept=".srt,.csv,.json,text/plain,text/csv,application/json"
+                  aria-label={copy.live.telemetryUpload}
+                  onChange={handleMetadataFileChange}
+                />
+              </label>
+              {metadataFile && (
+                <button
+                  type="button"
+                  className="drone-telemetry__clear"
+                  onClick={() => setMetadataFile(null)}
+                  aria-label={copy.live.telemetryClear}
+                  title={copy.live.telemetryClear}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <span className="drone-telemetry__divider">{copy.live.telemetryOrManual}</span>
+
+          <div className="drone-telemetry__fields">
+            <label>
+              <span>{copy.live.droneLatitude}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="mono"
+                value={droneTelemetry.latitude}
+                onChange={setDroneField('latitude')}
+                placeholder="47.673521"
+              />
+            </label>
+            <label>
+              <span>{copy.live.droneLongitude}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="mono"
+                value={droneTelemetry.longitude}
+                onChange={setDroneField('longitude')}
+                placeholder="9.518154"
+              />
+            </label>
+            <label>
+              <span>{copy.live.droneAltitude}</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="mono"
+                value={droneTelemetry.altitudeM}
+                onChange={setDroneField('altitudeM')}
+                placeholder="520"
+              />
+            </label>
+          </div>
+
+          <div className="metadata-prompt__footer">
+            <p>{copy.live.metadataApplyHint}</p>
+            <button
+              type="button"
+              className="primary-button metadata-prompt__apply"
+              onClick={runBackendInference}
+              disabled={!canApplyMetadata || isAnalyzing}
+            >
+              {isAnalyzing ? copy.live.analyzing : copy.live.metadataApply}
+            </button>
+          </div>
         </div>
       )}
 
@@ -266,11 +263,18 @@ export function LiveDemoPage({ copy, plotTheme }) {
             backendFrames={backendFrames}
             backendFrameIndex={backendFrameIndex}
             onBackendFrameChange={selectBackendFrame}
+            folderVideo={folderVideo}
+            canTransformFolderToVideo={media?.type === 'folder'}
+            transformingFolderVideo={isTransformingFolderVideo}
+            onTransformFolderToVideo={transformFolderToVideo}
+            onRestart={runBackendInference}
+            canRestart={Boolean(media)}
+            restarting={isAnalyzing}
             copy={copy}
           />
         </div>
 
-        <aside className="analysis-panel">
+        <aside className="analysis-panel" id="analysis-details">
           {hasResult ? (
             <>
               <div className="state-summary">

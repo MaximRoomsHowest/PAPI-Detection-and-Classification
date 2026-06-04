@@ -25,6 +25,9 @@ h1 {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   /* Faint blueprint grid: two repeating gradients in var(--grid) over the
      base background, 32px cells. */
   background:
@@ -46,6 +49,12 @@ h1 {
   color: var(--text);
 }
 
+.app-shell > main {
+  flex: 1 0 auto;
+  width: 100%;
+  padding-bottom: 48px;
+}
+
 /* Flight-strip topbar (Stage 2): full-bleed, single bottom rule, no float /
    blur / drop shadow. Brand | nav | util cluster divided by hairline rules. */
 .topbar {
@@ -53,11 +62,11 @@ h1 {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(330px, auto) 1fr auto;
   align-items: stretch;
   width: 100%;
   border-bottom: 1px solid var(--border);
-  background: var(--paper);
+  background: color-mix(in srgb, var(--paper) 96%, transparent);
 }
 
 .brand {
@@ -136,6 +145,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
   display: flex;
   align-items: stretch;
   justify-content: center;
+  min-width: 0;
 }
 
 .topbar-actions {
@@ -349,8 +359,8 @@ html[data-theme='dark'] .brand-logo .logo-light {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 14px 22px;
+  gap: 0;
+  padding: 14px 26px;
   border-left: 1px solid var(--border);
   color: var(--text-muted);
   text-decoration: none;
@@ -368,10 +378,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
 }
 
 .nav-link__idx {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  color: var(--faint);
+  display: none;
 }
 
 .topnav .nav-link:hover {

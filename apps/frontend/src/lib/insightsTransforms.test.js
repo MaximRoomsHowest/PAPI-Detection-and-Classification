@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  angleBrightnessSeries,
   angleVsStateSeries,
   confidenceValues,
   perLightStateSeries,
@@ -128,6 +129,40 @@ describe('angleVsStateSeries', () => {
     ])
     expect(series[0].points).toHaveLength(1)
     expect(series[0].points[0].angle).toBe(3.0)
+  })
+})
+
+describe('angleBrightnessSeries', () => {
+  it('builds client-style per-lamp brightness curves and marks the transition angle', () => {
+    const series = angleBrightnessSeries([
+      {
+        original_filename: 'clip.mp4',
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.18 }] },
+          { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.34 }] },
+          { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.72 }] },
+        ],
+      },
+    ])
+
+    expect(series).toHaveLength(4)
+    expect(series[0].points.map((point) => point.brightness)).toEqual([18, 34, 72])
+    expect(series[0].threshold).toBe(25)
+    expect(series[0].transitionAngle).toBeCloseTo(2.75, 5)
+  })
+
+  it('falls back to threshold intersection when no red-to-white state crossing exists', () => {
+    const series = angleBrightnessSeries([
+      {
+        original_filename: 'clip.mp4',
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 1.0, lamps: [{ index: 4, state: 'red', confidence: 0.1 }] },
+          { frame_index: 1, elevation_angle_deg: 2.0, lamps: [{ index: 4, state: 'red', confidence: 0.4 }] },
+        ],
+      },
+    ])
+
+    expect(series[3].transitionAngle).toBeCloseTo(1.5, 5)
   })
 })
 

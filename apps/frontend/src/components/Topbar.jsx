@@ -5,27 +5,12 @@ import clsx from 'clsx'
 import { LANGUAGE_LABELS } from '../i18n/translations'
 import { useClickOutside } from '../hooks/useClickOutside'
 
-const LANGUAGE_OPTIONS = ['en', 'de', 'nl', 'fr']
+const LANGUAGE_OPTIONS = ['en', 'nl', 'fr']
 
-// Real UTC wall clock (hh:mm:ss) — no fabricated value, just the browser's
-// current time rendered in UTC with a 1s tick.
-function formatUtcClock() {
-  return new Date().toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZone: 'UTC',
-    hour12: false,
-  })
-}
-
-// The sticky application header: brand, primary nav, backend-status dot, UTC
-// clock, language menu and theme toggle. Extracted from App.jsx so the App
-// component is just the route shell, and so the once-a-second clock tick
-// re-renders only the topbar instead of the whole page tree.
-export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage, backendStatus }) {
+// The sticky application header: brand, primary nav, language menu and theme
+// toggle. Extracted from App.jsx so the App component stays as the route shell.
+export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage }) {
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
-  const [clock, setClock] = useState(() => formatUtcClock())
   const languageMenuRef = useRef(null)
   const languageTriggerRef = useRef(null)
   // Stable ref store keyed by the language code (not a render-time array index),
@@ -42,13 +27,6 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
 
   const closeLanguageMenu = useCallback(() => setLanguageMenuOpen(false), [])
   useClickOutside(languageMenuRef, closeLanguageMenu, languageMenuOpen)
-
-  // Tick once a second. Keeping this state in the Topbar means the tick only
-  // re-renders the header, not the entire application tree (audit frontend-perf).
-  useEffect(() => {
-    const intervalId = window.setInterval(() => setClock(formatUtcClock()), 1000)
-    return () => window.clearInterval(intervalId)
-  }, [])
 
   // When the menu opens, move focus into the checked option so the arrow keys
   // (F24) have a starting point and keyboard users aren't stranded on the trigger.
@@ -133,18 +111,6 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
       </nav>
 
       <div className="topbar-actions">
-        <div className="util-cell status-cell" aria-live="polite">
-          <span className={clsx('status-dot', `status-dot--${backendStatus}`)} aria-hidden="true" />
-          <span className="util-cell__value mono">{copy.status[backendStatus]}</span>
-        </div>
-        <div className="util-cell">
-          <span className="util-cell__label mono">Site</span>
-          <span className="util-cell__value mono">EDNY</span>
-        </div>
-        <div className="util-cell clock-cell">
-          <span className="util-cell__value mono tnum" aria-hidden="true">{clock}</span>
-          <span className="util-cell__label mono">UTC</span>
-        </div>
         <div className="language-switch topbar-control" ref={languageMenuRef}>
           <button
             className="language-trigger"
