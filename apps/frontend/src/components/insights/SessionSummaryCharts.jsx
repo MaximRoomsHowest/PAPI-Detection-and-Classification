@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { BarChart3, SignalHigh } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { plotlyConfig, plotlyPalette } from '../../catalog/plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, plotlyPalette } from '../../catalog/plotly'
 import { confidenceValues, perLightStateSeries } from '../../lib/insightsTransforms'
 
 // Session-level distributions built from the real per-lamp results of the
@@ -36,24 +36,18 @@ function PerLightStateMix({ results, plotTheme, copy }) {
       className="plotly-chart"
       config={plotlyConfig}
       data={data}
-      layout={{
-        autosize: true,
+      layout={basePlotLayout(plotTheme, {
         height: 320,
         barmode: 'stack',
         margin: { l: 44, r: 14, t: 10, b: 40 },
-        paper_bgcolor: plotTheme.paper,
-        plot_bgcolor: plotTheme.paper,
-        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
         legend: { orientation: 'h', y: -0.18, font: { color: plotTheme.muted, size: 11 } },
-        xaxis: { fixedrange: true, tickfont: { color: plotTheme.muted } },
-        yaxis: {
+        xaxis: baseAxisStyle(plotTheme),
+        yaxis: baseAxisStyle(plotTheme, {
           gridcolor: plotTheme.grid,
-          fixedrange: true,
           dtick: 1,
           rangemode: 'tozero',
-          tickfont: { color: plotTheme.muted },
-        },
-      }}
+        }),
+      })}
       useResizeHandler
     />
   )
@@ -74,28 +68,20 @@ function ConfidenceDistribution({ results, plotTheme, copy }) {
           hovertemplate: `${copy.insights.confidenceAxis}: %{x}<br>%{y}<extra></extra>`,
         },
       ]}
-      layout={{
-        autosize: true,
+      layout={basePlotLayout(plotTheme, {
         height: 320,
         bargap: 0.04,
         margin: { l: 44, r: 14, t: 10, b: 42 },
-        paper_bgcolor: plotTheme.paper,
-        plot_bgcolor: plotTheme.paper,
-        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
-        xaxis: {
-          title: { text: copy.insights.confidenceAxis, font: { color: plotTheme.muted, size: 11 } },
+        xaxis: baseAxisStyle(plotTheme, {
+          title: axisTitle(copy.insights.confidenceAxis, plotTheme),
           range: [0, 100],
-          fixedrange: true,
           gridcolor: plotTheme.grid,
-          tickfont: { color: plotTheme.muted },
-        },
-        yaxis: {
+        }),
+        yaxis: baseAxisStyle(plotTheme, {
           gridcolor: plotTheme.grid,
-          fixedrange: true,
           rangemode: 'tozero',
-          tickfont: { color: plotTheme.muted },
-        },
-      }}
+        }),
+      })}
       useResizeHandler
     />
   )

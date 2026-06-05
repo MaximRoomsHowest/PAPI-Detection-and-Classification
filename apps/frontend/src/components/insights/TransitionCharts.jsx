@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { ArrowLeftRight } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { plotlyConfig, plotlyPalette } from '../../catalog/plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, plotlyPalette } from '../../catalog/plotly'
 import { transitionCountSeries } from '../../lib/insightsTransforms'
 
 // Transition tracking surfaces for video analyses: a frame×light timeline, a
@@ -66,34 +66,26 @@ function TransitionTimeline({ transitions, plotTheme, copy }) {
           },
         },
       ]}
-      layout={{
-        autosize: true,
+      layout={basePlotLayout(plotTheme, {
         height: 360,
         margin: { l: 78, r: 16, t: 10, b: 42 },
-        paper_bgcolor: plotTheme.paper,
-        plot_bgcolor: plotTheme.paper,
-        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
-        xaxis: {
-          title: { text: copy.insights.thFrame, font: { color: plotTheme.muted, size: 11 } },
+        xaxis: baseAxisStyle(plotTheme, {
+          title: axisTitle(copy.insights.thFrame, plotTheme),
           range: [minFrame - pad, maxFrame + pad],
           gridcolor: plotTheme.grid,
           zeroline: false,
-          fixedrange: true,
-          tickfont: { color: plotTheme.muted },
-        },
-        yaxis: {
+        }),
+        yaxis: baseAxisStyle(plotTheme, {
           // Plotly's y-axis is bottom-up: categoryarray[0] sits at the bottom.
           // Reverse so the lanes read Light 1 (top) → Light 4 (bottom), matching
           // the transition table's row order and the rest of the app's "Light 1
           // first" convention.
           categoryorder: 'array',
           categoryarray: [...laneLabels].reverse(),
-          fixedrange: true,
           gridcolor: plotTheme.grid,
-          tickfont: { color: plotTheme.muted },
-        },
+        }),
         showlegend: false,
-      }}
+      })}
       useResizeHandler
     />
   )
@@ -114,23 +106,17 @@ function TransitionCountBar({ transitions, plotTheme, copy }) {
           hovertemplate: `%{x}<br>${copy.insights.transitionCountAxis}: %{y}<extra></extra>`,
         },
       ]}
-      layout={{
-        autosize: true,
+      layout={basePlotLayout(plotTheme, {
         height: 320,
         margin: { l: 48, r: 16, t: 10, b: 40 },
-        paper_bgcolor: plotTheme.paper,
-        plot_bgcolor: plotTheme.paper,
-        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
-        xaxis: { fixedrange: true, tickfont: { color: plotTheme.muted } },
-        yaxis: {
-          title: { text: copy.insights.transitionCountAxis, font: { color: plotTheme.muted, size: 11 } },
+        xaxis: baseAxisStyle(plotTheme),
+        yaxis: baseAxisStyle(plotTheme, {
+          title: axisTitle(copy.insights.transitionCountAxis, plotTheme),
           gridcolor: plotTheme.grid,
-          fixedrange: true,
           dtick: 1,
           rangemode: 'tozero',
-          tickfont: { color: plotTheme.muted },
-        },
-      }}
+        }),
+      })}
       useResizeHandler
     />
   )

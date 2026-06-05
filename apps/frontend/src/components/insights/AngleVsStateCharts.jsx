@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Compass } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { plotlyConfig } from '../../catalog/plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig } from '../../catalog/plotly'
 import { angleBrightnessSeries } from '../../lib/insightsTransforms'
 
 // Client-critical chart modelled on the AGL Altitude tool: one stacked
@@ -85,13 +85,9 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
     })
   }
 
-  const layout = {
-    autosize: true,
+  const layout = basePlotLayout(plotTheme, {
     height: 210,
     margin: { l: 96, r: 14, t: 8, b: 42 },
-    paper_bgcolor: plotTheme.paper,
-    plot_bgcolor: plotTheme.paper,
-    font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
     // Legend top-right inside the plot, matching the client tool.
     legend: {
       x: 1,
@@ -101,21 +97,17 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
       bgcolor: 'rgba(0,0,0,0)',
       font: { color: plotTheme.muted, size: 11 },
     },
-    xaxis: {
-      title: { text: copy.insights.angleAxis, font: { color: plotTheme.muted, size: 11 } },
+    xaxis: baseAxisStyle(plotTheme, {
+      title: axisTitle(copy.insights.angleAxis, plotTheme),
       range: [axisMin, axisMax],
       gridcolor: plotTheme.grid,
       zeroline: false,
-      fixedrange: true,
-      tickfont: { color: plotTheme.muted },
-    },
-    yaxis: {
-      title: { text: copy.insights.brightnessAxis, font: { color: plotTheme.muted, size: 11 } },
+    }),
+    yaxis: baseAxisStyle(plotTheme, {
+      title: axisTitle(copy.insights.brightnessAxis, plotTheme),
       range: [0, 105],
-      fixedrange: true,
       gridcolor: plotTheme.grid,
-      tickfont: { color: plotTheme.muted },
-    },
+    }),
     annotations: Number.isFinite(transitionAngle)
       ? [
           {
@@ -130,7 +122,7 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
         ]
       : [],
     showlegend: true,
-  }
+  })
 
   return (
     <div className="angle-chart">

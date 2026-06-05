@@ -4,7 +4,7 @@ import { AngleEmptyState } from './AngleEmptyState'
 import { InlineMetric } from '../InlineMetric'
 import { useFetch } from '../../hooks/useFetch'
 import { fetchModelInfo, fetchStats } from '../../lib/api'
-import { plotlyConfig } from '../../catalog/plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig } from '../../catalog/plotly'
 import { backendStateId, stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
 import { percent } from '../../lib/format'
@@ -55,23 +55,20 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
           hovertemplate: `%{x}<br>${copy.insights.statsAxis}: %{y}<extra></extra>`,
         },
       ]}
-      layout={{
-        autosize: true,
+      layout={basePlotLayout(plotTheme, {
         height: 340,
         margin: { l: 46, r: 14, t: 10, b: 70 },
-        paper_bgcolor: plotTheme.paper,
-        plot_bgcolor: plotTheme.paper,
-        font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
-        xaxis: { fixedrange: true, tickangle: -25, tickfont: { color: plotTheme.muted, size: 11 } },
-        yaxis: {
-          title: { text: copy.insights.statsAxis, font: { color: plotTheme.muted, size: 11 } },
+        xaxis: baseAxisStyle(plotTheme, {
+          tickangle: -25,
+          tickfont: { color: plotTheme.muted, size: 11 },
+        }),
+        yaxis: baseAxisStyle(plotTheme, {
+          title: axisTitle(copy.insights.statsAxis, plotTheme),
           gridcolor: plotTheme.grid,
-          fixedrange: true,
           dtick: 1,
           rangemode: 'tozero',
-          tickfont: { color: plotTheme.muted },
-        },
-      }}
+        }),
+      })}
       useResizeHandler
     />
   )
