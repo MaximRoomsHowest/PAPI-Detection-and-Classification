@@ -12,6 +12,14 @@ This supersedes the earlier haversine + raw-altitude-subtraction approximation.
 At 300-1000 m baselines the two agree to ~0.01 deg, but ENU is the geodetically
 correct transform the client specified and avoids the spherical-earth shortcut.
 ``haversine`` is retained for distance display / cross-checks.
+
+This geometry is deliberately self-contained. The backend ships NO pymap3d/papi
+runtime dependency; these hand-rolled WGS-84 transforms (``_geodetic_to_enu`` /
+``haversine``) are numerically equivalent to ``papi.geodetic_to_enu`` /
+``papi.horizontal_distance_m`` and are pinned against pymap3d as a *test-only* oracle
+(``tests/test_angle.py::test_enu_matches_pymap3d_oracle``). The duplication is
+intentional: it keeps the client-validated serving path frozen and the deployable
+image dependency-light. Do NOT replace it with a papi/pymap3d import just to de-dup.
 """
 
 import math

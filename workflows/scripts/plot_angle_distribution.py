@@ -13,11 +13,13 @@ Usage:
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "apps" / "backend"))
+sys.path.insert(0, str(ROOT / "packages" / "papi" / "src"))
 
 import matplotlib  # noqa: E402
 import numpy as np  # noqa: E402
@@ -25,8 +27,8 @@ import pandas as pd  # noqa: E402
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from app.services.angle import _elevation_from_enu, _geodetic_to_enu  # noqa: E402
 from app.services.runways import get_runway  # noqa: E402
+from papi import geodetic_to_enu  # noqa: E402
 
 DEFAULT_DATASET = Path(
     "C:/Users/rodri/source/howest/25-26/industryproject/PAPI-artifacts/"
@@ -66,9 +68,12 @@ def main(dataset_dir: Path, out_png: Path) -> None:
             if key is None or not np.isfinite([lat, lon, alt]).all():
                 continue
             mlat, mlon, malt = mids[key]
-            _, angle = _elevation_from_enu(
-                *_geodetic_to_enu(float(lat), float(lon), float(alt), mlat, mlon, malt)
-            )
+            # Drone position in the PAPI-midpoint ENU frame, then elevation =
+            # atan2(up, horizontal). papi.geodetic_to_enu is numerically identical to the
+            # backend's hand-rolled ENU (pinned by apps/backend/tests/test_angle.py's
+            # pymap3d oracle); using it keeps this offline script off backend internals.
+            east, north, up = geodetic_to_enu(float(lat), float(lon), float(alt), mlat, mlon, malt)
+            angle = math.degrees(math.atan2(up, math.hypot(east, north)))
             angles[key].append(angle)
 
     for key in ("24", "06"):
