@@ -121,7 +121,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: apps/backend
           push: false
@@ -134,7 +134,7 @@ jobs:
         run: docker run --rm papi-backend:ci python -c "import app.main; print('backend import ok')"
 
       - name: Build frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: apps/frontend
           push: false
