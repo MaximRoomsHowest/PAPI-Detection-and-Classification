@@ -37,3 +37,9 @@ export function formatDurationMs(ms) {
   }
   return { value: Math.round(n), suffix: ' ms' }
 }
+
+// Human-readable horizontal distance: metres under 1 km, else kilometres.
+export function formatDistanceM(meters) {
+  if (meters == null) return ''
+  return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`
+}

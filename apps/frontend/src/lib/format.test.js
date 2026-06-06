@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from 'vitest'
 
-import { formatAngle, formatDurationMs, formatTimestamp } from './format.js'
+import { formatAngle, formatDistanceM, formatDurationMs, formatTimestamp } from './format.js'
 
 describe('formatAngle', () => {
   it('formats a finite number to 3 decimals with a degree sign', () => {
@@ -72,6 +72,25 @@ describe('formatDurationMs', () => {
 
   it('coerces numeric strings before formatting', () => {
     expect(formatDurationMs('2000')).toEqual({ value: '2.0', suffix: ' s' })
+  })
+})
+
+describe('formatDistanceM', () => {
+  it('returns an empty string for null and undefined (loose == null catches both)', () => {
+    expect(formatDistanceM(null)).toBe('')
+    expect(formatDistanceM(undefined)).toBe('')
+  })
+
+  it('renders sub-kilometre distances as rounded metres', () => {
+    expect(formatDistanceM(0)).toBe('0 m')
+    expect(formatDistanceM(500)).toBe('500 m')
+    expect(formatDistanceM(999.4)).toBe('999 m')
+  })
+
+  it('renders 1 km and above as kilometres with one decimal', () => {
+    expect(formatDistanceM(1000)).toBe('1.0 km')
+    expect(formatDistanceM(1500)).toBe('1.5 km')
+    expect(formatDistanceM(2499)).toBe('2.5 km')
   })
 })
 

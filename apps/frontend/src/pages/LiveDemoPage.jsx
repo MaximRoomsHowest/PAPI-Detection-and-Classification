@@ -7,15 +7,9 @@ import { LampCropZoom } from '../components/LampCropZoom'
 import { AnalysisHistoryPanel } from '../components/AnalysisHistoryPanel'
 import { VideoConfidenceChart } from '../components/VideoConfidenceChart'
 import { IDLE_SCENARIO } from '../catalog/scenarios'
-import { formatDurationMs } from '../lib/format'
+import { formatDistanceM, formatDurationMs } from '../lib/format'
 import { useLiveDemo } from '../context/liveDemoContext'
 import { FOLDER_MODE_ANGLE_SWEEP, FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
-
-// Human-readable horizontal distance: metres under 1 km, else kilometres.
-function formatDistanceM(meters) {
-  if (meters == null) return ''
-  return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`
-}
 
 export function LiveDemoPage({ copy, plotTheme }) {
   // Analysis state + the App-derived display objects come from context now
