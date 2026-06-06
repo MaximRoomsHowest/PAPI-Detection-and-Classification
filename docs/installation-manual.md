@@ -122,7 +122,7 @@ Use this when iterating on backend / frontend code.
 py -3.10 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e .[dev]
-pip install -r apps\backend\requirements.txt
+pip install -r apps\backend\requirements-dev.txt
 
 # Postgres is still needed — easiest to keep using docker for it:
 docker compose up -d postgres
@@ -141,7 +141,7 @@ cd apps\backend
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
-pip install -r apps/backend/requirements.txt
+pip install -r apps/backend/requirements-dev.txt
 docker compose up -d postgres
 cp apps/backend/.env.example apps/backend/.env
 cd apps/backend

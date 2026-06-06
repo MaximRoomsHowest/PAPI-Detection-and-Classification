@@ -1,3 +1,4 @@
+import pytest
 from app.config import Settings
 from app.services.inference import InferenceService
 
@@ -34,3 +35,20 @@ def test_model_info_detects_onnx_backend_without_loading_model(tmp_path):
     assert info.loaded is False
     assert info.confidence_threshold == 0.55
     assert info.device == "cpu"
+
+
+def test_pixel_budget_rejects_oversized_frame(tmp_path):
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=tmp_path / "models" / "best.pt",
+        max_image_megapixels=1,
+    )
+    service = InferenceService(settings)
+
+    # 1000x1000 = 1.0 MP sits exactly at the 1 MP cap -> allowed.
+    service._check_pixel_budget(1000, 1000, "image")
+    # A non-positive dimension means "unknown" (cv2 CAP_PROP can return 0) -> allowed.
+    service._check_pixel_budget(0, 0, "video frame")
+    # 2000x2000 = 4 MP exceeds the cap -> rejected.
+    with pytest.raises(ValueError, match="too large to decode"):
+        service._check_pixel_budget(2000, 2000, "image")

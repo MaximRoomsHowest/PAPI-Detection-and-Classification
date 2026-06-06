@@ -18,10 +18,35 @@ function waitFor(target, eventName) {
   })
 }
 
-async function seekVideo(video, timeSeconds) {
-  const seeked = waitFor(video, 'seeked')
-  video.currentTime = timeSeconds
-  await seeked
+// A seek can hang if the browser/codec never fires `seeked` (the same failure mode the
+// canvasToJpeg timeout guards). Race the event against a timer so a stuck seek rejects
+// cleanly and the caller's `finally` revokes the object URL instead of hanging forever.
+const SEEK_TIMEOUT_MS = 15_000
+
+function seekVideo(video, timeSeconds, timeoutMs = SEEK_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = () => {
+      clearTimeout(timer)
+      video.removeEventListener('seeked', onSeeked)
+      video.removeEventListener('error', onError)
+    }
+    const finish = (fn) => (value) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      fn(value)
+    }
+    const onSeeked = finish(() => resolve())
+    const onError = finish(() => reject(new Error('Could not read uploaded video.')))
+    const timer = setTimeout(
+      finish(() => reject(new Error('Timed out seeking a video frame.'))),
+      timeoutMs,
+    )
+    video.addEventListener('seeked', onSeeked, { once: true })
+    video.addEventListener('error', onError, { once: true })
+    video.currentTime = timeSeconds
+  })
 }
 
 // canvas.toBlob is async with no built-in timeout; on some browsers/codecs the

@@ -31,6 +31,14 @@ updates:
     schedule:
       interval: "weekly"
 
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      compose-images:
+        patterns: ["*"]
+
   # Track the sha256-pinned base images in the Dockerfiles so digest pins still
   # receive security-patch PRs (they never float on their own). One group per image.
   - package-ecosystem: "docker"

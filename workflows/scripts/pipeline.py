@@ -322,6 +322,14 @@ def stage_autolabel(args: argparse.Namespace) -> int:
     cams = cfg["cameras"]
     conv = _load_convention(args.projection_config)
 
+    # Clear labels from a previous run so a re-run (or a --limit pass) cannot leave stale
+    # .txt files behind for frames that no longer produce a bbox — mirrors
+    # _write_lamp_state_labels, which rmtrees its output dir for the same reason (audit W1).
+    if args.labels_dir.exists():
+        import shutil
+
+        shutil.rmtree(args.labels_dir)
+
     if args.limit:
         df = df.head(args.limit)
     print(f"Auto-labelling {len(df)} frames", file=sys.stderr)

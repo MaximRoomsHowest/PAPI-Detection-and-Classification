@@ -56,3 +56,25 @@ def test_max_video_seconds_negative_rejected(monkeypatch):
     monkeypatch.setenv("PAPI_MAX_VIDEO_SECONDS", "-1")
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_max_batch_upload_mb_zero_rejected(monkeypatch):
+    monkeypatch.setenv("PAPI_MAX_BATCH_UPLOAD_MB", "0")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_max_batch_upload_mb_default_matches_proxy_budget(monkeypatch):
+    monkeypatch.delenv("PAPI_MAX_BATCH_UPLOAD_MB", raising=False)
+    assert Settings().max_batch_upload_mb == 400
+
+
+def test_max_image_megapixels_zero_rejected(monkeypatch):
+    monkeypatch.setenv("PAPI_MAX_IMAGE_MEGAPIXELS", "0")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_max_image_megapixels_default(monkeypatch):
+    monkeypatch.delenv("PAPI_MAX_IMAGE_MEGAPIXELS", raising=False)
+    assert Settings().max_image_megapixels == 80

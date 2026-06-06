@@ -190,6 +190,24 @@ class InferenceService:
 
         self._detect_frame(np.zeros((64, 64, 3), dtype=np.uint8), use_tracking=False)
 
+    def _check_pixel_budget(self, width: int, height: int, what: str = "image") -> None:
+        """Reject a decoded frame whose pixel count exceeds the configured budget.
+
+        The upload byte-cap does not bound decode amplification, so a small, highly
+        compressed file can decode to gigabytes (a "decompression bomb"). Raising here
+        (a ValueError -> HTTP 400) stops it before the frame is processed or copied. A
+        non-positive dimension means "unknown" (e.g. cv2 CAP_PROP returned 0) and is left
+        for the real decode to surface.
+        """
+        if width <= 0 or height <= 0:
+            return
+        max_pixels = self.settings.max_image_megapixels * 1_000_000
+        if width * height > max_pixels:
+            raise ValueError(
+                f"Uploaded {what} is too large to decode safely ({width}x{height} px); "
+                f"the limit is {self.settings.max_image_megapixels} megapixels."
+            )
+
     def analyze_image(
         self,
         media_path: Path,
@@ -204,6 +222,7 @@ class InferenceService:
         frame = cv2.imread(str(media_path))
         if frame is None:
             raise ValueError("Could not read uploaded image.")
+        self._check_pixel_budget(frame.shape[1], frame.shape[0], "image")
 
         detections = self._detect_frame(frame, use_tracking=False)
         # A single image yields red/white per lamp; a "transition" requires a
@@ -252,6 +271,11 @@ class InferenceService:
 
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        try:
+            self._check_pixel_budget(frame_width, frame_height, "video frame")
+        except ValueError:
+            cap.release()
+            raise
         # cap.get(FPS) can return 0, a negative, or NaN for some containers; `NaN or 15`
         # keeps the NaN (NaN is truthy), which then poisons the frame-limit math and
         # surfaces as a leaked 500. Reject all three and clamp an absurd upper bound.
@@ -339,6 +363,7 @@ class InferenceService:
             first = cv2.imread(str(image_paths[0]))
             if first is None:
                 raise ValueError("Could not read the first image in the sequence.")
+            self._check_pixel_budget(first.shape[1], first.shape[0], "image")
             height, width = first.shape[:2]
             fps = float(self.settings.sequence_fps)
             max_frames = max(1, self.settings.max_batch_frames)
@@ -358,6 +383,7 @@ class InferenceService:
                         # Skip an unreadable frame rather than abort the whole run;
                         # _run_tracked_sequence raises if NONE were readable.
                         continue
+                    self._check_pixel_budget(frame.shape[1], frame.shape[0], "image")
                     if frame.shape[:2] != (height, width):
                         # The VideoWriter needs a fixed size; normalise odd frames
                         # to the first image's dimensions.

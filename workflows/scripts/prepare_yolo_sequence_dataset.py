@@ -34,15 +34,35 @@ def prepare_sequence_dataset(dataset_root: Path, out_dir: Path) -> dict:
             if not metadata_path.exists():
                 raise FileNotFoundError(f"Missing metadata.csv in sequence video dir: {metadata_path}")
             with metadata_path.open(newline="", encoding="utf-8") as fh:
-                for row in csv.DictReader(fh):
-                    split = row.get("split") or "train"
-                    if split not in splits:
-                        split = "train"
-                    image_name = row.get("image")
-                    if not image_name:
-                        raise ValueError(f"metadata.csv row missing 'image' column in {metadata_path}")
-                    image_path = (regime_root / video_dir.name / image_name).resolve()
-                    splits[split].append(image_path.as_posix())
+                rows = list(csv.DictReader(fh))
+            if not rows:
+                # A metadata.csv with only a header (no frames) contributes nothing;
+                # skip it rather than crash on the empty-split set's .pop() below.
+                continue
+
+            # A sequence is one flight: all its frames must share a split, or near-identical
+            # adjacent frames leak across train/val/test. Enforce one split per video rather
+            # than trusting (and silently 'train'-defaulting) a per-row column (audit W2).
+            raw_splits = {(row.get("split") or "").strip() or "train" for row in rows}
+            unknown = raw_splits - set(splits)
+            if unknown:
+                raise ValueError(
+                    f"{metadata_path} has unrecognised split value(s) {sorted(unknown)}; "
+                    f"expected one of {sorted(splits)}"
+                )
+            if len(raw_splits) > 1:
+                raise ValueError(
+                    f"{metadata_path} mixes splits {sorted(raw_splits)}; all frames of a "
+                    "sequence must share one split to avoid train/val leakage"
+                )
+            split = raw_splits.pop()
+
+            for row in rows:
+                image_name = row.get("image")
+                if not image_name:
+                    raise ValueError(f"metadata.csv row missing 'image' column in {metadata_path}")
+                image_path = (regime_root / video_dir.name / image_name).resolve()
+                splits[split].append(image_path.as_posix())
 
     for split, entries in splits.items():
         (out_dir / f"{split}.txt").write_text("\n".join(entries) + ("\n" if entries else ""), encoding="utf-8")

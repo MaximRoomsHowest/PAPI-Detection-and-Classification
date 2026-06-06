@@ -37,6 +37,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from starlette.datastructures import UploadFile
 
 
 @pytest.fixture
@@ -234,6 +235,17 @@ def test_analyze_frame_rejects_unknown_media_type(client):
         data={"runway_id": "papi_24"},
     )
     assert response.status_code == 400
+
+
+def test_analyze_frame_rejects_mislabeled_image_signature(client):
+    response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"not really a jpeg"), "image/jpeg")},
+        data={"runway_id": "papi_24"},
+    )
+
+    assert response.status_code == 400
+    assert "supported file signature" in response.json()["detail"]
 
 
 def test_analyze_frame_rejects_unknown_runway(client):
@@ -476,6 +488,35 @@ def test_analyze_frames_caps_batch_size(client, monkeypatch):
         get_settings.cache_clear()
 
 
+def test_analyze_frames_caps_aggregate_upload_size(client, monkeypatch):
+    """Folder uploads also need a total request budget, not only per-file caps."""
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("PAPI_MAX_UPLOAD_MB", "2")
+    monkeypatch.setenv("PAPI_MAX_BATCH_UPLOAD_MB", "1")
+    try:
+        files = [
+            ("files", ("frame_001.jpg", BytesIO(b"\xff\xd8\xff" + b"x" * 700_000), "image/jpeg")),
+            ("files", ("frame_002.jpg", BytesIO(b"\xff\xd8\xff" + b"x" * 700_000), "image/jpeg")),
+        ]
+        response = client.post("/api/analyze-frames", files=files, data={"runway_id": "papi_24"})
+        assert response.status_code == 413
+        assert "limited to 1 MB total" in response.json()["detail"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_batch_upload_size_helper_restores_stream_position():
+    import app.api.routers.analyze as analyze_router
+
+    upload = UploadFile(filename="frame.jpg", file=BytesIO(b"0123456789"))
+    upload.file.seek(4)
+
+    assert analyze_router._upload_size_bytes(upload) == 10
+    assert upload.file.tell() == 4
+
+
 def test_analyze_sequence_caps_batch_size(client, monkeypatch):
     """A sequence upload above the configured cap returns 413, not a minutes-long stitch.
 
@@ -502,6 +543,24 @@ def test_analyze_sequence_caps_batch_size(client, monkeypatch):
         body = response.json()
         assert "Image sequences are limited to 3 frames" in body["detail"]
         assert "Got 4" in body["detail"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_analyze_sequence_caps_aggregate_upload_size(client, monkeypatch):
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("PAPI_MAX_UPLOAD_MB", "2")
+    monkeypatch.setenv("PAPI_MAX_BATCH_UPLOAD_MB", "1")
+    try:
+        files = [
+            ("files", ("flight/frame_001.jpg", BytesIO(b"\xff\xd8\xff" + b"x" * 700_000), "image/jpeg")),
+            ("files", ("flight/frame_002.jpg", BytesIO(b"\xff\xd8\xff" + b"x" * 700_000), "image/jpeg")),
+        ]
+        response = client.post("/api/analyze-sequence", files=files, data={"runway_id": "papi_24"})
+        assert response.status_code == 413
+        assert "limited to 1 MB total" in response.json()["detail"]
     finally:
         get_settings.cache_clear()
 

@@ -7,7 +7,8 @@ import {
   fetchLogs,
   fetchModelInfo,
   fetchStats,
-  mediaUrl,
+  resolveMediaUrl,
+  revokeMediaUrl,
 } from '../lib/api'
 import { formatAngle, formatTimestamp, percent } from '../lib/format'
 import { useModalA11y } from '../hooks/useModalA11y'
@@ -204,6 +205,37 @@ export function HistoryPage({ copy }) {
   // on open, and restore focus to the trigger on close.
   useModalA11y(modalRef, Boolean(selectedLog), closeModal)
 
+  // Resolve the modal's annotated artifact through resolveMediaUrl so it still loads
+  // when an API key is configured: a bare /media <img>/<video> src can't send the
+  // X-API-Key header (→ 401). resolveMediaUrl fetches it once and hands back an object
+  // URL, and returns the plain URL untouched when no key is set (no-op in the keyless
+  // demo). Keyed by artifact_url so a stale blob is never shown for a newly-opened log,
+  // and revoked on close/change to avoid leaks. All setState stays in the async
+  // callbacks (never synchronously in the effect body) per the page's render-cascade
+  // rule (audit C1).
+  const [artifact, setArtifact] = useState({ key: null, url: null })
+  useEffect(() => {
+    const key = selectedLog?.artifact_url ?? null
+    let active = true
+    let resolved = null
+    resolveMediaUrl(key)
+      .then((url) => {
+        if (!active) {
+          revokeMediaUrl(url)
+          return
+        }
+        resolved = url
+        setArtifact({ key, url })
+      })
+      .catch(() => {
+        if (active) setArtifact({ key, url: null })
+      })
+    return () => {
+      active = false
+      revokeMediaUrl(resolved)
+    }
+  }, [selectedLog])
+
   const detections = selectedLog?.detections ?? []
 
   return (
@@ -375,9 +407,14 @@ export function HistoryPage({ copy }) {
                     <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at)}</td>
                     <td data-label={copy.history.artifact}>
                       {log.artifact_url ? (
-                        <a href={mediaUrl(log.artifact_url)} target="_blank" rel="noreferrer">
+                        <button
+                          className="history-link"
+                          type="button"
+                          onClick={() => openLog(log.id)}
+                          disabled={openingLogId === log.id}
+                        >
                           {copy.history.view}
-                        </a>
+                        </button>
                       ) : (
                         copy.history.unavailable
                       )}
@@ -500,14 +537,14 @@ export function HistoryPage({ copy }) {
               </div>
             </div>
 
-            {selectedLog.artifact_url && (
+            {artifact.key === selectedLog.artifact_url && artifact.url && (
               <div className="history-artifact">
                 {selectedLog.media_type === 'video' ? (
-                  <video src={mediaUrl(selectedLog.artifact_url)} controls>
+                  <video src={artifact.url} controls>
                     <track kind="captions" />
                   </video>
                 ) : (
-                  <img src={mediaUrl(selectedLog.artifact_url)} alt={selectedLog.original_filename} />
+                  <img src={artifact.url} alt={selectedLog.original_filename} />
                 )}
               </div>
             )}

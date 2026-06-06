@@ -8,6 +8,7 @@ from app.config import Settings
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 GENERIC_CONTENT_TYPES = {"application/octet-stream", "binary/octet-stream"}
+_PEEK_BYTES = 512
 
 
 def detect_media_type(filename: str, content_type: str | None) -> str:
@@ -34,6 +35,48 @@ def detect_media_type(filename: str, content_type: str | None) -> str:
 def safe_upload_name(filename: str) -> str:
     suffix = Path(filename).suffix.lower()
     return f"{uuid4()}{suffix}"
+
+
+def validate_media_signature(upload: UploadFile, media_type: str) -> None:
+    """Validate the upload's magic bytes without consuming the stream.
+
+    Extension and content-type checks are useful routing hints, but they are both
+    caller-controlled. This rejects obvious polyglot/mislabeled payloads before
+    they reach OpenCV's image/video decoders.
+    """
+    try:
+        position = upload.file.tell()
+        header = upload.file.read(_PEEK_BYTES)
+    except (AttributeError, OSError, ValueError) as exc:
+        raise ValueError("Could not inspect uploaded file signature.") from exc
+    finally:
+        try:
+            upload.file.seek(position)
+        except (NameError, AttributeError, OSError, ValueError):
+            pass
+
+    if media_type == "image" and _looks_like_image(header):
+        return
+    if media_type == "video" and _looks_like_video(header):
+        return
+    raise ValueError(f"Uploaded {media_type} does not match a supported file signature.")
+
+
+def _looks_like_image(header: bytes) -> bool:
+    return (
+        header.startswith(b"\xff\xd8\xff")
+        or header.startswith(b"\x89PNG\r\n\x1a\n")
+        or header.startswith(b"BM")
+        or (header.startswith(b"RIFF") and header[8:12] == b"WEBP")
+    )
+
+
+def _looks_like_video(header: bytes) -> bool:
+    return (
+        header[4:8] == b"ftyp"  # mp4/mov/quicktime family
+        or header.startswith(b"\x1a\x45\xdf\xa3")  # webm/mkv EBML
+        or (header.startswith(b"RIFF") and header[8:12] == b"AVI ")
+    )
 
 
 def save_upload(upload: UploadFile, settings: Settings) -> Path:

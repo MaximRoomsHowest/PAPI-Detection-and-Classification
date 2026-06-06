@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   python:
     name: Python (ruff + pytest)
@@ -22,10 +25,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
           cache: "pip"
           cache-dependency-path: |
             pyproject.toml
@@ -38,8 +41,8 @@ jobs:
           # Editable install pulls in numpy/pandas/Pillow/etc. via pyproject.toml.
           pip install -e .[dev]
           # Backend runtime + test deps (FastAPI, SQLAlchemy, ultralytics,
-          # opencv-headless, pytest, httpx). requirements-dev.txt pulls in
-          # requirements.txt via -r so tests get httpx after the split (DCK-D5).
+          # opencv-headless, pytest, httpx2). requirements-dev.txt pulls in
+          # requirements.txt via -r so tests get httpx2 after the split (DCK-D5).
           pip install -r apps/backend/requirements-dev.txt
 
       - name: Ruff (source only — notebooks intentionally excluded)
@@ -53,9 +56,8 @@ jobs:
         run: pytest -v
 
       - name: Mypy (type check — reported, not gating)
-        # Non-gating, like the pip-audit / npm-audit jobs (continue-on-error): surfaces
-        # the current type-error count so the team can decide when to promote it to a
-        # hard gate, without blocking the build today.
+        # Non-gating for now: surfaces the current type-error count so the team can
+        # decide when to promote it to a hard gate, without blocking the build today.
         continue-on-error: true
         run: |
           pip install mypy
@@ -123,10 +125,13 @@ jobs:
         with:
           context: apps/backend
           push: false
-          load: false
+          load: true
           tags: papi-backend:ci
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+
+      - name: Smoke backend image
+        run: docker run --rm papi-backend:ci python -c "import app.main; print('backend import ok')"
 
       - name: Build frontend image
         uses: docker/build-push-action@v6
@@ -146,16 +151,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       # Audit the pinned backend requirements without installing the heavy
-      # torch/ultralytics tree. Reported, not gating yet (audit IMP-INF-1) — flip
-      # off continue-on-error once findings are triaged.
+      # torch/ultralytics tree. This is a hard gate after the June 2026 triage.
       - name: pip-audit (backend requirements)
-        continue-on-error: true
         run: |
           python -m pip install --upgrade pip pip-audit
           pip-audit -r apps/backend/requirements.txt
@@ -167,8 +170,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: apps/frontend/package-lock.json
 
-      - name: npm audit (frontend)
-        continue-on-error: true
+      - name: npm audit (frontend runtime)
+        working-directory: apps/frontend
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: npm audit (frontend all dependencies)
         working-directory: apps/frontend
         run: npm audit --audit-level=high
 

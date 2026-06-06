@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
     # env var from effectively disabling the limit.
     max_upload_mb: int = Field(default=100, ge=1, le=10000, alias="PAPI_MAX_UPLOAD_MB")
+    # Hard cap on DECODED pixels per image/frame. The byte-size cap above does NOT bound
+    # decode amplification: a small, highly-compressed file (or video frame) can decode to
+    # gigabytes — a "decompression bomb". 80 MP covers legitimate high-res drone stills and
+    # 4K/8K video while rejecting bomb-sized frames before they are decoded into RAM.
+    max_image_megapixels: int = Field(default=80, ge=1, le=2000, alias="PAPI_MAX_IMAGE_MEGAPIXELS")
     # Hard cap on frames decoded from an uploaded video. >= 1; upper bound keeps a
     # runaway value from holding the worker indefinitely.
     max_video_frames: int = Field(default=600, ge=1, le=100000, alias="PAPI_MAX_VIDEO_FRAMES")
@@ -73,6 +78,10 @@ class Settings(BaseSettings):
     # count was not. Configurable via env so the demo can raise it for
     # benchmarking (audit B-MAJ-5).
     max_batch_frames: int = Field(default=200, ge=1, le=100000, alias="PAPI_MAX_BATCH_FRAMES")
+    # Aggregate upload-body budget for folder/batch endpoints. The per-file
+    # PAPI_MAX_UPLOAD_MB cap still applies, but without this a default
+    # 200-frame batch could carry 20 GB of files in one request.
+    max_batch_upload_mb: int = Field(default=400, ge=1, le=10000, alias="PAPI_MAX_BATCH_UPLOAD_MB")
     # FPS assigned to a folder->video sequence: the uploaded images are treated as
     # consecutive video frames, so this sets annotated-playback speed and the
     # transition frame-gap timing. It does not affect detection.

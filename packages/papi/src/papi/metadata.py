@@ -46,9 +46,15 @@ def _to_float(val: Any) -> float | None:
     if val is None or val == "":
         return None
     try:
-        return float(val)
+        out = float(val)
     except (TypeError, ValueError):
         return None
+    # Reject NaN/inf so a malformed tag can't push a non-finite coordinate into the
+    # projection/elevation math (which has no finite-guard). `out != out` tests for NaN;
+    # the membership check covers +/- inf. Mirrors the backend telemetry parser.
+    if out != out or out in (float("inf"), float("-inf")):
+        return None
+    return out
 
 
 def _to_int(val: Any) -> int | None:

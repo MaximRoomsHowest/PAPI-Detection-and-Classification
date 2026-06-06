@@ -8,7 +8,8 @@ notes keep the four-person team — and any future maintainer — consistent.
 Full details are in `README.md` and `docs/installation-manual.md`. In short:
 
 - Python: create a venv, then `pip install -e .[dev]` and
-  `pip install -r apps/backend/requirements.txt`.
+  `pip install -r apps/backend/requirements-dev.txt` (the `-dev` set adds `httpx`,
+  which the backend test client needs).
 - Frontend: `cd apps/frontend && npm install`.
 - Optional full stack: `docker compose up -d --build` (see `.env.example`).
 

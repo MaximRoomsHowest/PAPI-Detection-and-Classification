@@ -1,6 +1,7 @@
-# One-command developer tasks (audit IMP-DX-1). Mirrors the CI gates so
-# `make check` locally == green CI. Recipe lines are tab-indented (Make requires it).
-.PHONY: help install lint test build check deliverables-check
+# One-command developer tasks (audit IMP-DX-1). `make check` mirrors the
+# non-Docker CI gates; use `make docker-build` for the image-build gate.
+# Recipe lines are tab-indented (Make requires it).
+.PHONY: help install lint test build docker-build check deliverables-check
 
 help:
 	@echo "Targets:"
@@ -8,7 +9,8 @@ help:
 	@echo "  lint                ruff + eslint"
 	@echo "  test                pytest (papi + backend) + vitest"
 	@echo "  build               build the frontend bundle"
-	@echo "  check               lint + test (the CI gate)"
+	@echo "  docker-build        build backend + frontend images"
+	@echo "  check               lint + test + build (non-Docker CI gates)"
 	@echo "  deliverables-check  fail on unfilled TEAM/TODO/TBD markers"
 
 install:
@@ -29,7 +31,10 @@ test:
 build:
 	cd apps/frontend && npm run build
 
+docker-build:
+	docker compose build backend frontend
+
 deliverables-check:
 	pwsh scripts/build-deliverables.ps1 -CheckOnly -Strict
 
-check: lint test
+check: lint test build

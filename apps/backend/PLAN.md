@@ -1,5 +1,10 @@
 # Local FastAPI Backend Trial Plan
 
+> **Historical planning note.** This file is the original backend trial plan, kept for
+> provenance. Parts below (folder layout, endpoint list, the v1.0 framing) predate later
+> refactors — for the authoritative current backend reference, see
+> [`apps/backend/README.md`](./README.md).
+
 ## Purpose
 
 This folder contains the local FastAPI backend for the PAPI Detection and Classification project. It now serves the React frontend's Backend API mode while still being runnable on its own.
@@ -17,11 +22,12 @@ The backend lets a user upload an image or video, run the trained PAPI YOLO mode
 - Lamp-level result output: each detected lamp is reported per frame as `white`, `red`, or `unknown` (the YOLO detector is two-class: 0=red, 1=white — see `app/services/state.py:normalize_detections`). A lamp's white↔red `transition` is recognised **temporally** — a colour switch across video frames of the same tracked lamp — by `detect_lamp_transitions`, NOT as a per-frame class. (The geometric set-angle transition band in `packages/papi/src/papi/lamp_state.py` is used only by the offline dataset-labelling pipeline, never at runtime.)
 - Global PAPI state output: `far_too_high`, `too_high`, `correct_glidepath`, `too_low`, `far_too_low`, or `unknown`.
 - Annotated image/video export support.
-- Drone elevation angle calculation using the data-analysis notebook formula:
+- Drone elevation angle calculation using a WGS-84 LLA→ECEF→ENU transform. (The early
+  haversine approximation was replaced; `haversine` is now retained only for a
+  horizontal-distance display/cross-check — see `apps/backend/README.md`.)
 
 ```text
-distance = haversine(drone_lat, drone_lon, light_lat, light_lon)
-angle = degrees(atan2(drone_alt - light_alt, distance))
+elevation = degrees(atan2(Up, hypot(East, North)))
 ```
 
 If GPS/altitude metadata is missing, the backend returns `angle_available: false` instead of guessing an exact angle.
@@ -76,7 +82,7 @@ apps/backend/
 `POST /api/analyze-frame` is the expected frontend workflow for split video frames. It expects form data:
 
 - `file`: image frame upload
-- `runway_id`: optional, defaults to `papi_06`
+- `runway_id`: optional, defaults to `papi_24`
 - `drone_id`: optional
 - `drone_latitude`, `drone_longitude`, `drone_altitude_m`: optional manual drone metadata for angle calculation
 

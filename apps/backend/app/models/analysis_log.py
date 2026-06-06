@@ -37,7 +37,13 @@ class AnalysisLog(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     media_type: Mapped[str] = mapped_column(String(24))
-    runway_id: Mapped[str] = mapped_column(String(32), default="papi_24", index=True)
+    # String(96) (not 32): a custom runway id is "custom_" (7) + an up-to-80-char slug
+    # derived from RunwayCreate.id, so 32 would overflow and raise a Postgres
+    # StringDataRightTruncation → 503 that orphans the just-written artifact (SQLite
+    # ignores VARCHAR width, so this only bites on Postgres). create_all only widens a
+    # FRESH table; an existing deployment needs a manual
+    # ALTER TABLE analysis_logs ALTER COLUMN runway_id TYPE VARCHAR(96) (audit C2).
+    runway_id: Mapped[str] = mapped_column(String(96), default="papi_24", index=True)
     drone_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     original_filename: Mapped[str] = mapped_column(String(512))
     artifact_path: Mapped[str | None] = mapped_column(Text, nullable=True)

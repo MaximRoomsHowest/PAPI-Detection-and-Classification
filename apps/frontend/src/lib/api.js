@@ -7,18 +7,29 @@ const API_KEY = import.meta.env.VITE_PAPI_API_KEY
 const DEFAULT_MAX_UPLOAD_MB = 100
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000
 
+// Parse a numeric env override, falling back to the default when the value is absent
+// OR unparseable. Bare Number('abc') is NaN, which would silently disable the upload
+// guard (`size > NaN` is always false) and make setTimeout(…, NaN) fire immediately,
+// aborting every request (audit F1).
+function positiveNumberEnv(raw, fallback) {
+  const value = Number(raw)
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
 const MAX_UPLOAD_BYTES =
-  Number(import.meta.env.VITE_PAPI_MAX_UPLOAD_MB ?? DEFAULT_MAX_UPLOAD_MB) * 1024 * 1024
-const REQUEST_TIMEOUT_MS = Number(
-  import.meta.env.VITE_PAPI_REQUEST_TIMEOUT_MS ?? DEFAULT_REQUEST_TIMEOUT_MS,
+  positiveNumberEnv(import.meta.env.VITE_PAPI_MAX_UPLOAD_MB, DEFAULT_MAX_UPLOAD_MB) * 1024 * 1024
+const REQUEST_TIMEOUT_MS = positiveNumberEnv(
+  import.meta.env.VITE_PAPI_REQUEST_TIMEOUT_MS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
 )
 // Inference is sequential at ~0.4 fps, so a long video (up to 600 frames) or a
 // folder batch (up to 200 images) can legitimately run for many minutes — far
 // past the 60s GET timeout. The three analyze calls get their own generous budget
 // so the headline video/batch features aren't aborted mid-analysis (audit H2).
 const DEFAULT_ANALYZE_TIMEOUT_MS = 30 * 60_000
-const ANALYZE_TIMEOUT_MS = Number(
-  import.meta.env.VITE_PAPI_ANALYZE_TIMEOUT_MS ?? DEFAULT_ANALYZE_TIMEOUT_MS,
+const ANALYZE_TIMEOUT_MS = positiveNumberEnv(
+  import.meta.env.VITE_PAPI_ANALYZE_TIMEOUT_MS,
+  DEFAULT_ANALYZE_TIMEOUT_MS,
 )
 
 function buildHeaders(extra = {}) {

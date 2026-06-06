@@ -81,8 +81,10 @@ services:
       PAPI_CONFIDENCE_THRESHOLD: ${PAPI_CONFIDENCE_THRESHOLD:-0.4}
       PAPI_VIDEO_HISTORY_SIZE: ${PAPI_VIDEO_HISTORY_SIZE:-5}
       PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
+      PAPI_MAX_IMAGE_MEGAPIXELS: ${PAPI_MAX_IMAGE_MEGAPIXELS:-80}
       PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
       PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-30}
+      PAPI_MAX_BATCH_UPLOAD_MB: ${PAPI_MAX_BATCH_UPLOAD_MB:-400}
       # Aggregate cap on /api/analyze-frames batch size (audit B-MAJ-5).
       # 200 keeps a folder upload of a normal flight under a few minutes
       # of CPU inference; raise via .env if the demo needs a bigger sweep.
@@ -113,9 +115,9 @@ services:
       # restarts in a named volume.
       - papi_backend_storage:/storage
     healthcheck:
-      # Liveness via the stdlib (no curl in the slim image). start_period covers
-      # the model pre-warm + smoke inference at startup.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      # Readiness via the stdlib (no curl in the slim image). This keeps the
+      # frontend from starting until DB + model readiness pass.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
       interval: 10s
       timeout: 5s
       retries: 5

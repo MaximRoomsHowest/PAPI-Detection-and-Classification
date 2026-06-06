@@ -7,6 +7,7 @@ does not pay the ~5 s model-load latency in front of a jury (audit
 B-CRIT-4 + SMOKE-MAJ-2).
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -39,6 +40,31 @@ settings = get_settings()
 _DEFAULT_DB_CREDENTIAL_MARKER = "papi:papi@"
 
 
+def _allow_cors_credentials(origins: list[str]) -> bool:
+    """Never combine wildcard CORS origins with credentialed responses."""
+    return not any("*" in origin for origin in origins)
+
+
+def _startup_warmup() -> None:
+    """Blocking startup work, run in a thread so it doesn't stall the event loop.
+
+    ``init_db()`` creates the analysis_logs table; touching ``.model`` triggers the lazy
+    YOLO weight load; ``warmup()`` runs one dummy inference so a broken checkpoint fails
+    here, not in front of the jury on the first request. All failures are logged, never
+    fatal — a missing-weights local dev env can still serve /health and /api/runways.
+    """
+    init_db()
+    try:
+        service = get_inference_service()
+        _ = service.model
+        service.warmup()
+        logger.info("YOLO model pre-warmed and smoke-tested at startup.")
+    except RuntimeError as exc:
+        logger.warning("Could not pre-warm YOLO model: %s", exc)
+    except Exception as exc:  # noqa: BLE001 - warmup is best-effort; never abort startup
+        logger.warning("YOLO warmup inference failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Startup + shutdown hooks for the FastAPI app.
@@ -69,19 +95,10 @@ async def lifespan(_app: FastAPI):
                 "Set a real PAPI_DATABASE_URL before starting in production mode."
             )
 
-    init_db()
-    try:
-        # Touching .model triggers the lazy YOLO load inside InferenceService.
-        service = get_inference_service()
-        _ = service.model
-        # Run one dummy inference so a broken checkpoint fails here, not in front
-        # of the jury on the first real request (audit IMP-SRV-9).
-        service.warmup()
-        logger.info("YOLO model pre-warmed and smoke-tested at startup.")
-    except RuntimeError as exc:
-        logger.warning("Could not pre-warm YOLO model: %s", exc)
-    except Exception as exc:  # noqa: BLE001 - warmup is best-effort; never abort startup
-        logger.warning("YOLO warmup inference failed: %s", exc)
+    # init_db + the lazy YOLO load + warmup are blocking and CPU-bound (~5 s). Run them
+    # off the event loop in a thread so the server can still answer /health while it
+    # boots, instead of stalling the single asyncio loop during startup (audit B4).
+    await asyncio.get_running_loop().run_in_executor(None, _startup_warmup)
     yield
     # Nothing to clean up on shutdown for now; placeholder for future use.
 
@@ -96,10 +113,16 @@ app.add_middleware(RequestIdMiddleware)
 # allow_methods / allow_headers are explicit rather than "*" because the
 # combination of "*" + allow_credentials=True is rejected by some browsers
 # (audit B-MIN-1).
+# A "*" origin with allow_credentials=True makes Starlette reflect any Origin AND send
+# Access-Control-Allow-Credentials: true — i.e. any-origin-with-credentials. The bare "*"
+# (PAPI_CORS_ORIGINS=*) is the case Starlette actually treats as allow-all; we additionally
+# drop credentials if ANY entry merely contains "*" (e.g. a wildcard-subdomain that a future
+# allow_origin_regex could honour), so the combination can never ship (audit B3).
+_cors_allow_credentials = _allow_cors_credentials(settings.cors_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-API-Key"],
     expose_headers=["X-Request-ID", "X-Total-Count"],

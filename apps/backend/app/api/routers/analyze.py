@@ -28,7 +28,7 @@ import app.api.routes as routes
 from app.api._runways import validate_runway_id
 from app.database import get_session
 from app.repositories import AnalysisLogRepository
-from app.services.media import detect_media_type, save_upload
+from app.services.media import detect_media_type, save_upload, validate_media_signature
 from app.services.telemetry import DroneSample, parse_telemetry
 from app.validation.analyze import parse_manual_drone_metadata
 from app.validation.schemas import AnalysisPayload, FrameBatchPayload
@@ -112,6 +112,38 @@ def read_metadata_samples(metadata_file: UploadFile | None) -> list[DroneSample]
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _upload_size_bytes(upload: UploadFile) -> int:
+    """Return the spooled upload size without changing the caller's read position."""
+    try:
+        position = upload.file.tell()
+        upload.file.seek(0, 2)
+        size = upload.file.tell()
+    except (AttributeError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Could not inspect uploaded file size.") from exc
+    finally:
+        try:
+            upload.file.seek(position)
+        except (NameError, AttributeError, OSError, ValueError):
+            pass
+    return size
+
+
+def _enforce_batch_upload_budget(files: list[UploadFile], settings) -> None:
+    max_bytes = settings.max_batch_upload_mb * 1024 * 1024
+    total = 0
+    for upload in files:
+        total += _upload_size_bytes(upload)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Folder uploads are limited to {settings.max_batch_upload_mb} MB "
+                    f"total per request. Split the folder and retry, or raise "
+                    f"PAPI_MAX_BATCH_UPLOAD_MB on the server."
+                ),
+            )
+
+
 @router.post("/analyze", response_model=AnalysisPayload)
 def analyze_media(
     file: Annotated[UploadFile, File()],
@@ -164,6 +196,7 @@ def analyze_frames(
                 f"PAPI_MAX_BATCH_FRAMES on the server."
             ),
         )
+    _enforce_batch_upload_budget(files, settings)
 
     # Reject an unknown runway once, up front, before any per-file disk I/O.
     validate_runway_id(params.runway_id)
@@ -215,6 +248,7 @@ def analyze_sequence(
                 f"PAPI_MAX_BATCH_FRAMES on the server."
             ),
         )
+    _enforce_batch_upload_budget(files, settings)
 
     validate_runway_id(params.runway_id)
 
@@ -236,8 +270,10 @@ def analyze_sequence(
     saved_paths: list = []
     try:
         for upload in ordered:
-            if detect_media_type(upload.filename or "", upload.content_type) != "image":
+            media_type = detect_media_type(upload.filename or "", upload.content_type)
+            if media_type != "image":
                 raise HTTPException(status_code=400, detail="Image sequences accept image files only.")
+            validate_media_signature(upload, media_type)
             saved_paths.append(save_upload(upload, settings))
 
         payload = routes.get_inference_service().analyze_frame_sequence(
@@ -296,6 +332,10 @@ def _analyze_upload(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if image_only and media_type != "image":
         raise HTTPException(status_code=400, detail="Use /api/analyze-frame with image files only.")
+    try:
+        validate_media_signature(file, media_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Validate drone metadata BEFORE writing the upload to disk: parse_manual_drone_metadata
     # raises on invalid input, and if that happened after save_upload the just-saved file

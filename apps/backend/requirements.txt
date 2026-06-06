@@ -1,14 +1,14 @@
 # Backend runtime dependencies.
 #
-# Test-only deps (pytest, httpx) live in requirements-dev.txt so the production
+# Test-only deps (pytest, httpx2) live in requirements-dev.txt so the production
 # image never ships test tooling (audit DCK-D5). Install dev/test deps with:
 #   pip install -r requirements-dev.txt
-fastapi==0.115.6
+fastapi==0.136.3
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 pydantic-settings==2.7.1
-python-multipart==0.0.20
+python-multipart==0.0.32
 # Imported directly by app/services/runways.py to load the runway-geometry YAML;
 # pinned explicitly instead of relying on ultralytics to provide it transitively (audit).
 PyYAML==6.0.2
@@ -22,5 +22,5 @@ exifread==3.0.0
 # ONNX stack — only exercised when PAPI_MODEL_PATH points at a .onnx model (the
 # INT8 edge-export serving path); the default .pt path never imports these
 # (audit DCK-RE DEP-1).
-onnx==1.17.0
+onnx==1.21.0
 onnxruntime==1.20.1

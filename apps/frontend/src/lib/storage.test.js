@@ -47,6 +47,10 @@ function withLocalStorage(stub, fn) {
 
 beforeEach(() => {
   window.localStorage.clear()
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn().mockReturnValue({ matches: false }),
+  })
 })
 
 afterEach(() => {

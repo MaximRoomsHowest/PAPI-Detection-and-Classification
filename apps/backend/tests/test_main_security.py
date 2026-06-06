@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 from app import main as main_module
 from app.config import get_settings
-from app.main import _DEFAULT_DB_CREDENTIAL_MARKER, app, lifespan
+from app.main import _DEFAULT_DB_CREDENTIAL_MARKER, _allow_cors_credentials, app, lifespan
 from fastapi.testclient import TestClient
 
 
@@ -272,8 +272,17 @@ def test_default_credential_marker_matches_documented_default():
     )
 
 
+def test_cors_credentials_allowed_for_explicit_origins():
+    assert _allow_cors_credentials(["http://localhost:5173", "http://127.0.0.1:5173"]) is True
+
+
+def test_cors_credentials_disabled_for_wildcard_origins():
+    assert _allow_cors_credentials(["*"]) is False
+    assert _allow_cors_credentials(["https://*.example.test"]) is False
+
+
 # pytest-anyio requires a backend declaration. Use the asyncio backend
-# (already a transitive dep via httpx in the backend test suite).
+# (already a transitive dep via httpx2 in the backend test suite).
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
