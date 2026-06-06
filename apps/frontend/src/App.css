@@ -8,13 +8,18 @@
 @import './styles/sections.css';
 @import './styles/live-demo.css';
 @import './styles/insights.css';
-/* History page + global @keyframes (pulse/spin/cue-bounce) + the responsive
-   @media breakpoints. (Formerly misnamed 'decoder-ribbon.css' — the decoder/
-   ribbon UI it was named for is long gone, but this slice is very much live:
-   it owns the History table, the keyframes referenced from base/live-demo/intro,
-   and every max-width breakpoint. Renamed for clarity; contents unchanged so the
-   cascade order is byte-for-byte preserved.) */
-@import './styles/history-and-responsive.css';
+/* History page table/modal styles. (Formerly 'history-and-responsive.css', which
+   also carried the keyframes and the responsive breakpoints; those were split out
+   into animations.css + responsive.css below, kept in their original cascade
+   order so nothing moved relative to the rules it affects.) */
+@import './styles/history.css';
+/* Global @keyframes (pulse/spin/cue-bounce), referenced from base/live-demo/intro.
+   @keyframes resolve by name, so this slice's position in the cascade is immaterial. */
+@import './styles/animations.css';
+/* Every @media block: the reduce-motion resets + all max-width breakpoints.
+   Imported after the base/page partials it overrides and BEFORE runways.css, so the
+   responsive overrides and the .runway-delete > .ghost-button precedence both hold. */
+@import './styles/responsive.css';
 /* Runways page styles — imported after the responsive partial so the page's own
    button modifier (.runway-delete) wins over the shared .ghost-button base. */
 @import './styles/runways.css';
