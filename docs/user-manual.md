@@ -169,6 +169,20 @@ confidence, and annotated artifact, and reflects the backend's
 persisted analysis log. It is read straight from the backend, so it
 populates only when the backend is running.
 
+## 5b. The Runways page
+
+The **Runways** tab lists the runway geometries the app can analyse an approach
+against. Each runway defines the four PAPI lamp positions (latitude, longitude,
+altitude) used by the elevation-angle calculation.
+
+- Built-in runways (e.g. EDNY) ship with the app and are read-only.
+- You can register a custom runway by entering its four lamp coordinates; it then
+  becomes selectable in the runway dropdown on the Live Demo page.
+- Custom runways can be removed when no longer needed (built-ins are protected).
+
+You only need this page when working with a runway the app does not already know
+about — for the bundled demo footage, a default runway is preselected.
+
 ## 6. Theme and language
 
 Top-right corner:

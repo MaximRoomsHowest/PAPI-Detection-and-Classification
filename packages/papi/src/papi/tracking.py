@@ -247,19 +247,24 @@ def _assign_by_projection(
     if str(image_row.get("camera")) != "WideCamera":
         return None
 
-    _, papi_config = resolve_papi_for_frame(image_row, airport_config)
-    camera_config = airport_config["cameras"]["wide"]
-    projections = project_papi_lights(
-        image_row,
-        papi_config,
-        camera_config,
-        projection_convention,
-    )
-    projected_points = [
-        (lamp_id, float(u), float(v))
-        for lamp_id, (u, v, behind, _in_frame) in projections.items()
-        if not behind and u is not None and v is not None
-    ]
+    try:
+        _, papi_config = resolve_papi_for_frame(image_row, airport_config)
+        camera_config = airport_config["cameras"]["wide"]
+        projections = project_papi_lights(
+            image_row,
+            papi_config,
+            camera_config,
+            projection_convention,
+        )
+        projected_points = [
+            (lamp_id, float(u), float(v))
+            for lamp_id, (u, v, behind, _in_frame) in projections.items()
+            if not behind and u is not None and v is not None
+        ]
+    except (KeyError, ValueError, TypeError):
+        # Malformed/empty metadata (e.g. a blank DJI GPS/gimbal cell -> float('')) must
+        # honor the documented left-to-right fallback instead of crashing the build.
+        return None
     # A rectangular cost matrix with fewer columns (projected points) than rows (detections)
     # makes linear_sum_assignment return one pair *per column*, silently leaving some
     # detections unassigned. Reject that here so the caller falls back to left-to-right and
@@ -274,6 +279,10 @@ def _assign_by_projection(
         ],
         dtype=float,
     )
+    # A non-finite projection (NaN u/v can slip past the behind/None filter above) would
+    # make linear_sum_assignment raise; fall back to left-to-right instead.
+    if not np.isfinite(costs).all():
+        return None
     det_indices, projection_indices = linear_sum_assignment(costs)
     # Defence in depth for the guard above: every detection must have received a projected
     # point. If not, fall back rather than emit a partial (silently mismatched) assignment.

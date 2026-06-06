@@ -17,13 +17,8 @@ import zipfile
 from pathlib import Path
 
 import yaml
-from _pipeline_utils import read_label_zip
-from prepare_yolo_seed import (
-    CLASS_NAMES,
-    ManualSource,
-    _merged_manual_labels,
-    _parse_manual_source,
-)
+from _pipeline_utils import ManualSource, _parse_manual_source, read_label_zip
+from prepare_yolo_seed import CLASS_NAMES, _merged_manual_labels
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_METADATA = REPO_ROOT / "data" / "interim" / "images_metadata.csv"
@@ -201,14 +196,21 @@ def main() -> int:
     parser.add_argument(
         "--manual-source",
         action="append",
-        default=DEFAULT_MANUAL_SOURCES,
-        help="Manual source as path:limit. Can be passed multiple times; latest non-empty wins.",
+        default=None,
+        help=(
+            "Manual source as path:limit. Can be passed multiple times; latest non-empty "
+            "wins. When omitted, the standard correction sets are used; passing any value "
+            "replaces them entirely."
+        ),
     )
     args = parser.parse_args()
 
+    manual_source_values = (
+        args.manual_source if args.manual_source is not None else DEFAULT_MANUAL_SOURCES
+    )
     manual_sources = [
         ManualSource(_resolve_repo_path(source.path), source.limit)
-        for source in (_parse_manual_source(value) for value in args.manual_source)
+        for source in (_parse_manual_source(value) for value in manual_source_values)
     ]
     build_batches(
         metadata_path=_resolve_repo_path(args.metadata),

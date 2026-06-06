@@ -30,3 +30,21 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # Track the sha256-pinned base images in the Dockerfiles so digest pins still
+  # receive security-patch PRs (they never float on their own). One group per image.
+  - package-ecosystem: "docker"
+    directory: "/apps/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      backend-docker:
+        patterns: ["*"]
+
+  - package-ecosystem: "docker"
+    directory: "/apps/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend-docker:
+        patterns: ["*"]

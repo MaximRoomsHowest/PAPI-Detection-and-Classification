@@ -143,10 +143,10 @@ def _make_sample(
 # (which may itself span several lines) up to the next counter+timecode or EOF.
 # Comma OR dot millisecond separators are tolerated (DJI uses ',').
 _SRT_CUE_RE = re.compile(
-    r"(?P<counter>\d+)\s*\n"
+    r"(?P<counter>\d{1,9})\s*\n"
     r"\s*(?P<start>\d{2}:\d{2}:\d{2}[.,]\d{1,3})\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{1,3}"
     r"(?P<body>.*?)"
-    r"(?=\n\s*\d+\s*\n\s*\d{2}:\d{2}:\d{2}[.,]\d{1,3}\s*-->|\Z)",
+    r"(?=\n\s*\d{1,9}\s*\n\s*\d{2}:\d{2}:\d{2}[.,]\d{1,3}\s*-->|\Z)",
     re.DOTALL,
 )
 

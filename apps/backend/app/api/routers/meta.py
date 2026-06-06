@@ -15,7 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 import app.api.routes as routes
-from app.services.runways import add_runway, delete_runway, list_runways
+from app.services.runways import RunwayLimitError, add_runway, delete_runway, list_runways
 from app.validation.schemas import ModelInfo, RunwayCreate, RunwayResponse, SystemInfo
 
 router = APIRouter(prefix="/api")
@@ -36,10 +36,13 @@ def create_runway(
     The four lamp coordinates feed the same ENU elevation-angle solver and
     ``validate_runway_id`` gate as the built-in runways, so an analysis sent with
     the new ``runway_id`` works end-to-end. Pydantic rejects malformed bodies
-    (wrong lamp count, out-of-range coords) as 422; an id collision is 409.
+    (wrong lamp count, out-of-range coords) as 422; an id collision is 409; the
+    custom-runway quota being full is 429.
     """
     try:
         runway = add_runway(payload)
+    except RunwayLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return RunwayResponse(**runway)

@@ -28,6 +28,14 @@ from app.validation.schemas import RunwayCreate, RunwayResponse
 
 CONFIG_PATH: Path = REPO_ROOT / "configs" / "papi_edny.yaml"
 
+
+class RunwayLimitError(ValueError):
+    """Raised when the custom-runway quota is reached.
+
+    Subclasses ``ValueError`` so existing ``except ValueError`` handlers still catch
+    it, while letting the API layer map the quota case to HTTP 429 instead of 409.
+    """
+
 # Last-resort fallback when configs/papi_edny.yaml is unavailable. Values
 # mirror the YAML: both built-ins use 461.37 m. For papi_06 this is the
 # data_analysis-branch lamp reference, not the rejected 464.988 m minimum
@@ -255,7 +263,7 @@ def add_runway(payload: RunwayCreate) -> dict[str, Any]:
         if runway_id in store:
             raise ValueError(f"Runway '{runway_id}' already exists.")
         if len(store) >= MAX_CUSTOM_RUNWAYS:
-            raise ValueError(
+            raise RunwayLimitError(
                 f"Custom-runway limit reached ({MAX_CUSTOM_RUNWAYS}). "
                 "Delete an existing custom runway before adding another."
             )

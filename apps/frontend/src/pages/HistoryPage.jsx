@@ -43,6 +43,7 @@ export function HistoryPage({ copy }) {
   const [modelInfo, setModelInfo] = useState(null)
   const [stats, setStats] = useState(null)
   const [selectedLog, setSelectedLog] = useState(null)
+  const [openingLogId, setOpeningLogId] = useState(null)
   const [showRaw, setShowRaw] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -185,11 +186,14 @@ export function HistoryPage({ copy }) {
   const openLog = async (logId) => {
     setError('')
     setShowRaw(false)
+    setOpeningLogId(logId)
     try {
       const detail = await fetchLogDetail(logId)
       setSelectedLog(detail)
     } catch (detailError) {
       setError(detailError.message)
+    } finally {
+      setOpeningLogId(null)
     }
   }
 
@@ -346,7 +350,7 @@ export function HistoryPage({ copy }) {
                 {logs.map((log) => (
                   <tr key={log.id}>
                     <td data-label={copy.history.filename}>
-                      <button className="history-link" type="button" onClick={() => openLog(log.id)}>
+                      <button className="history-link" type="button" onClick={() => openLog(log.id)} disabled={openingLogId === log.id}>
                         {log.original_filename}
                       </button>
                     </td>

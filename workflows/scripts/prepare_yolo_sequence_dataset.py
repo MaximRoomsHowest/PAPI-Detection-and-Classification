@@ -30,12 +30,18 @@ def prepare_sequence_dataset(dataset_root: Path, out_dir: Path) -> dict:
     for regime in REGIMES:
         regime_root = dataset_root / regime
         for video_dir in sorted([path for path in regime_root.iterdir() if path.is_dir()]):
-            with (video_dir / "metadata.csv").open(newline="", encoding="utf-8") as fh:
+            metadata_path = video_dir / "metadata.csv"
+            if not metadata_path.exists():
+                raise FileNotFoundError(f"Missing metadata.csv in sequence video dir: {metadata_path}")
+            with metadata_path.open(newline="", encoding="utf-8") as fh:
                 for row in csv.DictReader(fh):
                     split = row.get("split") or "train"
                     if split not in splits:
                         split = "train"
-                    image_path = (regime_root / video_dir.name / row["image"]).resolve()
+                    image_name = row.get("image")
+                    if not image_name:
+                        raise ValueError(f"metadata.csv row missing 'image' column in {metadata_path}")
+                    image_path = (regime_root / video_dir.name / image_name).resolve()
                     splits[split].append(image_path.as_posix())
 
     for split, entries in splits.items():

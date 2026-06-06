@@ -44,6 +44,11 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    # Defense in depth: forbid privilege escalation. cap_drop: ALL is intentionally
+    # NOT set here — the official postgres entrypoint drops root via gosu and needs
+    # a few caps to chown its data dir on first init.
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:

@@ -130,10 +130,6 @@ html[data-theme='dark'] .brand-logo .logo-light {
   text-transform: uppercase;
 }
 
-.brand-company span {
-  display: block;
-}
-
 .icon-button,
 .viz-heading svg {
   display: inline-grid;

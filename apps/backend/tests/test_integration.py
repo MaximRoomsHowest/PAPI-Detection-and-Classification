@@ -476,6 +476,36 @@ def test_analyze_frames_caps_batch_size(client, monkeypatch):
         get_settings.cache_clear()
 
 
+def test_analyze_sequence_caps_batch_size(client, monkeypatch):
+    """A sequence upload above the configured cap returns 413, not a minutes-long stitch.
+
+    Sibling guard to test_analyze_frames_caps_batch_size: /api/analyze-sequence
+    re-implements the same PAPI_MAX_BATCH_FRAMES check, and the sequence path is
+    the heavier one (ByteTrack continuity + WebM stitch), so an accidental removal
+    of its cap must fail the suite too.
+    """
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("PAPI_MAX_BATCH_FRAMES", "3")
+    try:
+        files = [
+            ("files", (f"flight/frame_{i:03d}.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg"))
+            for i in range(4)
+        ]
+        response = client.post(
+            "/api/analyze-sequence",
+            files=files,
+            data={"runway_id": "papi_24"},
+        )
+        assert response.status_code == 413
+        body = response.json()
+        assert "Image sequences are limited to 3 frames" in body["detail"]
+        assert "Got 4" in body["detail"]
+    finally:
+        get_settings.cache_clear()
+
+
 def test_analyze_sequence_returns_single_video_payload(client):
     """A folder of images analysed as a time sequence yields ONE video-type payload
     (not a per-image batch) plus a persisted log row."""

@@ -68,6 +68,9 @@ def build_tracking(
         for video_dir in sorted([path for path in regime_root.iterdir() if path.is_dir()]):
             video_track_rows: list[dict[str, str]] = []
             metadata_path = video_dir / "metadata.csv"
+            if not metadata_path.exists():
+                manifest["errors"].append(f"missing metadata.csv: {metadata_path}")
+                continue
             with metadata_path.open(newline="", encoding="utf-8") as fh:
                 metadata_rows = list(csv.DictReader(fh))
 

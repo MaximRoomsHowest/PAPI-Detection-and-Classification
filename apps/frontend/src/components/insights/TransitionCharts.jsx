@@ -177,7 +177,12 @@ export function TransitionCharts({ backendResults, plotTheme, copy }) {
     const all = []
     for (const result of backendResults ?? []) {
       for (const event of result?.transitions ?? []) {
-        all.push(event)
+        // Single source of truth for lamp identity: drop events outside 1..4 here so the
+        // timeline, count bar, and table all operate on the same validated set (the
+        // per-view clamp in TransitionTimeline then becomes belt-and-braces).
+        if (Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= LANE_COUNT) {
+          all.push(event)
+        }
       }
     }
     return all

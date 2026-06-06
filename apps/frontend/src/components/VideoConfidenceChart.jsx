@@ -14,9 +14,9 @@ function stateLabel(rawState, copy) {
     const entry = stateCatalog.find((state) => state.id === id)
     if (entry) return translateState(entry, copy).label
   }
-  // Backend global states without a glidepath-catalog entry (e.g. "transition")
-  // fall back to the localized status label, then a prettified raw value — so a
-  // transition frame's hover never silently reads "Unknown".
+  // Backend global states with no entry in backendStateId / stateCatalog fall back
+  // to the localized status label, then a prettified raw value — so an unmapped raw
+  // state's hover never silently reads "Unknown".
   return copy.status?.[rawState] ?? rawState.replace(/_/g, ' ')
 }
 

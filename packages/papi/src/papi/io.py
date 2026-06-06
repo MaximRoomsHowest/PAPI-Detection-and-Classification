@@ -37,6 +37,8 @@ def write_yolo_labels(
     image_height: int,
 ) -> None:
     """Write a YOLO label file with zero or more bbox rows."""
+    if image_width <= 0 or image_height <= 0:
+        raise ValueError(f"image dimensions must be positive, got {image_width}x{image_height}")
     lines: list[str] = []
     for class_id, bbox_xyxy_px in labels:
         x1, y1, x2, y2 = bbox_xyxy_px
@@ -44,6 +46,12 @@ def write_yolo_labels(
         cy = (y1 + y2) / 2.0 / image_height
         w = (x2 - x1) / image_width
         h = (y2 - y1) / image_height
+        if not all(0.0 <= value <= 1.0 for value in (cx, cy, w, h)):
+            raise ValueError(
+                f"normalized YOLO coords out of [0, 1] for class {class_id}: "
+                f"cx={cx:.6f} cy={cy:.6f} w={w:.6f} h={h:.6f} "
+                f"(bbox {bbox_xyxy_px}, image {image_width}x{image_height})"
+            )
         lines.append(f"{class_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
     label_path.parent.mkdir(parents=True, exist_ok=True)
     label_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")

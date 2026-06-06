@@ -311,39 +311,6 @@ def _build_bbox(
     return x1, y1, x2, y2
 
 
-def _build_lamp_bbox(
-    projected: dict[int, tuple[float | None, float | None, bool, bool]],
-    light_no: int,
-    width: int,
-    height: int,
-) -> tuple[float, float, float, float] | None:
-    u, v, behind, in_frame = projected[light_no]
-    if behind or not in_frame or u is None or v is None:
-        return None
-
-    visible: list[tuple[float, float]] = []
-    for other_u, other_v, other_behind, other_in_frame in projected.values():
-        if other_behind or not other_in_frame or other_u is None or other_v is None:
-            continue
-        visible.append((float(other_u), float(other_v)))
-
-    distances = [
-        float(np.hypot(float(u) - other_u, float(v) - other_v))
-        for other_u, other_v in visible
-        if other_u != float(u) or other_v != float(v)
-    ]
-    nearest_spacing = min(distances) if distances else 40.0
-    half_size = max(10.0, min(80.0, 0.35 * nearest_spacing))
-
-    x1 = max(0.0, float(u) - half_size)
-    y1 = max(0.0, float(v) - half_size)
-    x2 = min(float(width - 1), float(u) + half_size)
-    y2 = min(float(height - 1), float(v) + half_size)
-    if x2 <= x1 or y2 <= y1:
-        return None
-    return x1, y1, x2, y2
-
-
 def _coverage_class(projected: dict[int, tuple]) -> str:
     in_frame = sum(1 for _, _, behind, inf in projected.values() if inf and not behind)
     return f"{in_frame}_in_frame"

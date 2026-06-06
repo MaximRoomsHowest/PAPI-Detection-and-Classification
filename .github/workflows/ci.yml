@@ -30,6 +30,7 @@ jobs:
           cache-dependency-path: |
             pyproject.toml
             apps/backend/requirements.txt
+            apps/backend/requirements-dev.txt
 
       - name: Install backend + papi + dev deps
         run: |

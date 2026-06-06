@@ -321,8 +321,10 @@ class RunwayResponse(BaseModel):
 
 class RunwayLightInput(BaseModel):
     """One PAPI lamp position in a create-runway request, WGS-84 and range-checked
-    so a typo can't push a nonsense coordinate into the ENU elevation-angle solver
-    (mirrors the bounds enforced on drone GPS in services/angle.py)."""
+    so a typo can't push a nonsense coordinate into the ENU elevation-angle solver.
+    Lat/lon bounds match the drone-GPS validation in services/angle.py; the altitude
+    ceiling here (15,000 m) is an independent, tighter lamp bound — drone GPS allows
+    up to ALTITUDE_MAX_M = 20,000 m — so the two are intentionally not coupled."""
 
     point: int = Field(ge=1, le=4)
     latitude: float = Field(ge=-90.0, le=90.0)

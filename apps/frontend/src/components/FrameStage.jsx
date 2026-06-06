@@ -64,6 +64,15 @@ export function FrameStage({
     if (isPaused) setIsPaused(false)
   }
 
+  // Reset the view toggle to the annotated export when a NEW analysis arrives.
+  // Keyed on the underlying media (media?.url), NOT displayMedia?.url — the latter
+  // changes on every toggle, so keying on it would instantly revert the user's choice.
+  const prevMediaUrl = useRef(media?.url)
+  if (prevMediaUrl.current !== media?.url) {
+    prevMediaUrl.current = media?.url
+    if (viewerMode !== 'annotated') setViewerMode('annotated')
+  }
+
   const toggleVideoPlayback = () => {
     const video = videoRef.current
     if (!video) return

@@ -37,15 +37,26 @@ def csv_safe(value) -> str:
 
 
 def stream_log_rows(rows: Iterable) -> Iterator[str]:
-    """Yield the CSV body for ``rows`` (header + one line per log).
+    """Yield the CSV export incrementally — the header, then one chunk per log row.
 
-    ``rows`` is the repository's fully-materialised filtered list, so iterating
-    here touches no detached ORM state.
+    Each row is written into a small reused buffer that is truncated after every yield,
+    so this serializer holds only one row of CSV text at a time instead of building the
+    whole body in memory, and the StreamingResponse flushes each chunk as it is produced.
+    Note: ``rows`` is already materialized by the caller (``iter_filtered`` does
+    ``list(...)``), so end-to-end peak memory is still bounded by the matching row set —
+    this generator removes the second, serialized-CSV copy, not the ORM-row copy.
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer)
 
+    def _drain() -> str:
+        chunk = buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+        return chunk
+
     writer.writerow(CSV_COLUMNS)
+    yield _drain()
     for log in rows:
         created = log.created_at.isoformat() if hasattr(log.created_at, "isoformat") else log.created_at
         writer.writerow([
@@ -53,4 +64,4 @@ def stream_log_rows(rows: Iterable) -> Iterator[str]:
             log.confidence, log.angle_available, log.elevation_angle_deg,
             log.frame_count, log.processing_ms, csv_safe(log.original_filename),
         ])
-    yield buffer.getvalue()
+        yield _drain()

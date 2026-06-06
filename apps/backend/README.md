@@ -40,7 +40,7 @@ root `.gitignore` (see lines 67-72 there). For local smoke testing without
 a trained model, copy a base weight into the serving slot:
 
 ```powershell
-Copy-Item ..\..\models\base\yolo26n.pt ..\..\models\serving\best.pt -Force
+Copy-Item ..\..\models\base\yolo26s.pt ..\..\models\serving\best.pt -Force
 ```
 
 For project-quality demos, replace `models/serving/best.pt` with the intended trained PAPI checkpoint.

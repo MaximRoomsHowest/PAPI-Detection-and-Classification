@@ -33,8 +33,12 @@ so daytime weakness is visible (per the client's kickoff guidance).
 - **Auto-labelled by geometry**: surveyed lamp coordinates are projected into image
   space using the calibrated camera model (`workflows/scripts/pipeline.py` →
   `autolabel`), then verified/corrected in CVAT — not hand-drawn from scratch.
-- The per-lamp *transition* state is derived from the elevation angle vs the set-angle
-  band at inference time; it is not a labelled class.
+- The per-lamp *transition* state is **not** a labelled class: at inference time it is
+  inferred *temporally* — each lamp is tracked across frames and a red/white flip is
+  detected (`app/services/state.py` → `detect_lamp_transitions`), with the viewing angle
+  only annotating the event. (The offline auto-labelling path separately uses the
+  elevation-angle-vs-set-angle band in `packages/papi/src/papi/lamp_state.py` to *seed*
+  labels — that is not the runtime path.)
 
 ## Splits
 

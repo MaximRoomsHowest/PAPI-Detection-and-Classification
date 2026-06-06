@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 // eslint-plugin-jsx-a11y exposes a flat-config variant. Catches missing alt
 // text, click handlers without keyboard handlers, role mis-use, etc. — see
 // audit F-MAJ-12. The plugin declares peer ESLint up to ^9 but the flat
-// API is unchanged in ESLint 10; install with --legacy-peer-deps.
+// API is unchanged in ESLint 10; the jsx-a11y/eslint peer mismatch is resolved
+// declaratively by the `overrides` block in package.json, so a plain
+// `npm install` suffices.
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import { defineConfig, globalIgnores } from 'eslint/config'
 

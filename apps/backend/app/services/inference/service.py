@@ -269,14 +269,16 @@ class InferenceService:
             cap.release()
             raise ValueError(too_long)
 
-        # Resolve the telemetry fixes ONCE up front (file track > manual fix > EXIF)
-        # so the tracked core can both stamp a representative angle on the overlay and
-        # build the per-frame angle track after the frame count is known.
-        resolved_samples, angle_source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
-        angle = self._angle_from_samples(resolved_samples, angle_source, runway_id)
         # Release the capture deterministically even if the core raises mid-stream
         # (e.g. the in-loop too-long guard) — a generator's finally would only run on GC.
+        # Resolving telemetry/angle stays inside the try too, so a missing-runway
+        # ValueError (e.g. a runway deleted concurrently) can't leak the capture handle.
         try:
+            # Resolve the telemetry fixes ONCE up front (file track > manual fix > EXIF)
+            # so the tracked core can both stamp a representative angle on the overlay and
+            # build the per-frame angle track after the frame count is known.
+            resolved_samples, angle_source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
+            angle = self._angle_from_samples(resolved_samples, angle_source, runway_id)
             return self._run_tracked_sequence(
                 self._iter_video_frames(cap),
                 fps=fps,
@@ -723,8 +725,8 @@ class InferenceService:
     @staticmethod
     def _evenly_spaced(items: list[int], cap: int) -> list[int]:
         """Down-sample a sorted list to at most ``cap`` evenly-spaced entries (endpoints kept)."""
-        if cap <= 0 or len(items) <= cap:
-            return items
+        if cap <= 1 or len(items) <= cap:
+            return items[:1] if cap == 1 else items
         step = (len(items) - 1) / (cap - 1)
         return [items[index] for index in sorted({round(i * step) for i in range(cap)})]
 

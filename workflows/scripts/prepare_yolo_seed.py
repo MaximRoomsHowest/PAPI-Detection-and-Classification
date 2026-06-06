@@ -17,14 +17,20 @@ label files in newer exports do not erase older corrected labels.
 from __future__ import annotations
 
 import argparse
-import csv
 import shutil
 from pathlib import Path
-from typing import NamedTuple
 
 import yaml
-from _pipeline_utils import remap_label_text, source_uses_zero_based_labels
-from PIL import Image
+from _pipeline_utils import (
+    ManualSource,
+    _flat_name_from_entry,
+    _image_group,
+    _metadata_lookup,
+    _parse_excluded_indices,
+    _parse_manual_source,
+    _source_from_flat_name,
+    remap_label_text,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CVAT = REPO_ROOT / "data" / "annotations" / "manual_corrections" / "cvat_140"
@@ -40,20 +46,6 @@ CLASS_NAMES = {
     0: "papi_light_red",
     1: "papi_light_white",
 }
-
-
-class ManualSource(NamedTuple):
-    path: Path
-    limit: int
-
-
-def _source_from_flat_name(flat_name: str, raw_dir: Path) -> Path:
-    folder, filename = flat_name.split("__", 1)
-    return raw_dir / folder / f"{Path(filename).stem}.JPG"
-
-
-def _source_uses_zero_based_labels(src: Path) -> bool:
-    return source_uses_zero_based_labels(src, CLASS_NAMES)
 
 
 def _remap_label_text(src: Path) -> str:
@@ -81,36 +73,6 @@ def _split_for_entries(limit: int, val_count: int, split_mode: str) -> list[str]
             index -= 1
         return ["val" if index in val_indices else "train" for index in range(limit)]
     raise ValueError(f"Unsupported split mode: {split_mode}")
-
-
-def _parse_excluded_indices(values: list[str]) -> set[int]:
-    excluded: set[int] = set()
-    for value in values:
-        for part in value.split(","):
-            item = part.strip()
-            if not item:
-                continue
-            if "-" in item:
-                start_text, end_text = item.split("-", 1)
-                start = int(start_text)
-                end = int(end_text)
-                if start > end:
-                    raise ValueError(f"Invalid index range: {item}")
-                excluded.update(range(start, end + 1))
-            else:
-                excluded.add(int(item))
-    return excluded
-
-
-def _parse_manual_source(value: str) -> ManualSource:
-    if ":" not in value:
-        raise ValueError(f"Manual source must be formatted as path:limit, got: {value}")
-    path_text, limit_text = value.rsplit(":", 1)
-    return ManualSource(Path(path_text), int(limit_text))
-
-
-def _flat_name_from_entry(entry: str) -> str:
-    return Path(entry.strip()).name
 
 
 def _read_entries(cvat_dir: Path, limit: int) -> list[str]:
@@ -149,33 +111,6 @@ def _merged_manual_labels(sources: list[ManualSource], exclude_indices: set[int]
     return labels_by_stem
 
 
-def _metadata_lookup(metadata_path: Path) -> dict[tuple[str, str], tuple[str, int, int]]:
-    if not metadata_path.exists():
-        return {}
-    lookup: dict[tuple[str, str], tuple[str, int, int]] = {}
-    with metadata_path.open(newline="", encoding="utf-8") as fh:
-        for row in csv.DictReader(fh):
-            lookup[(row["folder"], row["file"])] = (
-                row["camera"],
-                int(row["image_width"]),
-                int(row["image_height"]),
-            )
-    return lookup
-
-
-def _image_group(flat_name: str, raw_dir: Path, metadata: dict[tuple[str, str], tuple[str, int, int]]) -> str:
-    folder, filename = flat_name.split("__", 1)
-    jpg_name = f"{Path(filename).stem}.JPG"
-    meta = metadata.get((folder, jpg_name))
-    if meta is not None:
-        camera, width, height = meta
-    else:
-        with Image.open(_source_from_flat_name(flat_name, raw_dir)) as image:
-            width, height = image.size
-        camera = ""
-    return "normal" if camera == "WideCamera" and (width, height) == (5280, 3956) else "zoom_cropped"
-
-
 def prepare_dataset(
     cvat_dir: Path,
     manual_sources: list[ManualSource],
@@ -206,6 +141,12 @@ def prepare_dataset(
             skipped_groups[group] += 1
             continue
         filtered_entries.append(entry)
+
+    if not filtered_entries:
+        raise ValueError(
+            f"No images matched image-group '{image_group}' "
+            f"(skipped by group: {skipped_groups}). Nothing to prepare."
+        )
 
     subsets = _split_for_entries(len(filtered_entries), min(val_count, max(0, len(filtered_entries) - 1)), split_mode)
     object_counts = {"train": 0, "val": 0}

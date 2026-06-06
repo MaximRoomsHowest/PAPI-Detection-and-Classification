@@ -291,7 +291,7 @@ export async function downloadLogsCsv(options = {}, filename = 'papi_analysis_lo
 }
 
 export async function fetchLogDetail(logId) {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/logs/${logId}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/logs/${encodeURIComponent(logId)}`, {
     headers: buildHeaders(),
   })
   if (!response.ok) {

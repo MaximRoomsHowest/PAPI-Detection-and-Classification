@@ -285,6 +285,7 @@ each view is its own component under `src/pages/`. The routes:
 | --- | --- | --- |
 | `/` | `IntroductionPage` | Hero, project context, airport map |
 | `/live-demo` | `LiveDemoPage` | Upload (media / folder) paths, frame-stage + analysis panel; reads state from `LiveDemoProvider` context |
+| `/runways` | `RunwaysPage` | Manage runway geometry (select / add custom runways) used by the angle calculation |
 | `/insights` | `InsightsPage` | Tabbed charts (angle-vs-state, transitions, session summary) + model/dataset metrics, all from real backend output; PDF export |
 | `/history` | `HistoryPage` | Recent persisted analyses, artifacts, and model runtime status |
 
@@ -319,7 +320,7 @@ to `/api/analyze-sequence` for the folder→video path.
 
 | Item | Status | Where to look |
 | --- | --- | --- |
-| ZoomCamera auto-labelling | Skipped sprint 1 | `configs/papi_edny.yaml:55` (focal_px = null) |
+| ZoomCamera auto-labelling | Skipped sprint 1 | `configs/papi_edny.yaml:79` (focal_px = null) |
 | EDNY commissioned set-angles | FAA defaults used | `configs/papi_edny.yaml` (TODO comments) |
 | Multi-airport generalisation | Out of scope for v1.0 | One YAML per airport; geometry library already supports it |
 | Real-time inference (>10 fps) | ~0.4 fps on a laptop CPU | INT8 ONNX exists; GPU not configured |
