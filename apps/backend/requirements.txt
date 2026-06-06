@@ -3,24 +3,24 @@
 # Test-only deps (pytest, httpx) live in requirements-dev.txt so the production
 # image never ships test tooling (audit DCK-D5). Install dev/test deps with:
 #   pip install -r requirements-dev.txt
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
-psycopg[binary]==3.2.3
-pydantic-settings==2.7.1
-python-multipart==0.0.20
+fastapi==0.136.3
+uvicorn[standard]==0.49.0
+sqlalchemy==2.0.50
+psycopg[binary]==3.3.4
+pydantic-settings==2.14.1
+python-multipart==0.0.32
 # Imported directly by app/services/runways.py to load the runway-geometry YAML;
 # pinned explicitly instead of relying on ultralytics to provide it transitively (audit).
-PyYAML==6.0.2
-ultralytics==8.3.58
+PyYAML==6.0.3
+ultralytics==8.4.60
 lap==0.5.13
 # Headless OpenCV: the backend never opens a GUI window, so the -headless wheel
 # drops the libGL/X11 stack — which also lets the Dockerfile skip the libgl1
 # system package (audit DCK-D2).
-opencv-python-headless==4.10.0.84
-exifread==3.0.0
+opencv-python-headless==4.13.0.92
+exifread==3.5.1
 # ONNX stack — only exercised when PAPI_MODEL_PATH points at a .onnx model (the
 # INT8 edge-export serving path); the default .pt path never imports these
 # (audit DCK-RE DEP-1).
-onnx==1.17.0
-onnxruntime==1.20.1
+onnx==1.21.0
+onnxruntime==1.26.0
