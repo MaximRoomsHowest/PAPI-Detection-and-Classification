@@ -68,6 +68,15 @@ def build_oversampled_yaml(combined_dir: Path, factor: int) -> tuple[Path, dict]
 def train(args: argparse.Namespace) -> dict:
     from ultralytics import YOLO
 
+    if args.resume:
+        # Continue an interrupted run from its last.pt (restores optimizer/epoch state); the saved
+        # args drive the rest, so the other flags are ignored. Lets a checkpointed run mature
+        # without discarding completed epochs.
+        run_dir = args.project / args.name
+        YOLO(str(run_dir / "weights" / "last.pt")).train(resume=True)
+        print(json.dumps({"resumed": str(run_dir)}, indent=2))
+        return {"resumed": str(run_dir)}
+
     yaml_path, oversample = build_oversampled_yaml(args.combined, args.oversample)
     epochs = 2 if args.smoke else args.epochs
     imgsz = 640 if args.smoke else args.imgsz
@@ -107,6 +116,7 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=3)  # 20MP frames: keep parallel decodes low
     p.add_argument("--mosaic", type=float, default=0.0)  # off by default (20MP RAM cost)
     p.add_argument("--oversample", type=int, default=4)
+    p.add_argument("--resume", action="store_true", help="continue the run from its last.pt")
     p.add_argument("--smoke", action="store_true")
     args = p.parse_args()
     train(args)
