@@ -1,0 +1,147 @@
+import { MapPin, Upload, X } from 'lucide-react'
+import { useLiveDemo } from '../../context/liveDemoContext'
+
+// The "angle metadata missing" panel: runway select + telemetry-file upload + manual
+// lat/lon/alt fields + the re-run button. Shown only after a result whose angle came
+// back unavailable, so the user can supply a fix and re-analyse. Pulls its state and
+// handlers from the Live-Demo context; renders nothing when the angle is available.
+export function MetadataPrompt({ copy }) {
+  const {
+    activeScenario,
+    backendScenario,
+    media,
+    runways,
+    selectedRunwayId,
+    setSelectedRunwayId: onSelectRunway,
+    droneTelemetry,
+    setDroneTelemetry,
+    metadataFile,
+    setMetadataFile,
+    runBackendInference,
+    isAnalyzing,
+  } = useLiveDemo()
+
+  const hasResult = Boolean(backendScenario)
+  const hasMissingAngleMetadata = hasResult && !activeScenario.angleSummary?.available
+  if (!hasMissingAngleMetadata) return null
+
+  const setDroneField = (field) => (event) =>
+    setDroneTelemetry((current) => ({ ...current, [field]: event.target.value }))
+
+  const handleMetadataFileChange = (event) => {
+    setMetadataFile(event.target.files?.[0] ?? null)
+    // Reset the input so re-selecting the same file still fires onChange.
+    event.target.value = ''
+  }
+
+  const hasManualDroneTelemetry = Boolean(
+    droneTelemetry.latitude.trim() &&
+      droneTelemetry.longitude.trim() &&
+      droneTelemetry.altitudeM.trim(),
+  )
+  const canApplyMetadata = Boolean(media && (metadataFile || hasManualDroneTelemetry))
+
+  return (
+    <div className="metadata-prompt" role="region" aria-labelledby="metadata-prompt-title">
+      <div className="metadata-prompt__copy">
+        <MapPin size={18} aria-hidden="true" />
+        <div>
+          <h3 id="metadata-prompt-title">{copy.live.metadataMissingTitle}</h3>
+          <p>{copy.live.metadataMissingText}</p>
+        </div>
+      </div>
+
+      <div className="metadata-prompt__controls">
+        <label className="runway-select">
+          <span>{copy.live.runway}</span>
+          <select
+            value={selectedRunwayId}
+            onChange={(event) => onSelectRunway(event.target.value)}
+            aria-label={copy.live.runway}
+          >
+            {runways.length === 0 && <option value={selectedRunwayId}>{selectedRunwayId}</option>}
+            {runways.map((runway) => (
+              <option key={runway.id} value={runway.id}>
+                {runway.label ?? runway.id}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="drone-telemetry__file-row">
+          <label className="upload-button drone-telemetry__file">
+            <Upload size={16} />
+            <span>{metadataFile ? metadataFile.name : copy.live.telemetryUpload}</span>
+            <input
+              type="file"
+              accept=".srt,.csv,.json,text/plain,text/csv,application/json"
+              aria-label={copy.live.telemetryUpload}
+              onChange={handleMetadataFileChange}
+            />
+          </label>
+          {metadataFile && (
+            <button
+              type="button"
+              className="drone-telemetry__clear"
+              onClick={() => setMetadataFile(null)}
+              aria-label={copy.live.telemetryClear}
+              title={copy.live.telemetryClear}
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <span className="drone-telemetry__divider">{copy.live.telemetryOrManual}</span>
+
+      <div className="drone-telemetry__fields">
+        <label>
+          <span>{copy.live.droneLatitude}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="mono"
+            value={droneTelemetry.latitude}
+            onChange={setDroneField('latitude')}
+            placeholder="47.673521"
+          />
+        </label>
+        <label>
+          <span>{copy.live.droneLongitude}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="mono"
+            value={droneTelemetry.longitude}
+            onChange={setDroneField('longitude')}
+            placeholder="9.518154"
+          />
+        </label>
+        <label>
+          <span>{copy.live.droneAltitude}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="mono"
+            value={droneTelemetry.altitudeM}
+            onChange={setDroneField('altitudeM')}
+            placeholder="520"
+          />
+        </label>
+      </div>
+
+      <div className="metadata-prompt__footer">
+        <p>{copy.live.metadataApplyHint}</p>
+        <button
+          type="button"
+          className="primary-button metadata-prompt__apply"
+          onClick={runBackendInference}
+          disabled={!canApplyMetadata || isAnalyzing}
+        >
+          {isAnalyzing ? copy.live.analyzing : copy.live.metadataApply}
+        </button>
+      </div>
+    </div>
+  )
+}
