@@ -78,36 +78,35 @@ split leakage** (one split per flight); most-loaded clip share 0.19; 0 format er
 
 ## 14. Training configuration
 
-`train_transition_model.py`: base **yolo11s** (installed ultralytics 8.3.58 cannot parse yolo26 —
-documented caveat), imgsz 1280, batch 4, 80 epochs / patience 15, AdamW (auto). **Colour-safe
-augmentation: `hsv_h=0, hsv_s=0`** (hue/sat jitter would swap red↔white↔transition), mild `hsv_v`,
-horizontal flip only, mosaic off (20MP RAM). **Imbalance:** transition-bearing frames oversampled
-4× in the train list (val/test at true distribution). INTERIM model: flip-anchored +
-AI-spot-checked labels.
+`train_transition_model.py`: base **yolo26s** (the production backbone — needs **ultralytics ≥8.4**;
+the `.venv` was upgraded 8.3.58→8.4.61, pin bumped, 240 backend tests still green). imgsz 1280,
+batch 4, **workers 2** (20MP frames OOM the DataLoader at 3), 19 epochs (resumed via `--resume`),
+AdamW (auto). **Colour-safe augmentation: `hsv_h=0, hsv_s=0`** (hue/sat jitter would swap
+red↔white↔transition), mild `hsv_v`, horizontal flip only, mosaic off. **Imbalance:**
+transition-bearing frames oversampled 4× in the train list (val/test at true distribution). Labels
+are flip-anchored + AI-spot-checked.
 
 ## 15. Training results
 
-`yolo11s` @ 1280, 19 epochs (stopped at a converged checkpoint — val mAP50 plateaued ~0.42).
-Weights `data/runs/detect/transition3class-yolo11s-1280/weights/best.pt` (git-ignored). Full
-metrics/plots/logs in that run dir.
+**`yolo26s`** @ 1280, 19 epochs. Weights `data/runs/detect/transition3class-yolo26s-1280/weights/
+best.pt` (git-ignored). Full metrics/plots/logs in that run dir.
 
 ## 16–18. Transition-specific evaluation (TEST split, conf=0.25) — see `evaluation.md`
 
 | class | P | R | F1 | mAP50 |
 |---|--:|--:|--:|--:|
-| red | 0.829 | 0.383 | 0.524 | 0.590 |
-| white | 0.944 | 0.438 | 0.598 | 0.687 |
-| **transition** | **1.000** | **0.135** | **0.238** | **0.568** |
+| red | 0.853 | 0.752 | 0.800 | 0.809 |
+| white | 0.973 | 0.594 | 0.738 | 0.604 |
+| **transition** | **0.385** | **0.324** | **0.352** | **0.256** |
 
-- **Zero false transitions** (transition precision 1.0) — answers the brief's key question: it does
-  **not** hallucinate transitions in stable red/white. Transition mAP50 (0.568) ≈ red/white.
-- **Confusion matrix:** `artifacts/confusion_matrix.png` (dominant error is missed faint lamps, not
-  class confusion). **Example folders** (git-ignored twin `eval_examples/`): 4 correct, 12 missed,
-  **0 false**, 0 red/white-confusion.
-- **Head-to-head** (`head_to_head.json`): learned **F1 0.429 / P 0.75 / 1 false-transition** vs
-  temporal **F1 0.37 / P 0.29 / 12 false-transitions** — the learned class wins on F1 and precision;
-  both beat the historical 0.174. Interim caveats: small sample, epoch-19 yolo11s, conf=0.25 caps
-  recall.
+- **Transition F1 0.352 beats the historical temporal baseline (≈0.174) by 2×** (and the yolo11s
+  interim's 0.238). Red/white are production-grade. Transition mAP50 (0.256) is **still maturing**
+  (0.147→0.256 over epochs 11→19) — more epochs are the main lever.
+- **Confusion matrix:** `artifacts/confusion_matrix.png`. **Example folders** (git-ignored twin
+  `eval_examples/`): **12 correct, 12 missed, 12 false** transition frames + red/white confusion.
+- **Head-to-head** (`head_to_head.json`): learned **F1 0.364 / R 0.60 / 17 false** vs temporal
+  **F1 0.278 / R 0.50 / 21 false** — the learned class wins on F1 and recall; both beat 0.174.
+  Caveats: small sample (37 test transitions), epoch-19 (transition AP not converged), conf=0.25.
 
 ## 19. ByteTrack integration notes
 
@@ -138,8 +137,9 @@ frontend change needed until the model is promoted. See `05_frontend_reporting.m
 
 - **Interim labels:** flip-anchored + AI spot-check of 36/~150 flips + a dataset-wide rule — not a
   full human/CVAT pass. Production training needs a fuller human review (`transition_cvat_bundle.zip`).
-- **Backbone caveat:** yolo11s (not yolo26s) — venv ultralytics 8.3.58 can't parse yolo26; re-run
-  on yolo26s once the venv is on 8.4+ for a like-for-like comparison with the serving model.
+- **Transition AP not converged:** the yolo26s model is 19 epochs; its transition mAP50 is still
+  rising (0.147→0.256). Train to convergence (~40–60 epochs) for a higher transition AP — the F1
+  already beats the baseline, but the AP has headroom.
 - **Reversed lamp binding / rwy-06 angles:** transition labels are visual-correct, but per-lamp
   *angle* binding needs the corrected mapping; rwy-06 uses FAA defaults.
 - **Transition is rare (3.82%):** oversampling helps; recall on subtle/night transitions to watch.
@@ -149,7 +149,7 @@ frontend change needed until the model is promoted. See `05_frontend_reporting.m
 
 1. Full human/CVAT verification of all 495 candidates (bundle ready).
 2. Correct the lamp-order↔set-angle binding in `papi_edny.yaml`; obtain rwy-06 commissioned angles.
-3. Re-train on yolo26s (venv → ultralytics 8.4+) for a like-for-like head-to-head; promote the
-   winner to `models/serving` if it beats F1 ≈ 0.174.
-4. Wire the chosen transition path into the live sequence response + surface the richer per-lamp
-   event fields in the Insights charts.
+3. Train the yolo26s model to convergence (~40–60 epochs, `--resume`) to lift transition mAP50,
+   then promote `best.pt` to `models/serving` / set `PAPI_TRANSITION_MODEL_PATH`.
+4. The app's **transition-method toggle is already shipped** (tracking vs model — `06_method_toggle.md`);
+   flip its default to "model" once the 3-class model is promoted.
