@@ -1,0 +1,334 @@
+{
+  "twin": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\datasets\\transition-classification-data",
+  "config": "papi_edny_transition.yaml",
+  "half_window": 2,
+  "total_candidates": 495,
+  "per_lamp_total": {
+    "1": 136,
+    "2": 134,
+    "3": 120,
+    "4": 105
+  },
+  "per_runway_total": {
+    "24": 371,
+    "06": 124
+  },
+  "per_type_total": {
+    "red_to_white": 305,
+    "white_to_red": 190
+  },
+  "empirical_set_angle_by_lamp_deg": {
+    "1": 3.431,
+    "2": 2.994,
+    "3": 2.493,
+    "4": 2.175
+  },
+  "regimes": {
+    "daytime": {
+      "DJI_202604281910_010_UgCS": {
+        "frames": 741,
+        "flips": 23,
+        "transition_boxes": 92,
+        "transition_frames": 68,
+        "per_lamp": {
+          "4": 20,
+          "3": 24,
+          "2": 24,
+          "1": 24
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.559,
+          "2": 3.086,
+          "3": 2.535,
+          "4": 2.281
+        }
+      },
+      "DJI_202604281946_011_700": {
+        "frames": 185,
+        "flips": 6,
+        "transition_boxes": 21,
+        "transition_frames": 21,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 9
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.134,
+          "2": 2.915,
+          "3": 2.324,
+          "4": 2.045
+        }
+      },
+      "DJI_202604281946_012_600": {
+        "frames": 143,
+        "flips": 4,
+        "transition_boxes": 16,
+        "transition_frames": 16,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.347,
+          "2": 2.841,
+          "3": 2.26,
+          "4": 1.947
+        }
+      },
+      "DJI_202604281946_013_800": {
+        "frames": 319,
+        "flips": 8,
+        "transition_boxes": 32,
+        "transition_frames": 32,
+        "per_lamp": {
+          "4": 8,
+          "3": 8,
+          "2": 8,
+          "1": 8
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.481,
+          "2": 2.983,
+          "3": 2.401,
+          "4": 2.11
+        }
+      },
+      "DJI_202604281946_014_1000": {
+        "frames": 195,
+        "flips": 4,
+        "transition_boxes": 16,
+        "transition_frames": 16,
+        "per_lamp": {
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.513,
+          "2": 3.026,
+          "3": 2.429,
+          "4": 2.175
+        }
+      },
+      "DJI_202604291300_031_day2700mup": {
+        "frames": 134,
+        "flips": 36,
+        "transition_boxes": 88,
+        "transition_frames": 52,
+        "per_lamp": {
+          "4": 12,
+          "3": 15,
+          "2": 35,
+          "1": 26
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.381,
+          "2": 3.206,
+          "3": 2.512,
+          "4": 3.397
+        }
+      },
+      "DJI_202604291357_034_600day2up": {
+        "frames": 189,
+        "flips": 4,
+        "transition_boxes": 16,
+        "transition_frames": 16,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.578,
+          "2": 3.104,
+          "3": 2.534,
+          "4": 2.281
+        }
+      },
+      "DJI_202604291550_036_400mday2up": {
+        "frames": 87,
+        "flips": 2,
+        "transition_boxes": 8,
+        "transition_frames": 8,
+        "per_lamp": {
+          "4": 4,
+          "3": 4
+        },
+        "empirical_set_angle_deg": {
+          "3": 2.523,
+          "4": 2.292
+        }
+      },
+      "DJI_202604291738_037_500mday2v2up": {
+        "frames": 150,
+        "flips": 10,
+        "transition_boxes": 32,
+        "transition_frames": 22,
+        "per_lamp": {
+          "4": 4,
+          "3": 9,
+          "2": 9,
+          "1": 10
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.566,
+          "2": 3.538,
+          "3": 3.551,
+          "4": 2.278
+        }
+      },
+      "DJI_202604291738_039_400mday2up": {
+        "frames": 120,
+        "flips": 4,
+        "transition_boxes": 16,
+        "transition_frames": 16,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.55,
+          "2": 3.067,
+          "3": 2.509,
+          "4": 2.22
+        }
+      },
+      "DJI_202604291738_040_400day2dwnleftoffset": {
+        "frames": 143,
+        "flips": 6,
+        "transition_boxes": 18,
+        "transition_frames": 18,
+        "per_lamp": {
+          "1": 4,
+          "2": 4,
+          "3": 6,
+          "4": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.532,
+          "2": 3.074,
+          "3": 2.506,
+          "4": 2.243
+        }
+      },
+      "DJI_202604291738_041_300mday2up": {
+        "frames": 162,
+        "flips": 4,
+        "transition_boxes": 16,
+        "transition_frames": 16,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 3.51,
+          "2": 3.006,
+          "3": 2.493,
+          "4": 2.22
+        }
+      }
+    },
+    "nighttime": {
+      "DJI_202604290007_019_300mRwy06night": {
+        "frames": 66,
+        "flips": 4,
+        "transition_boxes": 16,
+        "transition_frames": 16,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 2.44,
+          "2": 2.005,
+          "3": 1.659,
+          "4": 0.969
+        }
+      },
+      "DJI_202604290007_020_300mrway06nightdown": {
+        "frames": 142,
+        "flips": 6,
+        "transition_boxes": 21,
+        "transition_frames": 21,
+        "per_lamp": {
+          "1": 4,
+          "2": 4,
+          "3": 9,
+          "4": 4
+        },
+        "empirical_set_angle_deg": {
+          "1": 2.437,
+          "2": 1.951,
+          "3": 1.657,
+          "4": 0.952
+        }
+      },
+      "DJI_202604290007_021_400mrwy06night": {
+        "frames": 101,
+        "flips": 18,
+        "transition_boxes": 48,
+        "transition_frames": 26,
+        "per_lamp": {
+          "4": 11,
+          "3": 9,
+          "1": 14,
+          "2": 14
+        },
+        "empirical_set_angle_deg": {
+          "1": 2.695,
+          "2": 2.225,
+          "3": 2.786,
+          "4": 1.331
+        }
+      },
+      "DJI_202604290007_022_400mrwy06dwnnighf": {
+        "frames": 163,
+        "flips": 6,
+        "transition_boxes": 18,
+        "transition_frames": 18,
+        "per_lamp": {
+          "1": 4,
+          "2": 4,
+          "3": 4,
+          "4": 6
+        },
+        "empirical_set_angle_deg": {
+          "1": 2.742,
+          "2": 2.245,
+          "3": 1.943,
+          "4": 1.27
+        }
+      },
+      "DJI_202604290007_023_500mrwy06night": {
+        "frames": 154,
+        "flips": 6,
+        "transition_boxes": 21,
+        "transition_frames": 21,
+        "per_lamp": {
+          "4": 4,
+          "3": 4,
+          "2": 4,
+          "1": 9
+        },
+        "empirical_set_angle_deg": {
+          "1": 2.596,
+          "2": 2.453,
+          "3": 2.168,
+          "4": 1.458
+        }
+      }
+    }
+  }
+}

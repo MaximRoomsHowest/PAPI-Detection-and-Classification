@@ -1,0 +1,496 @@
+candidate_id,decision,old_label,new_label,reviewer_note,source_id,frame_number,track_id
+cand_00095,ambiguous_review,white,white,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604281946_011_700,158,lamp_1
+cand_00240,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,95,lamp_2
+cand_00493,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,66,lamp_4
+cand_00090,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,412,lamp_4
+cand_00403,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,36,lamp_4
+cand_00411,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,22,lamp_4
+cand_00334,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,72,lamp_2
+cand_00249,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,95,lamp_3
+cand_00489,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,81,lamp_3
+cand_00473,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,98,lamp_3
+cand_00330,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,68,lamp_2
+cand_00366,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,37,lamp_3
+cand_00399,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,58,lamp_3
+cand_00304,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,94,lamp_1
+cand_00022,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,577,lamp_1
+cand_00070,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,706,lamp_3
+cand_00455,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,63,lamp_3
+cand_00477,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,116,lamp_4
+cand_00467,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,62,lamp_2
+cand_00443,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,35,lamp_4
+cand_00434,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,49,lamp_3
+cand_00323,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,118,lamp_1
+cand_00481,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,138,lamp_1
+cand_00421,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,126,lamp_1
+cand_00417,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,122,lamp_1
+cand_00459,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,50,lamp_4
+cand_00167,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,78,lamp_2
+cand_00379,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,34,lamp_4
+cand_00260,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,95,lamp_4
+cand_00395,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,120,lamp_2
+cand_00463,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291738_040_400day2dwnleftoffset,27,lamp_1
+cand_00391,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,158,lamp_1
+cand_00002,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,144,lamp_1
+cand_00318,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,109,lamp_1
+cand_00485,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,108,lamp_2
+cand_00311,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,102,lamp_1
+cand_00447,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,112,lamp_1
+cand_00407,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,35,lamp_3
+cand_00425,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,88,lamp_2
+cand_00451,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,89,lamp_2
+cand_00439,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,122,lamp_3
+cand_00050,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,94,lamp_3
+cand_00026,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,121,lamp_2
+cand_00375,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,86,lamp_3
+cand_00151,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,265,lamp_3
+cand_00415,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,120,lamp_1
+cand_00082,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,261,lamp_4
+cand_00034,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,294,lamp_2
+cand_00074,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,79,lamp_4
+cand_00111,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,74,lamp_4
+cand_00191,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,17,lamp_4
+cand_00347,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,99,lamp_2
+cand_00430,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,121,lamp_2
+cand_00350,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,102,lamp_2
+cand_00226,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,95,lamp_1
+cand_00255,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,23,lamp_4
+cand_00010,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,311,lamp_1
+cand_00018,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,528,lamp_1
+cand_00042,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,488,lamp_2
+cand_00143,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,218,lamp_2
+cand_00308,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,99,lamp_1
+cand_00046,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,638,lamp_2
+cand_00159,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,289,lamp_4
+cand_00338,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,85,lamp_2
+cand_00135,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,156,lamp_1
+cand_00373,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,84,lamp_3
+cand_00387,ambiguous_review,red,red,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291300_031_day2700mup,121,lamp_4
+cand_00155,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,18,lamp_4
+cand_00163,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,16,lamp_1
+cand_00364,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,35,lamp_3
+cand_00171,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,125,lamp_3
+cand_00058,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,277,lamp_3
+cand_00127,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,53,lamp_4
+cand_00051,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,95,lamp_3
+cand_00332,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,70,lamp_2
+cand_00370,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,48,lamp_3
+cand_00183,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,41,lamp_2
+cand_00325,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,120,lamp_1
+cand_00175,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,154,lamp_4
+cand_00066,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,433,lamp_3
+cand_00139,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,69,lamp_2
+cand_00187,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,33,lamp_3
+cand_00195,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,19,lamp_1
+cand_00205,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,75,lamp_3
+cand_00107,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,93,lamp_3
+cand_00147,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,33,lamp_3
+cand_00339,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,86,lamp_2
+cand_00099,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,176,lamp_1
+cand_00131,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,110,lamp_1
+cand_00360,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,118,lamp_2
+cand_00287,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,137,lamp_1
+cand_00231,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,51,lamp_2
+cand_00386,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,120,lamp_4
+cand_00310,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,101,lamp_1
+cand_00123,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,76,lamp_3
+cand_00208,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,78,lamp_3
+cand_00355,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,109,lamp_2
+cand_00115,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,131,lamp_1
+cand_00268,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,68,lamp_2
+cand_00278,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,138,lamp_4
+cand_00382,ambiguous_review,red,red,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291300_031_day2700mup,107,lamp_4
+cand_00059,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,278,lamp_3
+cand_00295,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,86,lamp_3
+cand_00217,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_021_400mrwy06night,51,lamp_1
+cand_00494,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,67,lamp_4
+cand_00119,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,108,lamp_2
+cand_00381,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,106,lamp_4
+cand_00346,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,98,lamp_2
+cand_00359,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,117,lamp_2
+cand_00238,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,93,lamp_2
+cand_00027,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,122,lamp_2
+cand_00471,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,96,lamp_3
+cand_00244,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,48,lamp_3
+cand_00221,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,90,lamp_1
+cand_00343,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,94,lamp_2
+cand_00011,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,312,lamp_1
+cand_00043,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,489,lamp_2
+cand_00314,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,105,lamp_1
+cand_00199,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,47,lamp_2
+cand_00404,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,37,lamp_4
+cand_00179,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,56,lamp_1
+cand_00203,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,73,lamp_3
+cand_00239,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,94,lamp_2
+cand_00476,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,115,lamp_4
+cand_00492,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,65,lamp_4
+cand_00488,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,80,lamp_3
+cand_00385,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,119,lamp_4
+cand_00412,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,23,lamp_4
+cand_00351,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,103,lamp_2
+cand_00103,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,142,lamp_2
+cand_00428,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,119,lamp_2
+cand_00035,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,295,lamp_2
+cand_00438,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,121,lamp_3
+cand_00299,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,29,lamp_4
+cand_00490,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,82,lamp_3
+cand_00402,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,35,lamp_4
+cand_00067,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,434,lamp_3
+cand_00354,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,108,lamp_2
+cand_00291,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,109,lamp_2
+cand_00437,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,120,lamp_3
+cand_00410,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,21,lamp_4
+cand_00398,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,57,lamp_3
+cand_00003,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,145,lamp_1
+cand_00478,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,117,lamp_4
+cand_00045,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,637,lamp_2
+cand_00258,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,93,lamp_4
+cand_00482,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,139,lamp_1
+cand_00091,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,413,lamp_4
+cand_00235,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,64,lamp_2
+cand_00444,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,36,lamp_4
+cand_00264,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,27,lamp_1
+cand_00365,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,36,lamp_3
+cand_00422,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,127,lamp_1
+cand_00460,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,51,lamp_4
+cand_00069,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,705,lamp_3
+cand_00470,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,95,lamp_3
+cand_00212,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,130,lamp_4
+cand_00272,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,89,lamp_3
+cand_00166,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,77,lamp_2
+cand_00408,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,36,lamp_3
+cand_00392,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,159,lamp_1
+cand_00021,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,576,lamp_1
+cand_00283,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,116,lamp_1
+cand_00474,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,99,lamp_3
+cand_00435,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,50,lamp_3
+cand_00448,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,113,lamp_1
+cand_00466,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,61,lamp_2
+cand_00333,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,71,lamp_2
+cand_00442,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,34,lamp_4
+cand_00380,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,35,lamp_4
+cand_00458,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,49,lamp_4
+cand_00468,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,63,lamp_2
+cand_00472,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,97,lamp_3
+cand_00309,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,100,lamp_1
+cand_00316,ambiguous_review,red,red,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291300_031_day2700mup,107,lamp_1
+cand_00248,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,94,lamp_3
+cand_00104,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,143,lamp_2
+cand_00396,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,121,lamp_2
+cand_00400,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,59,lamp_3
+cand_00202,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,72,lamp_3
+cand_00480,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,137,lamp_1
+cand_00247,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,93,lamp_3
+cand_00213,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,131,lamp_4
+cand_00259,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,94,lamp_4
+cand_00378,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,33,lamp_4
+cand_00342,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,93,lamp_2
+cand_00353,ambiguous_review,white,white,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291300_031_day2700mup,107,lamp_2
+cand_00383,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,108,lamp_4
+cand_00023,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,578,lamp_1
+cand_00371,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,49,lamp_3
+cand_00344,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,95,lamp_2
+cand_00426,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,89,lamp_2
+cand_00416,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,121,lamp_1
+cand_00301,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,31,lamp_4
+cand_00452,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,90,lamp_2
+cand_00431,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,122,lamp_2
+cand_00486,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,109,lamp_2
+cand_00019,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,529,lamp_1
+cand_00456,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,64,lamp_3
+cand_00326,ambiguous_review,white,white,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291300_031_day2700mup,121,lamp_1
+cand_00089,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,411,lamp_4
+cand_00394,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,119,lamp_2
+cand_00484,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,107,lamp_2
+cand_00418,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,123,lamp_1
+cand_00108,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,94,lamp_3
+cand_00462,ambiguous_review,white,white,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291738_040_400day2dwnleftoffset,26,lamp_1
+cand_00433,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,48,lamp_3
+cand_00464,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291738_040_400day2dwnleftoffset,28,lamp_1
+cand_00440,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,123,lamp_3
+cand_00148,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,34,lamp_3
+cand_00358,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,116,lamp_2
+cand_00361,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,119,lamp_2
+cand_00388,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,122,lamp_4
+cand_00100,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,177,lamp_1
+cand_00406,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,34,lamp_3
+cand_00206,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,76,lamp_3
+cand_00454,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,62,lamp_3
+cand_00001,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,143,lamp_1
+cand_00124,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,77,lamp_3
+cand_00429,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,120,lamp_2
+cand_00075,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,80,lamp_4
+cand_00176,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,155,lamp_4
+cand_00132,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,111,lamp_1
+cand_00420,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,125,lamp_1
+cand_00341,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,92,lamp_2
+cand_00446,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,111,lamp_1
+cand_00424,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,87,lamp_2
+cand_00083,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,262,lamp_4
+cand_00241,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,96,lamp_2
+cand_00292,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,110,lamp_2
+cand_00134,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,155,lamp_1
+cand_00256,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,24,lamp_4
+cand_00313,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,104,lamp_1
+cand_00356,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,110,lamp_2
+cand_00374,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,85,lamp_3
+cand_00376,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,87,lamp_3
+cand_00390,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,157,lamp_1
+cand_00414,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,119,lamp_1
+cand_00450,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,88,lamp_2
+cand_00369,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,47,lamp_3
+cand_00150,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,264,lamp_3
+cand_00312,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,103,lamp_1
+cand_00207,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,77,lamp_3
+cand_00261,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,96,lamp_4
+cand_00170,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,124,lamp_3
+cand_00073,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,78,lamp_4
+cand_00349,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,101,lamp_2
+cand_00367,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,38,lamp_3
+cand_00110,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,73,lamp_4
+cand_00140,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,70,lamp_2
+cand_00276,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,136,lamp_4
+cand_00363,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,34,lamp_3
+cand_00154,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,17,lamp_4
+cand_00164,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,17,lamp_1
+cand_00225,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,94,lamp_1
+cand_00331,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,69,lamp_2
+cand_00071,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,707,lamp_3
+cand_00337,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,84,lamp_2
+cand_00348,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,100,lamp_2
+cand_00081,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,260,lamp_4
+cand_00116,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,132,lamp_1
+cand_00112,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,75,lamp_4
+cand_00250,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,96,lamp_3
+cand_00303,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,93,lamp_1
+cand_00142,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,217,lamp_2
+cand_00329,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,67,lamp_2
+cand_00335,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,73,lamp_2
+cand_00224,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,93,lamp_1
+cand_00041,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,487,lamp_2
+cand_00126,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,52,lamp_4
+cand_00162,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,15,lamp_1
+cand_00168,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,79,lamp_2
+cand_00102,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,141,lamp_2
+cand_00047,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,639,lamp_2
+cand_00275,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,135,lamp_4
+cand_00288,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,138,lamp_1
+cand_00160,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,290,lamp_4
+cand_00128,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,54,lamp_4
+cand_00025,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,120,lamp_2
+cand_00049,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,93,lamp_3
+cand_00328,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,66,lamp_2
+cand_00227,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,96,lamp_1
+cand_00172,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,126,lamp_3
+cand_00324,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,119,lamp_1
+cand_00120,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,109,lamp_2
+cand_00156,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,19,lamp_4
+cand_00192,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,18,lamp_4
+cand_00009,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,310,lamp_1
+cand_00321,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,116,lamp_1
+cand_00182,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,40,lamp_2
+cand_00267,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,67,lamp_2
+cand_00144,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,219,lamp_2
+cand_00174,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,153,lamp_4
+cand_00106,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,92,lamp_3
+cand_00138,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,68,lamp_2
+cand_00254,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,22,lamp_4
+cand_00068,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,435,lamp_3
+cand_00204,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,74,lamp_3
+cand_00133,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,112,lamp_1
+cand_00296,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,87,lamp_3
+cand_00211,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,129,lamp_4
+cand_00098,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,175,lamp_1
+cand_00158,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,288,lamp_4
+cand_00118,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,107,lamp_2
+cand_00319,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,110,lamp_1
+cand_00190,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,16,lamp_4
+cand_00405,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,38,lamp_4
+cand_00186,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,32,lamp_3
+cand_00136,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,157,lamp_1
+cand_00017,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,527,lamp_1
+cand_00194,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,18,lamp_1
+cand_00307,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,98,lamp_1
+cand_00065,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,432,lamp_3
+cand_00057,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,276,lamp_3
+cand_00230,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,50,lamp_2
+cand_00322,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,117,lamp_1
+cand_00265,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,28,lamp_1
+cand_00271,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,88,lamp_3
+cand_00305,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,95,lamp_1
+cand_00033,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,293,lamp_2
+cand_00122,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,75,lamp_3
+cand_00196,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,20,lamp_1
+cand_00216,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_021_400mrwy06night,50,lamp_1
+cand_00495,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,68,lamp_4
+cand_00149,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,35,lamp_3
+cand_00300,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,30,lamp_4
+cand_00357,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,111,lamp_2
+cand_00146,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,32,lamp_3
+cand_00152,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,266,lamp_3
+cand_00302,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,92,lamp_1
+cand_00315,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,106,lamp_1
+cand_00377,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,88,lamp_3
+cand_00028,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,123,lamp_2
+cand_00352,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,104,lamp_2
+cand_00252,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,20,lamp_4
+cand_00188,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,34,lamp_3
+cand_00020,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,530,lamp_1
+cand_00298,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,28,lamp_4
+cand_00101,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,178,lamp_1
+cand_00243,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,47,lamp_3
+cand_00209,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,79,lamp_3
+cand_00093,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,156,lamp_1
+cand_00184,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,42,lamp_2
+cand_00004,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,146,lamp_1
+cand_00279,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,139,lamp_4
+cand_00384,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,109,lamp_4
+cand_00130,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,109,lamp_1
+cand_00114,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,130,lamp_1
+cand_00413,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,24,lamp_4
+cand_00245,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,49,lamp_3
+cand_00044,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,490,lamp_2
+cand_00222,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,91,lamp_1
+cand_00092,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,414,lamp_4
+cand_00236,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,65,lamp_2
+cand_00445,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,37,lamp_4
+cand_00362,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,120,lamp_2
+cand_00012,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,313,lamp_1
+cand_00317,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,108,lamp_1
+cand_00281,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,114,lamp_1
+cand_00483,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,140,lamp_1
+cand_00180,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,57,lamp_1
+cand_00094,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_011_700,157,lamp_1
+cand_00198,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,46,lamp_2
+cand_00393,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,160,lamp_1
+cand_00200,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,48,lamp_2
+cand_00277,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,137,lamp_4
+cand_00461,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,52,lamp_4
+cand_00253,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,21,lamp_4
+cand_00286,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,136,lamp_1
+cand_00220,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,89,lamp_1
+cand_00117,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,133,lamp_1
+cand_00215,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_021_400mrwy06night,49,lamp_1
+cand_00409,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291550_036_400mday2up,37,lamp_3
+cand_00479,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,118,lamp_4
+cand_00125,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,78,lamp_3
+cand_00284,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,117,lamp_1
+cand_00487,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,110,lamp_2
+cand_00294,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,85,lamp_3
+cand_00269,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,69,lamp_2
+cand_00290,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,108,lamp_2
+cand_00228,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,97,lamp_1
+cand_00263,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,26,lamp_1
+cand_00453,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,91,lamp_2
+cand_00491,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_041_300mday2up,83,lamp_3
+cand_00229,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,49,lamp_2
+cand_00178,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,55,lamp_1
+cand_00372,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,50,lamp_3
+cand_00234,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,63,lamp_2
+cand_00076,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,81,lamp_4
+cand_00282,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,115,lamp_1
+cand_00397,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,122,lamp_2
+cand_00096,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_011_700,159,lamp_1
+cand_00345,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,96,lamp_2
+cand_00218,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_021_400mrwy06night,52,lamp_1
+cand_00273,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,90,lamp_3
+cand_00327,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291300_031_day2700mup,122,lamp_1
+cand_00423,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,128,lamp_1
+cand_00232,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,52,lamp_2
+cand_00469,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,64,lamp_2
+cand_00419,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,124,lamp_1
+cand_00475,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291738_040_400day2dwnleftoffset,100,lamp_3
+cand_00427,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,90,lamp_2
+cand_00457,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,65,lamp_3
+cand_00340,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,87,lamp_2
+cand_00109,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,95,lamp_3
+cand_00121,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,110,lamp_2
+cand_00105,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,144,lamp_2
+cand_00036,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,296,lamp_2
+cand_00465,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604291738_040_400day2dwnleftoffset,29,lamp_1
+cand_00436,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,51,lamp_3
+cand_00193,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,19,lamp_4
+cand_00441,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,124,lamp_3
+cand_00257,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,25,lamp_4
+cand_00024,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,579,lamp_1
+cand_00389,ambiguous_review,white,white,unreliable left-to-right lamp identity (zoom/mirror); excluded from training [visually reviewed],DJI_202604291300_031_day2700mup,123,lamp_4
+cand_00242,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,97,lamp_2
+cand_00177,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,156,lamp_4
+cand_00449,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_039_400mday2up,114,lamp_1
+cand_00084,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,263,lamp_4
+cand_00432,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291738_037_500mday2v2up,123,lamp_2
+cand_00401,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604291357_034_600day2up,60,lamp_3
+cand_00060,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,279,lamp_3
+cand_00141,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,71,lamp_2
+cand_00052,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281910_010_UgCS,96,lamp_3
+cand_00368,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,39,lamp_3
+cand_00185,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,43,lamp_2
+cand_00262,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,97,lamp_4
+cand_00251,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,97,lamp_3
+cand_00169,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,80,lamp_2
+cand_00289,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,139,lamp_1
+cand_00113,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_011_700,76,lamp_4
+cand_00336,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,74,lamp_2
+cand_00214,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,132,lamp_4
+cand_00157,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,20,lamp_4
+cand_00145,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,220,lamp_2
+cand_00048,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,640,lamp_2
+cand_00072,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281910_010_UgCS,708,lamp_3
+cand_00297,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,88,lamp_3
+cand_00306,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,96,lamp_1
+cand_00161,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_013_800,291,lamp_4
+cand_00129,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604281946_012_600,55,lamp_4
+cand_00197,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,21,lamp_1
+cand_00165,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,18,lamp_1
+cand_00320,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604291300_031_day2700mup,111,lamp_1
+cand_00137,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,158,lamp_1
+cand_00233,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,53,lamp_2
+cand_00293,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,111,lamp_2
+cand_00223,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,92,lamp_1
+cand_00181,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,58,lamp_1
+cand_00173,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604281946_014_1000,127,lamp_3
+cand_00246,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,50,lamp_3
+cand_00266,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,29,lamp_1
+cand_00210,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,80,lamp_3
+cand_00237,accepted_transition,white,transition,flip-anchored + colour-confirmed,DJI_202604290007_021_400mrwy06night,66,lamp_2
+cand_00219,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_021_400mrwy06night,53,lamp_1
+cand_00189,accepted_transition,white,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_019_300mRwy06night,35,lamp_3
+cand_00153,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_013_800,267,lamp_3
+cand_00097,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604281946_011_700,160,lamp_1
+cand_00274,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,91,lamp_3
+cand_00285,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_023_500mrwy06night,118,lamp_1
+cand_00201,accepted_transition,red,transition,flip-anchored + colour-confirmed [visually reviewed],DJI_202604290007_020_300mrway06nightdown,49,lamp_2
+cand_00270,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,70,lamp_2
+cand_00280,accepted_transition,red,transition,flip-anchored + colour-confirmed,DJI_202604290007_022_400mrwy06dwnnighf,140,lamp_4
+cand_00038,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,331,lamp_2
+cand_00062,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,331,lamp_3
+cand_00054,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,188,lamp_3
+cand_00086,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,331,lamp_4
+cand_00006,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,188,lamp_1
+cand_00014,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,331,lamp_1
+cand_00030,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,188,lamp_2
+cand_00078,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,188,lamp_4
+cand_00061,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,330,lamp_3
+cand_00013,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,330,lamp_1
+cand_00029,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,187,lamp_2
+cand_00053,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,187,lamp_3
+cand_00005,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,187,lamp_1
+cand_00037,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,330,lamp_2
+cand_00077,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,187,lamp_4
+cand_00085,accepted_transition,white,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,330,lamp_4
+cand_00007,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,189,lamp_1
+cand_00079,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,189,lamp_4
+cand_00055,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,189,lamp_3
+cand_00063,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,332,lamp_3
+cand_00031,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,189,lamp_2
+cand_00039,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,332,lamp_2
+cand_00015,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,332,lamp_1
+cand_00087,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,332,lamp_4
+cand_00008,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,190,lamp_1
+cand_00056,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,190,lamp_3
+cand_00080,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,190,lamp_4
+cand_00088,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,333,lamp_4
+cand_00032,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,190,lamp_2
+cand_00064,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity),DJI_202604281910_010_UgCS,333,lamp_3
+cand_00040,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,333,lamp_2
+cand_00016,accepted_transition,red,transition,visual transition genuine; angle_unreliable (telemetry discontinuity) [visually reviewed],DJI_202604281910_010_UgCS,333,lamp_1

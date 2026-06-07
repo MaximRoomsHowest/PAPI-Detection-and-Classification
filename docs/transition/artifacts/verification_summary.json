@@ -1,0 +1,10 @@
+{
+  "candidates": 495,
+  "flips_visually_reviewed": 36,
+  "decisions": {
+    "ambiguous_review": 8,
+    "accepted_transition": 487
+  },
+  "final_transition_boxes": 487,
+  "verification_log": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\datasets\\transition-classification-data\\verification_log.csv"
+}
