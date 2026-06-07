@@ -84,6 +84,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         drone_id=None,
         drone_metadata=None,
         drone_samples=None,
+        transition_method=None,
     ):
         return AnalysisPayload(
             media_type=media_type,
@@ -106,7 +107,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         )
 
     def _fake_analyze_sequence(
-        image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None, drone_samples=None
+        image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None,
+        drone_samples=None, transition_method=None,
     ):
         return AnalysisPayload(
             media_type="video",

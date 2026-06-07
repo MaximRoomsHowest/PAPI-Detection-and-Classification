@@ -71,6 +71,11 @@ export function useAnalysis(copy) {
   // media and clears it explicitly.
   const [metadataFile, setMetadataFile] = useState(null)
 
+  // Transition-detection method the backend applies: "tracking" (temporal red<->white flips on the
+  // serving model) or "model" (learned class-2 events from the 3-class detector). An INPUT like the
+  // runway/telemetry, so it persists across media changes; the backend echoes the method it used.
+  const [transitionMethod, setTransitionMethod] = useState('tracking')
+
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [backendScenario, setBackendScenario] = useState(null)
   const [backendFrames, setBackendFrames] = useState([])
@@ -361,6 +366,7 @@ export function useAnalysis(copy) {
       )
       const metadata = {
         runwayId: effectiveRunwayId,
+        transitionMethod,
         ...(hasDroneTelemetry
           ? {
               droneLatitude: droneTelemetry.latitude.trim(),
@@ -533,6 +539,8 @@ export function useAnalysis(copy) {
     setDroneTelemetry,
     metadataFile,
     setMetadataFile,
+    transitionMethod,
+    setTransitionMethod,
     isAnalyzing,
     isExporting,
     exportError,

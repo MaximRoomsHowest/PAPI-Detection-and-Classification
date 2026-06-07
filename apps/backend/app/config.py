@@ -33,6 +33,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DATABASE_URL", "PAPI_DATABASE_URL"),
     )
     model_path: Path = Field(default=REPO_ROOT / "models" / "serving" / "best.pt", alias="PAPI_MODEL_PATH")
+    # Optional 3-class transition-aware model (red/white/transition) used by the "model" transition
+    # method. Kept separate from model_path so the 2-class serving model and the experimental 3-class
+    # model coexist without promoting one. When unset or absent, the "model" method gracefully falls
+    # back to the temporal "tracking" method.
+    transition_model_path: Path | None = Field(default=None, alias="PAPI_TRANSITION_MODEL_PATH")
+    # Transition method when a request omits it: "tracking" (temporal red<->white flips on the
+    # serving model) or "model" (learned class-2 events from the 3-class model).
+    default_transition_method: str = Field(default="tracking", alias="PAPI_TRANSITION_METHOD")
     device: str = Field(default="cpu", alias="PAPI_DEVICE")
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
@@ -106,6 +114,21 @@ class Settings(BaseSettings):
         if value.is_absolute():
             return value
         return (BACKEND_ROOT / value).resolve()
+
+    @field_validator("transition_model_path")
+    @classmethod
+    def resolve_optional_backend_relative_path(cls, value: Path | None) -> Path | None:
+        if value is None:
+            return None
+        return value if value.is_absolute() else (BACKEND_ROOT / value).resolve()
+
+    @field_validator("default_transition_method")
+    @classmethod
+    def validate_default_transition_method(cls, value: str) -> str:
+        normalized = (value or "tracking").strip().lower()
+        if normalized not in ("tracking", "model"):
+            raise ValueError("default_transition_method must be 'tracking' or 'model'")
+        return normalized
 
     @property
     def uploads_dir(self) -> Path:

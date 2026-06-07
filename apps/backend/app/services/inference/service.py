@@ -47,6 +47,9 @@ class InferenceService:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._model: Any | None = None
+        # Optional 3-class transition-aware model for the "model" transition method, loaded lazily
+        # from settings.transition_model_path. None until first used (or if unconfigured/absent).
+        self._transition_model: Any | None = None
         self._loaded_at: str | None = None
         self._resolved_device: str | None = None
         # A single Ultralytics YOLO instance (with one shared, mutable ByteTrack
@@ -68,17 +71,20 @@ class InferenceService:
         drone_id: str | None = None,
         drone_metadata: tuple[float, float, float] | None = None,
         drone_samples: list[DroneSample] | None = None,
+        transition_method: str | None = None,
     ) -> AnalysisPayload:
         # Serialise the whole inference so concurrent threadpool requests never
         # share the YOLO/ByteTrack state mid-stream (audit H1).
         with self._lock:
             if media_type == "image":
                 return self.analyze_image(
-                    media_path, runway_id, original_filename, drone_id, drone_metadata, drone_samples
+                    media_path, runway_id, original_filename, drone_id, drone_metadata,
+                    drone_samples, transition_method,
                 )
             if media_type == "video":
                 return self.analyze_video(
-                    media_path, runway_id, original_filename, drone_id, drone_metadata, drone_samples
+                    media_path, runway_id, original_filename, drone_id, drone_metadata,
+                    drone_samples, transition_method,
                 )
             raise ValueError(f"Unsupported media type: {media_type}")
 
@@ -133,6 +139,44 @@ class InferenceService:
                     self._model = YOLO(str(self.settings.model_path))
                     self._loaded_at = datetime.now(timezone.utc).isoformat()
         return self._model
+
+    @property
+    def transition_model(self) -> Any | None:
+        """The optional 3-class transition model, lazy-loaded; None when unconfigured or absent."""
+        path = self.settings.transition_model_path
+        if path is None or not path.exists():
+            return None
+        if self._transition_model is None:
+            with self._lock:
+                if self._transition_model is None:
+                    os.environ.setdefault("YOLO_AUTOINSTALL", "False")
+                    from ultralytics import YOLO
+
+                    self._transition_model = YOLO(str(path))
+        return self._transition_model
+
+    @staticmethod
+    def _is_three_class(model: Any) -> bool:
+        """A model that can emit class 2 (transition) — i.e. names has >= 3 entries."""
+        names = getattr(model, "names", None)
+        return isinstance(names, dict) and len(names) >= 3
+
+    def _resolve_transition(self, requested: str | None) -> tuple[Any, str]:
+        """Pick the (model, effective_method) for a request.
+
+        "model" needs a 3-class detector: prefer the dedicated transition model, else the serving
+        model if it is itself 3-class, else gracefully fall back to "tracking" (the temporal method)
+        on the serving model — so a request never fails just because no 3-class model is installed.
+        """
+        method = (requested or self.settings.default_transition_method or "tracking").strip().lower()
+        if method == "model":
+            transition_model = self.transition_model
+            if transition_model is not None and self._is_three_class(transition_model):
+                return transition_model, "model"
+            if self._is_three_class(self.model):
+                return self.model, "model"
+            return self.model, "tracking"
+        return self.model, "tracking"
 
     def model_info(self) -> ModelInfo:
         path = self.settings.model_path
@@ -199,6 +243,7 @@ class InferenceService:
         drone_id: str | None,
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
+        transition_method: str | None = None,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -207,7 +252,10 @@ class InferenceService:
             raise ValueError("Could not read uploaded image.")
         self._check_pixel_budget(frame.shape[1], frame.shape[0], "image")
 
-        detections = self._detect_frame(frame, use_tracking=False)
+        # With the "model" method a 3-class detector can classify a lamp as "transition" in a
+        # single frame; "tracking" uses the 2-class serving model (red/white only).
+        model, effective_method = self._resolve_transition(transition_method)
+        detections = self._detect_frame(frame, use_tracking=False, model=model)
         # A single image yields red/white per lamp; a "transition" requires a
         # red<->white switch across frames, so there are none here. The angle is
         # still computed for display / transition association.
@@ -235,6 +283,7 @@ class InferenceService:
             angle=angle,
             artifact_url=f"/media/{artifact_path.name}",
             detections=detections,
+            transition_method=effective_method,
         )
 
     def analyze_video(
@@ -245,6 +294,7 @@ class InferenceService:
         drone_id: str | None,
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
+        transition_method: str | None = None,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -286,6 +336,7 @@ class InferenceService:
             # build the per-frame angle track after the frame count is known.
             resolved_samples, angle_source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
             angle = self._angle_from_samples(resolved_samples, angle_source, runway_id)
+            model, effective_method = self._resolve_transition(transition_method)
             return self._run_tracked_sequence(
                 self._iter_video_frames(cap),
                 fps=fps,
@@ -300,6 +351,8 @@ class InferenceService:
                 max_frames=max_frames,
                 too_long_message=too_long,
                 empty_message="Uploaded video did not contain readable frames.",
+                model=model,
+                transition_method=effective_method,
             )
         finally:
             cap.release()
@@ -317,6 +370,7 @@ class InferenceService:
         drone_id: str | None,
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
+        transition_method: str | None = None,
     ) -> AnalysisPayload:
         """Treat an ordered list of images as consecutive video frames (folder->video).
 
@@ -365,6 +419,7 @@ class InferenceService:
                         frame = cv2.resize(frame, (width, height))
                     yield frame
 
+            model, effective_method = self._resolve_transition(transition_method)
             return self._run_tracked_sequence(
                 frames(),
                 fps=fps,
@@ -379,6 +434,8 @@ class InferenceService:
                 max_frames=max_frames,
                 too_long_message=too_long,
                 empty_message="None of the uploaded images could be read.",
+                model=model,
+                transition_method=effective_method,
             )
 
     def _run_tracked_sequence(
@@ -397,21 +454,31 @@ class InferenceService:
         too_long_message: str,
         empty_message: str,
         drone_samples: list[DroneSample] | None = None,
+        model: Any | None = None,
+        transition_method: str = "tracking",
     ) -> AnalysisPayload:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
         ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
 
         Runs ByteTrack detection per frame, writes the annotated artifact, and aggregates
-        the final per-lamp verdict + temporal transitions by STABLE track identity.
-        ``frames`` yields BGR frames already sized to ``width`` x ``height``.
+        the final per-lamp verdict + transitions by STABLE track identity. ``frames`` yields
+        BGR frames already sized to ``width`` x ``height``. ``model`` selects the detector
+        (serving 2-class or the 3-class transition model); ``transition_method`` selects how
+        transitions are derived from the tracked observations.
 
-        Delegates to ``sequence_runner.run_tracked_sequence``, injecting the loaded
-        model (via ``self._detect_frame``), the cv2 handle, and the relevant settings
-        so the core never imports the service (one-way leaf -> service dependency).
+        Delegates to ``sequence_runner.run_tracked_sequence``, injecting the chosen model
+        (via ``self._detect_frame``), the cv2 handle, and the relevant settings so the core
+        never imports the service (one-way leaf -> service dependency).
         """
+
+        def detect(frame: Any, *, use_tracking: bool, reset_tracker: bool = False) -> list[dict]:
+            return self._detect_frame(
+                frame, use_tracking=use_tracking, reset_tracker=reset_tracker, model=model
+            )
+
         return run_tracked_sequence(
             frames,
-            detect=self._detect_frame,
+            detect=detect,
             cv2=self._require_cv2(),
             fps=fps,
             width=width,
@@ -427,6 +494,7 @@ class InferenceService:
             history_size=self.settings.video_history_size,
             exports_dir=self.settings.exports_dir,
             drone_samples=drone_samples,
+            transition_method=transition_method,
         )
 
     @staticmethod
@@ -445,12 +513,14 @@ class InferenceService:
         frame: Any,
         use_tracking: bool,
         reset_tracker: bool = False,
+        model: Any | None = None,
     ) -> list[dict]:
-        """Delegates to ``detector.detect_frame``, binding the loaded model + the
-        configured confidence threshold + resolved device. ``warmup`` and the
-        tracked-sequence core both reach YOLO through here."""
+        """Delegates to ``detector.detect_frame``, binding a model (the serving model by
+        default, or the 3-class transition model for the "model" method) + the configured
+        confidence threshold + resolved device. ``warmup`` and the tracked-sequence core
+        both reach YOLO through here."""
         return detect_frame(
-            self.model,
+            model or self.model,
             frame,
             use_tracking=use_tracking,
             reset_tracker=reset_tracker,

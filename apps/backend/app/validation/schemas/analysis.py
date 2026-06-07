@@ -29,6 +29,11 @@ class AnalysisPayload(BaseModel):
     # single images, which can't show a switch). Each carries the associated
     # viewing angle when drone telemetry was supplied.
     transitions: list[TransitionEvent] = Field(default_factory=list)
+    # Which method produced ``transitions``: "tracking" (temporal red<->white flips on the serving
+    # model) or "model" (learned class-2 events from the 3-class detector). Echoes the method that
+    # actually ran — if "model" was requested but no 3-class model was available, this reads
+    # "tracking" (graceful fallback), so the UI can tell the user what it is looking at.
+    transition_method: str = "tracking"
     # Raw per-frame confidence + verdict for video / folder-sequence analyses
     # (empty for single images). Drives the Live Demo frame-by-frame confidence
     # chart; these are the per-frame values BEFORE the overlay's sliding-window

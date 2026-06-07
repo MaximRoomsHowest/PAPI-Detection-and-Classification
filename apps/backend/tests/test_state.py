@@ -4,6 +4,7 @@ from app.services.state import (
     detect_lamp_transitions,
     global_state_from_lamps,
     normalize_detections,
+    transition_events_from_state_runs,
 )
 from app.validation.schemas import LampResult
 
@@ -162,3 +163,28 @@ def test_aggregate_transition_state_events_min_run_filters_flicker():
     obs = {5: [(0, "red", 1.0), (1, "transition", 1.0), (2, "red", 1.0)]}
     assert aggregate_transition_state_events(obs, min_run_frames=2) == []
     assert len(aggregate_transition_state_events(obs, min_run_frames=1)) == 1
+
+
+def test_transition_events_from_state_runs_is_the_model_method():
+    """The 'model' method emits one TransitionEvent per complete class-2 run, carrying the run's
+    span/duration, method='model', the bracketing red/white states, and the start-frame angle."""
+    obs = {5: [(0, "red", 100.0), (1, "transition", 100.0), (2, "transition", 100.0), (3, "white", 100.0)]}
+    events = transition_events_from_state_runs(obs, frame_angles={1: 3.10})
+    assert len(events) == 1
+    e = events[0]
+    assert e.method == "model"
+    assert (e.from_state, e.to_state) == ("red", "white")
+    assert (e.frame_index, e.start_frame, e.end_frame, e.duration_frames) == (1, 1, 2, 2)
+    assert e.transition_event_id == "L1-E1"
+    assert e.elevation_angle_deg == 3.10
+
+
+def test_transition_events_from_state_runs_empty_for_two_class():
+    """A 2-class model never emits 'transition' states -> the model method yields no events."""
+    assert transition_events_from_state_runs({5: [(0, "red", 1.0), (1, "white", 1.0)]}) == []
+
+
+def test_transition_events_from_state_runs_skips_incomplete_run():
+    """A run with no stable colour after it (track ends mid-transition) is skipped so to_state
+    never becomes None."""
+    assert transition_events_from_state_runs({5: [(0, "red", 1.0), (1, "transition", 1.0)]}) == []

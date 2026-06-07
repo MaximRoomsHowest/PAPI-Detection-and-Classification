@@ -128,6 +128,19 @@ export function ResultPanel({ copy }) {
           {activeScenario.transitions?.length > 0 && (
             <div className="transition-readout">
               <span>{copy.live.transitionsHeading}</span>
+              {/* Which method produced these transitions — the backend echoes it, so if "model"
+                  was requested but no 3-class model was available this reads "Tracking" (the
+                  graceful fallback), telling the user exactly what they are looking at. */}
+              {activeScenario.rawResult?.transition_method && (
+                <small className="transition-readout__method">
+                  {copy.live.transitionMethodUsed.replace(
+                    '{method}',
+                    activeScenario.rawResult.transition_method === 'model'
+                      ? copy.live.transitionMethodModel
+                      : copy.live.transitionMethodTracking,
+                  )}
+                </small>
+              )}
               <ul>
                 {activeScenario.transitions.map((event, index) => (
                   <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>

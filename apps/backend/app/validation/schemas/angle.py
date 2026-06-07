@@ -57,6 +57,16 @@ class TransitionEvent(BaseModel):
     to_state: Literal["red", "white"]
     frame_index: int
     elevation_angle_deg: float | None = None
+    # Which method produced this event: "tracking" (temporal red<->white flip on the 2-class
+    # model) or "model" (a learned class-2 transition-state run from the 3-class detector).
+    # Additive — existing tracking events keep the default.
+    method: Literal["tracking", "model"] = "tracking"
+    # Span fields populated by the "model" method (a transition state persists for a run of
+    # frames); None for the single-frame "tracking" flip. ``frame_index`` is the run start.
+    transition_event_id: str | None = None
+    start_frame: int | None = None
+    end_frame: int | None = None
+    duration_frames: int | None = None
 
 
 class FramePoint(BaseModel):

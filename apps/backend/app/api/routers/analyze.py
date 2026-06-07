@@ -67,6 +67,10 @@ class AnalyzeParams:
     drone_latitude: float | None
     drone_longitude: float | None
     drone_altitude_m: float | None
+    # "tracking" (temporal red<->white flips) or "model" (learned class-2 events from the 3-class
+    # detector). None lets the service apply its configured default. Validated server-side; an
+    # unknown value falls back to "tracking".
+    transition_method: str | None
 
 
 def analyze_params(
@@ -79,8 +83,11 @@ def analyze_params(
     drone_latitude: Annotated[float | None, Form()] = None,
     drone_longitude: Annotated[float | None, Form()] = None,
     drone_altitude_m: Annotated[float | None, Form()] = None,
+    transition_method: Annotated[str | None, Form()] = None,
 ) -> AnalyzeParams:
-    return AnalyzeParams(runway_id, drone_id, drone_latitude, drone_longitude, drone_altitude_m)
+    return AnalyzeParams(
+        runway_id, drone_id, drone_latitude, drone_longitude, drone_altitude_m, transition_method
+    )
 
 
 def read_metadata_samples(metadata_file: UploadFile | None) -> list[DroneSample] | None:
@@ -334,6 +341,7 @@ def analyze_sequence(
                 drone_id=params.drone_id,
                 drone_metadata=manual_metadata,
                 drone_samples=drone_samples,
+                transition_method=params.transition_method,
             )
             log = AnalysisLogRepository(db).create_from_payload(payload)
             payload.log_id = log.id
@@ -386,6 +394,7 @@ def _analyze_upload(
                 drone_id=params.drone_id,
                 drone_metadata=manual_metadata,
                 drone_samples=drone_samples,
+                transition_method=params.transition_method,
             )
             log = AnalysisLogRepository(db).create_from_payload(payload)
             payload.log_id = log.id

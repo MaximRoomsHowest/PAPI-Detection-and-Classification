@@ -367,6 +367,9 @@ function appendMetadata(formData, metadata = {}) {
     drone_latitude: metadata.droneLatitude,
     drone_longitude: metadata.droneLongitude,
     drone_altitude_m: metadata.droneAltitudeM,
+    // "tracking" (temporal red<->white flips) or "model" (learned class-2 events). Omitted when
+    // empty/undefined so the backend applies its own default.
+    transition_method: metadata.transitionMethod,
   }
   for (const [key, value] of Object.entries(fields)) {
     if (value !== undefined && value !== null && value !== '') {

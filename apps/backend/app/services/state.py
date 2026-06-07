@@ -219,6 +219,47 @@ def aggregate_transition_state_events(
     return events
 
 
+def transition_events_from_state_runs(
+    track_observations: dict[int, list[tuple]],
+    elevation_angle_deg: float | None = None,
+    frame_angles: dict[int, float] | None = None,
+) -> list[TransitionEvent]:
+    """The "model" transition method: per-lamp ``TransitionEvent``s from a 3-class model's class-2 runs.
+
+    Each maximal run of per-frame "transition" state (``aggregate_transition_state_events``) that is
+    bracketed by two stable colours becomes one event (``method="model"``) carrying the run's span +
+    duration. Incomplete runs (a lamp still transitioning at the track edge) are skipped so
+    ``from_state``/``to_state`` stay red/white. Returns [] for a 2-class model. The viewing angle is
+    the drone's angle at the run's start frame when a per-frame track is available, else the single
+    representative angle — mirroring ``detect_lamp_transitions`` (the "tracking" method).
+    """
+    events: list[TransitionEvent] = []
+    for run in aggregate_transition_state_events(track_observations, frame_angles):
+        from_state, to_state = run["from_state"], run["to_state"]
+        if from_state not in ("red", "white") or to_state not in ("red", "white"):
+            continue
+        start = run["start_frame"]
+        angle = run["start_angle_deg"]
+        if angle is None:
+            angle = (frame_angles or {}).get(start, elevation_angle_deg)
+        events.append(
+            TransitionEvent(
+                lamp_index=run["lamp_index"],
+                from_state=from_state,
+                to_state=to_state,
+                frame_index=start,
+                elevation_angle_deg=angle,
+                method="model",
+                transition_event_id=run["transition_event_id"],
+                start_frame=start,
+                end_frame=run["end_frame"],
+                duration_frames=run["duration_frames"],
+            )
+        )
+    events.sort(key=lambda event: (event.frame_index, event.lamp_index))
+    return events
+
+
 # Exact white-lamp count -> glidepath state for a complete 4-lamp PAPI unit.
 # The five states are defined purely by how many lamps are white vs red, so this
 # is an exact lookup, not a ratio. Mirrors the offline decoder

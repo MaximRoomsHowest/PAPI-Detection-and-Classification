@@ -24,6 +24,7 @@ from app.services.state import (
     detect_lamp_transitions,
     global_state_from_lamps,
     normalize_detections,
+    transition_events_from_state_runs,
 )
 from app.services.telemetry import DroneSample
 from app.validation.schemas import AnalysisPayload, AngleResult, FramePoint
@@ -48,10 +49,15 @@ def run_tracked_sequence(
     history_size: int,
     exports_dir: Path,
     drone_samples: list[DroneSample] | None = None,
+    transition_method: str = "tracking",
 ) -> AnalysisPayload:
     """Run ByteTrack detection per frame, write the annotated artifact, and aggregate
-    the final per-lamp verdict + temporal transitions by STABLE track identity.
+    the final per-lamp verdict + transitions by STABLE track identity.
     ``frames`` yields BGR frames already sized to ``width`` x ``height``.
+
+    ``transition_method`` selects how transitions are derived from the SAME tracked observations:
+    "tracking" = temporal red<->white flips (``detect_lamp_transitions``); "model" = learned
+    class-2 transition-state runs (``transition_events_from_state_runs``, needs a 3-class model).
     """
     history = deque(maxlen=history_size)
     # ByteTrack id -> [(frame_index, color_state, center_x, confidence)].
@@ -148,9 +154,14 @@ def run_tracked_sequence(
     angle_track, frame_angles = build_angle_track(
         drone_samples, runway_id, frame_count, track_observations
     )
-    transitions = detect_lamp_transitions(
-        track_observations, angle.elevation_angle_deg, frame_angles=frame_angles
-    )
+    if transition_method == "model":
+        transitions = transition_events_from_state_runs(
+            track_observations, angle.elevation_angle_deg, frame_angles=frame_angles
+        )
+    else:
+        transitions = detect_lamp_transitions(
+            track_observations, angle.elevation_angle_deg, frame_angles=frame_angles
+        )
     processing_ms = int((perf_counter() - start) * 1000)
 
     return AnalysisPayload(
@@ -167,6 +178,7 @@ def run_tracked_sequence(
         artifact_url=f"/media/{artifact_path.name}",
         detections=last_detections,
         transitions=transitions,
+        transition_method=transition_method,
         per_frame=per_frame,
         angle_track=angle_track,
     )
