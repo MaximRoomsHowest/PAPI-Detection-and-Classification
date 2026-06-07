@@ -18,8 +18,17 @@ def get_engine() -> Engine:
     Building it at import time made engine creation + ``get_settings()`` an import
     side-effect; deferring it keeps ``import app.database`` cheap and lets tests and
     tooling import the app without a database configured.
+
+    A ``sqlite`` URL (the host/local-dev DB — see .gitignore "local SQLite dev DB used by a host
+    uvicorn run") needs ``check_same_thread=False`` + ``StaticPool`` so the FastAPI threadpool can
+    share one connection instead of a fresh empty DB per checkout; the Postgres path is unchanged.
     """
-    return create_engine(get_settings().database_url, pool_pre_ping=True)
+    url = get_settings().database_url
+    if url.startswith("sqlite"):
+        from sqlalchemy.pool import StaticPool
+
+        return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    return create_engine(url, pool_pre_ping=True)
 
 
 @lru_cache(maxsize=1)
