@@ -1,0 +1,172 @@
+"""Source-agnostic tracked-video core, shared by ``analyze_video`` (frames from a
+``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
+
+The YOLO call is injected as ``detect`` (bound to the service's loaded model +
+device + confidence) so this module never imports the service — keeping the
+dependency one-way (leaf -> service). Everything else it needs (writer, overlay,
+aggregation, angle track, state) is a stateless leaf import.
+"""
+
+from collections import Counter, deque
+from collections.abc import Callable
+from pathlib import Path
+from time import perf_counter
+from typing import Any
+from uuid import uuid4
+
+from app.services.inference.aggregation import aggregate_video_lamps
+from app.services.inference.angle_resolver import build_angle_track
+from app.services.inference.overlay import draw_overlay
+from app.services.inference.video_writer import open_video_writer
+from app.services.state import (
+    DETECTION_CLASS_TO_STATE,
+    confidence_from_lamps,
+    detect_lamp_transitions,
+    global_state_from_lamps,
+    normalize_detections,
+)
+from app.services.telemetry import DroneSample
+from app.validation.schemas import AnalysisPayload, AngleResult, FramePoint
+
+
+def run_tracked_sequence(
+    frames,
+    *,
+    detect: Callable[..., list[dict]],
+    cv2: Any,
+    fps: float,
+    width: int,
+    height: int,
+    runway_id: str,
+    original_filename: str,
+    drone_id: str | None,
+    angle: AngleResult,
+    start: float,
+    max_frames: int,
+    too_long_message: str,
+    empty_message: str,
+    history_size: int,
+    exports_dir: Path,
+    drone_samples: list[DroneSample] | None = None,
+) -> AnalysisPayload:
+    """Run ByteTrack detection per frame, write the annotated artifact, and aggregate
+    the final per-lamp verdict + temporal transitions by STABLE track identity.
+    ``frames`` yields BGR frames already sized to ``width`` x ``height``.
+    """
+    history = deque(maxlen=history_size)
+    # ByteTrack id -> [(frame_index, color_state, center_x, confidence)].
+    # Drives BOTH temporal transition detection AND the final per-lamp verdict,
+    # so both reference the same stable track identity (not per-frame rank).
+    track_observations: dict[int, list[tuple]] = {}
+    frame_count = 0
+    last_detections: list[dict] = []
+    # Raw per-frame verdict + confidence series (one entry per processed frame),
+    # surfaced on the payload so the Live Demo can chart frame-by-frame confidence.
+    per_frame: list[FramePoint] = []
+
+    # Open the writer LAST before the try below, so nothing fallible runs between
+    # acquiring it and the try/except that releases it (avoids a writer leak on an
+    # init error between creation and the loop).
+    base_path = exports_dir / f"{uuid4()}_annotated"
+    writer, artifact_path = open_video_writer(cv2, base_path, fps, width, height)
+    if writer is None:
+        raise RuntimeError("Could not write annotated video artifact.")
+
+    # The annotated artifact is partially written as the loop runs. If the loop
+    # raises (in-loop too-long guard) OR finishes with no readable frames, that
+    # partial file must NOT survive as an orphan: release the writer AND unlink
+    # it before re-raising. A SUCCESSFUL run releases the writer and keeps the
+    # artifact (audit: orphaned-annotated-artifact on max_frames exceeded).
+    try:
+        for frame in frames:
+            if frame_count >= max_frames:
+                raise ValueError(too_long_message)
+
+            # ByteTrack reset on the first frame so state from a previous
+            # request doesn't bleed in (audit B-MAJ-1). Subsequent frames
+            # continue with persist=True for actual tracking.
+            detections = detect(
+                frame,
+                use_tracking=True,
+                reset_tracker=(frame_count == 0),
+            )
+            lamps = normalize_detections(detections)
+            # Record each tracked lamp's colour over time so red<->white
+            # switches can be detected after the loop (transition is temporal,
+            # not a per-frame geometric verdict).
+            for det in detections:
+                track_id = det.get("track_id")
+                color = DETECTION_CLASS_TO_STATE.get(int(det.get("class_id", -1)))
+                bbox = det.get("bbox")
+                if track_id is None or color is None or not bbox:
+                    continue
+                center_x = (bbox["x1"] + bbox["x2"]) / 2
+                track_observations.setdefault(int(track_id), []).append(
+                    (frame_count, color, center_x, float(det.get("confidence", 0.0)))
+                )
+            frame_state = global_state_from_lamps(lamps)
+            frame_confidence = confidence_from_lamps(lamps)
+            # Raw per-frame sample (before the sliding-window smoothing used for
+            # the overlay) — the genuine frame-to-frame confidence the UI plots.
+            per_frame.append(
+                FramePoint(frame_index=frame_count, confidence=frame_confidence, state=frame_state)
+            )
+
+            history.append(frame_state)
+            smoothed_state = Counter(history).most_common(1)[0][0]
+            annotated = draw_overlay(
+                cv2,
+                frame,
+                lamps,
+                smoothed_state,
+                frame_confidence,
+                angle.elevation_angle_deg,
+            )
+            writer.write(annotated)
+
+            last_detections = detections
+            frame_count += 1
+
+        if frame_count == 0:
+            raise ValueError(empty_message)
+    except BaseException:
+        # Any failure (too-long mid-loop, empty stream, or an unexpected error)
+        # discards the half-written artifact instead of leaking it to disk.
+        writer.release()
+        artifact_path.unlink(missing_ok=True)
+        raise
+    else:
+        writer.release()
+
+    final_lamps = aggregate_video_lamps(track_observations)
+    global_state = global_state_from_lamps(final_lamps)
+    confidence = confidence_from_lamps(final_lamps)
+    # Per-frame angle track from the resolved telemetry (empty when no fixes or a
+    # single fix): pairs each frame's viewing angle with the lamps seen there so
+    # the chart can draw the real red<->white sweep. ``frame_angles`` then gives
+    # each transition the angle AT its own frame (its commissioned set angle).
+    angle_track, frame_angles = build_angle_track(
+        drone_samples, runway_id, frame_count, track_observations
+    )
+    transitions = detect_lamp_transitions(
+        track_observations, angle.elevation_angle_deg, frame_angles=frame_angles
+    )
+    processing_ms = int((perf_counter() - start) * 1000)
+
+    return AnalysisPayload(
+        media_type="video",
+        original_filename=original_filename,
+        runway_id=runway_id,
+        drone_id=drone_id,
+        global_state=global_state,
+        lamps=final_lamps,
+        confidence=confidence,
+        frame_count=frame_count,
+        processing_ms=processing_ms,
+        angle=angle,
+        artifact_url=f"/media/{artifact_path.name}",
+        detections=last_detections,
+        transitions=transitions,
+        per_frame=per_frame,
+        angle_track=angle_track,
+    )

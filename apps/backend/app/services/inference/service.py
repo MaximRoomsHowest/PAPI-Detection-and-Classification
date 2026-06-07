@@ -1,6 +1,5 @@
 import os
 import threading
-from collections import Counter, deque
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -9,42 +8,39 @@ from typing import Any
 from uuid import uuid4
 
 from app.config import Settings
-from app.services.angle import (
-    compute_elevation_angles,
-    extract_gps_metadata,
-    extract_gps_uncertainty,
-    unavailable_angle,
-)
 from app.services.inference.aggregation import aggregate_video_lamps
+from app.services.inference.angle_resolver import (
+    angle_for_media,
+    angle_from_samples,
+    build_angle_track,
+    evenly_spaced,
+    resolve_drone_samples,
+)
 from app.services.inference.cv2_loader import require_cv2
+from app.services.inference.detector import detect_frame
+from app.services.inference.frame_source import (
+    check_pixel_budget,
+    iter_video_frames,
+    video_frame_limit,
+)
 from app.services.inference.overlay import LAMP_COLORS, draw_overlay
+from app.services.inference.sequence_runner import run_tracked_sequence
 from app.services.inference.video_writer import open_video_writer
 from app.services.model_registry import compute_sha256, load_model_card
 from app.services.state import (
-    DETECTION_CLASS_TO_STATE,
     confidence_from_lamps,
-    detect_lamp_transitions,
     global_state_from_lamps,
-    lamp_index_by_track,
     normalize_detections,
 )
-from app.services.telemetry import DroneSample, resample_to_frames
+from app.services.telemetry import DroneSample
 from app.validation.schemas import (
     AnalysisPayload,
     AngleResult,
     AngleSample,
-    FrameLampState,
-    FramePoint,
     LampResult,
     ModelInfo,
     ValMetrics,
 )
-
-# Cap the per-frame angle track surfaced to the client. The exact red<->white
-# crossing is carried separately by transitions[] (full frame resolution), so the
-# track only needs enough points to draw a smooth sweep; evenly downsampling a long
-# clip keeps the payload lean. Demo videos are usually well under this.
-_MAX_ANGLE_TRACK_POINTS = 240
 
 
 class InferenceService:
@@ -191,22 +187,9 @@ class InferenceService:
         self._detect_frame(np.zeros((64, 64, 3), dtype=np.uint8), use_tracking=False)
 
     def _check_pixel_budget(self, width: int, height: int, what: str = "image") -> None:
-        """Reject a decoded frame whose pixel count exceeds the configured budget.
-
-        The upload byte-cap does not bound decode amplification, so a small, highly
-        compressed file can decode to gigabytes (a "decompression bomb"). Raising here
-        (a ValueError -> HTTP 400) stops it before the frame is processed or copied. A
-        non-positive dimension means "unknown" (e.g. cv2 CAP_PROP returned 0) and is left
-        for the real decode to surface.
-        """
-        if width <= 0 or height <= 0:
-            return
-        max_pixels = self.settings.max_image_megapixels * 1_000_000
-        if width * height > max_pixels:
-            raise ValueError(
-                f"Uploaded {what} is too large to decode safely ({width}x{height} px); "
-                f"the limit is {self.settings.max_image_megapixels} megapixels."
-            )
+        """Delegates to ``frame_source.check_pixel_budget`` (kept as a method so the
+        decompression-bomb guard stays reachable via the service surface + tests)."""
+        check_pixel_budget(width, height, self.settings.max_image_megapixels, what)
 
     def analyze_image(
         self,
@@ -323,16 +306,8 @@ class InferenceService:
 
     @staticmethod
     def _iter_video_frames(cap: Any):
-        """Yield decoded BGR frames from an open ``cv2.VideoCapture``.
-
-        Releasing the capture is the CALLER's job (``analyze_video`` does it in a
-        ``finally``) so an early raise in the tracked-sequence core can't leak the handle.
-        """
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-            yield frame
+        """Delegates to ``frame_source.iter_video_frames``."""
+        return iter_video_frames(cap)
 
     def analyze_frame_sequence(
         self,
@@ -429,124 +404,29 @@ class InferenceService:
         Runs ByteTrack detection per frame, writes the annotated artifact, and aggregates
         the final per-lamp verdict + temporal transitions by STABLE track identity.
         ``frames`` yields BGR frames already sized to ``width`` x ``height``.
+
+        Delegates to ``sequence_runner.run_tracked_sequence``, injecting the loaded
+        model (via ``self._detect_frame``), the cv2 handle, and the relevant settings
+        so the core never imports the service (one-way leaf -> service dependency).
         """
-        cv2 = self._require_cv2()
-
-        history = deque(maxlen=self.settings.video_history_size)
-        # ByteTrack id -> [(frame_index, color_state, center_x, confidence)].
-        # Drives BOTH temporal transition detection AND the final per-lamp verdict,
-        # so both reference the same stable track identity (not per-frame rank).
-        track_observations: dict[int, list[tuple]] = {}
-        frame_count = 0
-        last_detections: list[dict] = []
-        # Raw per-frame verdict + confidence series (one entry per processed frame),
-        # surfaced on the payload so the Live Demo can chart frame-by-frame confidence.
-        per_frame: list[FramePoint] = []
-
-        # Open the writer LAST before the try below, so nothing fallible runs between
-        # acquiring it and the try/except that releases it (avoids a writer leak on an
-        # init error between creation and the loop).
-        base_path = self.settings.exports_dir / f"{uuid4()}_annotated"
-        writer, artifact_path = self._open_video_writer(cv2, base_path, fps, width, height)
-        if writer is None:
-            raise RuntimeError("Could not write annotated video artifact.")
-
-        # The annotated artifact is partially written as the loop runs. If the loop
-        # raises (in-loop too-long guard) OR finishes with no readable frames, that
-        # partial file must NOT survive as an orphan: release the writer AND unlink
-        # it before re-raising. A SUCCESSFUL run releases the writer and keeps the
-        # artifact (audit: orphaned-annotated-artifact on max_frames exceeded).
-        try:
-            for frame in frames:
-                if frame_count >= max_frames:
-                    raise ValueError(too_long_message)
-
-                # ByteTrack reset on the first frame so state from a previous
-                # request doesn't bleed in (audit B-MAJ-1). Subsequent frames
-                # continue with persist=True for actual tracking.
-                detections = self._detect_frame(
-                    frame,
-                    use_tracking=True,
-                    reset_tracker=(frame_count == 0),
-                )
-                lamps = normalize_detections(detections)
-                # Record each tracked lamp's colour over time so red<->white
-                # switches can be detected after the loop (transition is temporal,
-                # not a per-frame geometric verdict).
-                for det in detections:
-                    track_id = det.get("track_id")
-                    color = DETECTION_CLASS_TO_STATE.get(int(det.get("class_id", -1)))
-                    bbox = det.get("bbox")
-                    if track_id is None or color is None or not bbox:
-                        continue
-                    center_x = (bbox["x1"] + bbox["x2"]) / 2
-                    track_observations.setdefault(int(track_id), []).append(
-                        (frame_count, color, center_x, float(det.get("confidence", 0.0)))
-                    )
-                frame_state = global_state_from_lamps(lamps)
-                frame_confidence = confidence_from_lamps(lamps)
-                # Raw per-frame sample (before the sliding-window smoothing used for
-                # the overlay) — the genuine frame-to-frame confidence the UI plots.
-                per_frame.append(
-                    FramePoint(frame_index=frame_count, confidence=frame_confidence, state=frame_state)
-                )
-
-                history.append(frame_state)
-                smoothed_state = Counter(history).most_common(1)[0][0]
-                annotated = self._draw_overlay(
-                    frame,
-                    lamps,
-                    smoothed_state,
-                    frame_confidence,
-                    angle.elevation_angle_deg,
-                )
-                writer.write(annotated)
-
-                last_detections = detections
-                frame_count += 1
-
-            if frame_count == 0:
-                raise ValueError(empty_message)
-        except BaseException:
-            # Any failure (too-long mid-loop, empty stream, or an unexpected error)
-            # discards the half-written artifact instead of leaking it to disk.
-            writer.release()
-            artifact_path.unlink(missing_ok=True)
-            raise
-        else:
-            writer.release()
-
-        final_lamps = self._aggregate_video_lamps(track_observations)
-        global_state = global_state_from_lamps(final_lamps)
-        confidence = confidence_from_lamps(final_lamps)
-        # Per-frame angle track from the resolved telemetry (empty when no fixes or a
-        # single fix): pairs each frame's viewing angle with the lamps seen there so
-        # the chart can draw the real red<->white sweep. ``frame_angles`` then gives
-        # each transition the angle AT its own frame (its commissioned set angle).
-        angle_track, frame_angles = self._build_angle_track(
-            drone_samples, runway_id, frame_count, track_observations
-        )
-        transitions = detect_lamp_transitions(
-            track_observations, angle.elevation_angle_deg, frame_angles=frame_angles
-        )
-        processing_ms = int((perf_counter() - start) * 1000)
-
-        return AnalysisPayload(
-            media_type="video",
-            original_filename=original_filename,
+        return run_tracked_sequence(
+            frames,
+            detect=self._detect_frame,
+            cv2=self._require_cv2(),
+            fps=fps,
+            width=width,
+            height=height,
             runway_id=runway_id,
+            original_filename=original_filename,
             drone_id=drone_id,
-            global_state=global_state,
-            lamps=final_lamps,
-            confidence=confidence,
-            frame_count=frame_count,
-            processing_ms=processing_ms,
             angle=angle,
-            artifact_url=f"/media/{artifact_path.name}",
-            detections=last_detections,
-            transitions=transitions,
-            per_frame=per_frame,
-            angle_track=angle_track,
+            start=start,
+            max_frames=max_frames,
+            too_long_message=too_long_message,
+            empty_message=empty_message,
+            history_size=self.settings.video_history_size,
+            exports_dir=self.settings.exports_dir,
+            drone_samples=drone_samples,
         )
 
     @staticmethod
@@ -566,57 +446,17 @@ class InferenceService:
         use_tracking: bool,
         reset_tracker: bool = False,
     ) -> list[dict]:
-        """Run YOLO on a single frame.
-
-        ``use_tracking=True`` routes through Ultralytics' ByteTrack so per-lamp
-        identity is maintained across frames inside a video request. The
-        ``reset_tracker`` flag controls whether the tracker state from a
-        previous video bleeds into this one (audit B-MAJ-1): pass
-        ``reset_tracker=True`` on the FIRST frame of every new video and
-        ``False`` thereafter. Implementation: Ultralytics treats
-        ``persist=False`` as "reinitialise the tracker on this call" and
-        ``persist=True`` as "continue with whatever state the predictor has".
-        Reversing the previous always-False default re-enables ByteTrack's
-        actual job (continuity) while keeping cross-request isolation.
-        """
-        if use_tracking:
-            results = self.model.track(
-                frame,
-                persist=not reset_tracker,
-                tracker="bytetrack.yaml",
-                conf=self.settings.confidence_threshold,
-                device=self.device,
-                verbose=False,
-            )
-        else:
-            results = self.model.predict(
-                frame,
-                conf=self.settings.confidence_threshold,
-                device=self.device,
-                verbose=False,
-            )
-
-        if not results:
-            return []
-
-        result = results[0]
-        boxes = getattr(result, "boxes", None)
-        if boxes is None:
-            return []
-
-        detections: list[dict] = []
-        for box in boxes:
-            x1, y1, x2, y2 = [int(value) for value in box.xyxy[0]]
-            detections.append(
-                {
-                    "class_id": int(box.cls[0]),
-                    "confidence": round(float(box.conf[0]), 4),
-                    "bbox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
-                    # ByteTrack id on the video/tracking path; None for single-image predict.
-                    "track_id": int(box.id[0]) if getattr(box, "id", None) is not None else None,
-                }
-            )
-        return detections
+        """Delegates to ``detector.detect_frame``, binding the loaded model + the
+        configured confidence threshold + resolved device. ``warmup`` and the
+        tracked-sequence core both reach YOLO through here."""
+        return detect_frame(
+            self.model,
+            frame,
+            use_tracking=use_tracking,
+            reset_tracker=reset_tracker,
+            conf=self.settings.confidence_threshold,
+            device=self.device,
+        )
 
     @staticmethod
     def _resolve_drone_samples(
@@ -624,29 +464,9 @@ class InferenceService:
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None,
     ) -> tuple[list[DroneSample] | None, str | None]:
-        """Resolve telemetry fixes + a source label for the angle calc.
-
-        Priority: an uploaded telemetry-file track > a manual lat/lon/alt fix on the
-        request > the media's embedded DJI XMP / EXIF GPS. Returns ``(None, None)``
-        when no source carries usable telemetry, so the caller marks the angle
-        unavailable rather than inventing one.
-        """
-        if drone_samples:
-            return drone_samples, "telemetry_file"
-        if drone_metadata:
-            lat, lon, alt = drone_metadata
-            return [DroneSample(lat, lon, alt)], "request_metadata"
-        embedded = extract_gps_metadata(media_path)
-        if embedded is not None:
-            lat, lon, alt = embedded
-            # Attach the RTK std when the file carries it, so the angle gets a 1-sigma
-            # band; manual + telemetry-file fixes have no std and stay unbanded.
-            uncertainty = extract_gps_uncertainty(media_path)
-            sigma_h, sigma_v = uncertainty if uncertainty is not None else (None, None)
-            return [
-                DroneSample(lat, lon, alt, sigma_horizontal_m=sigma_h, sigma_vertical_m=sigma_v)
-            ], "file_metadata"
-        return None, None
+        """Delegates to ``angle_resolver.resolve_drone_samples`` (telemetry-file >
+        manual fix > embedded EXIF priority)."""
+        return resolve_drone_samples(media_path, drone_metadata, drone_samples)
 
     def _angle_from_samples(
         self,
@@ -654,28 +474,8 @@ class InferenceService:
         angle_source: str | None,
         runway_id: str,
     ) -> AngleResult:
-        """Representative single elevation angle from a telemetry track.
-
-        The MIDDLE fix is the representative position (a descent's mid-point is a fair
-        one-number summary for the overlay / readout / log); the full sweep is carried
-        separately by the per-frame angle track. A single fix is its own representative.
-        """
-        if not samples:
-            return unavailable_angle(
-                "GPS/altitude metadata not available. Browser uploads usually preserve the original file "
-                "bytes, but many exported/compressed videos and images do not contain drone telemetry. "
-                "Upload the drone's telemetry file (DJI .SRT / CSV / JSON) or enter the position manually."
-            )
-        rep = samples[len(samples) // 2]
-        return compute_elevation_angles(
-            rep.latitude,
-            rep.longitude,
-            rep.altitude_m,
-            runway_id,
-            angle_source=angle_source or "metadata",
-            sigma_horizontal_m=rep.sigma_horizontal_m,
-            sigma_vertical_m=rep.sigma_vertical_m,
-        )
+        """Delegates to ``angle_resolver.angle_from_samples`` (representative midpoint angle)."""
+        return angle_from_samples(samples, angle_source, runway_id)
 
     def _angle_for_media(
         self,
@@ -684,9 +484,8 @@ class InferenceService:
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
     ) -> AngleResult:
-        """Single-fix elevation angle for an image (or any non-tracked media)."""
-        samples, source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
-        return self._angle_from_samples(samples, source, runway_id)
+        """Delegates to ``angle_resolver.angle_for_media`` (single-fix angle for an image)."""
+        return angle_for_media(media_path, runway_id, drone_metadata, drone_samples)
 
     def _build_angle_track(
         self,
@@ -695,66 +494,13 @@ class InferenceService:
         frame_count: int,
         track_observations: dict[int, list[tuple]],
     ) -> tuple[list[AngleSample], dict[int, float]]:
-        """Per-frame angle track + a frame_index -> midpoint-angle map.
-
-        Aligns the telemetry track to the processed frames (``resample_to_frames``),
-        computes the PAPI-midpoint elevation angle per frame, and tags each frame with
-        the lamps observed there (stable ByteTrack identity). With fewer than two
-        fixes there is nothing to sweep, so an empty track + map is returned and the
-        single representative angle on the payload covers it. The surfaced track is
-        evenly downsampled to ``_MAX_ANGLE_TRACK_POINTS``; the full-resolution
-        ``frame_angles`` map still tags every transition with the angle at its frame.
-        """
-        if not drone_samples or len(drone_samples) < 2 or frame_count <= 0:
-            return [], {}
-
-        resampled = resample_to_frames(drone_samples, frame_count)
-        # Cache midpoint angle by (lat, lon, alt): nearest-frame resampling reuses the
-        # same fix across several frames, so this avoids recomputing identical angles.
-        cache: dict[tuple[float, float, float], float | None] = {}
-        frame_angles: dict[int, float] = {}
-        for frame_index, sample in enumerate(resampled):
-            key = (sample.latitude, sample.longitude, sample.altitude_m)
-            if key not in cache:
-                cache[key] = compute_elevation_angles(
-                    sample.latitude, sample.longitude, sample.altitude_m, runway_id
-                ).elevation_angle_deg
-            angle_deg = cache[key]
-            if angle_deg is not None:
-                frame_angles[frame_index] = round(angle_deg, 6)
-
-        # Per-frame per-lamp colour by stable identity, so each angle sample lists the
-        # lamps actually seen at that frame.
-        index_by_track = lamp_index_by_track(track_observations)
-        frame_lamps: dict[int, dict[int, tuple[str, float]]] = {}
-        for track_id, observations in track_observations.items():
-            lamp_index = index_by_track.get(track_id)
-            if lamp_index is None:
-                continue
-            for frame_idx, color, _center_x, conf in observations:
-                frame_lamps.setdefault(frame_idx, {})[lamp_index] = (color, float(conf))
-
-        kept = self._evenly_spaced(sorted(frame_angles), _MAX_ANGLE_TRACK_POINTS)
-        track = [
-            AngleSample(
-                frame_index=frame_index,
-                elevation_angle_deg=frame_angles[frame_index],
-                lamps=[
-                    FrameLampState(index=idx, state=state, confidence=round(conf, 4))
-                    for idx, (state, conf) in sorted(frame_lamps.get(frame_index, {}).items())
-                ],
-            )
-            for frame_index in kept
-        ]
-        return track, frame_angles
+        """Delegates to ``angle_resolver.build_angle_track`` (per-frame angle sweep)."""
+        return build_angle_track(drone_samples, runway_id, frame_count, track_observations)
 
     @staticmethod
     def _evenly_spaced(items: list[int], cap: int) -> list[int]:
-        """Down-sample a sorted list to at most ``cap`` evenly-spaced entries (endpoints kept)."""
-        if cap <= 1 or len(items) <= cap:
-            return items[:1] if cap == 1 else items
-        step = (len(items) - 1) / (cap - 1)
-        return [items[index] for index in sorted({round(i * step) for i in range(cap)})]
+        """Delegates to ``angle_resolver.evenly_spaced``."""
+        return evenly_spaced(items, cap)
 
     # Retained on the class so the BGR overlay palette stays reachable via the
     # service surface; the canonical definition lives in ``overlay.LAMP_COLORS``.
@@ -782,11 +528,8 @@ class InferenceService:
         return require_cv2()
 
     def _video_frame_limit(self, fps: float) -> int:
-        frame_limit = max(1, self.settings.max_video_frames)
-        if self.settings.max_video_seconds <= 0:
-            return frame_limit
-        seconds_limit = max(1, int(fps * self.settings.max_video_seconds))
-        return min(frame_limit, seconds_limit)
+        """Delegates to ``frame_source.video_frame_limit``."""
+        return video_frame_limit(fps, self.settings.max_video_frames, self.settings.max_video_seconds)
 
 
 @lru_cache
