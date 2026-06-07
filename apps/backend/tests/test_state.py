@@ -1,4 +1,5 @@
 from app.services.state import (
+    aggregate_transition_state_events,
     confidence_from_lamps,
     detect_lamp_transitions,
     global_state_from_lamps,
@@ -135,3 +136,29 @@ def test_detect_lamp_transitions_gap_tolerance_boundary():
 def test_detect_lamp_transitions_empty_without_a_switch():
     assert detect_lamp_transitions({}) == []
     assert detect_lamp_transitions({1: [(0, "red", 10.0)]}) == []  # single observation
+
+
+def test_aggregate_transition_state_events_groups_a_run():
+    """A 3-class model reads 'transition' for a run of frames; the run collapses to one event
+    with a stable id, frame span, duration, and the bracketing red/white states + angles."""
+    obs = {5: [(0, "red", 100.0), (1, "transition", 100.0), (2, "transition", 100.0), (3, "white", 100.0)]}
+    events = aggregate_transition_state_events(obs, frame_angles={1: 3.10, 2: 3.05})
+    assert len(events) == 1
+    e = events[0]
+    assert e["transition_event_id"] == "L1-E1"
+    assert e["lamp_index"] == 1
+    assert (e["start_frame"], e["end_frame"], e["duration_frames"]) == (1, 2, 2)
+    assert (e["from_state"], e["to_state"]) == ("red", "white")
+    assert (e["start_angle_deg"], e["end_angle_deg"]) == (3.10, 3.05)
+
+
+def test_aggregate_transition_state_events_empty_for_two_class():
+    """A 2-class model never emits 'transition', so no state-run events are produced."""
+    assert aggregate_transition_state_events({5: [(0, "red", 1.0), (1, "white", 1.0)]}) == []
+
+
+def test_aggregate_transition_state_events_min_run_filters_flicker():
+    """A single isolated 'transition' frame is dropped at min_run_frames=2 (flicker), kept at 1."""
+    obs = {5: [(0, "red", 1.0), (1, "transition", 1.0), (2, "red", 1.0)]}
+    assert aggregate_transition_state_events(obs, min_run_frames=2) == []
+    assert len(aggregate_transition_state_events(obs, min_run_frames=1)) == 1

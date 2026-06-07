@@ -17,6 +17,12 @@ from app.validation.schemas import BoundingBox, LampResult, TransitionEvent
 DETECTION_CLASS_TO_STATE = {
     0: "red",
     1: "white",
+    # Forward-compatible with the 3-class transition-aware model (branch transition-model):
+    # such a model emits class 2 directly, so a single frame CAN read "transition". The live
+    # 2-class model never produces class 2, so this entry is inert for it (no behaviour change).
+    # The temporal red<->white method below (detect_lamp_transitions) remains the path for
+    # 2-class models; aggregate_transition_state_events is the path for a 3-class model.
+    2: "transition",
 }
 
 # The only per-frame lamp states that represent a real detection the model made.
@@ -148,6 +154,68 @@ def detect_lamp_transitions(
                 )
             )
     events.sort(key=lambda event: (event.frame_index, event.lamp_index))
+    return events
+
+
+# A genuine transition state run must persist at least this many observed frames; a single
+# isolated "transition" frame is treated as detector flicker and dropped (temporal smoothing).
+MIN_TRANSITION_RUN_FRAMES = 1
+
+
+def _transition_event(eid: int, lamp_index: int, run: list[int], before: str | None,
+                      after: str | None, frame_angles: dict[int, float] | None) -> dict:
+    angles = frame_angles or {}
+    start, end = run[0], run[-1]
+    return {
+        "transition_event_id": f"L{lamp_index}-E{eid}",
+        "lamp_index": lamp_index,
+        "start_frame": start,
+        "end_frame": end,
+        "duration_frames": end - start + 1,
+        "from_state": before,
+        "to_state": after,
+        "start_angle_deg": angles.get(start),
+        "end_angle_deg": angles.get(end),
+    }
+
+
+def aggregate_transition_state_events(
+    track_observations: dict[int, list[tuple]],
+    frame_angles: dict[int, float] | None = None,
+    min_run_frames: int = MIN_TRANSITION_RUN_FRAMES,
+) -> list[dict]:
+    """Group runs of per-frame "transition" state (from a 3-class model) into per-lamp events.
+
+    For a transition-aware detector a lamp reads "transition" for a short run of frames around a
+    red<->white switch. This collapses each maximal run into ONE event with a stable id, frame
+    span, duration, and the bracketing stable colours (the per-lamp transition events the frontend
+    counts), applying a minimum-run filter so a one-frame flicker is not reported. Returns [] for a
+    2-class model (no "transition" states ever appear). Lamp identity uses the same
+    ``lamp_index_by_track`` as the temporal method so both reference one physical-lamp numbering.
+    """
+    index_by_track = lamp_index_by_track(track_observations)
+    events: list[dict] = []
+    eid = 0
+    for tid, obs in track_observations.items():
+        lamp_index = index_by_track.get(tid)
+        if lamp_index is None:
+            continue
+        ordered = sorted(obs, key=lambda item: item[0])
+        last_stable: str | None = None
+        run: list[int] = []
+        for frame, state, *_ in ordered:
+            if state == "transition":
+                run.append(frame)
+                continue
+            if len(run) >= min_run_frames:
+                eid += 1
+                events.append(_transition_event(eid, lamp_index, run, last_stable, state, frame_angles))
+            run = []
+            last_stable = state
+        if len(run) >= min_run_frames:
+            eid += 1
+            events.append(_transition_event(eid, lamp_index, run, last_stable, None, frame_angles))
+    events.sort(key=lambda e: (e["start_frame"], e["lamp_index"]))
     return events
 
 
