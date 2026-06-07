@@ -98,7 +98,7 @@ def main() -> int:
     p.add_argument("--combined", type=Path, default=DEFAULT_COMBINED)
     p.add_argument("--base", type=Path, default=DEFAULT_BASE)
     p.add_argument("--project", type=Path, default=DEFAULT_PROJECT)
-    p.add_argument("--name", default="transition3class-yolo26s-1280")
+    p.add_argument("--name", default="transition3class-yolo26s-1280")  # base yolo26s (needs ultralytics>=8.4)
     p.add_argument("--epochs", type=int, default=80)
     p.add_argument("--imgsz", type=int, default=1280)
     p.add_argument("--batch", type=int, default=4)

@@ -19,7 +19,9 @@ dependencies = [
     "scipy>=1.11",
     "PyYAML>=6.0",
     "tqdm>=4.66",
-    "ultralytics>=8.3",
+    # >=8.4: the project's yolo26 models can be loaded for inference by 8.3.x, but TRAINING
+    # (re-parsing the architecture) needs 8.4+ (8.3.x raises SPPF arg-count errors on yolo26).
+    "ultralytics>=8.4",
 ]
 
 [project.optional-dependencies]

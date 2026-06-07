@@ -20,7 +20,7 @@ from collections import Counter
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_WEIGHTS = REPO_ROOT / "data" / "runs" / "detect" / "transition3class-yolo11s-1280" / "weights" / "best.pt"
+DEFAULT_WEIGHTS = REPO_ROOT / "data" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
 DEFAULT_DATA = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "transition_combined" / "data.yaml"
 OUT = REPO_ROOT / "docs" / "transition"
 EXAMPLES = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "eval_examples"
