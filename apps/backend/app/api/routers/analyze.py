@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Annotated
@@ -144,6 +145,83 @@ def _enforce_batch_upload_budget(files: list[UploadFile], settings) -> None:
             )
 
 
+def _validate_batch_upload(files: list[UploadFile], *, what: str):
+    """Shared front-door checks for the two batch endpoints; returns the settings.
+
+    Rejects an empty upload (400) and a batch over PAPI_MAX_BATCH_FRAMES (413) so a
+    10,000-image folder can't pin the worker for minutes (audit B-MAJ-5), then runs
+    the byte-budget guard. ``what`` names the upload in the 413 message ("Folder
+    uploads" / "Image sequences").
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one image file.")
+    settings = routes.get_settings()
+    if len(files) > settings.max_batch_frames:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"{what} are limited to {settings.max_batch_frames} frames per "
+                f"request. Got {len(files)}. Split the folder and retry, or raise "
+                f"PAPI_MAX_BATCH_FRAMES on the server."
+            ),
+        )
+    _enforce_batch_upload_budget(files, settings)
+    return settings
+
+
+@contextmanager
+def _analysis_error_handling(runway_id: str):
+    """Map inference failures to the analyze endpoints' HTTP contract.
+
+    A ``ValueError`` (bad upload / unreadable media / telemetry) becomes a 400; any
+    other failure — RuntimeError (missing model/OpenCV), cv2.error, or a
+    SQLAlchemyError on commit — is logged server-side and returned as a generic 503
+    so internal paths/library internals are never disclosed (rubric LR1D). An
+    already-formed HTTPException passes through unchanged. The success-path file
+    cleanup stays in each caller's own ``finally`` (the saved-file set differs).
+    """
+    try:
+        yield
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.warning("analysis.value_error", extra={"runway_id": runway_id, "detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("analysis.error", extra={"runway_id": runway_id})
+        raise HTTPException(
+            status_code=503,
+            detail="Inference service is temporarily unavailable. Check the server logs.",
+        ) from exc
+
+
+def _log_analysis_success(
+    media_type: str,
+    runway_id: str,
+    payload: AnalysisPayload,
+    log_id: str,
+    *,
+    include_frame_count: bool = False,
+) -> None:
+    """Structured success log shared by the upload and sequence paths.
+
+    Pairs with the request_id from middleware so a single analysis can be traced
+    end-to-end (audit B-IMP-4). The sequence path passes ``include_frame_count`` so
+    the assembled-clip frame total is recorded.
+    """
+    extra = {
+        "media_type": media_type,
+        "runway_id": runway_id,
+        "global_state": payload.global_state,
+        "confidence": payload.confidence,
+        "processing_ms": payload.processing_ms,
+        "log_id": log_id,
+    }
+    if include_frame_count:
+        extra["frame_count"] = payload.frame_count
+    logger.info("analysis.success", extra=extra)
+
+
 @router.post("/analyze", response_model=AnalysisPayload)
 def analyze_media(
     file: Annotated[UploadFile, File()],
@@ -181,22 +259,7 @@ def analyze_frames(
     Each file is analyzed in turn (sequentially, sharing the loaded inference model)
     and a single FrameBatchPayload aggregates the per-frame results plus total wall time.
     """
-    if not files:
-        raise HTTPException(status_code=400, detail="Upload at least one image file.")
-
-    # Bound the batch size so a 10,000-image folder upload can't pin the
-    # worker for minutes (audit B-MAJ-5). Configurable via PAPI_MAX_BATCH_FRAMES.
-    settings = routes.get_settings()
-    if len(files) > settings.max_batch_frames:
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                f"Folder uploads are limited to {settings.max_batch_frames} frames per "
-                f"request. Got {len(files)}. Split the folder and retry, or raise "
-                f"PAPI_MAX_BATCH_FRAMES on the server."
-            ),
-        )
-    _enforce_batch_upload_budget(files, settings)
+    _validate_batch_upload(files, what="Folder uploads")
 
     # Reject an unknown runway once, up front, before any per-file disk I/O.
     validate_runway_id(params.runway_id)
@@ -235,20 +298,7 @@ def analyze_sequence(
     verdict — the same pipeline as a real video upload. Files are ordered by
     filename so a drone's frame_000.jpg…frame_NNN.jpg sequence plays in capture order.
     """
-    if not files:
-        raise HTTPException(status_code=400, detail="Upload at least one image file.")
-
-    settings = routes.get_settings()
-    if len(files) > settings.max_batch_frames:
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                f"Image sequences are limited to {settings.max_batch_frames} frames per "
-                f"request. Got {len(files)}. Split the folder and retry, or raise "
-                f"PAPI_MAX_BATCH_FRAMES on the server."
-            ),
-        )
-    _enforce_batch_upload_budget(files, settings)
+    settings = _validate_batch_upload(files, what="Image sequences")
 
     validate_runway_id(params.runway_id)
 
@@ -269,47 +319,28 @@ def analyze_sequence(
 
     saved_paths: list = []
     try:
-        for upload in ordered:
-            media_type = detect_media_type(upload.filename or "", upload.content_type)
-            if media_type != "image":
-                raise HTTPException(status_code=400, detail="Image sequences accept image files only.")
-            validate_media_signature(upload, media_type)
-            saved_paths.append(save_upload(upload, settings))
+        with _analysis_error_handling(params.runway_id):
+            for upload in ordered:
+                media_type = detect_media_type(upload.filename or "", upload.content_type)
+                if media_type != "image":
+                    raise HTTPException(status_code=400, detail="Image sequences accept image files only.")
+                validate_media_signature(upload, media_type)
+                saved_paths.append(save_upload(upload, settings))
 
-        payload = routes.get_inference_service().analyze_frame_sequence(
-            image_paths=saved_paths,
-            runway_id=params.runway_id,
-            original_filename=display_name,
-            drone_id=params.drone_id,
-            drone_metadata=manual_metadata,
-            drone_samples=drone_samples,
-        )
-        log = AnalysisLogRepository(db).create_from_payload(payload)
-        payload.log_id = log.id
-        logger.info(
-            "analysis.success",
-            extra={
-                "media_type": "video",
-                "runway_id": params.runway_id,
-                "global_state": payload.global_state,
-                "confidence": payload.confidence,
-                "processing_ms": payload.processing_ms,
-                "log_id": log.id,
-                "frame_count": payload.frame_count,
-            },
-        )
-        return payload
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.warning("analysis.value_error", extra={"runway_id": params.runway_id, "detail": str(exc)})
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("analysis.error", extra={"runway_id": params.runway_id})
-        raise HTTPException(
-            status_code=503,
-            detail="Inference service is temporarily unavailable. Check the server logs.",
-        ) from exc
+            payload = routes.get_inference_service().analyze_frame_sequence(
+                image_paths=saved_paths,
+                runway_id=params.runway_id,
+                original_filename=display_name,
+                drone_id=params.drone_id,
+                drone_metadata=manual_metadata,
+                drone_samples=drone_samples,
+            )
+            log = AnalysisLogRepository(db).create_from_payload(payload)
+            payload.log_id = log.id
+            _log_analysis_success(
+                "video", params.runway_id, payload, log.id, include_frame_count=True
+            )
+            return payload
     finally:
         for path in saved_paths:
             path.unlink(missing_ok=True)
@@ -346,46 +377,19 @@ def _analyze_upload(
     saved_path = save_upload(file, settings)
 
     try:
-        payload = routes.get_inference_service().analyze(
-            media_path=saved_path,
-            media_type=media_type,
-            runway_id=params.runway_id,
-            original_filename=file.filename or saved_path.name,
-            drone_id=params.drone_id,
-            drone_metadata=manual_metadata,
-            drone_samples=drone_samples,
-        )
-        log = AnalysisLogRepository(db).create_from_payload(payload)
-        payload.log_id = log.id
-        # Structured success log — pairs with the request_id from middleware
-        # so a single analysis can be traced end-to-end (audit B-IMP-4).
-        logger.info(
-            "analysis.success",
-            extra={
-                "media_type": media_type,
-                "runway_id": params.runway_id,
-                "global_state": payload.global_state,
-                "confidence": payload.confidence,
-                "processing_ms": payload.processing_ms,
-                "log_id": log.id,
-            },
-        )
-        return payload
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.warning("analysis.value_error", extra={"runway_id": params.runway_id, "detail": str(exc)})
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        # Any other failure — RuntimeError (missing model/OpenCV), cv2.error, or a
-        # SQLAlchemyError on commit — is logged server-side and returned as a generic
-        # 503 so internal paths/library internals are never disclosed (rubric LR1D).
-        # Previously only RuntimeError was caught, so cv2/DB errors surfaced as an
-        # opaque 500 with no structured log (audit backend-bugs).
-        logger.exception("analysis.error", extra={"runway_id": params.runway_id})
-        raise HTTPException(
-            status_code=503,
-            detail="Inference service is temporarily unavailable. Check the server logs.",
-        ) from exc
+        with _analysis_error_handling(params.runway_id):
+            payload = routes.get_inference_service().analyze(
+                media_path=saved_path,
+                media_type=media_type,
+                runway_id=params.runway_id,
+                original_filename=file.filename or saved_path.name,
+                drone_id=params.drone_id,
+                drone_metadata=manual_metadata,
+                drone_samples=drone_samples,
+            )
+            log = AnalysisLogRepository(db).create_from_payload(payload)
+            payload.log_id = log.id
+            _log_analysis_success(media_type, params.runway_id, payload, log.id)
+            return payload
     finally:
         saved_path.unlink(missing_ok=True)
