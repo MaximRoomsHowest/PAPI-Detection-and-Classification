@@ -1,22 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   analyzeFrame,
   analyzeMedia,
   analyzeSequence,
-  createRunway,
-  deleteRunway as deleteRunwayRequest,
-  fetchRunways,
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
-import { useFetch } from './useFetch'
 import { extractFrameImages } from '../lib/frameExtraction'
-import { loadPlotlyBundle } from '../lib/plotlyBundle'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
 import { scenarioFromBackendResult } from '../lib/papi'
-import { resolveRunwayId } from '../lib/runwaySelection'
-import { STORAGE_KEYS, safeLocalStorageSet, initialRunwayId } from '../lib/storage'
 import { createFolderVideo } from '../lib/folderVideo'
 import {
   FOLDER_MODE_ANGLE_SWEEP,
@@ -24,6 +17,8 @@ import {
   shouldAnalyzeFolderAsSequence,
   shouldKeepFrameScenarios,
 } from '../lib/analysisMode'
+import { useRunwayManagement } from './useRunwayManagement'
+import { useChartExport } from './useChartExport'
 
 // Client-side mirror of the backend PAPI_MAX_BATCH_FRAMES cap so an oversized folder is
 // rejected up front instead of uploading the whole batch only to be 413'd (audit).
@@ -32,66 +27,34 @@ const MAX_BATCH_FRAMES = Number(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES) || 2
 // Owns the Live-Demo upload + backend-inference state and the handlers that drive
 // it — extracted from App.jsx so the App component is just the route shell. `copy`
 // is the active-locale i18n object; every user-facing string is read from it.
+//
+// The two cleanly-separable concerns — runway management and the Insights PDF
+// export — live in their own hooks (useRunwayManagement / useChartExport); this hook
+// composes them and assembles the single flat object the Live-Demo context spreads.
+// The media-upload + inference core stays here, deliberately NOT split further: it is
+// tightly coupled through the shared `runIdRef` (stale-run guard, threaded across
+// handleMediaFiles / resolveResultArtifactUrls / runBackendInference) and the one-shot
+// auto-run effect, so separating it would only relocate that coupling into wiring.
 export function useAnalysis(copy) {
+  // Runway list + selection (shared with the Runways page). The reconciled
+  // `effectiveRunwayId` is what the analyze calls score against.
+  const {
+    runways,
+    effectiveRunwayId,
+    selectedRunway,
+    setSelectedRunwayId,
+    addRunway,
+    removeRunway,
+    refetchRunways,
+  } = useRunwayManagement()
+
+  // Insights PDF export (independent of the analysis state).
+  const { insightsRef, isExporting, exportError, setExportError, handleDownloadCharts } =
+    useChartExport(copy)
+
   const [activeId, setActiveId] = useState('clean')
   const [media, setMedia] = useState(null)
   const [folderMode, setFolderMode] = useState(FOLDER_MODE_ANGLE_SWEEP)
-  // Runway selection: the list comes from the backend (/api/runways); the chosen
-  // id is sent as `runway_id` so the analysis scores against the right PAPI unit's
-  // surveyed geometry. The id is persisted across reloads (localStorage) and
-  // reconciled against the live list, so a stored/selected id that no longer exists
-  // (custom runway deleted in another tab) self-heals to a safe default instead of
-  // silently breaking the selector and the analyze call.
-  const { data: runwayData, refetch: refetchRunways } = useFetch(fetchRunways, [])
-  // Memoised so its identity is stable across renders — an inline `?? []` makes a
-  // new array every render, which would churn the dependent memo/effect below.
-  const runways = useMemo(() => runwayData ?? [], [runwayData])
-  const [selectedRunwayId, setSelectedRunwayId] = useState(initialRunwayId)
-
-  // Effective selection: the stored id reconciled against the live list. A
-  // stale/deleted id (e.g. a custom runway removed in another tab) transparently
-  // resolves to a safe default — DERIVED, not stored, so we never setState in an
-  // effect (which cascades renders). Before the list loads we keep the raw id so the
-  // persisted choice isn't clobbered by the empty-list fallback.
-  const effectiveRunwayId =
-    runways.length > 0 ? resolveRunwayId(selectedRunwayId, runways) : selectedRunwayId
-
-  // Persist the effective id (best-effort; safe in private-mode / SSR) so a stale
-  // stored id self-heals on disk too once the live list is known.
-  useEffect(() => {
-    safeLocalStorageSet(STORAGE_KEYS.runway, effectiveRunwayId)
-  }, [effectiveRunwayId])
-
-  // The full record for the selected runway, shared app-wide so the Live Demo and
-  // Runways page can show its label + geometry (not just the id).
-  const selectedRunway = useMemo(
-    () => runways.find((runway) => runway.id === effectiveRunwayId) ?? null,
-    [runways, effectiveRunwayId],
-  )
-
-  // Runway management, shared app-wide via context so the Runways page and the
-  // Live Demo selector stay in sync. A newly added runway is persisted server-side
-  // and immediately usable for analysis, so refetch the list and make it active;
-  // deleting the active runway falls back to the backend default (papi_24).
-  async function addRunway(payload) {
-    const created = await createRunway(payload)
-    refetchRunways()
-    setSelectedRunwayId(created.id)
-    return created
-  }
-
-  async function removeRunway(runwayId) {
-    await deleteRunwayRequest(runwayId)
-    refetchRunways()
-    // Fall off the deleted runway to a still-valid one. papi_24 is a built-in
-    // (undeletable), so resolveRunwayId always yields a valid id; the reconciliation
-    // effect is the backstop once the refetched list arrives.
-    setSelectedRunwayId((current) =>
-      current === runwayId
-        ? resolveRunwayId(null, runways.filter((runway) => runway.id !== runwayId))
-        : current,
-    )
-  }
 
   // Optional manual drone telemetry for the elevation-angle calc, used when an
   // uploaded image carries no GPS EXIF (browser uploads usually strip it). Empty
@@ -109,8 +72,6 @@ export function useAnalysis(copy) {
   const [metadataFile, setMetadataFile] = useState(null)
 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
-  const [exportError, setExportError] = useState('')
   const [backendScenario, setBackendScenario] = useState(null)
   const [backendFrames, setBackendFrames] = useState([])
   // Raw AnalysisPayload[] kept in parallel with backendFrames so result-driven
@@ -123,7 +84,6 @@ export function useAnalysis(copy) {
   const autoRunRequestedRef = useRef(false)
   const [folderVideo, setFolderVideo] = useState(null)
   const [isTransformingFolderVideo, setIsTransformingFolderVideo] = useState(false)
-  const insightsRef = useRef(null)
   // Monotonic analysis run id: bumped whenever new media is selected and captured
   // at the start of each run, so a slow in-flight analysis whose media was replaced
   // mid-flight discards its (now stale) result instead of painting it onto the new
@@ -370,69 +330,6 @@ export function useAnalysis(copy) {
       toast.error(error.message || copy.live.folderVideoFailed)
     } finally {
       setIsTransformingFolderVideo(false)
-    }
-  }
-
-  async function handleDownloadCharts() {
-    if (!insightsRef.current || isExporting) {
-      return
-    }
-
-    setIsExporting(true)
-    setExportError('')
-
-    try {
-      const { jsPDF } = await import('jspdf')
-      const { Plotly } = await loadPlotlyBundle()
-      const chartNodes = Array.from(
-        insightsRef.current.querySelectorAll('.js-plotly-plot'),
-      )
-
-      if (!chartNodes.length) {
-        // No rendered charts to capture — tell the user instead of silently
-        // doing nothing (audit F06/F07).
-        setExportError(copy.insights.downloadUnavailable)
-        return
-      }
-
-      const images = []
-      for (const node of chartNodes) {
-        const rect = node.getBoundingClientRect()
-        const width = Math.max(1, Math.round(rect.width))
-        const height = Math.max(1, Math.round(rect.height))
-        const dataUrl = await Plotly.toImage(node, {
-          format: 'png',
-          width,
-          height,
-          scale: 2,
-        })
-        images.push({
-          dataUrl,
-          width,
-          height,
-          orientation: width >= height ? 'landscape' : 'portrait',
-        })
-      }
-
-      const [first, ...rest] = images
-      const pdf = new jsPDF({
-        orientation: first.orientation,
-        unit: 'px',
-        format: [first.width, first.height],
-      })
-      pdf.addImage(first.dataUrl, 'PNG', 0, 0, first.width, first.height)
-      rest.forEach((image) => {
-        pdf.addPage([image.width, image.height], image.orientation)
-        pdf.addImage(image.dataUrl, 'PNG', 0, 0, image.width, image.height)
-      })
-      pdf.save('papi-vision-insights.pdf')
-      toast.success(copy.insights.downloadReady)
-    } catch (error) {
-      console.error('PDF export failed', error)
-      setExportError(copy.insights.downloadFailed)
-      toast.error(copy.insights.downloadFailed)
-    } finally {
-      setIsExporting(false)
     }
   }
 
