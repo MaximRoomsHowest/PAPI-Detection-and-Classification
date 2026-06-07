@@ -11,6 +11,17 @@ cleanup to keep Git lean:
 Do not commit generated folders directly under `data/`; recreate or junction
 them locally from the archive when a workflow needs them.
 
+## Reference notebook
+
+- `data_analysis.ipynb` — the retained exploratory notebook from the
+  `data_analysis` branch (committed **with** its outputs, hence its size). It is
+  the documented origin of the PAPI 06 `461.37 m` reference altitude wired into
+  `configs/papi_edny.yaml`, `apps/backend/app/services/runways.py`, and
+  `apps/backend/app/api/routers/analyze.py`, and its haversine angle ranges are
+  pinned by `apps/backend/tests/test_angle.py`. The active, output-stripped
+  pipeline version is `workflows/notebooks/05_data_analysis.ipynb`. Keep both:
+  this one is the provenance record, that one is the runnable pipeline step.
+
 ## Stable Sources
 
 - `raw/` - optional local junction to the archived original client image drop.
