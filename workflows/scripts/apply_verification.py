@@ -108,9 +108,10 @@ def apply(twin: Path) -> dict:
             for r in rows:
                 keep_transition = (source_id, fr, r["track_id"]) in accepted
                 cls = CLASS_TRANSITION if keep_transition else int(r["class_id"])
-                if cls == CLASS_TRANSITION:
-                    final_transition_boxes += 1
                 lines.append(f"{cls} {r['cx']} {r['cy']} {r['w']} {r['h']}")
+            # Drop exact-duplicate boxes (pre-existing annotation artifacts in a few frames).
+            lines = list(dict.fromkeys(lines))
+            final_transition_boxes += sum(1 for ln in lines if ln.startswith("2 "))
             (vd / "labels" / (Path(file).stem + ".txt")).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     log_path = twin / "verification_log.csv"

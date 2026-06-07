@@ -98,14 +98,12 @@ def process_video(video_dir: Path, airport_config: dict, *, half_window: int, wa
             CLASS_TRANSITION if (fr, r["track_id"]) in marked else int(r["class_id"]) for r in rows
         ]
         label_path = video_dir / "labels" / (Path(file).stem + ".txt")
-        label_path.write_text(
-            "\n".join(
-                f"{cls} {r['cx']} {r['cy']} {r['w']} {r['h']}"
-                for r, cls in zip(rows, new_classes, strict=True)
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        # dict.fromkeys drops exact-duplicate boxes (pre-existing annotation artifacts).
+        label_lines = list(dict.fromkeys(
+            f"{cls} {r['cx']} {r['cy']} {r['w']} {r['h']}"
+            for r, cls in zip(rows, new_classes, strict=True)
+        ))
+        label_path.write_text("\n".join(label_lines) + "\n", encoding="utf-8")
 
         image_bgr = None
         if want_colour:
