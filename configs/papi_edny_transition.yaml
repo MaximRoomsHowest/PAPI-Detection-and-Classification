@@ -1,0 +1,64 @@
+# PAPI geometry override for TRANSITION-LABEL SEEDING ONLY (Phase 3 of the transition-aware
+# pipeline). This file is a copy of configs/papi_edny.yaml with the rwy-24 commissioned
+# set-angles filled in. The live config is intentionally NOT modified: changing set-angles
+# there would silently shift production transition boundaries.
+#
+# Why the override matters: lamp_state.compute_lamp_state() centers each lamp's ±halfwidth
+# "transition" blend zone on its set_angle_deg. The live config leaves set_angle_deg null,
+# so it falls back to FAA defaults [2.50, 2.83, 3.17, 3.50] -- which are NOT where these
+# lamps actually transition. Seeding transition labels with the FAA defaults would flag the
+# wrong frames. The commissioned rwy-24 angles below were validated to +/-0.02 deg against
+# the client's own "Redness vs Angle" tool at the 2026-06-01/06-02 geometry-closure meetings
+# (see BigBrain intersoft-papi-detection-angle-transition-requirement-2026-06-02).
+#
+# Mapping (innermost light_1 -> outermost light_4, ascending set-angle, matching the FAA-default
+# ordering already used by the validated tracking pipeline):
+#   light_1 = 2.32 deg (client lamp A)   light_3 = 3.12 deg (client lamp C)
+#   light_2 = 2.55 deg (client lamp B)   light_4 = 3.60 deg (client lamp D)
+# rwy-06 commissioned set-angles are still PENDING from the client, so rwy-06 stays null
+# (FAA fallback) and its night-flight transition seeds are flagged higher-uncertainty
+# downstream (routed preferentially to manual CVAT review).
+
+airport: EDNY
+
+runways:
+  '06':
+    papi:
+      # rwy-06 commissioned set-angles still pending -> keep null (FAA fallback). Higher
+      # uncertainty; Phase 4 scoring routes more of these to manual review.
+      light_1: { lat: 47.668810, lon: 9.504007, alt: 461.37, set_angle_deg: null }
+      light_2: { lat: 47.668881, lon: 9.503948, alt: 461.37, set_angle_deg: null }
+      light_3: { lat: 47.668951, lon: 9.503888, alt: 461.37, set_angle_deg: null }
+      light_4: { lat: 47.669021, lon: 9.503828, alt: 461.37, set_angle_deg: null }
+  '24':
+    papi:
+      # Commissioned set-angles validated to +/-0.02 deg (see header). alt 461.37 m datum
+      # carried over from the live config (datum risk note applies equally here).
+      light_1: { lat: 47.673521, lon: 9.518154, alt: 461.37, set_angle_deg: 2.32 }
+      light_2: { lat: 47.673450, lon: 9.518214, alt: 461.37, set_angle_deg: 2.55 }
+      light_3: { lat: 47.673380, lon: 9.518274, alt: 461.37, set_angle_deg: 3.12 }
+      light_4: { lat: 47.673309, lon: 9.518333, alt: 461.37, set_angle_deg: 3.60 }
+
+# FAA defaults for a 3.0deg glideslope (used when set_angle_deg above is null):
+faa_default_set_angles_deg: [2.50, 2.83, 3.17, 3.50]
+glideslope_deg: 3.0
+# Blend-zone half-width: a lamp within +/-0.10 deg of its set-angle is geometrically "in
+# transition". This is the width that defines how many frames per crossing get seeded.
+transition_half_width_deg: 0.10
+default_alt_wgs84_m: 465.0
+
+cameras:
+  wide:
+    sensor: WideCamera
+    width: 5280
+    height: 3956
+    calibrated_focal_px: 3725.151611
+    optical_center_x: 2640.0
+    optical_center_y: 1978.0
+  zoom:
+    sensor: ZoomCamera
+    width: 8192
+    height: 6144
+    calibrated_focal_px: null
+    optical_center_x: 4096.0
+    optical_center_y: 3072.0
