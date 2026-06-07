@@ -1,14 +1,16 @@
-import { useMemo } from 'react'
-import { Compass } from 'lucide-react'
+import { memo, useMemo } from 'react'
+import { Compass, TrendingDown } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig } from '../../catalog/plotly'
-import { angleBrightnessSeries } from '../../lib/insightsTransforms'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, CHART_HEIGHT, LAMP_COLORS } from '../../catalog/plotly'
+import { angleBrightnessSeries, elevationOverFrameSeries } from '../../lib/insightsTransforms'
 
-// Client-critical chart modelled on the AGL Altitude tool: one stacked
-// brightness/visibility curve per lamp, plotted against real elevation angle.
-const lampColor = (lampIndex, plotTheme) =>
-  ['#2f6fed', '#e23b3b', '#1f9d57', plotTheme.strong][lampIndex - 1]
+// Client-critical chart modelled on the AGL Altitude tool: one confidence/visibility
+// curve per lamp, plotted against real elevation angle, plus a descent-profile
+// (elevation-over-frame) chart. Lamp-IDENTITY colours come from the CVD-safe Okabe-Ito
+// palette (catalog/plotly.js) and are deliberately distinct from the red/white/transition
+// STATE colours so a series is never misread as a lamp state (audit B3).
+const lampColor = (lampIndex) => LAMP_COLORS[lampIndex - 1]
 const THRESHOLD_COLOR = '#2e8d46'
 const TRANSITION_COLOR = '#b04cc8'
 
@@ -23,7 +25,7 @@ function intersectionLabel(transitionAngle, copy) {
   return `${copy.insights.intersectionLabel}: ${transitionAngle.toFixed(2)}°`
 }
 
-function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, copy }) {
+const AngleChart = memo(function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, copy }) {
   const name = lampName(lampIndex, copy)
   if (!points.length) {
     return (
@@ -34,7 +36,7 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
     )
   }
 
-  const color = lampColor(lampIndex, plotTheme)
+  const color = lampColor(lampIndex)
   const transitionName = copy.insights.transitionAngleName.replace('{lamp}', name)
   const angles = points.map((point) => point.angle)
   const minAngle = Math.min(...angles)
@@ -45,22 +47,22 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
   const data = [
     {
       type: 'scatter',
+      // Linear, not spline: the samples are discrete per-frame confidences, so a
+      // smoothed curve would imply a continuous function the data doesn't support
+      // (and could overshoot) — audit B2.
       mode: 'lines+markers',
       name,
       x: points.map((point) => point.angle),
       y: points.map((point) => point.brightness),
-      line: { color, shape: 'spline', smoothing: 0.45, width: 2.3 },
+      line: { color, shape: 'linear', width: 2.3 },
       marker: { size: 4, color },
-      customdata: points.map((point) => [
-        copy.status?.[point.state] ?? point.state,
-        point.confidence,
-        point.label || '',
-      ]),
+      // [state label, source label] — the confidence value is already the y-axis, so
+      // it is no longer duplicated as its own hover row (audit A2).
+      customdata: points.map((point) => [copy.status?.[point.state] ?? point.state, point.label || '']),
       hovertemplate:
-        `${copy.insights.angleAxis}: %{x:.3f}<br>` +
+        `${copy.insights.angleAxis}: %{x:.3f}°<br>` +
         `${copy.insights.brightnessAxis}: %{y:.0f}%<br>` +
-        `${copy.insights.stateAxis}: %{customdata[0]}<br>` +
-        `${copy.insights.angleConfidence}: %{customdata[1]}%<extra>%{customdata[2]}</extra>`,
+        `${copy.insights.stateAxis}: %{customdata[0]}<extra>%{customdata[1]}</extra>`,
     },
     {
       type: 'scatter',
@@ -86,13 +88,15 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
   }
 
   const layout = basePlotLayout(plotTheme, {
-    height: 210,
-    margin: { l: 96, r: 14, t: 8, b: 42 },
-    // Legend top-right inside the plot, matching the client tool.
+    height: CHART_HEIGHT,
+    // Bottom margin leaves room for the horizontal legend below the plot, so the
+    // legend no longer overlaps the curve on the right edge (audit: legend overlap).
+    margin: { l: 96, r: 14, t: 24, b: 64 },
     legend: {
-      x: 1,
-      y: 1,
-      xanchor: 'right',
+      orientation: 'h',
+      x: 0.5,
+      y: -0.18,
+      xanchor: 'center',
       yanchor: 'top',
       bgcolor: 'rgba(0,0,0,0)',
       font: { color: plotTheme.muted, size: 11 },
@@ -127,47 +131,118 @@ function AngleChart({ lampIndex, points, transitionAngle, threshold, plotTheme, 
   return (
     <div className="angle-chart">
       <h4>{name}</h4>
-      <LazyPlot className="plotly-chart" config={plotlyConfig} data={data} layout={layout} useResizeHandler />
+      <LazyPlot
+        className="plotly-chart"
+        config={plotlyConfig}
+        data={data}
+        layout={layout}
+        copy={copy}
+        ariaLabel={`${copy.insights.brightnessAxis} — ${name}`}
+        useResizeHandler
+      />
     </div>
   )
-}
+})
+
+// Deliverable #3: elevation angle over frame — the real descent profile from each
+// analysed video/sequence's telemetry track (audit B6). One line per series.
+const ElevationOverFrameChart = memo(function ElevationOverFrameChart({ series, plotTheme, copy }) {
+  const multi = series.length > 1
+  const data = series.map((entry, index) => ({
+    type: 'scatter',
+    mode: 'lines',
+    name: entry.label,
+    x: entry.frames,
+    y: entry.angles,
+    line: { color: LAMP_COLORS[index % LAMP_COLORS.length], width: 2 },
+    hovertemplate:
+      `${copy.insights.thFrame}: %{x}<br>${copy.insights.elevationAxis}: %{y:.3f}°<extra>${entry.label}</extra>`,
+  }))
+  const layout = basePlotLayout(plotTheme, {
+    height: CHART_HEIGHT,
+    margin: { l: 64, r: 16, t: 10, b: multi ? 64 : 42 },
+    showlegend: multi,
+    legend: { orientation: 'h', x: 0.5, y: -0.18, xanchor: 'center', font: { color: plotTheme.muted, size: 11 } },
+    xaxis: baseAxisStyle(plotTheme, {
+      title: axisTitle(copy.insights.thFrame, plotTheme),
+      gridcolor: plotTheme.grid,
+      zeroline: false,
+    }),
+    yaxis: baseAxisStyle(plotTheme, {
+      title: axisTitle(copy.insights.elevationAxis, plotTheme),
+      gridcolor: plotTheme.grid,
+    }),
+  })
+  return (
+    <LazyPlot
+      className="plotly-chart"
+      config={plotlyConfig}
+      data={data}
+      layout={layout}
+      copy={copy}
+      ariaLabel={copy.insights.elevationTitle}
+      useResizeHandler
+    />
+  )
+})
 
 export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
   const series = useMemo(() => angleBrightnessSeries(backendResults), [backendResults])
+  const elevationSeries = useMemo(() => elevationOverFrameSeries(backendResults), [backendResults])
   const hasAny = series.some((lamp) => lamp.points.length > 0)
 
   return (
-    <article className="viz-card angle-card span-all">
-      <div className="viz-heading">
-        <Compass size={18} />
-        <div>
-          <h3>{copy.insights.angleTitle}</h3>
-          <p>{copy.insights.angleText}</p>
+    <>
+      <article className="viz-card angle-card span-all">
+        <div className="viz-heading">
+          <Compass size={18} />
+          <div>
+            <h3>{copy.insights.angleTitle}</h3>
+            <p>{copy.insights.angleText}</p>
+          </div>
+          <span className="client-tag">{copy.insights.angleClientTag}</span>
         </div>
-        <span className="client-tag">{copy.insights.angleClientTag}</span>
-      </div>
 
-      {hasAny ? (
-        <div className="angle-stack">
-          {series.map((lamp) => (
-            <AngleChart
-              key={lamp.lampIndex}
-              lampIndex={lamp.lampIndex}
-              points={lamp.points}
-              transitionAngle={lamp.transitionAngle}
-              threshold={lamp.threshold}
-              plotTheme={plotTheme}
-              copy={copy}
-            />
-          ))}
+        {hasAny ? (
+          <div className="angle-stack">
+            {series.map((lamp) => (
+              <AngleChart
+                key={lamp.lampIndex}
+                lampIndex={lamp.lampIndex}
+                points={lamp.points}
+                transitionAngle={lamp.transitionAngle}
+                threshold={lamp.threshold}
+                plotTheme={plotTheme}
+                copy={copy}
+              />
+            ))}
+          </div>
+        ) : (
+          <AngleEmptyState
+            icon={<Compass size={26} aria-hidden="true" />}
+            title={copy.insights.angleEmptyTitle}
+            message={copy.insights.angleEmptyText}
+          />
+        )}
+      </article>
+
+      <article className="viz-card span-all">
+        <div className="viz-heading">
+          <TrendingDown size={18} />
+          <div>
+            <h3>{copy.insights.elevationTitle}</h3>
+            <p>{copy.insights.elevationText}</p>
+          </div>
         </div>
-      ) : (
-        <AngleEmptyState
-          icon={<Compass size={26} aria-hidden="true" />}
-          title={copy.insights.angleEmptyTitle}
-          message={copy.insights.angleEmptyText}
-        />
-      )}
-    </article>
+        {elevationSeries.length ? (
+          <ElevationOverFrameChart series={elevationSeries} plotTheme={plotTheme} copy={copy} />
+        ) : (
+          <AngleEmptyState
+            icon={<TrendingDown size={26} aria-hidden="true" />}
+            message={copy.insights.elevationEmpty}
+          />
+        )}
+      </article>
+    </>
   )
 }

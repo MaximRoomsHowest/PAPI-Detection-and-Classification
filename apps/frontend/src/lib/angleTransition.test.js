@@ -44,6 +44,17 @@ describe('detectTransitionAngle', () => {
     expect(detectTransitionAngle(points)).toBeCloseTo(2.55, 5)
   })
 
+  it('detects a descending white -> red crossing (not only ascending captures)', () => {
+    // A capture taken while descending: white at low angle, red at high angle.
+    const points = [
+      { angle: 2.0, state: 'white' },
+      { angle: 2.5, state: 'white' },
+      { angle: 2.6, state: 'red' },
+      { angle: 3.0, state: 'red' },
+    ]
+    expect(detectTransitionAngle(points)).toBeCloseTo(2.55, 5)
+  })
+
   it('returns null when the lamp never goes white', () => {
     expect(detectTransitionAngle([
       { angle: 2.0, state: 'red' },

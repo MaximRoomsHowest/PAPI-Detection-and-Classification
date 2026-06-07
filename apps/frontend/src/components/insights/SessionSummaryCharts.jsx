@@ -2,7 +2,15 @@ import { useMemo } from 'react'
 import { BarChart3, SignalHigh } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, plotlyPalette } from '../../catalog/plotly'
+import {
+  axisTitle,
+  basePlotLayout,
+  baseAxisStyle,
+  plotlyConfig,
+  plotlyPalette,
+  CHART_HEIGHT,
+  integerTicks,
+} from '../../catalog/plotly'
 import { confidenceValues, perLightStateSeries } from '../../lib/insightsTransforms'
 
 // Session-level distributions built from the real per-lamp results of the
@@ -22,6 +30,7 @@ const STATE_COLOR = {
 
 function PerLightStateMix({ results, plotTheme, copy }) {
   const counts = useMemo(() => perLightStateSeries(results), [results])
+  const maxStack = Math.max(0, ...counts.map((entry) => Object.values(entry).reduce((a, b) => a + b, 0)))
   const lights = [1, 2, 3, 4].map((index) => `${copy.live.light} ${index}`)
   const data = STATES.map((state) => ({
     type: 'bar',
@@ -36,15 +45,19 @@ function PerLightStateMix({ results, plotTheme, copy }) {
       className="plotly-chart"
       config={plotlyConfig}
       data={data}
+      copy={copy}
+      ariaLabel={copy.insights.perLightStateTitle}
       layout={basePlotLayout(plotTheme, {
-        height: 320,
+        height: CHART_HEIGHT,
         barmode: 'stack',
         margin: { l: 44, r: 14, t: 10, b: 40 },
         legend: { orientation: 'h', y: -0.18, font: { color: plotTheme.muted, size: 11 } },
         xaxis: baseAxisStyle(plotTheme),
         yaxis: baseAxisStyle(plotTheme, {
           gridcolor: plotTheme.grid,
-          dtick: 1,
+          // Readable integer ticks at any scale — `dtick:1` crammed ~70 labels into
+          // the axis once a session had many results (audit B8).
+          ...integerTicks(maxStack),
           rangemode: 'tozero',
         }),
       })}
@@ -59,17 +72,21 @@ function ConfidenceDistribution({ results, plotTheme, copy }) {
     <LazyPlot
       className="plotly-chart"
       config={plotlyConfig}
+      copy={copy}
+      ariaLabel={copy.insights.confidenceTitle}
       data={[
         {
           type: 'histogram',
           x: values,
           marker: { color: plotTheme.accent, line: { color: plotTheme.paper, width: 1 } },
-          xbins: { start: 0, end: 100, size: 10 },
-          hovertemplate: `${copy.insights.confidenceAxis}: %{x}<br>%{y}<extra></extra>`,
+          // end slightly past 100 so a perfect 100%-confidence detection (a half-open
+          // bin edge) is still counted in the top bin (audit B7).
+          xbins: { start: 0, end: 100.001, size: 10 },
+          hovertemplate: `${copy.insights.confidenceAxis}: %{x}<br>${copy.insights.countAxis}: %{y}<extra></extra>`,
         },
       ]}
       layout={basePlotLayout(plotTheme, {
-        height: 320,
+        height: CHART_HEIGHT,
         bargap: 0.04,
         margin: { l: 44, r: 14, t: 10, b: 42 },
         xaxis: baseAxisStyle(plotTheme, {
@@ -78,7 +95,10 @@ function ConfidenceDistribution({ results, plotTheme, copy }) {
           gridcolor: plotTheme.grid,
         }),
         yaxis: baseAxisStyle(plotTheme, {
+          title: axisTitle(copy.insights.countAxis, plotTheme),
           gridcolor: plotTheme.grid,
+          // Detections is an integer count too — keep its ticks whole at low counts (audit B8).
+          ...integerTicks(values.length),
           rangemode: 'tozero',
         }),
       })}

@@ -1,44 +1,90 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { ArrowLeftRight } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
-import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, plotlyPalette } from '../../catalog/plotly'
+import {
+  axisTitle,
+  basePlotLayout,
+  baseAxisStyle,
+  plotlyConfig,
+  plotlyPalette,
+  CHART_HEIGHT,
+  integerTicks,
+} from '../../catalog/plotly'
 import { transitionCountSeries } from '../../lib/insightsTransforms'
 
-// Transition tracking surfaces for video analyses: a frame×light timeline, a
-// per-light count bar, and an event table. Every value comes from the backend's
-// transitions[] (lamp_index, from_state, to_state, frame_index, optional
-// elevation_angle_deg). Timestamp / intermediate state / per-event confidence
-// are NOT in the payload, so the table shows "—" for them — never fabricated.
-// The transitionCountSeries transform lives in lib/insightsTransforms.js.
-
+// Transition tracking surfaces for video / folder-sequence analyses: a frame×light
+// timeline, a per-light count bar, and an event table. Every value comes from the
+// backend's transitions[] (lamp_index, from_state, to_state, frame_index, optional
+// elevation_angle_deg, and — for the "model" method — method/start_frame/end_frame/
+// duration_frames). Nothing is fabricated: a field that a given method doesn't
+// produce shows "—".
 const LANE_COUNT = 4
 
-function TransitionTimeline({ transitions, plotTheme, copy }) {
+const clampLamp = (lampIndex) => Math.min(Math.max(lampIndex, 1), LANE_COUNT)
+
+// Which method(s) produced these events, for the provenance badge (audit C3).
+function methodLabel(transitions, copy) {
+  const methods = [...new Set(transitions.map((event) => event.method ?? 'tracking'))]
+  if (methods.length !== 1) {
+    return copy.insights.transitionMethodMixed
+  }
+  const label = methods[0] === 'model' ? copy.live.transitionMethodModel : copy.live.transitionMethodTracking
+  return copy.live.transitionMethodUsed.replace('{method}', label)
+}
+
+function eventHover(event, copy) {
+  const lampIndex = clampLamp(event.lamp_index)
+  const fromLabel = copy.status?.[event.from_state] ?? event.from_state
+  const toLabel = copy.status?.[event.to_state] ?? event.to_state
+  const lines = [
+    `${copy.live.light} ${lampIndex}`,
+    `${copy.insights.thFrame} ${event.frame_index}`,
+    `${fromLabel} → ${toLabel}`,
+  ]
+  if (Number.isFinite(event.duration_frames)) {
+    lines.push(`${copy.insights.thDuration}: ${event.duration_frames}`)
+  }
+  return lines.join('<br>')
+}
+
+// One marker trace per direction, distinguished by marker SYMBOL (not colour alone),
+// so direction survives greyscale / the static PDF export / colour-vision deficiency,
+// and a real legend explains it (audit B4).
+function directionTrace(events, { symbol, fill, outline, name }, copy) {
+  return {
+    type: 'scatter',
+    mode: 'markers',
+    name,
+    x: events.map((event) => event.frame_index),
+    y: events.map((event) => `${copy.live.light} ${clampLamp(event.lamp_index)}`),
+    text: events.map((event) => eventHover(event, copy)),
+    hovertemplate: '%{text}<extra></extra>',
+    marker: { size: 14, symbol, color: fill, line: { color: outline, width: 2 } },
+  }
+}
+
+const TransitionTimeline = memo(function TransitionTimeline({ transitions, plotTheme, copy }) {
   const laneLabels = useMemo(
     () => Array.from({ length: LANE_COUNT }, (_, i) => `${copy.live.light} ${i + 1}`),
     [copy.live.light],
   )
 
-  const markers = useMemo(() => {
-    const xs = []
-    const ys = []
-    const colors = []
-    const lines = []
-    const hover = []
-    for (const event of transitions) {
-      const lampIndex = Math.min(Math.max(event.lamp_index, 1), LANE_COUNT)
-      xs.push(event.frame_index)
-      ys.push(`${copy.live.light} ${lampIndex}`)
-      colors.push(event.to_state === 'white' ? plotlyPalette.white : plotlyPalette.red)
-      lines.push(event.to_state === 'white' ? plotlyPalette.red : plotlyPalette.warn)
-      const fromLabel = copy.status?.[event.from_state] ?? event.from_state
-      const toLabel = copy.status?.[event.to_state] ?? event.to_state
-      hover.push(
-        `${copy.live.light} ${lampIndex}<br>${copy.insights.thFrame} ${event.frame_index}<br>${fromLabel} → ${toLabel}`,
-      )
-    }
-    return { xs, ys, colors, lines, hover }
+  const data = useMemo(() => {
+    const toWhite = transitions.filter((event) => event.to_state === 'white')
+    const toRed = transitions.filter((event) => event.to_state !== 'white')
+    return [
+      directionTrace(
+        toWhite,
+        { symbol: 'triangle-up', fill: plotlyPalette.white, outline: plotlyPalette.red, name: copy.insights.dirToWhite },
+        copy,
+      ),
+      directionTrace(
+        toRed,
+        { symbol: 'triangle-down', fill: plotlyPalette.red, outline: plotlyPalette.warn, name: copy.insights.dirToRed },
+        copy,
+      ),
+    ]
   }, [transitions, copy])
 
   const frames = transitions.map((event) => event.frame_index).filter(Number.isFinite)
@@ -50,25 +96,14 @@ function TransitionTimeline({ transitions, plotTheme, copy }) {
     <LazyPlot
       className="plotly-chart"
       config={plotlyConfig}
-      data={[
-        {
-          type: 'scatter',
-          mode: 'markers',
-          x: markers.xs,
-          y: markers.ys,
-          text: markers.hover,
-          hovertemplate: '%{text}<extra></extra>',
-          marker: {
-            size: 15,
-            symbol: 'square',
-            color: markers.colors,
-            line: { color: markers.lines, width: 2 },
-          },
-        },
-      ]}
+      data={data}
+      copy={copy}
+      ariaLabel={copy.insights.transitionTimelineTitle}
       layout={basePlotLayout(plotTheme, {
-        height: 360,
-        margin: { l: 78, r: 16, t: 10, b: 42 },
+        height: CHART_HEIGHT,
+        margin: { l: 78, r: 16, t: 10, b: 56 },
+        // Legend below the plot keys the two direction symbols (audit B4).
+        legend: { orientation: 'h', x: 0.5, y: -0.16, xanchor: 'center', font: { color: plotTheme.muted, size: 11 } },
         xaxis: baseAxisStyle(plotTheme, {
           title: axisTitle(copy.insights.thFrame, plotTheme),
           range: [minFrame - pad, maxFrame + pad],
@@ -76,27 +111,27 @@ function TransitionTimeline({ transitions, plotTheme, copy }) {
           zeroline: false,
         }),
         yaxis: baseAxisStyle(plotTheme, {
-          // Plotly's y-axis is bottom-up: categoryarray[0] sits at the bottom.
-          // Reverse so the lanes read Light 1 (top) → Light 4 (bottom), matching
-          // the transition table's row order and the rest of the app's "Light 1
-          // first" convention.
+          // Plotly's y-axis is bottom-up: reverse so the lanes read Light 1 (top) →
+          // Light 4 (bottom), matching the table and the app's "Light 1 first" order.
           categoryorder: 'array',
           categoryarray: [...laneLabels].reverse(),
           gridcolor: plotTheme.grid,
         }),
-        showlegend: false,
+        showlegend: true,
       })}
       useResizeHandler
     />
   )
-}
+})
 
-function TransitionCountBar({ transitions, plotTheme, copy }) {
+const TransitionCountBar = memo(function TransitionCountBar({ transitions, plotTheme, copy }) {
   const { lamps, counts } = useMemo(() => transitionCountSeries(transitions), [transitions])
   return (
     <LazyPlot
       className="plotly-chart"
       config={plotlyConfig}
+      copy={copy}
+      ariaLabel={copy.insights.transitionCountTitle}
       data={[
         {
           type: 'bar',
@@ -107,20 +142,21 @@ function TransitionCountBar({ transitions, plotTheme, copy }) {
         },
       ]}
       layout={basePlotLayout(plotTheme, {
-        height: 320,
+        height: CHART_HEIGHT,
         margin: { l: 48, r: 16, t: 10, b: 40 },
         xaxis: baseAxisStyle(plotTheme),
         yaxis: baseAxisStyle(plotTheme, {
           title: axisTitle(copy.insights.transitionCountAxis, plotTheme),
           gridcolor: plotTheme.grid,
-          dtick: 1,
+          // Readable integer ticks at any scale (audit B8).
+          ...integerTicks(Math.max(0, ...counts)),
           rangemode: 'tozero',
         }),
       })}
       useResizeHandler
     />
   )
-}
+})
 
 function TransitionTable({ transitions, copy }) {
   return (
@@ -129,42 +165,51 @@ function TransitionTable({ transitions, copy }) {
         <thead>
           <tr>
             <th>{copy.insights.thLight}</th>
-            <th>{copy.insights.thTimestamp}</th>
             <th className="num">{copy.insights.thFrame}</th>
             <th>{copy.insights.thFrom}</th>
             <th>{copy.insights.thTransition}</th>
             <th>{copy.insights.thTo}</th>
             <th className="num">{copy.insights.thAngle}</th>
-            <th className="num">{copy.insights.thConfidence}</th>
+            <th className="num">{copy.insights.thDuration}</th>
           </tr>
         </thead>
         <tbody>
-          {transitions.map((event, index) => (
-            <tr key={`${event.lamp_index}-${event.frame_index}-${index}`}>
-              <td>
-                {copy.live.light} {event.lamp_index}
-              </td>
-              <td className="muted">—</td>
-              <td className="num mono tnum">{event.frame_index}</td>
-              <td>
-                <span className={`state-pill is-${event.from_state}`}>
-                  {copy.status?.[event.from_state] ?? event.from_state}
-                </span>
-              </td>
-              <td className="muted">—</td>
-              <td>
-                <span className={`state-pill is-${event.to_state}`}>
-                  {copy.status?.[event.to_state] ?? event.to_state}
-                </span>
-              </td>
-              <td className="num mono tnum">
-                {Number.isFinite(event.elevation_angle_deg)
-                  ? event.elevation_angle_deg.toFixed(3)
-                  : '—'}
-              </td>
-              <td className="num muted">—</td>
-            </tr>
-          ))}
+          {transitions.map((event, index) => {
+            const isModel = event.method === 'model'
+            return (
+              <tr key={`${event.lamp_index}-${event.frame_index}-${index}`}>
+                <td>
+                  {copy.live.light} {event.lamp_index}
+                </td>
+                <td className="num mono tnum">{event.frame_index}</td>
+                <td>
+                  <span className={`state-pill is-${event.from_state}`}>
+                    {copy.status?.[event.from_state] ?? event.from_state}
+                  </span>
+                </td>
+                <td>
+                  {/* The intermediate state: a model event is an explicit transition-state
+                      run, a tracking flip is instantaneous (no intermediate) -> "—". */}
+                  {isModel ? (
+                    <span className="state-pill is-transition">{copy.status?.transition ?? 'transition'}</span>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                <td>
+                  <span className={`state-pill is-${event.to_state}`}>
+                    {copy.status?.[event.to_state] ?? event.to_state}
+                  </span>
+                </td>
+                <td className="num mono tnum">
+                  {Number.isFinite(event.elevation_angle_deg) ? event.elevation_angle_deg.toFixed(3) : '—'}
+                </td>
+                <td className="num mono tnum">
+                  {Number.isFinite(event.duration_frames) ? event.duration_frames : '—'}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
       <p className="viz-footnote">{copy.insights.transitionTableFootnote}</p>
@@ -178,8 +223,7 @@ export function TransitionCharts({ backendResults, plotTheme, copy }) {
     for (const result of backendResults ?? []) {
       for (const event of result?.transitions ?? []) {
         // Single source of truth for lamp identity: drop events outside 1..4 here so the
-        // timeline, count bar, and table all operate on the same validated set (the
-        // per-view clamp in TransitionTimeline then becomes belt-and-braces).
+        // timeline, count bar, and table all operate on the same validated set.
         if (Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= LANE_COUNT) {
           all.push(event)
         }
@@ -187,6 +231,8 @@ export function TransitionCharts({ backendResults, plotTheme, copy }) {
     }
     return all
   }, [backendResults])
+
+  const provenance = useMemo(() => (transitions.length ? methodLabel(transitions, copy) : ''), [transitions, copy])
 
   if (!transitions.length) {
     return (
@@ -215,6 +261,7 @@ export function TransitionCharts({ backendResults, plotTheme, copy }) {
             <h3>{copy.insights.transitionTimelineTitle}</h3>
             <p>{copy.insights.transitionTimelineText}</p>
           </div>
+          {provenance ? <span className="client-tag method-tag">{provenance}</span> : null}
         </div>
         <TransitionTimeline transitions={transitions} plotTheme={plotTheme} copy={copy} />
       </article>

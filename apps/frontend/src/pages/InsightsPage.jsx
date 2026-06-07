@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import * as Tabs from '@radix-ui/react-tabs'
-import { Download, TriangleAlert } from 'lucide-react'
+import { Download, TriangleAlert, Info } from 'lucide-react'
 import clsx from 'clsx'
 import { AngleVsStateCharts } from '../components/insights/AngleVsStateCharts'
 import { TransitionCharts } from '../components/insights/TransitionCharts'
@@ -26,6 +27,8 @@ export function InsightsPage({
   // (removed from the tab order and the a11y tree) while staying in the DOM at
   // full size for PDF export. Plotly.toImage still reads inert nodes.
   const [tab, setTab] = useState('current')
+  // "Current analysis" charts the in-memory results of THIS session only (audit C1).
+  const hasSession = (backendResults?.length ?? 0) > 0
   return (
     <section className="insights-section">
       <div className="section-heading">
@@ -38,12 +41,18 @@ export function InsightsPage({
             className={clsx('secondary-button', exportError && 'has-error')}
             type="button"
             onClick={onDownloadCharts}
-            disabled={isExporting}
+            // Disabled with no session charts so a first-time click can't produce a
+            // misleading PDF of only the aggregate model chart (audit D4).
+            disabled={isExporting || !hasSession}
+            aria-busy={isExporting}
+            title={!hasSession ? copy.insights.downloadNeedsData : undefined}
+            aria-label={!hasSession ? copy.insights.downloadNeedsData : copy.insights.download}
           >
             <Download size={18} />
             {isExporting ? copy.insights.preparing : copy.insights.download}
           </button>
           <span className="source-note">{copy.insights.source}</span>
+          <span className="source-note">{copy.insights.scopeNote}</span>
         </div>
       </div>
 
@@ -51,6 +60,18 @@ export function InsightsPage({
         <div className="export-status error" role="alert" aria-live="assertive">
           <TriangleAlert size={16} />
           {exportError}
+        </div>
+      )}
+
+      {/* No analysis this session: point the user at Live Demo instead of leaving
+          them with several empty cards and a working-but-lonely model chart (audit D5). */}
+      {!hasSession && (
+        <div className="insights-cta" role="note">
+          <Info size={18} aria-hidden="true" />
+          <span>{copy.insights.emptyCta}</span>
+          <Link className="text-link" to="/live-demo">
+            {copy.insights.emptyCtaLink}
+          </Link>
         </div>
       )}
 

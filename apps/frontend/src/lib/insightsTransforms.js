@@ -24,12 +24,14 @@ export function resolveAngle(angle, lampIndex) {
   return Number.isFinite(value) ? value : null
 }
 
-// Estimate the angle at which a lamp switches red -> white (its PAPI transition
-// angle): the midpoint of the first adjacent (red|transition) -> white crossing in
-// the angle-sorted samples. As a drone climbs the approach a PAPI lamp goes red
-// (below set angle) -> white (above), so the crossing is the commissioned set
-// angle of that lamp. Returns null when the lamp never crosses to white in the
-// captured range. Pure detection from the real classified states — nothing modelled.
+// Estimate the angle at which a lamp switches red <-> white (its PAPI transition
+// angle): the midpoint of the first red/transition <-> white boundary in the
+// angle-sorted samples, in EITHER direction. An ascending capture crosses
+// red->white (a lamp below its set angle climbs above it); a descending capture
+// crosses white->red. Returns null when the lamp never crosses (all-red, all-white,
+// or no coloured samples). Pure detection from the real classified states — nothing
+// modelled, and (since the confidence-threshold fallback was removed) no fabricated
+// angle for a lamp that never actually transitions.
 export function detectTransitionAngle(points) {
   const colored = (points ?? [])
     .filter((point) => point.state === 'red' || point.state === 'white' || point.state === 'transition')
@@ -37,40 +39,12 @@ export function detectTransitionAngle(points) {
   for (let i = 1; i < colored.length; i += 1) {
     const previous = colored[i - 1]
     const current = colored[i]
-    if (current.state === 'white' && previous.state !== 'white') {
+    // XOR on "is white": exactly one side of the pair is white -> a red/transition
+    // <-> white boundary, regardless of climb/descent direction.
+    if ((current.state === 'white') !== (previous.state === 'white')) {
       return (previous.angle + current.angle) / 2
     }
   }
-  return null
-}
-
-function detectThresholdIntersection(points, threshold = VISIBILITY_THRESHOLD) {
-  const sorted = (points ?? [])
-    .filter((point) => Number.isFinite(point.angle) && Number.isFinite(point.brightness))
-    .sort((a, b) => a.angle - b.angle)
-
-  for (let i = 1; i < sorted.length; i += 1) {
-    const previous = sorted[i - 1]
-    const current = sorted[i]
-    const previousDelta = previous.brightness - threshold
-    const currentDelta = current.brightness - threshold
-
-    if (previousDelta === 0) {
-      return previous.angle
-    }
-    if (currentDelta === 0) {
-      return current.angle
-    }
-    if (previousDelta * currentDelta < 0) {
-      const brightnessSpan = current.brightness - previous.brightness
-      if (brightnessSpan === 0) {
-        return (previous.angle + current.angle) / 2
-      }
-      const ratio = (threshold - previous.brightness) / brightnessSpan
-      return previous.angle + ratio * (current.angle - previous.angle)
-    }
-  }
-
   return null
 }
 
@@ -85,9 +59,9 @@ function brightnessPoint({ angle, lamp, label }) {
   }
 }
 
-// Build the client-style brightness-vs-angle curves. The backend currently sends
+// Build the client-style confidence-vs-angle curves. The backend currently sends
 // classification confidence rather than a raw photometric intensity, so the graph
-// uses confidence as a visibility/brightness score proxy and labels it as such.
+// uses confidence as a detection/visibility score proxy and labels it as such.
 export function angleBrightnessSeries(results) {
   const series = [1, 2, 3, 4].map((lampIndex) => ({
     lampIndex,
@@ -134,7 +108,10 @@ export function angleBrightnessSeries(results) {
 
   for (const lamp of series) {
     lamp.points.sort((a, b) => a.angle - b.angle)
-    lamp.transitionAngle = detectTransitionAngle(lamp.points) ?? detectThresholdIntersection(lamp.points)
+    // Only a genuine red/transition<->white crossing yields a transition angle; a
+    // lamp that never changes colour gets null (no marker) rather than a fabricated
+    // confidence-threshold crossing that would read as a real set angle.
+    lamp.transitionAngle = detectTransitionAngle(lamp.points)
   }
 
   return series
@@ -266,4 +243,37 @@ export function confidenceValues(results) {
     }
   }
   return values
+}
+
+// --- Elevation angle over frame (descent profile) ----------------------------
+
+// One (frame_index, elevation_angle_deg) line per analysed video/sequence that
+// carried a per-frame telemetry track (DJI .SRT / CSV). The client's deliverable-#3
+// "elevation angle over time" view — a real read of `angle_track`, nothing modelled.
+// Results without a track (single images, or telemetry that was a single fix) are
+// skipped, so the chart only shows series it can honestly draw.
+export function elevationOverFrameSeries(results) {
+  const series = []
+  for (const result of results ?? []) {
+    const track = result?.angle_track
+    if (!Array.isArray(track) || track.length === 0) {
+      continue
+    }
+    const frames = []
+    const angles = []
+    for (const sample of track) {
+      const angle = sample?.elevation_angle_deg
+      if (Number.isFinite(sample?.frame_index) && Number.isFinite(angle)) {
+        frames.push(sample.frame_index)
+        angles.push(angle)
+      }
+    }
+    if (frames.length > 0) {
+      const label =
+        result?.original_filename ??
+        (result?.log_id ? `log ${result.log_id.slice(0, 8)}` : `series ${series.length + 1}`)
+      series.push({ label, frames, angles })
+    }
+  }
+  return series
 }

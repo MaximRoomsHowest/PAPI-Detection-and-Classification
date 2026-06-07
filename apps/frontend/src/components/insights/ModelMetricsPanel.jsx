@@ -4,7 +4,7 @@ import { AngleEmptyState } from './AngleEmptyState'
 import { InlineMetric } from '../InlineMetric'
 import { useFetch } from '../../hooks/useFetch'
 import { fetchModelInfo, fetchStats } from '../../lib/api'
-import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig } from '../../catalog/plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, CHART_HEIGHT, integerTicks } from '../../catalog/plotly'
 import { backendStateId, stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
 import { percent } from '../../lib/format'
@@ -46,6 +46,8 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
     <LazyPlot
       className="plotly-chart"
       config={plotlyConfig}
+      copy={copy}
+      ariaLabel={copy.insights.statsTitle}
       data={[
         {
           type: 'bar',
@@ -56,7 +58,7 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
         },
       ]}
       layout={basePlotLayout(plotTheme, {
-        height: 340,
+        height: CHART_HEIGHT,
         margin: { l: 46, r: 14, t: 10, b: 70 },
         xaxis: baseAxisStyle(plotTheme, {
           tickangle: -25,
@@ -65,7 +67,9 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
         yaxis: baseAxisStyle(plotTheme, {
           title: axisTitle(copy.insights.statsAxis, plotTheme),
           gridcolor: plotTheme.grid,
-          dtick: 1,
+          // Aggregates across EVERY logged analysis (can be thousands), so a fixed
+          // `dtick:1` produced an unreadable wall of labels (audit B8).
+          ...integerTicks(Math.max(0, ...values)),
           rangemode: 'tozero',
         }),
       })}

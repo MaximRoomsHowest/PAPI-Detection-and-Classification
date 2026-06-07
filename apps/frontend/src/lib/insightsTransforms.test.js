@@ -3,6 +3,7 @@ import {
   angleBrightnessSeries,
   angleVsStateSeries,
   confidenceValues,
+  elevationOverFrameSeries,
   perLightStateSeries,
   resolveAngle,
   transitionCountSeries,
@@ -151,7 +152,7 @@ describe('angleBrightnessSeries', () => {
     expect(series[0].transitionAngle).toBeCloseTo(2.75, 5)
   })
 
-  it('falls back to threshold intersection when no red-to-white state crossing exists', () => {
+  it('returns a null transition angle when the lamp never crosses (no fabricated fallback)', () => {
     const series = angleBrightnessSeries([
       {
         original_filename: 'clip.mp4',
@@ -162,7 +163,33 @@ describe('angleBrightnessSeries', () => {
       },
     ])
 
-    expect(series[3].transitionAngle).toBeCloseTo(1.5, 5)
+    // The lamp stays red throughout: no genuine red<->white crossing, so no marker.
+    // (Previously this fabricated a 25%-confidence-threshold crossing at 1.5°.)
+    expect(series[3].transitionAngle).toBeNull()
+  })
+})
+
+describe('elevationOverFrameSeries', () => {
+  it('returns no series when no result carries a per-frame angle track', () => {
+    expect(elevationOverFrameSeries([])).toEqual([])
+    expect(elevationOverFrameSeries([result({ lamps: [{ index: 1, state: 'white', confidence: 0.9 }] })])).toEqual([])
+  })
+
+  it('builds one (frame, angle) line per tracked result, skipping non-finite samples', () => {
+    const series = elevationOverFrameSeries([
+      {
+        original_filename: 'clip.mp4',
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0 },
+          { frame_index: 1, elevation_angle_deg: null }, // dropped
+          { frame_index: 2, elevation_angle_deg: 3.0 },
+        ],
+      },
+    ])
+    expect(series).toHaveLength(1)
+    expect(series[0].label).toBe('clip.mp4')
+    expect(series[0].frames).toEqual([0, 2])
+    expect(series[0].angles).toEqual([2.0, 3.0])
   })
 })
 

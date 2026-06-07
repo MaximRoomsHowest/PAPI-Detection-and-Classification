@@ -121,6 +121,35 @@
   white-space: nowrap;
 }
 
+/* Provenance badge on the transition timeline (tracking vs model) — informational,
+   so a muted pill rather than the accent "client requirement" badge (audit C3). */
+.method-tag {
+  background: rgba(127, 135, 148, 0.18);
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
+/* Empty-session call-to-action: nudge the user to Live Demo rather than leaving
+   them with empty cards (audit D5). */
+.insights-cta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--border, rgba(127, 135, 148, 0.3));
+  border-radius: 12px;
+  background: rgba(127, 135, 148, 0.08);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.insights-cta .text-link {
+  margin-left: 2px;
+}
+
 /* ---------- Shared chart empty / loading states ---------- */
 .chart-empty,
 .chart-skeleton {
@@ -160,6 +189,11 @@
 /* Plotly chart sizing + modebar theming (moved here when the dead decoder/
    ribbon UI was removed — audit dead-CSS cleanup). */
 .plotly-chart {
+  width: 100%;
+}
+
+/* a11y wrapper (role="img") around a chart — must not alter the chart's layout. */
+.plotly-chart-frame {
   width: 100%;
 }
 
