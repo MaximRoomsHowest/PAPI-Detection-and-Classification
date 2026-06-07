@@ -56,7 +56,9 @@ def evaluate(weights: Path, data: Path) -> dict:
     from ultralytics import YOLO
 
     model = YOLO(str(weights))
+    # workers/batch capped: source frames are 20MP, so default worker fan-out OOMs the loader.
     metrics = model.val(data=str(data), split="test", imgsz=1280, conf=0.25, iou=0.5,
+                        batch=4, workers=2,
                         project=str(REPO_ROOT / "data" / "runs" / "detect"), name="transition3class-test", exist_ok=True)
 
     per_class = {}

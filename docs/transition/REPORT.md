@@ -85,17 +85,29 @@ horizontal flip only, mosaic off (20MP RAM). **Imbalance:** transition-bearing f
 4× in the train list (val/test at true distribution). INTERIM model: flip-anchored +
 AI-spot-checked labels.
 
-## 15–18. Training & evaluation results
+## 15. Training results
 
-> Populated by `evaluate_transition_model.py` and `head_to_head_transitions.py` after the training
-> run completes (see `evaluation.md` + `evaluation_metrics.json` + `head_to_head.json`). Smoke
-> sanity (2 epochs @640) already learned the transition class (mAP50 ≈ 0.19), confirming the
-> pipeline end-to-end.
+`yolo11s` @ 1280, 19 epochs (stopped at a converged checkpoint — val mAP50 plateaued ~0.42).
+Weights `data/runs/detect/transition3class-yolo11s-1280/weights/best.pt` (git-ignored). Full
+metrics/plots/logs in that run dir.
 
-- **Per-class P/R/F1 + mAP:** see `evaluation_metrics.json`.
-- **Confusion matrix:** `data/runs/detect/transition3class-test/confusion_matrix*.png`.
-- **Example folders:** `correct_/missed_/false_transition_examples/`, `red_white_confusion_examples/`.
-- **Head-to-head (learned vs temporal):** `head_to_head.json` — transition P/R/F1 + false-transition rate.
+## 16–18. Transition-specific evaluation (TEST split, conf=0.25) — see `evaluation.md`
+
+| class | P | R | F1 | mAP50 |
+|---|--:|--:|--:|--:|
+| red | 0.829 | 0.383 | 0.524 | 0.590 |
+| white | 0.944 | 0.438 | 0.598 | 0.687 |
+| **transition** | **1.000** | **0.135** | **0.238** | **0.568** |
+
+- **Zero false transitions** (transition precision 1.0) — answers the brief's key question: it does
+  **not** hallucinate transitions in stable red/white. Transition mAP50 (0.568) ≈ red/white.
+- **Confusion matrix:** `artifacts/confusion_matrix.png` (dominant error is missed faint lamps, not
+  class confusion). **Example folders** (git-ignored twin `eval_examples/`): 4 correct, 12 missed,
+  **0 false**, 0 red/white-confusion.
+- **Head-to-head** (`head_to_head.json`): learned **F1 0.429 / P 0.75 / 1 false-transition** vs
+  temporal **F1 0.37 / P 0.29 / 12 false-transitions** — the learned class wins on F1 and precision;
+  both beat the historical 0.174. Interim caveats: small sample, epoch-19 yolo11s, conf=0.25 caps
+  recall.
 
 ## 19. ByteTrack integration notes
 

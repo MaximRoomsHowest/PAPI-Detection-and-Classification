@@ -1,0 +1,30 @@
+{
+  "weights": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-yolo11s-1280\\weights\\best.pt",
+  "per_class": {
+    "red": {
+      "precision": 0.829,
+      "recall": 0.3829,
+      "f1": 0.5238,
+      "mAP50": 0.5899
+    },
+    "white": {
+      "precision": 0.9437,
+      "recall": 0.4379,
+      "f1": 0.5982,
+      "mAP50": 0.687
+    },
+    "transition": {
+      "precision": 1.0,
+      "recall": 0.1351,
+      "f1": 0.2381,
+      "mAP50": 0.5676
+    }
+  },
+  "mAP50": 0.6148,
+  "mAP50_95": 0.295,
+  "val_dir": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-test",
+  "example_counts": {
+    "missed_transition_examples": 12,
+    "correct_transition_examples": 4
+  }
+}
