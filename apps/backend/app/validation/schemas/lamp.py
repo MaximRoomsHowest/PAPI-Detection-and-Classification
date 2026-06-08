@@ -18,6 +18,10 @@ class Detection(BaseModel):
     # None for single-image predictions. Used to detect temporal red<->white
     # transitions per lamp across frames.
     track_id: int | None = None
+    # Measured "redness" of the lamp crop (red-channel fraction scaled to 0-255):
+    # high while the lamp is red, low once it turns white. Real pixel measurement
+    # backing the client's "Redness vs angle" graph; None when it can't be computed.
+    redness: float | None = Field(default=None, ge=0.0)
 
 
 class LampResult(BaseModel):
@@ -25,15 +29,21 @@ class LampResult(BaseModel):
     state: LampState
     confidence: float = Field(ge=0.0, le=1.0)
     bbox: BoundingBox | None = None
+    # Measured red-channel redness of this lamp (0-255, high=red); None when the
+    # crop pixels weren't available. Additive — drives the Redness-vs-angle chart.
+    redness: float | None = Field(default=None, ge=0.0)
 
 
 class FrameLampState(BaseModel):
     """One lamp's classified colour at a single frame, by STABLE ByteTrack identity.
 
     Lighter than ``LampResult`` (no bbox): the per-frame angle track only needs the
-    lamp index, its colour, and the detection confidence for the chart hover.
+    lamp index, its colour, the detection confidence, and the measured redness for
+    the chart.
     """
 
     index: int = Field(ge=1, le=4)
     state: LampState
     confidence: float = Field(ge=0.0, le=1.0)
+    # Measured red-channel redness (0-255, high=red) at this frame; None if absent.
+    redness: float | None = Field(default=None, ge=0.0)

@@ -133,13 +133,16 @@ def build_angle_track(
     # Per-frame per-lamp colour by stable identity, so each angle sample lists the
     # lamps actually seen at that frame.
     index_by_track = lamp_index_by_track(track_observations)
-    frame_lamps: dict[int, dict[int, tuple[str, float]]] = {}
+    frame_lamps: dict[int, dict[int, tuple[str, float, float | None]]] = {}
     for track_id, observations in track_observations.items():
         lamp_index = index_by_track.get(track_id)
         if lamp_index is None:
             continue
-        for frame_idx, color, _center_x, conf in observations:
-            frame_lamps.setdefault(frame_idx, {})[lamp_index] = (color, float(conf))
+        # Tuples are (frame, color, center_x, conf[, redness]); tolerate the older
+        # 4-tuple shape so nothing breaks if an upstream path doesn't carry redness.
+        for frame_idx, color, _center_x, conf, *rest in observations:
+            redness = rest[0] if rest else None
+            frame_lamps.setdefault(frame_idx, {})[lamp_index] = (color, float(conf), redness)
 
     kept = evenly_spaced(sorted(frame_angles), MAX_ANGLE_TRACK_POINTS)
     track = [
@@ -147,8 +150,8 @@ def build_angle_track(
             frame_index=frame_index,
             elevation_angle_deg=frame_angles[frame_index],
             lamps=[
-                FrameLampState(index=idx, state=state, confidence=round(conf, 4))
-                for idx, (state, conf) in sorted(frame_lamps.get(frame_index, {}).items())
+                FrameLampState(index=idx, state=state, confidence=round(conf, 4), redness=redness)
+                for idx, (state, conf, redness) in sorted(frame_lamps.get(frame_index, {}).items())
             ],
         )
         for frame_index in kept

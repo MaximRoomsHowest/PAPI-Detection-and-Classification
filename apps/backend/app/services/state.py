@@ -55,19 +55,20 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
             continue
         confidence = float(detection.get("confidence", 0.0))
         center_x = (bbox["x1"] + bbox["x2"]) / 2
-        candidates.append((center_x, confidence, state, bbox))
+        candidates.append((center_x, confidence, state, bbox, detection.get("redness")))
 
     candidates = sorted(candidates, key=lambda item: item[1], reverse=True)[:4]
     candidates = sorted(candidates, key=lambda item: item[0])
 
     lamps: list[LampResult] = []
-    for index, (_, confidence, state, bbox) in enumerate(candidates, start=1):
+    for index, (_, confidence, state, bbox, redness) in enumerate(candidates, start=1):
         lamps.append(
             LampResult(
                 index=index,
                 state=state,
                 confidence=confidence,
                 bbox=BoundingBox(**bbox),
+                redness=redness,
             )
         )
 

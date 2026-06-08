@@ -107,8 +107,11 @@ def run_tracked_sequence(
                 if track_id is None or color is None or not bbox:
                     continue
                 center_x = (bbox["x1"] + bbox["x2"]) / 2
+                # (frame, color, center_x, confidence, redness). The redness rides along so
+                # the angle track can carry the per-frame Redness curve; downstream consumers
+                # index the tuple or use *_, so the extra element is safe.
                 track_observations.setdefault(int(track_id), []).append(
-                    (frame_count, color, center_x, float(det.get("confidence", 0.0)))
+                    (frame_count, color, center_x, float(det.get("confidence", 0.0)), det.get("redness"))
                 )
             frame_state = global_state_from_lamps(lamps)
             frame_confidence = confidence_from_lamps(lamps)

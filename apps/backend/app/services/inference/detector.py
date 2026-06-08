@@ -5,6 +5,44 @@ just binds ``self.model`` / ``self.settings.confidence_threshold`` / ``self.devi
 from typing import Any
 
 
+def lamp_redness(frame: Any, x1: int, y1: int, x2: int, y2: int) -> float | None:
+    """Measured "redness" of a lamp crop: the red-channel fraction (R/(R+G+B)),
+    scaled to 0-255 and averaged over the inner 60% of the bbox.
+
+    High while the lamp is red, low once it turns white (a white lamp has R~G~B, so
+    its red fraction drops to ~1/3). This is the real pixel measurement behind the
+    client's "Redness vs angle" graph — NOT derived from the classified state. The
+    inner-60% crop avoids the dark halo around the lamp. Returns None when the frame
+    isn't an image array or the crop is empty, so callers stay None-safe.
+    """
+    if not hasattr(frame, "shape") or getattr(frame, "ndim", 0) < 3:
+        return None
+    try:
+        h, w = frame.shape[:2]
+        x1c, x2c = max(0, x1), min(w, x2)
+        y1c, y2c = max(0, y1), min(h, y2)
+        if x2c <= x1c or y2c <= y1c:
+            return None
+        bw, bh = x2c - x1c, y2c - y1c
+        ix1, ix2 = x1c + int(bw * 0.2), x2c - int(bw * 0.2)
+        iy1, iy2 = y1c + int(bh * 0.2), y2c - int(bh * 0.2)
+        if ix2 <= ix1 or iy2 <= iy1:
+            ix1, iy1, ix2, iy2 = x1c, y1c, x2c, y2c
+        crop = frame[iy1:iy2, ix1:ix2]
+        if crop.size == 0:
+            return None
+        # cv2 frames are BGR: channel 0=B, 1=G, 2=R.
+        blue = float(crop[:, :, 0].mean())
+        green = float(crop[:, :, 1].mean())
+        red = float(crop[:, :, 2].mean())
+        total = red + green + blue
+        if total <= 0:
+            return None
+        return round(255.0 * red / total, 1)
+    except Exception:
+        return None
+
+
 def detect_frame(
     model: Any,
     frame: Any,
@@ -62,6 +100,8 @@ def detect_frame(
                 "bbox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
                 # ByteTrack id on the video/tracking path; None for single-image predict.
                 "track_id": int(box.id[0]) if getattr(box, "id", None) is not None else None,
+                # Real measured redness of the lamp crop (drives the Redness-vs-angle chart).
+                "redness": lamp_redness(frame, x1, y1, x2, y2),
             }
         )
     return detections

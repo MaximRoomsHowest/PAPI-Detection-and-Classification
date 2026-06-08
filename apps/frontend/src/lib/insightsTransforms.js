@@ -99,6 +99,9 @@ export function angleVsStateSeries(results) {
             stateNum,
             state: lamp.state,
             confidence: Math.round((lamp.confidence ?? 0) * 100),
+            // Real measured red-channel redness (0-255, high=red) — the client's
+            // "Redness vs angle" Y; null when the backend couldn't measure it.
+            redness: Number.isFinite(lamp.redness) ? lamp.redness : null,
             label,
           })
         }
@@ -130,11 +133,12 @@ export function angleVsStateSeries(results) {
         stateNum,
         state: lamp.state,
         confidence: Math.round((lamp.confidence ?? 0) * 100),
+        redness: Number.isFinite(lamp.redness) ? lamp.redness : null,
         label,
       })
     }
   }
-  // Sort by angle so the step line reads left-to-right, then detect each lamp's
+  // Sort by angle so the line reads left-to-right, then detect each lamp's
   // red->white transition angle from its own sorted samples.
   for (const lamp of series) {
     lamp.points.sort((a, b) => a.angle - b.angle)

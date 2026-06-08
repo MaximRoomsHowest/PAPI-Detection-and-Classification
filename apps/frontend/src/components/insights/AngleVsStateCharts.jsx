@@ -13,104 +13,116 @@ import {
 } from '../../catalog/plotly'
 import { angleVsStateSeries, elevationOverFrameSeries } from '../../lib/insightsTransforms'
 
-// THE client-critical chart: each PAPI lamp's classified STATE (red→transition→white)
-// against the real elevation angle, all four lamps on ONE shared angle ruler. The
-// vertical riser in each lamp's step line sits at the angle where it flipped red↔white
-// — the commissioning event — so the engineer reads each lamp's transition angle and
-// their ordering directly, instead of four flat confidence ribbons (readability audit
-// P0-A). Lamp identity = CVD-safe LAMP_COLORS, kept distinct from the red/white state
-// colours used elsewhere.
-
-// Ordinal state axis: obscured sits below red so non-detections are still visible.
-const STATE_TICKVALS = [-1, 0, 1, 2]
-// Small per-lamp Y offset so four lamps sharing a state (e.g. all white) don't draw on
-// top of each other — colour still identifies the lamp; the offset only de-occludes.
-const stateOffset = (lampIndex) => (lampIndex - 1) * 0.05
+// THE client-critical chart, matching the Intersoft "AGL Altitude" tool's "Redness vs
+// angle" view: ONE graph per lamp, Y = measured red-channel REDNESS (high while the lamp
+// is red, dropping sharply to a low plateau once it turns white), X = real elevation
+// angle, with a dashed vertical line at the lamp's detected red->white transition angle.
+// Redness is a real pixel measurement from the backend (lamp.redness), not the
+// classified state. Lamp identity uses the CVD-safe LAMP_COLORS.
+const TRANSITION_COLOR = '#b04cc8'
+const REDNESS_CHART_HEIGHT = 260
 
 function lampName(lampIndex, copy) {
   return `${copy.live.light} ${lampIndex}`
 }
 
-const LightStateChart = memo(function LightStateChart({ series, plotTheme, copy }) {
-  const populated = series.filter((lamp) => lamp.points.length > 0)
-  const angles = populated.flatMap((lamp) => lamp.points.map((point) => point.angle))
-  const minAngle = angles.length ? Math.min(...angles) : 2
-  const maxAngle = angles.length ? Math.max(...angles) : 4
-  const span = maxAngle - minAngle
-  const pad = span > 0 ? span * 0.03 : 0.3
+const RednessChart = memo(function RednessChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
+  const name = lampName(lampIndex, copy)
+  const reddable = points.filter((point) => Number.isFinite(point.redness))
+  if (!reddable.length) {
+    return (
+      <div className="angle-chart angle-chart--empty">
+        <h4>{name}</h4>
+        <p>{copy.insights.angleLightNoData}</p>
+      </div>
+    )
+  }
+  const color = LAMP_COLORS[lampIndex - 1]
+  const transitionName = copy.insights.transitionAngleName.replace('{lamp}', name)
+  const angles = reddable.map((point) => point.angle)
+  const minAngle = Math.min(...angles)
+  const maxAngle = Math.max(...angles)
+  const axisMin = minAngle === maxAngle ? minAngle - 0.5 : minAngle
+  const axisMax = minAngle === maxAngle ? maxAngle + 0.5 : maxAngle
+  const rednessValues = reddable.map((point) => point.redness)
+  const rMin = Math.min(...rednessValues)
+  const rMax = Math.max(...rednessValues)
 
-  const stateTicktext = [
-    copy.status?.obscured ?? 'obscured',
-    copy.status?.red ?? 'red',
-    copy.status?.transition ?? 'transition',
-    copy.status?.white ?? 'white',
-  ]
-
-  const data = populated.map((lamp) => {
-    const color = LAMP_COLORS[lamp.lampIndex - 1]
-    const offset = stateOffset(lamp.lampIndex)
-    const baseName = lampName(lamp.lampIndex, copy)
-    // Append the detected crossing angle to the legend so each lamp's transition angle
-    // is readable without hovering.
-    const name = Number.isFinite(lamp.transitionAngle)
-      ? `${baseName} · ${lamp.transitionAngle.toFixed(2)}°`
-      : baseName
-    return {
+  const data = [
+    {
       type: 'scatter',
-      // Step (horizontal-then-vertical) so the flip reads as a vertical riser whose
-      // x-position IS the transition angle. Sparse (single-fix) lamps fall back to a
-      // marker so a lone point is still visible.
-      mode: lamp.points.length > 3 ? 'lines' : 'markers',
+      mode: reddable.length > 3 ? 'lines' : 'lines+markers',
       name,
-      x: lamp.points.map((point) => point.angle),
-      y: lamp.points.map((point) => point.stateNum + offset),
-      line: { color, shape: 'hv', width: 2 },
-      marker: { color, size: 7 },
-      customdata: lamp.points.map((point) => [copy.status?.[point.state] ?? point.state, point.confidence]),
+      x: reddable.map((point) => point.angle),
+      y: reddable.map((point) => point.redness),
+      line: { color, width: 2 },
+      marker: { color, size: 4 },
+      customdata: reddable.map((point) => copy.status?.[point.state] ?? point.state),
       hovertemplate:
         `${copy.insights.angleAxis}: %{x:.2f}°<br>` +
-        `${copy.insights.stateAxis}: %{customdata[0]}<br>` +
-        `${copy.insights.angleConfidence}: %{customdata[1]}%<extra>${name}</extra>`,
-    }
-  })
+        `${copy.insights.rednessAxis}: %{y:.0f}<br>` +
+        `${copy.insights.stateAxis}: %{customdata}<extra>${name}</extra>`,
+    },
+  ]
+  if (Number.isFinite(transitionAngle)) {
+    // Span the data's redness range so the dashed marker is a visible full-height line
+    // without expanding the y-axis, and shows in the legend like the client tool.
+    data.push({
+      type: 'scatter',
+      mode: 'lines',
+      name: transitionName,
+      x: [transitionAngle, transitionAngle],
+      y: [rMin, rMax],
+      line: { color: TRANSITION_COLOR, dash: 'dash', width: 1.6 },
+      hovertemplate: `${transitionName}: %{x:.2f}°<extra></extra>`,
+    })
+  }
 
   const layout = basePlotLayout(plotTheme, {
-    height: 440,
-    margin: { l: 104, r: 16, t: 16, b: 56 },
-    legend: { orientation: 'h', x: 0.5, y: -0.16, xanchor: 'center', font: { color: plotTheme.muted, size: 11 } },
+    height: REDNESS_CHART_HEIGHT,
+    margin: { l: 64, r: 12, t: 8, b: 38 },
+    // Legend top-right inside the plot (over the post-drop low plateau), matching the
+    // client tool's "PAPI X / PAPI X transition angle" key.
+    legend: {
+      x: 1,
+      y: 1,
+      xanchor: 'right',
+      yanchor: 'top',
+      bgcolor: 'rgba(0,0,0,0)',
+      font: { color: plotTheme.muted, size: 11 },
+    },
     xaxis: baseAxisStyle(plotTheme, {
       title: axisTitle(copy.insights.angleAxis, plotTheme),
-      range: [minAngle - pad, maxAngle + pad],
+      range: [axisMin, axisMax],
       gridcolor: plotTheme.grid,
       zeroline: false,
     }),
     yaxis: baseAxisStyle(plotTheme, {
-      title: axisTitle(copy.insights.stateAxis, plotTheme),
-      tickvals: STATE_TICKVALS,
-      ticktext: stateTicktext,
-      range: [-1.4, 2.4],
+      title: axisTitle(copy.insights.rednessAxis, plotTheme),
       gridcolor: plotTheme.grid,
-      zeroline: false,
     }),
     showlegend: true,
   })
 
   return (
-    <LazyPlot
-      className="plotly-chart"
-      config={plotlyConfig}
-      data={data}
-      layout={layout}
-      copy={copy}
-      ariaLabel={copy.insights.angleTitle}
-      useResizeHandler
-    />
+    <div className="angle-chart">
+      <h4>{name}</h4>
+      <LazyPlot
+        className="plotly-chart"
+        config={plotlyConfig}
+        data={data}
+        layout={layout}
+        copy={copy}
+        ariaLabel={`${copy.insights.rednessAxis} — ${name}`}
+        useResizeHandler
+      />
+    </div>
   )
 })
 
-// Deliverable #3: elevation angle over frame — the real descent profile from each
-// analysed video/sequence's telemetry track. One NEUTRAL-coloured line per series, so
-// a sequence line is never confused with a "Light N" lamp colour (readability audit).
+// Deliverable: elevation angle over frame — the descent profile from each analysed
+// sequence's telemetry track. Neutral SEQUENCE_COLORS so a flight line is never the
+// same colour as a "Light N" lamp identity in the chart above.
 const ElevationOverFrameChart = memo(function ElevationOverFrameChart({ series, plotTheme, copy }) {
   const multi = series.length > 1
   const data = series.map((entry, index) => ({
@@ -154,7 +166,7 @@ const ElevationOverFrameChart = memo(function ElevationOverFrameChart({ series, 
 export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
   const series = useMemo(() => angleVsStateSeries(backendResults), [backendResults])
   const elevationSeries = useMemo(() => elevationOverFrameSeries(backendResults), [backendResults])
-  const hasAny = series.some((lamp) => lamp.points.length > 0)
+  const hasRedness = series.some((lamp) => lamp.points.some((point) => Number.isFinite(point.redness)))
 
   return (
     <>
@@ -168,8 +180,19 @@ export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
           <span className="client-tag">{copy.insights.angleClientTag}</span>
         </div>
 
-        {hasAny ? (
-          <LightStateChart series={series} plotTheme={plotTheme} copy={copy} />
+        {hasRedness ? (
+          <div className="angle-stack">
+            {series.map((lamp) => (
+              <RednessChart
+                key={lamp.lampIndex}
+                lampIndex={lamp.lampIndex}
+                points={lamp.points}
+                transitionAngle={lamp.transitionAngle}
+                plotTheme={plotTheme}
+                copy={copy}
+              />
+            ))}
+          </div>
         ) : (
           <AngleEmptyState
             icon={<Compass size={26} aria-hidden="true" />}
