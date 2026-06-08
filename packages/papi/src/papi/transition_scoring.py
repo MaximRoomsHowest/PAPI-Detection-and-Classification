@@ -10,9 +10,10 @@ blend (vs a near-stable window edge), and surface suspect cases for human eyes. 
   the lamp. A weak per-frame signal (small overexposed lamps read amber even when stable), so it
   refines rather than drives the rank, and never sets a label.
 
-`review_flag` forces human attention regardless of score: ``elev_discontinuity`` (bad telemetry
-at the flip), ``fallback_identity`` (left-to-right lamp id, less trustworthy), ``rwy06`` (FAA
-default angles, commissioned set-angles pending).
+`review_flag` records why a candidate warrants human attention: ``elev_discontinuity`` (bad
+telemetry at the flip), ``fallback_identity`` (left-to-right lamp id, less trustworthy), ``rwy06``
+(FAA default angles, commissioned set-angles pending). Of these, ONLY ``elev_discontinuity`` also
+forces the ``ambiguous`` tier regardless of score; the other two annotate without changing the tier.
 """
 
 from __future__ import annotations

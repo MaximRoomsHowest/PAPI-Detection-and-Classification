@@ -198,6 +198,11 @@ def detect_transitions(track_rows: list[dict[str, str]]) -> list[dict[str, str]]
                 continue
             if {previous["state"], current["state"]} != {"red", "white"}:
                 continue
+            if not previous["physical_lamp_id"]:
+                # Non-physical "extra_N" track (no lamp binding): its red/white flicker is not
+                # a real PAPI transition and would otherwise leak an empty lamp_id "" into the
+                # per-video set-angle aggregation (audit nit).
+                continue
             transition_type = f"{previous['state']}_to_{current['state']}"
             transitions.append(
                 {
