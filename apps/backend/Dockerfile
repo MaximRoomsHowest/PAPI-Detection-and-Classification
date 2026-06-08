@@ -5,7 +5,7 @@
 # build-essential lives ONLY here so the runtime image ships no compilers
 # (audit DCK-D3: build-essential used to leak into the final image). Base is
 # pinned by digest for reproducible builds (audit DCK-D8).
-FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS builder
+FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97 AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -42,7 +42,7 @@ RUN pip install -r requirements.txt \
 
 # ---- runtime stage --------------------------------------------------------
 # Slim final image: no compilers, no GUI libs, no curl, no test tooling.
-FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
+FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
