@@ -15,7 +15,7 @@ PyYAML==6.0.3
 # MUST stay on the 8.4.x line: the serving model is a yolo26s detector and the
 # YOLO26 architecture only exists in Ultralytics >= 8.4. An 8.3.x pin cannot load
 # models/serving/best.pt on a clean install (Docker/CI) — do not downgrade.
-ultralytics==8.4.60
+ultralytics==8.4.62
 lap==0.5.13
 # Headless OpenCV: the backend never opens a GUI window, so the -headless wheel
 # drops the libGL/X11 stack — which also lets the Dockerfile skip the libgl1
@@ -31,4 +31,4 @@ onnx==1.21.0
 # Dependabot proposed 1.26.0, but the latest version resolvable on our index is
 # 1.23.2 — pinning a non-existent version would break the image build, so we take
 # the installable ceiling (still a bump from 1.20.1). Revisit if the index gains 1.26.x.
-onnxruntime==1.23.2
+onnxruntime==1.26.0
