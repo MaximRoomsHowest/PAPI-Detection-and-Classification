@@ -22,8 +22,11 @@
 
 services:
   postgres:
-    # Pinned by digest for reproducible builds (audit DCK-D8); tag = 16-alpine (16.14).
-    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    # Pinned by digest for reproducible builds (audit DCK-D8); tag = 18-alpine.
+    # NOTE: a v16 data dir is not readable by a v18 server — on first adoption run
+    # `docker compose down -v` to drop the ephemeral demo volume (no migration needed,
+    # the result_json column is portable JSON, not a pg-version-specific type).
+    image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
     container_name: papi-postgres
     environment:
       POSTGRES_DB: papi_backend

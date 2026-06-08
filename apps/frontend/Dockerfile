@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- build stage ----------------------------------------------------------
-FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS build
+FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS build
 
 WORKDIR /app
 
