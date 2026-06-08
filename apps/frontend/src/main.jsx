@@ -31,7 +31,9 @@ createRoot(document.getElementById('root')).render(
     {/* Top-level boundary so a render error shows a recover-by-reload fallback
         instead of a blank white screen. */}
     <ErrorBoundary>
-      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+      {/* react-router v7: relative-splat-path + startTransition are the DEFAULT now,
+          so the v6 `future` opt-in flags are dropped (passing them warns in v7). */}
+      <BrowserRouter>
         {/* LazyMotion + domAnimation loads only the DOM animation features (~15kB)
             instead of the full Motion bundle; `strict` enforces the lightweight
             `m` components so no component can pull in the heavy `motion.*` API. */}
