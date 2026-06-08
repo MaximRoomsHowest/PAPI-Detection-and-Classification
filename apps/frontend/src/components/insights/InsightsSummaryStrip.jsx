@@ -28,7 +28,9 @@ export function InsightsSummaryStrip({ summary, copy }) {
     : !anglePlausible
       ? copy.insights.trustImplausible
       : [
-          angleSource ? angleSource.toUpperCase() : null,
+          // Localise the backend angle_source enum (telemetry_file -> "from telemetry file")
+          // instead of shouting the raw snake-case value (audit REFACTOR-2).
+          angleSource ? (copy.live.angleSource?.[angleSource] ?? angleSource) : null,
           Number.isFinite(maxUncertaintyDeg) ? `±${maxUncertaintyDeg.toFixed(2)}°` : null,
         ]
           .filter(Boolean)

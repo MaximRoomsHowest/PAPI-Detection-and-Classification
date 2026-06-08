@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Activity } from 'lucide-react'
 import { LazyPlot } from './insights/LazyPlot'
-import { plotlyConfig } from '../catalog/plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig } from '../catalog/plotly'
 import { backendStateId, stateCatalog } from '../catalog/stateCatalog'
 import { translateState } from '../i18n/translate'
 
@@ -45,29 +45,23 @@ export function VideoConfidenceChart({ perFrame, plotTheme, copy }) {
     ]
   }, [perFrame, plotTheme, copy])
 
-  const layout = {
-    autosize: true,
+  // Built from the shared catalog helpers (audit REFACTOR-7) so this chart matches every
+  // other LazyPlot consumer instead of hand-rolling autosize/bgcolor/font/axis blocks.
+  const layout = basePlotLayout(plotTheme, {
     height: 280,
     margin: { l: 52, r: 16, t: 10, b: 44 },
-    paper_bgcolor: plotTheme.paper,
-    plot_bgcolor: plotTheme.paper,
-    font: { color: plotTheme.text, family: 'Poppins, Segoe UI, sans-serif' },
-    xaxis: {
-      title: { text: copy.live.frameAxis, font: { color: plotTheme.muted, size: 11 } },
+    showlegend: false,
+    xaxis: baseAxisStyle(plotTheme, {
+      title: axisTitle(copy.live.frameAxis, plotTheme),
       gridcolor: plotTheme.grid,
       zeroline: false,
-      fixedrange: true,
-      tickfont: { color: plotTheme.muted },
-    },
-    yaxis: {
-      title: { text: copy.live.frameConfidenceAxis, font: { color: plotTheme.muted, size: 11 } },
+    }),
+    yaxis: baseAxisStyle(plotTheme, {
+      title: axisTitle(copy.live.frameConfidenceAxis, plotTheme),
       range: [0, 100],
       gridcolor: plotTheme.grid,
-      fixedrange: true,
-      tickfont: { color: plotTheme.muted },
-    },
-    showlegend: false,
-  }
+    }),
+  })
 
   return (
     <article className="viz-card video-confidence-card">
