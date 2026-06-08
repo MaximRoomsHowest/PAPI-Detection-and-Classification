@@ -33,9 +33,12 @@ COPY requirements.txt ./
 # runtime image needs no X11/GL libs (audit DCK-D2): install the tree, then drop
 # BOTH opencv variants and reinstall only headless (pip resolves the dependency
 # graph, not file order, so this explicit last-write is the deterministic fix).
+# The version is READ FROM requirements.txt (single source of truth) so this
+# reinstall can never silently ship a different opencv than the pinned one.
 RUN pip install -r requirements.txt \
+ && opencv_pin="$(sed -n 's/^opencv-python-headless==//p' requirements.txt)" \
  && pip uninstall -y opencv-python opencv-python-headless \
- && pip install opencv-python-headless==4.10.0.84
+ && pip install "opencv-python-headless==${opencv_pin}"
 
 # ---- runtime stage --------------------------------------------------------
 # Slim final image: no compilers, no GUI libs, no curl, no test tooling.
