@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.services.inference.detector import lamp_redness
 
 
