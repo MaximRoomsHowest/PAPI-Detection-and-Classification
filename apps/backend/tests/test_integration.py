@@ -172,6 +172,10 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     get_settings().ensure_storage()
 
     test_client = TestClient(app)
+    # Expose the session factory so a test can insert a row directly (e.g. a
+    # schema-incompatible log for the /logs/{id} 422 guard). Additive — existing
+    # `client` users ignore it.
+    test_client.session_local = session_local
     try:
         yield test_client
     finally:
@@ -507,6 +511,51 @@ def test_analyze_frames_caps_aggregate_upload_size(client, monkeypatch):
         assert "limited to 1 MB total" in response.json()["detail"]
     finally:
         get_settings.cache_clear()
+
+
+def test_analyze_frames_no_partial_commit_on_mid_batch_bad_file(client):
+    """A bad file in the MIDDLE of a folder batch fails the whole call WITHOUT committing
+    the earlier frames (audit BUG-1: pre-validation prevents partial commits/orphans)."""
+    jpeg = b"\xff\xd8\xff" + b"\x00" * 256
+    files = [
+        ("files", ("frame_001.jpg", BytesIO(jpeg), "image/jpeg")),  # valid
+        ("files", ("frame_002.txt", BytesIO(b"not an image at all"), "text/plain")),  # bad
+        ("files", ("frame_003.jpg", BytesIO(jpeg), "image/jpeg")),  # valid
+    ]
+    response = client.post("/api/analyze-frames", files=files, data={"runway_id": "papi_24"})
+    assert response.status_code == 400
+    # The first (valid) frame must NOT have been persisted: pre-validation rejects the
+    # whole batch before any per-file commit, so the log table stays empty.
+    assert client.get("/api/logs").json() == []
+
+
+def test_get_log_returns_422_for_schema_incompatible_record(client):
+    """A stored row whose result_json predates a schema change yields a clean 422, not an
+    unhandled 500 on the detail view (audit REFACTOR-3)."""
+    from app.models import AnalysisLog
+
+    db = client.session_local()
+    try:
+        log = AnalysisLog(
+            media_type="image",
+            runway_id="papi_24",
+            global_state="unknown",
+            original_filename="old.jpg",
+            confidence=0.5,
+            angle_available=False,
+            frame_count=1,
+            processing_ms=1,
+            result_json={},  # incompatible with the current AnalysisPayload schema
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        log_id = log.id
+    finally:
+        db.close()
+
+    response = client.get(f"/api/logs/{log_id}")
+    assert response.status_code == 422
 
 
 def test_batch_upload_size_helper_restores_stream_position():

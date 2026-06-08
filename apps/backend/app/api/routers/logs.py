@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 import app.api.routes as routes
@@ -77,6 +78,15 @@ def get_log(
     log = AnalysisLogRepository(db).get(log_id)
     if log is None:
         raise HTTPException(status_code=404, detail="Analysis log not found.")
-    payload = AnalysisPayload(**log.result_json)
+    try:
+        payload = AnalysisPayload(**log.result_json)
+    except ValidationError as exc:
+        # A row written under an older, now-incompatible schema (a newly-required field,
+        # a narrowed Literal) would otherwise raise an unhandled 500 on every detail view.
+        # There is no migration tool, so surface a clean 422 instead (audit REFACTOR-3).
+        raise HTTPException(
+            status_code=422,
+            detail="Stored analysis record is incompatible with the current schema.",
+        ) from exc
     payload.log_id = log.id
     return payload

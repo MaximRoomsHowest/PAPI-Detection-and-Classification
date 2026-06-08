@@ -275,6 +275,24 @@ def analyze_frames(
     # every image in the batch (each frame is analysed independently as a still).
     drone_samples = read_metadata_samples(metadata_file)
 
+    # Pre-validate EVERY file's media type + signature up front (like /analyze-sequence)
+    # so a bad file in the MIDDLE of the batch can't leave the earlier frames already
+    # committed with orphaned artifacts on disk (audit BUG-1). validate_media_signature
+    # restores the stream position, so save_upload in the loop still reads the full file.
+    # (An inference/DB error on a later frame can still partial-commit — the rarer residual
+    # that a full batch-transaction would close; not worth it for this endpoint.)
+    for file in files:
+        try:
+            media_type = detect_media_type(file.filename or "", file.content_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if media_type != "image":
+            raise HTTPException(status_code=400, detail="Use /api/analyze-frame with image files only.")
+        try:
+            validate_media_signature(file, media_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     start = perf_counter()
     results: list[AnalysisPayload] = []
     for file in files:
