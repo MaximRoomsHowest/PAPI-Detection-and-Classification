@@ -119,7 +119,7 @@ Use this when iterating on backend / frontend code.
 
 ```powershell
 # Windows PowerShell from the repo root
-py -3.10 -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e .[dev]
 pip install -r apps\backend\requirements-dev.txt
@@ -138,7 +138,7 @@ cd apps\backend
 
 ```bash
 # Linux / macOS equivalents
-python3.10 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
 pip install -r apps/backend/requirements-dev.txt

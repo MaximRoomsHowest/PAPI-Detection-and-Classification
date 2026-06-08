@@ -60,7 +60,7 @@ def run_tracked_sequence(
     class-2 transition-state runs (``transition_events_from_state_runs``, needs a 3-class model).
     """
     history = deque(maxlen=history_size)
-    # ByteTrack id -> [(frame_index, color_state, center_x, confidence)].
+    # ByteTrack id -> [(frame_index, color_state, center_x, confidence, redness)].
     # Drives BOTH temporal transition detection AND the final per-lamp verdict,
     # so both reference the same stable track identity (not per-frame rank).
     track_observations: dict[int, list[tuple]] = {}

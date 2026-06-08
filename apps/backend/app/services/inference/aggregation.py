@@ -15,7 +15,7 @@ def aggregate_video_lamps(
     tracks map to lamp 1..4 left-to-right via ``lamp_index_by_track`` (the same
     identity the transition detector uses). Keying off track id rather than the
     per-frame left-to-right rank prevents a dropped/re-ordered frame from mixing
-    observations of different physical lamps. Tuples: (frame, color, center_x, conf).
+    observations of different physical lamps. Tuples: (frame, color, center_x, conf, redness).
     """
     index_by_track = lamp_index_by_track(track_observations)
     obs_by_index: dict[int, list[tuple]] = {}
