@@ -11,8 +11,7 @@ from pathlib import Path
 
 from app.services.angle import (
     compute_elevation_angles,
-    extract_gps_metadata,
-    extract_gps_uncertainty,
+    extract_gps_pose,
     unavailable_angle,
 )
 from app.services.state import lamp_index_by_track
@@ -43,13 +42,11 @@ def resolve_drone_samples(
     if drone_metadata:
         lat, lon, alt = drone_metadata
         return [DroneSample(lat, lon, alt)], "request_metadata"
-    embedded = extract_gps_metadata(media_path)
+    # One head read for BOTH the pose and the RTK std (audit REFACTOR-1): the file carries
+    # a 1-sigma band only when it has RTK XMP std; manual + telemetry-file fixes have none.
+    embedded = extract_gps_pose(media_path)
     if embedded is not None:
-        lat, lon, alt = embedded
-        # Attach the RTK std when the file carries it, so the angle gets a 1-sigma
-        # band; manual + telemetry-file fixes have no std and stay unbanded.
-        uncertainty = extract_gps_uncertainty(media_path)
-        sigma_h, sigma_v = uncertainty if uncertainty is not None else (None, None)
+        lat, lon, alt, sigma_h, sigma_v = embedded
         return [
             DroneSample(lat, lon, alt, sigma_horizontal_m=sigma_h, sigma_vertical_m=sigma_v)
         ], "file_metadata"

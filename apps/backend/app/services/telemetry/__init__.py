@@ -30,6 +30,7 @@ it can be unit-tested in isolation and reused by the offline pipeline if needed.
 
 from __future__ import annotations
 
+import bisect
 import re
 
 from app.services.telemetry.csv_parser import _parse_csv
@@ -128,8 +129,16 @@ def resample_to_frames(samples: list[DroneSample], frame_count: int) -> list[Dro
         keys = [s.frame_index for s in indexed]
         out: list[DroneSample] = []
         for frame in range(frame_count):
-            # Nearest frame_index (linear scan is fine for demo-sized tracks).
-            best = min(range(len(keys)), key=lambda i: abs(keys[i] - frame))
+            # Nearest frame_index via binary search on the sorted keys — O((F+N)logN)
+            # instead of the previous O(F*N) linear scan. Ties resolve to the lower index
+            # (matches the old min()'s first-wins behaviour).
+            pos = bisect.bisect_left(keys, frame)
+            if pos == 0:
+                best = 0
+            elif pos == len(keys):
+                best = len(keys) - 1
+            else:
+                best = pos if (keys[pos] - frame) < (frame - keys[pos - 1]) else pos - 1
             out.append(indexed[best])
         return out
 

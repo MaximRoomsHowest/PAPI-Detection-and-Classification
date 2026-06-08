@@ -28,7 +28,14 @@ from pathlib import Path
 from typing import Any
 
 from app.services.runways import get_runway
-from app.validation.analyze import ALTITUDE_MAX_M
+from app.validation.analyze import (
+    ALTITUDE_MAX_M,
+    ALTITUDE_MIN_M,
+    LATITUDE_MAX_DEG,
+    LATITUDE_MIN_DEG,
+    LONGITUDE_MAX_DEG,
+    LONGITUDE_MIN_DEG,
+)
 from app.validation.schemas import AnglePerLight, AngleResult
 
 # WGS-84 ellipsoid — the datum the DJI GPS metadata and the surveyed lamp
@@ -296,24 +303,35 @@ def _extract_dji_xmp_pose(raw_head: bytes) -> dict[str, float]:
     return pose
 
 
-def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
-    # Prefer the RTK-corrected DJI XMP pose (ellipsoidal AbsoluteAltitude) over EXIF.
-    # exifread reads EXIF only; the RTK altitude lives in the XMP APP1 segment near the
-    # file start, so a bounded head read is enough and keeps videos cheap. Using EXIF
-    # GPSAltitude (1-15 m non-RTK vertical error) is what pushed the computed PAPI angle
-    # below 2.5 deg; the RTK ellipsoidal altitude is the fix.
+def _read_media_head(media_path: Path) -> bytes:
+    """Bounded 256 KB head read — covers the DJI XMP APP1 packet near the file start and
+    keeps videos cheap. Returns ``b""`` on any read error."""
     try:
         with media_path.open("rb") as file:
-            head = file.read(262_144)  # 256 KB covers the XMP packet
+            return file.read(262_144)
     except Exception:
-        head = b""
-    xmp = _extract_dji_xmp_pose(head) if head else {}
+        return b""
+
+
+def _xmp_pose(xmp: dict) -> tuple[float, float, float] | None:
+    """Validated (lat, lon, alt) from a parsed DJI XMP pose, or None.
+
+    Prefers the RTK-corrected ellipsoidal AbsoluteAltitude — using EXIF GPSAltitude
+    (1-15 m non-RTK vertical error) is what pushed the computed PAPI angle below 2.5 deg.
+    """
     if all(field in xmp for field in ("lat", "lon", "abs_alt")):
         lat, lon, alt = xmp["lat"], xmp["lon"], xmp["abs_alt"]
-        if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0 and -500.0 <= alt <= ALTITUDE_MAX_M:
+        if (
+            LATITUDE_MIN_DEG <= lat <= LATITUDE_MAX_DEG
+            and LONGITUDE_MIN_DEG <= lon <= LONGITUDE_MAX_DEG
+            and ALTITUDE_MIN_M <= alt <= ALTITUDE_MAX_M
+        ):
             return lat, lon, alt
+    return None
 
-    # Fallback: EXIF GPSAltitude (no RTK XMP present) — less accurate vertically.
+
+def _exif_pose(media_path: Path) -> tuple[float, float, float] | None:
+    """Fallback (lat, lon, alt) from EXIF GPSAltitude when no RTK XMP pose is present."""
     try:
         import exifread
     except ImportError:
@@ -356,41 +374,63 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
 
     # Range-validate before the values reach the angle math — a corrupted/crafted
     # EXIF (e.g. lat=999) must NOT flow into ENU and fabricate an angle shown as
-    # real. Mirrors the manual-metadata validation in validation/analyze.py (audit:
-    # extract_gps_metadata had no bounds check while the manual path did).
-    if not (-90.0 <= latitude <= 90.0) or not (-180.0 <= longitude <= 180.0):
+    # real. Mirrors the manual-metadata validation in validation/analyze.py.
+    if not (LATITUDE_MIN_DEG <= latitude <= LATITUDE_MAX_DEG) or not (
+        LONGITUDE_MIN_DEG <= longitude <= LONGITUDE_MAX_DEG
+    ):
         return None
-    if not (-500.0 <= altitude <= ALTITUDE_MAX_M):
+    if not (ALTITUDE_MIN_M <= altitude <= ALTITUDE_MAX_M):
         return None
 
     return latitude, longitude, altitude
 
 
-def extract_gps_uncertainty(media_path: Path) -> tuple[float, float] | None:
-    """RTK ``(sigma_horizontal_m, sigma_vertical_m)`` from a file's DJI XMP, or None.
+def _xmp_uncertainty(xmp: dict) -> tuple[float, float] | None:
+    """RTK ``(sigma_horizontal_m, sigma_vertical_m)`` from a parsed DJI XMP pose, or None.
 
-    Reads the same bounded head as ``extract_gps_metadata`` and pulls the per-axis RTK
-    standard deviations DJI writes alongside the pose. Horizontal sigma combines the
-    lat/lon components (``hypot``); vertical sigma is the height std. Returns None when
-    the file carries no RTK std (manual + telemetry-file fixes never do), so the
-    angle's uncertainty band is shown only when it is genuinely measured.
+    Horizontal sigma combines the lat/lon std components (``hypot``); vertical sigma is the
+    height std. None when the file carries no RTK std (manual + telemetry-file fixes never do),
+    so the angle's uncertainty band is shown only when it is genuinely measured.
     """
-    try:
-        with media_path.open("rb") as file:
-            head = file.read(262_144)  # 256 KB covers the XMP packet (matches above)
-    except Exception:
-        return None
-    if not head:
-        return None
-
-    pose = _extract_dji_xmp_pose(head)
-    std_lat = pose.get("rtk_std_lat")
-    std_lon = pose.get("rtk_std_lon")
-    std_hgt = pose.get("rtk_std_hgt")
+    std_lat = xmp.get("rtk_std_lat")
+    std_lon = xmp.get("rtk_std_lon")
+    std_hgt = xmp.get("rtk_std_hgt")
     if std_lat is None or std_lon is None or std_hgt is None:
         return None
     # Reject negative/garbage std — a standard deviation is non-negative.
     if std_lat < 0.0 or std_lon < 0.0 or std_hgt < 0.0:
         return None
-
     return math.hypot(std_lat, std_lon), std_hgt
+
+
+def extract_gps_pose(
+    media_path: Path,
+) -> tuple[float, float, float, float | None, float | None] | None:
+    """Read the file head ONCE → ``(lat, lon, alt, sigma_h, sigma_v)`` | None.
+
+    The single hot-path entry point for embedded telemetry: prefers the RTK XMP pose + std,
+    falls back to EXIF GPSAltitude for the pose (no std). Reading + parsing the 256 KB head
+    once here avoids the previous double read/regex when a caller needs both the pose and its
+    uncertainty (audit REFACTOR-1). ``extract_gps_metadata`` / ``extract_gps_uncertainty``
+    remain as the narrower public surfaces.
+    """
+    head = _read_media_head(media_path)
+    xmp = _extract_dji_xmp_pose(head) if head else {}
+    pose = _xmp_pose(xmp) or _exif_pose(media_path)
+    if pose is None:
+        return None
+    sigma = _xmp_uncertainty(xmp)
+    sigma_h, sigma_v = sigma if sigma is not None else (None, None)
+    return (*pose, sigma_h, sigma_v)
+
+
+def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
+    """(lat, lon, alt) from a media file's embedded RTK XMP / EXIF GPS, or None."""
+    pose = extract_gps_pose(media_path)
+    return pose[:3] if pose is not None else None
+
+
+def extract_gps_uncertainty(media_path: Path) -> tuple[float, float] | None:
+    """RTK ``(sigma_horizontal_m, sigma_vertical_m)`` from a media file's DJI XMP, or None."""
+    head = _read_media_head(media_path)
+    return _xmp_uncertainty(_extract_dji_xmp_pose(head)) if head else None

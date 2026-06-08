@@ -158,8 +158,10 @@ def detect_lamp_transitions(
     return events
 
 
-# A genuine transition state run must persist at least this many observed frames; a single
-# isolated "transition" frame is treated as detector flicker and dropped (temporal smoothing).
+# A transition-state run is reported once it persists at least this many observed frames.
+# At the current value (1) even a single isolated "transition" frame becomes an event; raise
+# to 2 to drop one-frame detector flicker (temporal smoothing). Only affects the opt-in
+# "model" transition method — bump it deliberately and add a run-of-1 test if you do.
 MIN_TRANSITION_RUN_FRAMES = 1
 
 
