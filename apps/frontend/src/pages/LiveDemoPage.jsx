@@ -9,6 +9,7 @@ import { FOLDER_MODE_ANGLE_SWEEP, FOLDER_MODE_SEQUENCE } from '../lib/analysisMo
 import { MediaUploadControls } from '../components/live/MediaUploadControls'
 import { MetadataPrompt } from '../components/live/MetadataPrompt'
 import { ResultPanel } from '../components/live/ResultPanel'
+import { RunwaySelector } from '../components/live/RunwaySelector'
 
 export function LiveDemoPage({ copy, plotTheme }) {
   // Analysis state comes from context (previously ~16 drilled props). The upload
@@ -47,6 +48,8 @@ export function LiveDemoPage({ copy, plotTheme }) {
         </div>
         <MediaUploadControls copy={copy} />
       </div>
+
+      <RunwaySelector copy={copy} />
 
       {media?.type === 'folder' && (
         <div className="folder-mode" aria-live="polite">

@@ -26,6 +26,11 @@ export const plotlyPalette = {
 // state. Okabe-Ito: colour-vision-deficiency-safe and theme-independent (audit B3).
 export const LAMP_COLORS = ['#0072B2', '#E69F00', '#009E73', '#CC79A7']
 
+// Neutral palette for arbitrary multi-series charts (e.g. one line per analysed
+// flight/sequence). Kept SEPARATE from LAMP_COLORS so a sequence line is never the
+// same colour as a "Light N" lamp identity in an adjacent card (readability audit).
+export const SEQUENCE_COLORS = ['#5b6b7b', '#2f6fed', '#8a5cf6', '#0e8a6e', '#b8702f', '#9aa5b1']
+
 // Shared layout/axis builders for the insights charts. Every chart repeated the same
 // paper/plot/font wrapper and the same fixedrange + muted-tick axis defaults; these
 // centralise that. They are behaviour-preserving: callers spread the result and add
@@ -66,4 +71,23 @@ export function axisTitle(text, plotTheme) {
 export function integerTicks(maxValue) {
   const max = Number.isFinite(maxValue) ? maxValue : 0
   return max > 0 && max <= 10 ? { dtick: 1, tickformat: ',d' } : { tickformat: ',d' }
+}
+
+// The "white" lamp-state fill is near-white; on a near-white card it needs a visible
+// outline (+ a faint cream fill) so "reached white" — the state the engineer checks —
+// is never the least-visible mark on the chart (readability audit P0-B).
+export const WHITE_FILL = '#eef2f8'
+export const WHITE_OUTLINE = '#8a94a6'
+
+// Direct value labels for low-cardinality bars: the PDF export is static (no hover), so
+// a <=6-category bar must print its values or it exports as a label-less shape — data
+// loss on the page's primary deliverable (readability audit). Spread onto a bar trace:
+// `...barValueLabels(values)`.
+export function barValueLabels(values, plotTheme) {
+  return {
+    text: values.map((value) => (Number.isFinite(value) ? String(value) : '')),
+    textposition: 'outside',
+    textfont: { color: plotTheme?.muted, size: 11 },
+    cliponaxis: false,
+  }
 }

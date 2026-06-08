@@ -10,6 +10,8 @@ import {
   plotlyPalette,
   CHART_HEIGHT,
   integerTicks,
+  WHITE_FILL,
+  WHITE_OUTLINE,
 } from '../../catalog/plotly'
 import { confidenceValues, perLightStateSeries } from '../../lib/insightsTransforms'
 
@@ -30,15 +32,22 @@ const STATE_COLOR = {
 
 function PerLightStateMix({ results, plotTheme, copy }) {
   const counts = useMemo(() => perLightStateSeries(results), [results])
-  const maxStack = Math.max(0, ...counts.map((entry) => Object.values(entry).reduce((a, b) => a + b, 0)))
   const lights = [1, 2, 3, 4].map((index) => `${copy.live.light} ${index}`)
   const data = STATES.map((state) => ({
     type: 'bar',
     name: copy.status?.[state] ?? state,
     x: lights,
+    // Raw counts kept in customdata so the hover stays absolute while the bars are
+    // normalised to 100% (so each lamp's red/white split is comparable — audit P0-B).
     y: counts.map((entry) => entry[state]),
-    marker: { color: STATE_COLOR[state], line: { color: plotTheme.border, width: 1 } },
-    hovertemplate: `%{x}<br>${copy.status?.[state] ?? state}: %{y}<extra></extra>`,
+    customdata: counts.map((entry) => entry[state]),
+    // The near-white "white" state needs a visible outline + faint fill so it doesn't
+    // vanish into the card; the rest keep the subtle border (audit P0-B).
+    marker:
+      state === 'white'
+        ? { color: WHITE_FILL, line: { color: WHITE_OUTLINE, width: 1.5 } }
+        : { color: STATE_COLOR[state], line: { color: plotTheme.border, width: 1 } },
+    hovertemplate: `%{x}<br>${copy.status?.[state] ?? state}: %{customdata}<extra></extra>`,
   }))
   return (
     <LazyPlot
@@ -50,15 +59,17 @@ function PerLightStateMix({ results, plotTheme, copy }) {
       layout={basePlotLayout(plotTheme, {
         height: CHART_HEIGHT,
         barmode: 'stack',
-        margin: { l: 44, r: 14, t: 10, b: 40 },
+        barnorm: 'percent',
+        margin: { l: 48, r: 14, t: 10, b: 40 },
         legend: { orientation: 'h', y: -0.18, font: { color: plotTheme.muted, size: 11 } },
         xaxis: baseAxisStyle(plotTheme),
         yaxis: baseAxisStyle(plotTheme, {
           gridcolor: plotTheme.grid,
-          // Readable integer ticks at any scale — `dtick:1` crammed ~70 labels into
-          // the axis once a session had many results (audit B8).
-          ...integerTicks(maxStack),
-          rangemode: 'tozero',
+          // 100%-normalised: every lamp's bar is full height so the red/white SHARE is
+          // directly comparable across lamps (audit P0-B).
+          range: [0, 100],
+          ticksuffix: '%',
+          dtick: 25,
         }),
       })}
       useResizeHandler

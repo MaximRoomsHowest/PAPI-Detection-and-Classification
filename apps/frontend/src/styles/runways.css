@@ -16,6 +16,28 @@
   line-height: 1.55;
 }
 
+.runway-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  margin: 0 0 16px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.runway-status.error {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+}
+
 .runways-layout {
   display: grid;
   /* The form (12 coordinate inputs) is the content-dense column, so it gets the

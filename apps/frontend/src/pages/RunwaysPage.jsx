@@ -51,8 +51,17 @@ const nextAvailablePapiLabel = (runways) => {
 }
 
 export function RunwaysPage({ copy }) {
-  const { runways, selectedRunwayId, selectedRunway, setSelectedRunwayId, addRunway, removeRunway } =
-    useLiveDemo()
+  const {
+    runways,
+    runwayLoading,
+    runwayError,
+    selectedRunwayId,
+    selectedRunway,
+    setSelectedRunwayId,
+    addRunway,
+    removeRunway,
+    refetchRunways,
+  } = useLiveDemo()
   const t = copy.runways
 
   const [form, setForm] = useState(emptyForm)
@@ -67,6 +76,11 @@ export function RunwaysPage({ copy }) {
       null,
     [openRunwayId, runways, selectedRunway],
   )
+  const runwayStatusMessage = runwayError
+    ? t.loadError.replace('{message}', runwayError.message || String(runwayError))
+    : runways.length > 0
+      ? t.refreshing
+      : t.loading
 
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const setLamp = (index, key, value) =>
@@ -124,9 +138,14 @@ export function RunwaysPage({ copy }) {
   }
 
   const handleDelete = async (runway) => {
+    const label = runway.label ?? runway.id
+    if (!window.confirm(t.deleteConfirm.replace('{label}', label))) {
+      return
+    }
+
     try {
       await removeRunway(runway.id)
-      toast.success(t.deleted.replace('{label}', runway.label))
+      toast.success(t.deleted.replace('{label}', label))
     } catch (caught) {
       toast.error(caught.message || t.errorGeneric)
     }
@@ -145,6 +164,21 @@ export function RunwaysPage({ copy }) {
       </div>
 
       <p className="runways-intro">{t.intro}</p>
+
+      {(runwayLoading || runwayError) && (
+        <div
+          className={clsx('runway-status', runwayError && 'error')}
+          role={runwayError ? 'alert' : 'status'}
+          aria-live={runwayError ? 'assertive' : 'polite'}
+        >
+          <span>{runwayStatusMessage}</span>
+          {runwayError ? (
+            <button type="button" className="ghost-button" onClick={refetchRunways}>
+              {t.retry}
+            </button>
+          ) : null}
+        </div>
+      )}
 
       <div className="runways-layout">
         {/* Add-runway form: the four lamp coordinates are required because the
@@ -257,7 +291,9 @@ export function RunwaysPage({ copy }) {
         <div className="runway-browser" aria-label={t.listTitle}>
           <div className="runway-list">
             <h3 className="runway-list__title">{t.listTitle}</h3>
-            {runways.length === 0 && <p className="runway-list__empty">{t.listEmpty}</p>}
+            {runways.length === 0 && (
+              <p className="runway-list__empty">{runwayLoading ? t.loading : t.listEmpty}</p>
+            )}
             <div className="runway-list__items">
               {runways.map((runway) => {
                 const isActive = runway.id === selectedRunwayId

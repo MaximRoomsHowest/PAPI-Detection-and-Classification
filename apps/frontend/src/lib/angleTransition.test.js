@@ -44,6 +44,20 @@ describe('detectTransitionAngle', () => {
     expect(detectTransitionAngle(points)).toBeCloseTo(2.55, 5)
   })
 
+  it('ignores a single-frame blip and reports the sustained crossing', () => {
+    // A lone spurious "white" at a low angle must not register as the transition;
+    // the real sustained red->white flip is at ~2.55.
+    const points = [
+      { angle: 2.0, state: 'red' },
+      { angle: 2.13, state: 'white' }, // 1-frame mis-classification blip
+      { angle: 2.2, state: 'red' },
+      { angle: 2.5, state: 'red' },
+      { angle: 2.6, state: 'white' },
+      { angle: 3.0, state: 'white' },
+    ]
+    expect(detectTransitionAngle(points)).toBeCloseTo(2.55, 5)
+  })
+
   it('detects a descending white -> red crossing (not only ascending captures)', () => {
     // A capture taken while descending: white at low angle, red at high angle.
     const points = [

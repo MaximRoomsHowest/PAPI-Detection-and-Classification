@@ -40,6 +40,8 @@ export function useAnalysis(copy) {
   // `effectiveRunwayId` is what the analyze calls score against.
   const {
     runways,
+    runwayLoading,
+    runwayError,
     effectiveRunwayId,
     selectedRunway,
     setSelectedRunwayId,
@@ -527,6 +529,8 @@ export function useAnalysis(copy) {
     folderMode,
     setFolderMode,
     runways,
+    runwayLoading,
+    runwayError,
     // Expose the reconciled id so the selector value, the active-card highlight and
     // the analyze call all agree even when the raw stored id is stale.
     selectedRunwayId: effectiveRunwayId,

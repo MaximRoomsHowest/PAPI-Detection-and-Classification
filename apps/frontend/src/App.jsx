@@ -169,11 +169,12 @@ function App() {
                     isExporting={analysis.isExporting}
                     exportError={analysis.exportError}
                     onDownloadCharts={analysis.handleDownloadCharts}
+                    runways={analysis.runways}
                     copy={copy}
                   />
                 }
               />
-              <Route path="/history" element={<HistoryPage copy={copy} />} />
+              <Route path="/history" element={<HistoryPage copy={copy} runways={analysis.runways} />} />
               <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
               <Route path="*" element={<NotFound copy={copy} />} />
             </Routes>

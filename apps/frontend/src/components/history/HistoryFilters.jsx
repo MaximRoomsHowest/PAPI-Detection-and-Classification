@@ -1,4 +1,10 @@
 import { Download, X } from 'lucide-react'
+import { runwayDisplayName } from '../../lib/runwaySelection'
+
+function runwayOptionLabel(runwayId, runways) {
+  const label = runwayDisplayName(runwayId, runways)
+  return label === runwayId ? runwayId : `${label} · ${runwayId}`
+}
 
 // Runway/state filter selects, the clear-filters reset, and the CSV export button.
 // Presentational: the parent owns the filter state + the (pre-bound) change handlers
@@ -17,6 +23,7 @@ export function HistoryFilters({
   isExporting,
   isBusy,
   total,
+  runways,
   copy,
 }) {
   return (
@@ -30,7 +37,7 @@ export function HistoryFilters({
         <option value="">{copy.history.filterRunway}</option>
         {runwayOptions.map((runwayId) => (
           <option key={runwayId} value={runwayId}>
-            {runwayId}
+            {runwayOptionLabel(runwayId, runways)}
           </option>
         ))}
       </select>

@@ -15,7 +15,13 @@ export function useRunwayManagement() {
   // reconciled against the live list, so a stored/selected id that no longer exists
   // (custom runway deleted in another tab) self-heals to a safe default instead of
   // silently breaking the selector and the analyze call.
-  const { data: runwayData, refetch: refetchRunways } = useFetch(fetchRunways, [])
+  const {
+    data: runwayData,
+    loading: runwayLoading,
+    error: runwayError,
+    refetch: refetchRunways,
+    setData: setRunwayData,
+  } = useFetch(fetchRunways, [], { keepPreviousData: true })
   // Memoised so its identity is stable across renders — an inline `?? []` makes a
   // new array every render, which would churn the dependent memo/effect below.
   const runways = useMemo(() => runwayData ?? [], [runwayData])
@@ -48,6 +54,10 @@ export function useRunwayManagement() {
   // deleting the active runway falls back to the backend default (papi_24).
   async function addRunway(payload) {
     const created = await createRunway(payload)
+    setRunwayData((current) => {
+      const list = Array.isArray(current) ? current : []
+      return [...list.filter((runway) => runway.id !== created.id), created]
+    })
     refetchRunways()
     setSelectedRunwayId(created.id)
     return created
@@ -55,6 +65,9 @@ export function useRunwayManagement() {
 
   async function removeRunway(runwayId) {
     await deleteRunwayRequest(runwayId)
+    setRunwayData((current) =>
+      Array.isArray(current) ? current.filter((runway) => runway.id !== runwayId) : current,
+    )
     refetchRunways()
     // Fall off the deleted runway to a still-valid one. papi_24 is a built-in
     // (undeletable), so resolveRunwayId always yields a valid id; the reconciliation
@@ -68,6 +81,8 @@ export function useRunwayManagement() {
 
   return {
     runways,
+    runwayLoading,
+    runwayError,
     effectiveRunwayId,
     selectedRunway,
     setSelectedRunwayId,

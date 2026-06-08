@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import * as Tabs from '@radix-ui/react-tabs'
-import { Download, TriangleAlert, Info } from 'lucide-react'
+import { Download, TriangleAlert, Info, MapPin } from 'lucide-react'
 import clsx from 'clsx'
 import { AngleVsStateCharts } from '../components/insights/AngleVsStateCharts'
 import { TransitionCharts } from '../components/insights/TransitionCharts'
 import { SessionSummaryCharts } from '../components/insights/SessionSummaryCharts'
 import { ModelMetricsPanel } from '../components/insights/ModelMetricsPanel'
+import { InsightsSummaryStrip } from '../components/insights/InsightsSummaryStrip'
+import { sessionRunwaySummary } from '../lib/runwaySelection'
+import { summarizeSession } from '../lib/insightsTransforms'
 
 // Insights is split into two tabs: "Current analysis" (charts built from the
 // session's real results — angle-vs-state, transitions, per-light/confidence
@@ -21,6 +24,7 @@ export function InsightsPage({
   isExporting,
   exportError,
   onDownloadCharts,
+  runways = [],
   copy,
 }) {
   // Controlled so the off-screen, force-mounted panel can be marked `inert`
@@ -29,6 +33,15 @@ export function InsightsPage({
   const [tab, setTab] = useState('current')
   // "Current analysis" charts the in-memory results of THIS session only (audit C1).
   const hasSession = (backendResults?.length ?? 0) > 0
+  // At-a-glance roll-up for the verdict strip (lamps crossed / elevation / trust).
+  const summary = useMemo(() => summarizeSession(backendResults), [backendResults])
+  const runwaySummary = sessionRunwaySummary(backendResults, runways)
+  const runwayContextText =
+    runwaySummary.kind === 'mixed'
+      ? copy.insights.runwayContextMixed.replace('{runways}', runwaySummary.label)
+      : runwaySummary.kind === 'single'
+        ? copy.insights.runwayContext.replace('{runway}', runwaySummary.label)
+        : copy.insights.runwayContextNone
   return (
     <section className="insights-section">
       <div className="section-heading">
@@ -37,6 +50,12 @@ export function InsightsPage({
           <h2>{copy.insights.title}</h2>
         </div>
         <div className="section-actions">
+          {hasSession && (
+            <Link className="insights-runway-chip" to="/runways">
+              <MapPin size={15} aria-hidden="true" />
+              {runwayContextText}
+            </Link>
+          )}
           <button
             className={clsx('secondary-button', exportError && 'has-error')}
             type="button"
@@ -74,6 +93,10 @@ export function InsightsPage({
           </Link>
         </div>
       )}
+
+      {/* Verdict layer: stated before the charts and OUTSIDE the tabs (so it isn't
+          parked off-screen with an inactive force-mounted panel). Self-hides when empty. */}
+      <InsightsSummaryStrip summary={summary} copy={copy} />
 
       <Tabs.Root value={tab} onValueChange={setTab} className="insights-tabs">
         <Tabs.List className="insights-tab-list" aria-label={copy.insights.eyebrow}>

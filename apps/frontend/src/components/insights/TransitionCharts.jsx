@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react'
-import { ArrowLeftRight } from 'lucide-react'
+import { ArrowLeftRight, Check, TriangleAlert } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
 import {
@@ -10,8 +10,10 @@ import {
   plotlyPalette,
   CHART_HEIGHT,
   integerTicks,
+  barValueLabels,
 } from '../../catalog/plotly'
 import { transitionCountSeries } from '../../lib/insightsTransforms'
+import { degrees } from '../../lib/format'
 
 // Transition tracking surfaces for video / folder-sequence analyses: a frame×light
 // timeline, a per-light count bar, and an event table. Every value comes from the
@@ -138,6 +140,8 @@ const TransitionCountBar = memo(function TransitionCountBar({ transitions, plotT
           x: lamps.map((lamp) => `${copy.live.light} ${lamp}`),
           y: counts,
           marker: { color: plotTheme.accent },
+          // Print the value on each bar so it survives the static PDF export (audit).
+          ...barValueLabels(counts, plotTheme),
           hovertemplate: `%{x}<br>${copy.insights.transitionCountAxis}: %{y}<extra></extra>`,
         },
       ]}
@@ -159,53 +163,65 @@ const TransitionCountBar = memo(function TransitionCountBar({ transitions, plotT
 })
 
 function TransitionTable({ transitions, copy }) {
+  // Lead with the commissioning variable (angle), then read in lamp/frame order so a
+  // clean ascending sweep reads top-to-bottom (audit P1-C).
+  const rows = [...transitions].sort(
+    (a, b) => a.lamp_index - b.lamp_index || a.frame_index - b.frame_index,
+  )
   return (
     <div className="transition-table-wrap">
       <table className="transition-table" aria-labelledby="transition-table-heading">
         <thead>
           <tr>
             <th>{copy.insights.thLight}</th>
-            <th className="num">{copy.insights.thFrame}</th>
-            <th>{copy.insights.thFrom}</th>
-            <th>{copy.insights.thTransition}</th>
-            <th>{copy.insights.thTo}</th>
             <th className="num">{copy.insights.thAngle}</th>
+            <th>{copy.insights.thDirection}</th>
+            <th className="num">{copy.insights.thFrame}</th>
             <th className="num">{copy.insights.thDuration}</th>
+            <th>{copy.insights.thStatus}</th>
           </tr>
         </thead>
         <tbody>
-          {transitions.map((event, index) => {
+          {rows.map((event, index) => {
             const isModel = event.method === 'model'
+            // On an ascending sweep red→white is the expected climb-through; a →red
+            // flip is a reversal worth flagging (audit P1-C).
+            const climbThrough = event.to_state === 'white'
+            const statusLabel = climbThrough ? copy.insights.statusClimb : copy.insights.statusReversal
             return (
               <tr key={`${event.lamp_index}-${event.frame_index}-${index}`}>
                 <td>
                   {copy.live.light} {event.lamp_index}
                 </td>
-                <td className="num mono tnum">{event.frame_index}</td>
-                <td>
+                <td className="num mono tnum">{degrees(event.elevation_angle_deg)}</td>
+                <td className="direction-cell">
                   <span className={`state-pill is-${event.from_state}`}>
                     {copy.status?.[event.from_state] ?? event.from_state}
                   </span>
-                </td>
-                <td>
-                  {/* The intermediate state: a model event is an explicit transition-state
-                      run, a tracking flip is instantaneous (no intermediate) -> "—". */}
-                  {isModel ? (
-                    <span className="state-pill is-transition">{copy.status?.transition ?? 'transition'}</span>
-                  ) : (
-                    <span className="muted">—</span>
+                  <span className="dir-arrow" aria-hidden="true">→</span>
+                  {isModel && (
+                    <>
+                      <span className="state-pill is-transition">{copy.status?.transition ?? 'transition'}</span>
+                      <span className="dir-arrow" aria-hidden="true">→</span>
+                    </>
                   )}
-                </td>
-                <td>
                   <span className={`state-pill is-${event.to_state}`}>
                     {copy.status?.[event.to_state] ?? event.to_state}
                   </span>
                 </td>
-                <td className="num mono tnum">
-                  {Number.isFinite(event.elevation_angle_deg) ? event.elevation_angle_deg.toFixed(3) : '—'}
-                </td>
+                <td className="num mono tnum">{event.frame_index}</td>
                 <td className="num mono tnum">
                   {Number.isFinite(event.duration_frames) ? event.duration_frames : '—'}
+                </td>
+                <td>
+                  <span
+                    className={`transition-status ${climbThrough ? 'is-ok' : 'is-warn'}`}
+                    role="img"
+                    aria-label={statusLabel}
+                    title={statusLabel}
+                  >
+                    {climbThrough ? <Check size={15} aria-hidden="true" /> : <TriangleAlert size={15} aria-hidden="true" />}
+                  </span>
                 </td>
               </tr>
             )

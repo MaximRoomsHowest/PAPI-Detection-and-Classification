@@ -11,9 +11,10 @@ import { useCallback, useEffect, useState } from 'react'
  * `ignore` flag drops stale results if the component unmounts or deps change
  * mid-flight (same pattern as HistoryPage), and `refetch()` forces a re-run.
  *
- * Returns `{ data, loading, error, refetch }`.
+ * Returns `{ data, loading, error, refetch, setData }`.
  */
-export function useFetch(fetchFn, deps = []) {
+export function useFetch(fetchFn, deps = [], options = {}) {
+  const { keepPreviousData = false } = options
   const [state, setState] = useState({ data: null, loading: true, error: null })
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -21,8 +22,20 @@ export function useFetch(fetchFn, deps = []) {
   // to loading here is safe and keeps the effect body free of synchronous
   // setState (react-hooks/set-state-in-effect).
   const refetch = useCallback(() => {
-    setState({ data: null, loading: true, error: null })
+    setState((current) => ({
+      data: keepPreviousData ? current.data : null,
+      loading: true,
+      error: null,
+    }))
     setRefreshKey((key) => key + 1)
+  }, [keepPreviousData])
+
+  const setData = useCallback((valueOrUpdater) => {
+    setState((current) => ({
+      ...current,
+      data: typeof valueOrUpdater === 'function' ? valueOrUpdater(current.data) : valueOrUpdater,
+      error: null,
+    }))
   }, [])
 
   useEffect(() => {
@@ -37,7 +50,11 @@ export function useFetch(fetchFn, deps = []) {
       })
       .catch((error) => {
         if (!ignore) {
-          setState({ data: null, loading: false, error })
+          setState((current) => ({
+            data: keepPreviousData ? current.data : null,
+            loading: false,
+            error,
+          }))
         }
       })
 
@@ -47,7 +64,7 @@ export function useFetch(fetchFn, deps = []) {
     // `deps` is the caller's explicit dependency contract; `fetchFn` is assumed
     // stable (defined at module scope or wrapped). refreshKey drives refetch().
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, refreshKey])
+  }, [...deps, refreshKey, keepPreviousData])
 
-  return { ...state, refetch }
+  return { ...state, refetch, setData }
 }

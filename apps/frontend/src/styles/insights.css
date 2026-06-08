@@ -150,6 +150,86 @@
   margin-left: 2px;
 }
 
+/* Verdict / summary strip — at-a-glance roll-up above the tabs (readability audit). */
+.insights-summary {
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--border, rgba(127, 135, 148, 0.3));
+  border-radius: 14px;
+  background: rgba(127, 135, 148, 0.06);
+}
+
+.insights-summary__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+}
+
+.insights-summary__verdict {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.insights-summary__verdict.is-warn {
+  color: #c8821f;
+  font-weight: 600;
+}
+
+/* Transition table: one Direction cell + a climb-through/reversal status (audit P1-C). */
+.direction-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.dir-arrow {
+  color: var(--text-muted);
+}
+
+.transition-status {
+  display: inline-flex;
+  align-items: center;
+}
+
+.transition-status.is-ok {
+  color: #1f9d57;
+}
+
+.transition-status.is-warn {
+  color: #c8821f;
+}
+
+.insights-runway-chip {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.insights-runway-chip svg {
+  color: var(--accent);
+  flex: none;
+}
+
+.insights-runway-chip:hover {
+  border-color: var(--accent);
+}
+
+.insights-runway-chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* ---------- Shared chart empty / loading states ---------- */
 .chart-empty,
 .chart-skeleton {

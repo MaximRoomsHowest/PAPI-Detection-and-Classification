@@ -24,6 +24,8 @@ import {
   analyzeFrames,
   analyzeMedia,
   analyzeSequence,
+  createRunway,
+  deleteRunway,
   fetchLogs,
   fetchModelInfo,
   fetchReady,
@@ -132,6 +134,67 @@ describe('GET endpoints — URL + header pinning', () => {
   it('GET endpoints surface backend errors with status code in the message', async () => {
     fetch.mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 503 }))
     await expect(fetchRunways()).rejects.toThrow(/503/)
+  })
+})
+
+describe('runway mutations — payloads and backend details', () => {
+  const runwayPayload = {
+    label: 'Custom 24',
+    airport: 'EDNY',
+    designation: '24',
+    lights: [
+      { point: 1, latitude: 47.673521, longitude: 9.518154, altitude_m: 461.37 },
+      { point: 2, latitude: 47.67345, longitude: 9.518214, altitude_m: 461.37 },
+      { point: 3, latitude: 47.67338, longitude: 9.518274, altitude_m: 461.37 },
+      { point: 4, latitude: 47.673309, longitude: 9.518333, altitude_m: 461.37 },
+    ],
+  }
+
+  it('createRunway posts JSON and returns the backend body', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ id: 'custom_24', label: 'Custom 24' }))
+
+    const result = await createRunway(runwayPayload)
+
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/api\/runways$/)
+    expect(init.method).toBe('POST')
+    expect(init.headers['Content-Type']).toBe('application/json')
+    expect(JSON.parse(init.body)).toEqual(runwayPayload)
+    expect(result).toEqual({ id: 'custom_24', label: 'Custom 24' })
+  })
+
+  it('createRunway flattens backend validation detail arrays', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          detail: [
+            { msg: 'A runway must have exactly 4 PAPI lamps.' },
+            { msg: 'Lamp coordinates must be distinct.' },
+          ],
+        },
+        { ok: false, status: 422 },
+      ),
+    )
+
+    await expect(createRunway({})).rejects.toThrow(
+      'A runway must have exactly 4 PAPI lamps.; Lamp coordinates must be distinct.',
+    )
+  })
+
+  it('deleteRunway encodes the id and uses DELETE', async () => {
+    await deleteRunway('custom x/1')
+
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/api\/runways\/custom%20x%2F1$/)
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('deleteRunway surfaces backend detail strings', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({ detail: 'Built-in runways cannot be deleted.' }, { ok: false, status: 400 }),
+    )
+
+    await expect(deleteRunway('papi_24')).rejects.toThrow('Built-in runways cannot be deleted.')
   })
 })
 

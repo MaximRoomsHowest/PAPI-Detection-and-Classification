@@ -24,6 +24,12 @@ export function formatAngle(value, fallback = '—') {
   return Number.isFinite(Number(value)) ? `${Number(value).toFixed(3)}°` : fallback
 }
 
+// 2-dp angle for insights tables/summaries: three decimals asserted a precision the
+// ~0.1° elevation uncertainty doesn't support and were harder to scan (readability audit).
+export function degrees(value, fallback = '—') {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(2)}°` : fallback
+}
+
 // Human-readable duration: sub-second renders as ms, 1s+ as seconds, so a video
 // figure (e.g. 45000 ms) reads as "45 s" instead of a wall of milliseconds.
 // Returns { value, suffix } to match the InlineMetric props.

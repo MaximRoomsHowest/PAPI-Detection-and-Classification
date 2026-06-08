@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { History as HistoryIcon, X } from 'lucide-react'
 import { formatAngle, percent } from '../../lib/format'
+import { runwayDisplayName } from '../../lib/runwaySelection'
 
 // Mirrors the backend's DETECTION_CLASS_TO_STATE (apps/backend/app/services/state.py)
 // so the compact detections summary shows a readable lamp colour instead of a
@@ -18,7 +19,16 @@ function detectionLabel(detection) {
 // artifact, per-lamp colours, the detections summary + raw-JSON disclosure, and the
 // angle note. Rendered only when a log is selected; the parent owns selection +
 // artifact resolution + the focus-trap ref and passes onClose / onToggleRaw down.
-export function HistoryDetailModal({ selectedLog, artifact, showRaw, onToggleRaw, onClose, modalRef, copy }) {
+export function HistoryDetailModal({
+  selectedLog,
+  artifact,
+  showRaw,
+  onToggleRaw,
+  onClose,
+  modalRef,
+  runways,
+  copy,
+}) {
   const detections = selectedLog?.detections ?? []
 
   return (
@@ -78,6 +88,12 @@ export function HistoryDetailModal({ selectedLog, artifact, showRaw, onToggleRaw
           <div>
             <span>{copy.history.state}</span>
             <strong>{selectedLog.global_state?.replaceAll('_', ' ') ?? '—'}</strong>
+          </div>
+          <div>
+            <span>{copy.history.runway}</span>
+            <strong title={selectedLog.runway_id}>
+              {runwayDisplayName(selectedLog.runway_id, runways)}
+            </strong>
           </div>
           <div>
             <span>{copy.history.confidence}</span>

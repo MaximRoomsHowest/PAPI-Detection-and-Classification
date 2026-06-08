@@ -7,7 +7,6 @@
 // still plotted against the viewing angle (client ask: surface non-detections in
 // the graphs). A bare "unknown" has no tier and is intentionally dropped.
 const STATE_NUM = { obscured: -1, red: 0, transition: 1, white: 2 }
-const VISIBILITY_THRESHOLD = 25
 
 // --- Angle vs. light state ---------------------------------------------------
 
@@ -24,18 +23,37 @@ export function resolveAngle(angle, lampIndex) {
   return Number.isFinite(value) ? value : null
 }
 
+// Collapse a single-sample state that differs from BOTH equal neighbours (a one-frame
+// mis-classification blip) into the neighbours' state, so a lone spurious "white" frame
+// at a low angle doesn't get read as the transition. Real transitions persist across
+// several frames, so this only removes noise. Endpoints are left untouched.
+function denoiseStates(colored) {
+  if (colored.length < 3) {
+    return colored
+  }
+  return colored.map((point, i) => {
+    if (i === 0 || i === colored.length - 1) {
+      return point
+    }
+    const prev = colored[i - 1]
+    const next = colored[i + 1]
+    return point.state !== prev.state && prev.state === next.state ? { ...point, state: prev.state } : point
+  })
+}
+
 // Estimate the angle at which a lamp switches red <-> white (its PAPI transition
 // angle): the midpoint of the first red/transition <-> white boundary in the
-// angle-sorted samples, in EITHER direction. An ascending capture crosses
-// red->white (a lamp below its set angle climbs above it); a descending capture
-// crosses white->red. Returns null when the lamp never crosses (all-red, all-white,
-// or no coloured samples). Pure detection from the real classified states — nothing
-// modelled, and (since the confidence-threshold fallback was removed) no fabricated
-// angle for a lamp that never actually transitions.
+// angle-sorted, blip-denoised samples, in EITHER direction. An ascending capture
+// crosses red->white (a lamp below its set angle climbs above it); a descending
+// capture crosses white->red. Returns null when the lamp never crosses (all-red,
+// all-white, or no coloured samples). Pure detection from the real classified states —
+// nothing modelled, and no fabricated angle for a lamp that never transitions.
 export function detectTransitionAngle(points) {
-  const colored = (points ?? [])
-    .filter((point) => point.state === 'red' || point.state === 'white' || point.state === 'transition')
-    .sort((a, b) => a.angle - b.angle)
+  const colored = denoiseStates(
+    (points ?? [])
+      .filter((point) => point.state === 'red' || point.state === 'white' || point.state === 'transition')
+      .sort((a, b) => a.angle - b.angle),
+  )
   for (let i = 1; i < colored.length; i += 1) {
     const previous = colored[i - 1]
     const current = colored[i]
@@ -46,75 +64,6 @@ export function detectTransitionAngle(points) {
     }
   }
   return null
-}
-
-function brightnessPoint({ angle, lamp, label }) {
-  const confidence = Math.round((lamp.confidence ?? 0) * 100)
-  return {
-    angle,
-    brightness: confidence,
-    state: lamp.state,
-    confidence,
-    label,
-  }
-}
-
-// Build the client-style confidence-vs-angle curves. The backend currently sends
-// classification confidence rather than a raw photometric intensity, so the graph
-// uses confidence as a detection/visibility score proxy and labels it as such.
-export function angleBrightnessSeries(results) {
-  const series = [1, 2, 3, 4].map((lampIndex) => ({
-    lampIndex,
-    points: [],
-    threshold: VISIBILITY_THRESHOLD,
-  }))
-
-  for (const result of results ?? []) {
-    const label = result?.original_filename ?? (result?.log_id ? `log ${result.log_id.slice(0, 8)}` : '')
-    const track = result?.angle_track
-
-    if (Array.isArray(track) && track.length > 0) {
-      for (const sample of track) {
-        const angle = sample?.elevation_angle_deg
-        if (!Number.isFinite(angle)) {
-          continue
-        }
-        for (const lamp of sample.lamps ?? []) {
-          const lampIndex = lamp.index
-          if (lampIndex >= 1 && lampIndex <= 4) {
-            series[lampIndex - 1].points.push(brightnessPoint({ angle, lamp, label }))
-          }
-        }
-      }
-      continue
-    }
-
-    const angleData = result?.angle
-    if (!angleData?.angle_available) {
-      continue
-    }
-    for (const lamp of result.lamps ?? []) {
-      const lampIndex = lamp.index
-      if (!(lampIndex >= 1 && lampIndex <= 4)) {
-        continue
-      }
-      const angle = resolveAngle(angleData, lampIndex)
-      if (angle === null) {
-        continue
-      }
-      series[lampIndex - 1].points.push(brightnessPoint({ angle, lamp, label }))
-    }
-  }
-
-  for (const lamp of series) {
-    lamp.points.sort((a, b) => a.angle - b.angle)
-    // Only a genuine red/transition<->white crossing yields a transition angle; a
-    // lamp that never changes colour gets null (no marker) rather than a fabricated
-    // confidence-threshold crossing that would read as a real set angle.
-    lamp.transitionAngle = detectTransitionAngle(lamp.points)
-  }
-
-  return series
 }
 
 // Build per-light (angle, state) point series from raw AnalysisPayload[]. Only
@@ -276,4 +225,64 @@ export function elevationOverFrameSeries(results) {
     }
   }
   return series
+}
+
+// --- Session summary (verdict strip) -----------------------------------------
+
+// One at-a-glance roll-up of the current session for the header strip: how many of the
+// 4 lamps were seen to cross red<->white, the elevation band swept, frame count, runway,
+// and a data-trust read (geometry plausibility + angle source + 1-sigma uncertainty).
+// Pure read of real fields; it deliberately does NOT compute a pass/fail verdict — that
+// needs the commissioned set-angles, which aren't on the frontend yet.
+export function summarizeSession(results) {
+  const list = results ?? []
+  const states = angleVsStateSeries(list)
+  const lampsDetected = states.filter((lamp) => lamp.points.length > 0).length
+  const lampsCrossed = states.filter((lamp) => Number.isFinite(lamp.transitionAngle)).length
+
+  const angles = []
+  let frameCount = 0
+  let anglePlausible = true
+  let angleSource = null
+  let maxUncertaintyDeg = null
+  for (const result of list) {
+    frameCount += Number.isFinite(result?.frame_count) ? result.frame_count : 1
+    const track = result?.angle_track
+    if (Array.isArray(track) && track.length > 0) {
+      for (const sample of track) {
+        if (Number.isFinite(sample?.elevation_angle_deg)) {
+          angles.push(sample.elevation_angle_deg)
+        }
+      }
+    } else if (result?.angle?.angle_available && Number.isFinite(result.angle.elevation_angle_deg)) {
+      angles.push(result.angle.elevation_angle_deg)
+    }
+    const angle = result?.angle
+    if (angle) {
+      if (angle.plausible === false) {
+        anglePlausible = false
+      }
+      if (!angleSource && angle.angle_source) {
+        angleSource = angle.angle_source
+      }
+      if (Number.isFinite(angle.elevation_angle_uncertainty_deg)) {
+        maxUncertaintyDeg = Math.max(maxUncertaintyDeg ?? 0, angle.elevation_angle_uncertainty_deg)
+      }
+    }
+  }
+
+  return {
+    analysisCount: list.length,
+    frameCount,
+    runwayId: list.find((result) => result?.runway_id)?.runway_id ?? null,
+    lampsDetected,
+    lampsCrossed,
+    totalLamps: 4,
+    hasAngles: angles.length > 0,
+    elevationMin: angles.length ? Math.min(...angles) : null,
+    elevationMax: angles.length ? Math.max(...angles) : null,
+    anglePlausible,
+    angleSource,
+    maxUncertaintyDeg,
+  }
 }

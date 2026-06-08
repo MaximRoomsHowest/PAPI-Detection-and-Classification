@@ -28,7 +28,7 @@ function mergeOptions(previous, incoming, active) {
   return [...next].sort()
 }
 
-export function HistoryPage({ copy }) {
+export function HistoryPage({ copy, runways = [] }) {
   const [logs, setLogs] = useState([])
   const [total, setTotal] = useState(0)
   const [modelInfo, setModelInfo] = useState(null)
@@ -265,6 +265,7 @@ export function HistoryPage({ copy }) {
         isExporting={isExporting}
         isBusy={isBusy}
         total={total}
+        runways={runways}
         copy={copy}
       />
 
@@ -287,6 +288,7 @@ export function HistoryPage({ copy }) {
           setIsFetching(true)
           setPage((current) => current + 1)
         }}
+        runways={runways}
         copy={copy}
       />
 
@@ -298,6 +300,7 @@ export function HistoryPage({ copy }) {
           onToggleRaw={() => setShowRaw((open) => !open)}
           onClose={closeModal}
           modalRef={modalRef}
+          runways={runways}
           copy={copy}
         />
       )}

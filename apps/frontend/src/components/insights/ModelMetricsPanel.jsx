@@ -4,7 +4,15 @@ import { AngleEmptyState } from './AngleEmptyState'
 import { InlineMetric } from '../InlineMetric'
 import { useFetch } from '../../hooks/useFetch'
 import { fetchModelInfo, fetchStats } from '../../lib/api'
-import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig, CHART_HEIGHT, integerTicks } from '../../catalog/plotly'
+import {
+  axisTitle,
+  basePlotLayout,
+  baseAxisStyle,
+  plotlyConfig,
+  CHART_HEIGHT,
+  integerTicks,
+  barValueLabels,
+} from '../../catalog/plotly'
 import { backendStateId, stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
 import { percent } from '../../lib/format'
@@ -54,6 +62,8 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
           x: labels,
           y: values,
           marker: { color: plotTheme.accent },
+          // Print each bar's value so the static PDF export isn't label-less (audit).
+          ...barValueLabels(values, plotTheme),
           hovertemplate: `%{x}<br>${copy.insights.statsAxis}: %{y}<extra></extra>`,
         },
       ]}
