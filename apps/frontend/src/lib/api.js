@@ -74,9 +74,18 @@ function checkUploadSize(files) {
  * UI spinning forever. The signal is the only way to give fetch() a timeout
  * in the browser — there is no built-in timeout option.
  */
-async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS, externalSignal) {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  // An optional caller-supplied signal lets the UI CANCEL an in-flight request — e.g.
+  // a Live-Demo run superseded by a newer upload. Without it the old request keeps
+  // running server-side, logs a History row, and writes an annotated artifact for a
+  // result the UI has already discarded (audit P2: stale backend requests).
+  const onExternalAbort = () => controller.abort()
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true })
+  }
   try {
     // no-store: API responses (logs, stats, model) must never be served from
     // the browser HTTP cache, or the History "Refresh" button could re-render
@@ -84,6 +93,12 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
     return await fetch(input, { ...init, cache: 'no-store', signal: controller.signal })
   } catch (error) {
     if (error?.name === 'AbortError') {
+      // A caller-driven cancel (newer run/upload) is not a timeout — surface it as a
+      // distinct, quietly-ignorable error so the stale-run guard drops it without the
+      // misleading "backend didn't respond" message.
+      if (externalSignal?.aborted) {
+        throw new Error('Request superseded by a newer analysis.', { cause: error })
+      }
       // Attach the original AbortError as the cause so devtools / Sentry
       // / future error boundaries can inspect both layers (preserve-caught-error).
       throw new Error(
@@ -94,6 +109,7 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
     throw error
   } finally {
     window.clearTimeout(timer)
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort)
   }
 }
 
@@ -127,13 +143,13 @@ export function mediaUrl(path) {
  * browser media tags cannot add X-API-Key, so fetch the artifact once and render
  * it through an object URL instead of a bare /media src.
  */
-export async function resolveMediaUrl(path) {
+export async function resolveMediaUrl(path, signal) {
   const url = mediaUrl(path)
   if (!url || !API_KEY || url.startsWith('blob:')) {
     return url
   }
 
-  const response = await fetchWithTimeout(url, { headers: buildHeaders() })
+  const response = await fetchWithTimeout(url, { headers: buildHeaders() }, REQUEST_TIMEOUT_MS, signal)
   if (!response.ok) {
     throw new Error(`Could not load media artifact (${response.status})`)
   }
@@ -391,7 +407,7 @@ function appendMetadataFile(formData, metadataFile) {
   }
 }
 
-export async function analyzeFrame(file, metadata, metadataFile) {
+export async function analyzeFrame(file, metadata, metadataFile, signal) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
@@ -402,12 +418,13 @@ export async function analyzeFrame(file, metadata, metadataFile) {
     `${API_BASE_URL}/api/analyze-frame`,
     { method: 'POST', headers: buildHeaders(), body: formData },
     ANALYZE_TIMEOUT_MS,
+    signal,
   )
 
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeFrames(files, metadata, metadataFile) {
+export async function analyzeFrames(files, metadata, metadataFile, signal) {
   checkUploadSize(files)
   const formData = new FormData()
   files.forEach((file) => {
@@ -420,6 +437,7 @@ export async function analyzeFrames(files, metadata, metadataFile) {
     `${API_BASE_URL}/api/analyze-frames`,
     { method: 'POST', headers: buildHeaders(), body: formData },
     ANALYZE_TIMEOUT_MS,
+    signal,
   )
 
   return parseAnalysisResponse(response)
@@ -431,7 +449,7 @@ export async function analyzeFrames(files, metadata, metadataFile) {
  * and returns a single AnalysisPayload (not a per-image batch like analyzeFrames).
  * Files keep their folder paths so the backend can order them by capture sequence.
  */
-export async function analyzeSequence(files, metadata, metadataFile) {
+export async function analyzeSequence(files, metadata, metadataFile, signal) {
   checkUploadSize(files)
   const formData = new FormData()
   files.forEach((file) => {
@@ -444,12 +462,13 @@ export async function analyzeSequence(files, metadata, metadataFile) {
     `${API_BASE_URL}/api/analyze-sequence`,
     { method: 'POST', headers: buildHeaders(), body: formData },
     ANALYZE_TIMEOUT_MS,
+    signal,
   )
 
   return parseAnalysisResponse(response)
 }
 
-export async function analyzeMedia(file, metadata, metadataFile) {
+export async function analyzeMedia(file, metadata, metadataFile, signal) {
   checkUploadSize(file)
   const formData = new FormData()
   formData.append('file', file)
@@ -460,6 +479,7 @@ export async function analyzeMedia(file, metadata, metadataFile) {
     `${API_BASE_URL}/api/analyze`,
     { method: 'POST', headers: buildHeaders(), body: formData },
     ANALYZE_TIMEOUT_MS,
+    signal,
   )
 
   return parseAnalysisResponse(response)

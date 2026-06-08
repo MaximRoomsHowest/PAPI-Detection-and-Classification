@@ -57,6 +57,10 @@ export function useAnalysis(copy) {
   const [activeId, setActiveId] = useState('clean')
   const [media, setMedia] = useState(null)
   const [folderMode, setFolderMode] = useState(FOLDER_MODE_ANGLE_SWEEP)
+  // The folder mode that PRODUCED the on-screen result. When the user flips the mode
+  // toggle after a result is shown, this differs from `folderMode`, so the result is
+  // flagged stale (re-run needed) instead of silently drifting from the toggle (audit P1).
+  const [resultFolderMode, setResultFolderMode] = useState(null)
 
   // Optional manual drone telemetry for the elevation-angle calc, used when an
   // uploaded image carries no GPS EXIF (browser uploads usually strip it). Empty
@@ -97,6 +101,11 @@ export function useAnalysis(copy) {
   // upload (audit frontend-bugs: mid-analysis file swap).
   const runIdRef = useRef(0)
   const resolvedArtifactUrlsRef = useRef([])
+  // AbortController for the in-flight analysis run. A newer run or a media swap aborts it
+  // so the superseded backend request is genuinely CANCELLED (not just ignored client-side),
+  // which prevents it finishing server-side and leaving a stale History row + artifact
+  // (audit P2: stale backend requests can still create History rows/artifacts).
+  const abortRef = useRef(null)
 
   useEffect(() => {
     return () => {
@@ -135,36 +144,58 @@ export function useAnalysis(copy) {
     })
   }
 
-  async function resolveResultArtifactUrls(results, runId) {
+  // Cancel the in-flight analysis request (if any). Called when a newer run starts or the
+  // user swaps media, so the superseded backend job is actually aborted instead of running
+  // to completion and persisting a History row + artifact for a discarded result (audit P2).
+  function abortInFlight() {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+  }
+
+  async function resolveResultArtifactUrls(results, runId, signal) {
     const createdUrls = []
     const urls = []
+    let failed = 0
 
-    try {
-      for (const result of results) {
-        if (runIdRef.current !== runId) {
-          createdUrls.forEach(revokeMediaUrl)
-          return null
-        }
-
-        const url = await resolveMediaUrl(result.artifact_url)
-
-        if (runIdRef.current !== runId) {
-          revokeMediaUrl(url)
-          createdUrls.forEach(revokeMediaUrl)
-          return null
-        }
-
-        if (url?.startsWith('blob:')) {
-          createdUrls.push(url)
-        }
-        urls.push(url)
+    for (const result of results) {
+      if (runIdRef.current !== runId) {
+        createdUrls.forEach(revokeMediaUrl)
+        return null
       }
-    } catch (error) {
-      createdUrls.forEach(revokeMediaUrl)
-      throw error
+
+      let url
+      try {
+        url = await resolveMediaUrl(result.artifact_url, signal)
+      } catch {
+        // A newer run aborted this fetch — discard quietly like the runId guard.
+        if (signal?.aborted) {
+          createdUrls.forEach(revokeMediaUrl)
+          return null
+        }
+        // The numeric analysis already succeeded server-side; only the annotated preview
+        // failed to load. Keep the result with no preview (artifactUrl=null) and let the
+        // caller warn, instead of failing the whole analysis over a missing artifact —
+        // which would hide a usable result (audit P2: artifact fetch failure hides analysis).
+        failed += 1
+        urls.push(null)
+        continue
+      }
+
+      if (runIdRef.current !== runId) {
+        revokeMediaUrl(url)
+        createdUrls.forEach(revokeMediaUrl)
+        return null
+      }
+
+      if (url?.startsWith('blob:')) {
+        createdUrls.push(url)
+      }
+      urls.push(url)
     }
 
-    return { urls, createdUrls }
+    return { urls, createdUrls, failed }
   }
 
   function handleMediaFiles(files) {
@@ -188,6 +219,7 @@ export function useAnalysis(copy) {
     if (!isFolderBatch && !isImageFile(file) && !isVideoFile(file)) {
       // Clear any prior result so a stale result panel doesn't sit under the
       // "unsupported file" error as if it belonged to the rejected file (audit FB-03).
+      abortInFlight()
       runIdRef.current += 1
       clearResolvedArtifactUrls()
       setIsAnalyzing(false)
@@ -220,7 +252,8 @@ export function useAnalysis(copy) {
       }
     })
     // Invalidate any in-flight analysis so its result is not applied to this
-    // newly selected media.
+    // newly selected media — and abort it so it doesn't finish server-side (audit P2).
+    abortInFlight()
     runIdRef.current += 1
     clearResolvedArtifactUrls()
     setIsAnalyzing(false)
@@ -346,6 +379,12 @@ export function useAnalysis(copy) {
     }
 
     const runId = ++runIdRef.current
+    // Abort any previous in-flight run, then open a fresh AbortController for THIS run so a
+    // later run / media swap can cancel it server-side rather than just ignoring it (audit P2).
+    abortInFlight()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const signal = controller.signal
     setIsAnalyzing(true)
     setAnalysisError('')
 
@@ -353,6 +392,7 @@ export function useAnalysis(copy) {
       let bestScenario = null
       let bestIndex = 0
       let rawResults = []
+      let partialFailures = 0
       const frameContexts = []
       const currentFolderMode = folderMode
       const keepsFrameScenarios = shouldKeepFrameScenarios(media.type, currentFolderMode)
@@ -385,7 +425,7 @@ export function useAnalysis(copy) {
 
       if (media.type === 'video') {
         setAnalysisProgress(copy.live.uploadingVideo)
-        const result = await analyzeMedia(media.file, metadata, telemetryFile)
+        const result = await analyzeMedia(media.file, metadata, telemetryFile, signal)
         rawResults = [result]
         frameContexts.push({
           frameLabel: `${result.frame_count ?? 0} labeled frames`,
@@ -402,7 +442,7 @@ export function useAnalysis(copy) {
           )
         }
         setAnalysisProgress(copy.live.uploadingSequence.replace('{count}', files.length))
-        const result = await analyzeSequence(files, metadata, telemetryFile)
+        const result = await analyzeSequence(files, metadata, telemetryFile, signal)
         rawResults = [result]
         frameContexts.push({
           frameLabel: `${result.frame_count ?? files.length} sequenced frames`,
@@ -436,7 +476,20 @@ export function useAnalysis(copy) {
             return
           }
           setAnalysisProgress(copy.live.analyzingFrame.replace('{current}', index + 1).replace('{total}', frames.length))
-          const result = await analyzeFrame(frame.file, metadata, telemetryFile)
+          let result
+          try {
+            result = await analyzeFrame(frame.file, metadata, telemetryFile, signal)
+          } catch (error) {
+            // A newer run aborted us — bail to the outer catch (the runId guard drops it).
+            if (signal.aborted) {
+              throw error
+            }
+            // One frame failed mid-sweep — keep the frames that already succeeded instead
+            // of discarding the whole batch, and warn afterwards (audit P2: partial failures
+            // discard earlier successful frames).
+            partialFailures += 1
+            continue
+          }
           rawResults.push(result)
           frameContexts.push({
             frameLabel: frame.label,
@@ -445,7 +498,9 @@ export function useAnalysis(copy) {
           const score = result.global_state === 'unknown' ? result.confidence : result.confidence + 1
           if (score >= bestScore) {
             bestScore = score
-            bestIndex = index
+            // Index into rawResults (NOT the frame index): with failed frames skipped the
+            // two diverge, and the `scenarios` array below is built from rawResults.
+            bestIndex = rawResults.length - 1
           }
         }
       }
@@ -454,7 +509,7 @@ export function useAnalysis(copy) {
         throw new Error(copy.live.noMediaAnalyzed)
       }
 
-      const resolvedArtifacts = await resolveResultArtifactUrls(rawResults, runId)
+      const resolvedArtifacts = await resolveResultArtifactUrls(rawResults, runId, signal)
       if (resolvedArtifacts == null) {
         return
       }
@@ -488,6 +543,9 @@ export function useAnalysis(copy) {
 
       setBackendFrames(nextBackendFrames)
       setBackendResults(rawResults)
+      // Remember which folder mode produced this result so the toggle can flag the result
+      // stale if the user switches modes without re-running (audit P1).
+      setResultFolderMode(currentFolderMode)
       setBackendFrameIndex(0)
       setBackendScenario(bestScenario)
       setActiveId('backend')
@@ -504,6 +562,19 @@ export function useAnalysis(copy) {
       // A lingering "Analysis complete" message would persist under the heading
       // with nothing left to report; the rendered result is the success signal.
       setAnalysisProgress('')
+      // Non-fatal warnings — the result is already on screen; these only explain a gap so
+      // a partial sweep / missing preview isn't silently swallowed (audit P2).
+      if (partialFailures > 0) {
+        toast.warning(
+          copy.live.partialFramesWarning
+            .replace('{ok}', String(rawResults.length))
+            .replace('{total}', String(rawResults.length + partialFailures))
+            .replace('{failed}', String(partialFailures)),
+        )
+      }
+      if (resolvedArtifacts.failed > 0) {
+        toast.warning(copy.live.artifactWarning)
+      }
       // Non-blocking confirmation — the inline result panel is the primary
       // signal, the toast just confirms it from any scroll position / route.
       toast.success(copy.live.analysisComplete)
@@ -523,11 +594,21 @@ export function useAnalysis(copy) {
     }
   }
 
+  // The on-screen folder result was produced in `resultFolderMode`; if the user has since
+  // flipped the toggle, the result no longer matches the selected mode and needs a re-run
+  // rather than silently drifting (audit P1: folder mode can drift from the displayed result).
+  const folderResultStale =
+    media?.type === 'folder' &&
+    backendResults.length > 0 &&
+    resultFolderMode != null &&
+    resultFolderMode !== folderMode
+
   return {
     activeId,
     media,
     folderMode,
     setFolderMode,
+    folderResultStale,
     runways,
     runwayLoading,
     runwayError,

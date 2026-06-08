@@ -113,3 +113,39 @@ def test_create_from_payload_truncates_overlong_drone_id(session):
     )
     log = AnalysisLogRepository(session).create_from_payload(payload)
     assert log.drone_id == "x" * 128
+
+
+def test_create_from_payload_deletes_artifact_when_commit_fails(session, tmp_path, monkeypatch):
+    """The annotated artifact is written by inference BEFORE the log commit. If the commit
+    fails (DB error, column-width truncation), the artifact must be deleted rather than
+    orphaning on disk with no log pointing to it (audit P3)."""
+    from types import SimpleNamespace
+
+    from app.repositories import analysis_logs as repo_module
+
+    monkeypatch.setattr(repo_module, "get_settings", lambda: SimpleNamespace(exports_dir=tmp_path))
+    artifact = tmp_path / "abc_annotated.mp4"
+    artifact.write_bytes(b"fake artifact bytes")
+
+    payload = AnalysisPayload(
+        media_type="video",
+        original_filename="clip.mp4",
+        runway_id="papi_24",
+        global_state="unknown",
+        lamps=[],
+        confidence=0.5,
+        frame_count=1,
+        processing_ms=1,
+        angle=AngleResult(angle_available=False, angle_note="no metadata"),
+        artifact_url="/media/abc_annotated.mp4",
+    )
+
+    def _boom():
+        raise RuntimeError("simulated commit failure")
+
+    monkeypatch.setattr(session, "commit", _boom)
+
+    with pytest.raises(RuntimeError):
+        AnalysisLogRepository(session).create_from_payload(payload)
+
+    assert not artifact.exists()  # orphan cleaned up on the failed persist

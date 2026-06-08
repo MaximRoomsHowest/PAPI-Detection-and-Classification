@@ -836,6 +836,73 @@
   line-height: 1.5;
 }
 
+/* Stale-result prompt: shown when the mode toggle no longer matches the result on
+   screen, so the user knows to re-run rather than trusting a drifted result (audit P1). */
+.folder-mode__stale {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(200, 130, 31, 0.12);
+  color: #c8821f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Active-metadata notice: surfaces persisted telemetry / a telemetry file that will
+   override the media's own GPS, even after the metadata prompt has hidden (audit P1). */
+.active-metadata-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: -4px 0 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(127, 135, 148, 0.08);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.active-metadata-notice svg {
+  color: var(--accent);
+  flex: none;
+}
+
+.active-metadata-notice__text {
+  flex: 1 1 240px;
+}
+
+.active-metadata-notice__file {
+  font-size: 12px;
+  color: var(--text-strong);
+  word-break: break-all;
+}
+
+.active-metadata-notice__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.active-metadata-notice__clear:hover {
+  border-color: var(--accent);
+}
+
+.active-metadata-notice__clear:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* PDF export feedback banner (audit F06/F07): mirrors the Live Demo
    .analysis-status.error pattern so a failed or empty export is visible
    (aria-live) instead of console-only. */

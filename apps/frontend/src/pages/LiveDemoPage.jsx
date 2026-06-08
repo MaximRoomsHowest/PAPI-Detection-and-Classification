@@ -8,6 +8,7 @@ import { useLiveDemo } from '../context/liveDemoContext'
 import { FOLDER_MODE_ANGLE_SWEEP, FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
 import { MediaUploadControls } from '../components/live/MediaUploadControls'
 import { MetadataPrompt } from '../components/live/MetadataPrompt'
+import { ActiveMetadataNotice } from '../components/live/ActiveMetadataNotice'
 import { ResultPanel } from '../components/live/ResultPanel'
 import { RunwaySelector } from '../components/live/RunwaySelector'
 
@@ -22,6 +23,7 @@ export function LiveDemoPage({ copy, plotTheme }) {
     media,
     folderMode,
     setFolderMode,
+    folderResultStale,
     backendScenario,
     backendFrames,
     backendFrameIndex,
@@ -51,6 +53,8 @@ export function LiveDemoPage({ copy, plotTheme }) {
 
       <RunwaySelector copy={copy} />
 
+      <ActiveMetadataNotice copy={copy} />
+
       {media?.type === 'folder' && (
         <div className="folder-mode" aria-live="polite">
           <span className="folder-mode__label">{copy.live.folderMode}</span>
@@ -73,6 +77,13 @@ export function LiveDemoPage({ copy, plotTheme }) {
             </button>
           </div>
           <p>{copy.live.folderModeHint}</p>
+          {/* The shown result was produced in a different mode than the toggle now selects —
+              prompt a re-run instead of letting the result drift silently (audit P1). */}
+          {folderResultStale && (
+            <p className="folder-mode__stale" role="status">
+              {copy.live.folderModeStale}
+            </p>
+          )}
         </div>
       )}
 

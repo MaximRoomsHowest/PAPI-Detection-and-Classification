@@ -44,7 +44,18 @@ class AnalysisLogRepository:
             result_json=payload.model_dump(),
         )
         self.db.add(log)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            # The annotated artifact was written by inference BEFORE this commit. If the
+            # row never persists (DB error, a column-width truncation, etc.) the artifact
+            # would orphan on disk with no log pointing to it. Roll the transaction back
+            # and delete the file so a failed persist leaves nothing behind (audit P3).
+            # ``artifact_path`` is already the resolved, in-exports-tree path (or None).
+            self.db.rollback()
+            if artifact_path:
+                Path(artifact_path).unlink(missing_ok=True)
+            raise
         self.db.refresh(log)
         return log
 
