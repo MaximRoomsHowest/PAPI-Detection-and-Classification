@@ -44,6 +44,43 @@ def colour_intermediacy(cf: dict) -> float:
     return _clamp(0.6 * mix + 0.4 * min(amber, 0.6))
 
 
+# Thresholds for calling a crop a *clearly stable* colour (vs an amber blend). The orange/amber
+# band IS the transition signal, so a crop is only "red"/"white" when a pure colour dominates the
+# lit pixels -- never merely because some red or white is present.
+RED_RATIO_MIN = 0.45  # pure-red pixels must be a real share of the crop
+RED_DOMINANCE_MIN = 0.65  # ...and dominate the warm (red+amber+yellow) pixels
+WHITE_RATIO_MIN = 0.30
+WHITE_VAL_MIN = 175.0  # OpenCV value channel: a stable white lamp is bright
+
+
+def classify_lamp_colour(cf: dict) -> str:
+    """Stable-colour verdict for a lamp crop from ``colour_features`` stats.
+
+    Returns ``"red"`` / ``"white"`` when the crop is a *clearly stable* colour (so it is NOT a
+    transition and should keep its red/white label), ``"intermediate"`` for an amber/blended crop
+    (the genuine transition signal), or ``"unknown"`` when too few lit pixels to judge. Amber-aware
+    by construction: ranking by red-as-a-share-of-warm separates a pure-red graze from a red->white
+    blend without hand-tuned per-ratio cutoffs. Used by both the label gate (apply_verification) and
+    the manual-review triage so the audit numbers and the fix cannot drift apart.
+    """
+    if not cf or cf.get("n_px", 0) < 16:
+        return "unknown"
+    red = float(cf.get("red_ratio", 0.0))
+    amber = float(cf.get("orange_amber_ratio", 0.0))
+    yellow = float(cf.get("yellow_ratio", 0.0))
+    white = float(cf.get("white_ratio", 0.0))
+    val = float(cf.get("val_mean", 0.0))
+    warm = red + amber + yellow
+    if warm < 0.15 and white < 0.15:
+        return "unknown"  # crop not clearly lit -> let other signals decide
+    red_dominance = red / warm if warm > 0 else 0.0
+    if red >= RED_RATIO_MIN and red_dominance >= RED_DOMINANCE_MIN and white <= 0.20:
+        return "red"
+    if white >= WHITE_RATIO_MIN and val >= WHITE_VAL_MIN and red <= 0.10 and amber <= 0.30:
+        return "white"
+    return "intermediate"
+
+
 def review_flag(quality_flags: str, runway: str) -> str:
     flags = []
     if "elev_discontinuity" in quality_flags:
@@ -77,6 +114,7 @@ def score(*, colour: dict, frame_offset: int, quality_flags: str, runway: str) -
         "transition_score": value,
         "score_offset": round(prox, 3),
         "score_colour": round(col, 3),
+        "colour_verdict": classify_lamp_colour(colour),
         "tier": tier(value, frame_offset, suspect),
         "review_flag": flag,
     }

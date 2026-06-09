@@ -110,27 +110,29 @@ def mine_examples(weights: Path, data: Path, per_cat: int = 12) -> dict:
 
         gt_t = [b for cls, b in gt if cls == 2]
         pr_t = [b for cls, b in preds if cls == 2]
-        cat = None
-        # transition correctness
+        trans_cat = None
+        # transition correctness (a frame gets at most one transition verdict)
         for gb in gt_t:
             hit = any(_iou(gb, pb) > 0.3 for pb in pr_t)
-            cat = "correct_transition_examples" if hit else "missed_transition_examples"
+            trans_cat = "correct_transition_examples" if hit else "missed_transition_examples"
             break
         for pb in pr_t:
             if not any(_iou(gb, pb) > 0.3 for gb in gt_t):
-                cat = "false_transition_examples"
-        # red/white confusion (GT red matched to pred white or vice versa)
-        if cat is None:
-            for cls, gb in gt:
-                if cls not in (0, 1):
-                    continue
-                for pc, pb in preds:
-                    if pc in (0, 1) and pc != cls and _iou(gb, pb) > 0.4:
-                        cat = "red_white_confusion_examples"
-        if cat and counts[cat] < per_cat:
-            counts[cat] += 1
-            annotated = res.plot()
-            cv2.imwrite(str(EXAMPLES / cat / f"{ip.parent.parent.name}__{ip.stem}.jpg"), annotated)
+                trans_cat = "false_transition_examples"
+        # red/white confusion (GT red matched to pred white or vice versa) is INDEPENDENT of the
+        # transition verdict -- mined separately so a frame with transition boxes can't starve it.
+        rw_conf = any(
+            cls in (0, 1) and pc in (0, 1) and pc != cls and _iou(gb, pb) > 0.4
+            for cls, gb in gt
+            for pc, pb in preds
+        )
+        annotated = None
+        for cat in (trans_cat, "red_white_confusion_examples" if rw_conf else None):
+            if cat and counts[cat] < per_cat:
+                if annotated is None:
+                    annotated = res.plot()
+                counts[cat] += 1
+                cv2.imwrite(str(EXAMPLES / cat / f"{ip.parent.parent.name}__{ip.stem}.jpg"), annotated)
     return dict(counts)
 
 

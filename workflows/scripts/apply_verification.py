@@ -1,14 +1,20 @@
-"""Apply Phase 5 verification verdicts to the twin and write the verification log.
+"""Apply verification verdicts to the twin and write the verification log.
 
-Verdicts come from a visual spot-check of per-flip montages (review_assets/review_page_*.png,
-36 flips across all strata). The review established an evidence-based rule, applied dataset-wide:
+Verdicts combine the per-flip review flags with the per-crop colour verdict
+(``papi.transition_scoring.classify_lamp_colour``) so a flip-anchored box is only kept as class 2
+when it is *visibly* an amber blend, not a stable colour that merely sits inside a flip's frame
+window. The dataset-wide rule:
 
-* ``fallback_identity`` (left-to-right lamp id on zoom/mirrored geometry) -> ``ambiguous_review``:
-  identity unreliable, the "flip" may be a tracking artifact -> revert that box to its original
-  red/white label (excluded from the transition class).
-* ``elev_discontinuity`` -> ``accepted_transition`` with note ``angle_unreliable``: the visual
-  red<->white change is genuine; only the telemetry angle at the flip is untrustworthy.
-* otherwise -> ``accepted_transition`` (flip-anchored + colour-confirmed).
+* ``fallback_identity`` (left-to-right lamp id on zoom/mirrored geometry) -> excluded: identity
+  unreliable, the "flip" may be a tracking artifact -> revert that box to its red/white label.
+* ``elev_discontinuity`` -> excluded: the flip's from/to frames are at very different elevations,
+  so the sampled window does NOT bracket a captured colour change (the real flip fell in an
+  unsampled gap) -- both sides are stable observations. (Audit 2026-06-09: the crops are solid
+  red, e.g. red_ratio 0.86 three minutes from the flip; the earlier "angle-only unreliable"
+  assumption was wrong.)
+* crop colour is a clearly stable ``red``/``white`` -> excluded: window-edge colour bleed, not a
+  transition (audit found ~205 such boxes, ~42% of the live transition labels).
+* otherwise (amber/blended crop) -> ``accepted_transition`` (flip-anchored + colour-confirmed).
 
 Reverting rewrites only the affected lamp's class back to the human red/white label from
 tracks.csv; accepted boxes keep class 2. Writes verification_log.csv (brief schema) and a summary.
@@ -25,6 +31,8 @@ import csv
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
+
+from papi.transition_scoring import classify_lamp_colour
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "data" / "datasets" / "transition-classification-data"
@@ -46,12 +54,14 @@ def _video_dir(twin: Path, source_id: str) -> Path | None:
     return None
 
 
-def decide(review_flag: str) -> tuple[str, str]:
+def decide(review_flag: str, colour_verdict: str) -> tuple[str, str]:
     if "fallback_identity" in review_flag:
         return "ambiguous_review", "unreliable left-to-right lamp identity (zoom/mirror); excluded from training"
     if "elev_discontinuity" in review_flag:
-        return "accepted_transition", "visual transition genuine; angle_unreliable (telemetry discontinuity)"
-    return "accepted_transition", "flip-anchored + colour-confirmed"
+        return "reverted_telemetry_gap", "flip window does not bracket a captured transition (telemetry gap); reverted to stable colour"
+    if colour_verdict in ("red", "white"):
+        return "reverted_stable_colour", f"crop is stable {colour_verdict} (red-dominant / not an amber blend); reverted to {colour_verdict}"
+    return "accepted_transition", "flip-anchored + colour-confirmed intermediate"
 
 
 def apply(twin: Path) -> dict:
@@ -67,7 +77,12 @@ def apply(twin: Path) -> dict:
     accepted: set[tuple[str, int, str]] = set()  # (source, frame, track) kept as transition
     decisions = Counter()
     for c in candidates:
-        decision, note = decide(c["review_flag"])
+        try:
+            colour = json.loads(c.get("colour_features") or "{}")
+        except json.JSONDecodeError:
+            colour = {}
+        verdict = c.get("colour_verdict") or classify_lamp_colour(colour)
+        decision, note = decide(c["review_flag"], verdict)
         if (c["source_id"], c["track_id"], int(c["flip_frame"])) in reviewed_keys:
             note += " [visually reviewed]"
         decisions[decision] += 1
