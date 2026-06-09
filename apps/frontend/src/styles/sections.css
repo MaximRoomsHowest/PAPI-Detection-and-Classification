@@ -298,10 +298,9 @@
   cursor: pointer;
 }
 
-/* Transition-method toggle — a segmented control (Tracking | Model) matching the runway
-   selector's bordered surface; the active option is filled with the theme accent. Lets the
-   user pick how transitions are detected before/after an analysis. */
-.transition-method {
+/* Inference model selector — a segmented control matching the runway selector's
+   bordered surface; unavailable registry entries are visible but disabled. */
+.model-selector {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -314,19 +313,19 @@
   font-size: 13px;
 }
 
-.transition-method__label {
+.model-selector__label {
   white-space: nowrap;
   font-weight: 600;
 }
 
-.transition-method__options {
+.model-selector__options {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 3px;
   overflow: hidden;
 }
 
-.transition-method__option {
+.model-selector__option {
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -335,19 +334,35 @@
   cursor: pointer;
 }
 
-.transition-method__option + .transition-method__option {
+.model-selector__option + .model-selector__option {
   border-left: 1px solid var(--border);
 }
 
-.transition-method__option.is-active {
+.model-selector__option.is-active {
   background: var(--accent);
   color: var(--surface);
   font-weight: 600;
 }
 
-.transition-method__option:focus-visible {
+.model-selector__option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.model-selector__option:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.model-selector small {
+  max-width: 18ch;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.model-selector__error {
+  color: var(--danger);
 }
 
 .upload-button,

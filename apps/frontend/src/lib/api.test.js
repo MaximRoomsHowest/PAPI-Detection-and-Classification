@@ -28,6 +28,7 @@ import {
   deleteRunway,
   fetchLogs,
   fetchModelInfo,
+  fetchModels,
   fetchReady,
   fetchRunways,
   fetchStats,
@@ -119,6 +120,12 @@ describe('GET endpoints — URL + header pinning', () => {
     expect(url).toMatch(/\/api\/model$/)
   })
 
+  it('fetchModels targets /api/models', async () => {
+    await fetchModels()
+    const [url] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/api\/models$/)
+  })
+
   it('fetchStats targets /api/stats', async () => {
     await fetchStats()
     const [url] = fetch.mock.calls[0]
@@ -205,6 +212,7 @@ describe('analyze* — multipart payload + auth', () => {
     droneLatitude: '47.668810',
     droneLongitude: '9.504007',
     droneAltitudeM: '466.5',
+    modelId: 'nano',
   }
 
   it('analyzeFrame POSTs to /api/analyze-frame with file + metadata', async () => {
@@ -217,6 +225,7 @@ describe('analyze* — multipart payload + auth', () => {
     expect(init.body).toBeInstanceOf(FormData)
     expect(init.body.get('file')).toBe(file)
     expect(init.body.get('runway_id')).toBe('24')
+    expect(init.body.get('model_id')).toBe('nano')
     expect(init.body.get('drone_id')).toBe('M4E-01')
     expect(init.body.get('drone_latitude')).toBe('47.668810')
   })

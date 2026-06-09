@@ -1,17 +1,22 @@
 import { FolderOpen, Upload } from 'lucide-react'
 import { useLiveDemo } from '../../context/liveDemoContext'
 
-// The image/video file picker + the folder picker (webkitdirectory) + the transition-method
-// toggle. Lives in the section heading. Pulls the current media (for the filename label), the
-// change handler, and the transition-method state from the Live-Demo context so the page shell
-// doesn't thread them through.
+// The image/video file picker + the folder picker (webkitdirectory) + the inference-model
+// selector. Lives in the section heading and reads the Live-Demo context directly.
 export function MediaUploadControls({ copy }) {
-  const { media, handleMediaChange, transitionMethod, setTransitionMethod } = useLiveDemo()
-
-  const methods = [
-    { id: 'tracking', label: copy.live.transitionMethodTracking, hint: copy.live.transitionMethodTrackingHint },
-    { id: 'model', label: copy.live.transitionMethodModel, hint: copy.live.transitionMethodModelHint },
-  ]
+  const {
+    media,
+    handleMediaChange,
+    selectedModelId,
+    setSelectedModelId,
+    modelOptions,
+    modelOptionsLoading,
+    modelOptionsError,
+    isAnalyzing,
+  } = useLiveDemo()
+  const options = modelOptions.length
+    ? modelOptions
+    : [{ model_id: selectedModelId, model_label: selectedModelId, available: true }]
 
   return (
     <div className="demo-actions">
@@ -41,22 +46,39 @@ export function MediaUploadControls({ copy }) {
           onChange={handleMediaChange}
         />
       </label>
-      <div className="transition-method" role="group" aria-label={copy.live.transitionMethod}>
-        <span className="transition-method__label">{copy.live.transitionMethod}</span>
-        <div className="transition-method__options">
-          {methods.map((method) => (
-            <button
-              key={method.id}
-              type="button"
-              className={`transition-method__option${transitionMethod === method.id ? ' is-active' : ''}`}
-              aria-pressed={transitionMethod === method.id}
-              title={method.hint}
-              onClick={() => setTransitionMethod(method.id)}
-            >
-              {method.label}
-            </button>
-          ))}
+      <div className="model-selector" role="group" aria-label={copy.live.inferenceModel}>
+        <span className="model-selector__label">{copy.live.inferenceModel}</span>
+        <div className="model-selector__options">
+          {options.map((model) => {
+            const unavailable = model.available === false
+            // Block model switching mid-analysis: setSelectedModelId arms the auto-run, so a click
+            // during an in-flight run queues a wasted re-run and flashes the stale-model result first (audit).
+            const reason = unavailable
+              ? model.disabled_reason || copy.live.modelUnavailable
+              : isAnalyzing
+                ? copy.live.restartDisabledBusy
+                : model.description || model.model_role || model.model_id
+            return (
+              <button
+                key={model.model_id}
+                type="button"
+                className={`model-selector__option${selectedModelId === model.model_id ? ' is-active' : ''}`}
+                aria-pressed={selectedModelId === model.model_id}
+                disabled={unavailable || isAnalyzing}
+                title={reason}
+                onClick={() => setSelectedModelId(model.model_id)}
+              >
+                {model.model_label || model.model_id}
+              </button>
+            )
+          })}
         </div>
+        {modelOptionsLoading && <small>{copy.live.modelLoading}</small>}
+        {modelOptionsError && (
+          <small className="model-selector__error" role="status" aria-live="polite">
+            {modelOptionsError}
+          </small>
+        )}
       </div>
     </div>
   )

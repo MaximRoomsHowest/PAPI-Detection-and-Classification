@@ -235,6 +235,16 @@ export async function fetchModelInfo() {
   return parseJsonBody(response, 'Model info')
 }
 
+export async function fetchModels() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/models`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`Could not load model options (${response.status})`)
+  }
+  return parseJsonBody(response, 'Model options')
+}
+
 export async function fetchStats() {
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats`, {
     headers: buildHeaders(),
@@ -386,6 +396,7 @@ function appendMetadata(formData, metadata = {}) {
     // "tracking" (temporal red<->white flips) or "model" (learned class-2 events). Omitted when
     // empty/undefined so the backend applies its own default.
     transition_method: metadata.transitionMethod,
+    model_id: metadata.modelId,
   }
   for (const [key, value] of Object.entries(fields)) {
     if (value !== undefined && value !== null && value !== '') {

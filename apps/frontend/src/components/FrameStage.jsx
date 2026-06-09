@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Film,
@@ -28,6 +29,7 @@ export function FrameStage({
   onRestart,
   canRestart,
   restarting,
+  artifactWarning,
   copy,
 }) {
   const [isDragActive, setIsDragActive] = useState(false)
@@ -169,12 +171,20 @@ export function FrameStage({
           )}
           <button
             type="button"
+            className="frame-restart-button"
             onClick={onRestart}
             disabled={!canRestart || restarting}
             aria-label={copy.live.restartAnalysis}
-            title={copy.live.restartAnalysis}
+            title={
+              !canRestart
+                ? copy.live.restartDisabledNoMedia
+                : restarting
+                  ? copy.live.restartDisabledBusy
+                  : copy.live.restartAnalysisLabel
+            }
           >
             <RotateCcw size={16} />
+            <span>{restarting ? copy.live.analyzing : copy.live.restartAnalysisLabel}</span>
           </button>
         </div>
         {canNavigateFrames && (
@@ -199,6 +209,14 @@ export function FrameStage({
               <ChevronRight size={16} />
             </button>
           </div>
+        )}
+        {/* Annotated-preview fetch failed but the numeric analysis is on screen — show an
+            inline badge so the gap isn't only a transient toast (audit F6). */}
+        {artifactWarning && (
+          <span className="frame-artifact-warning" role="status">
+            <AlertTriangle size={13} aria-hidden="true" />
+            {copy.live.artifactInlineWarning}
+          </span>
         )}
       </div>
 

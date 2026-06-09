@@ -4,6 +4,7 @@ import {
   analyzeFrame,
   analyzeMedia,
   analyzeSequence,
+  fetchModels,
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
@@ -77,10 +78,13 @@ export function useAnalysis(copy) {
   // media and clears it explicitly.
   const [metadataFile, setMetadataFile] = useState(null)
 
-  // Transition-detection method the backend applies: "tracking" (temporal red<->white flips on the
-  // serving model) or "model" (learned class-2 events from the 3-class detector). An INPUT like the
-  // runway/telemetry, so it persists across media changes; the backend echoes the method it used.
-  const [transitionMethod, setTransitionMethod] = useState('tracking')
+  // Inference model selected from /api/models. The backend owns model availability and the
+  // transition classifier's auto-"model" transition behavior; the UI sends only model_id so it
+  // cannot drift into a conflicting model/method combination.
+  const [selectedModelId, setSelectedModelIdState] = useState('small')
+  const [modelOptions, setModelOptions] = useState([])
+  const [modelOptionsLoading, setModelOptionsLoading] = useState(true)
+  const [modelOptionsError, setModelOptionsError] = useState('')
 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [backendScenario, setBackendScenario] = useState(null)
@@ -92,6 +96,9 @@ export function useAnalysis(copy) {
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
+  // True when the numeric analysis succeeded but at least one annotated preview could not
+  // be fetched — surfaced as an inline toolbar badge in addition to the toast (audit F6).
+  const [artifactWarning, setArtifactWarning] = useState(false)
   const autoRunRequestedRef = useRef(false)
   const [folderVideo, setFolderVideo] = useState(null)
   const [isTransformingFolderVideo, setIsTransformingFolderVideo] = useState(false)
@@ -127,6 +134,36 @@ export function useAnalysis(copy) {
     return () => {
       resolvedArtifactUrlsRef.current.forEach(revokeMediaUrl)
       resolvedArtifactUrlsRef.current = []
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    fetchModels()
+      .then((options) => {
+        if (!active) return
+        const list = Array.isArray(options) ? options : []
+        setModelOptions(list)
+        const fallback =
+          list.find((model) => model.is_default && model.available !== false) ??
+          list.find((model) => model.available !== false) ??
+          list[0]
+        setSelectedModelIdState((current) => {
+          const stillAvailable = list.some(
+            (model) => model.model_id === current && model.available !== false,
+          )
+          return stillAvailable ? current : fallback?.model_id ?? current
+        })
+      })
+      .catch((error) => {
+        if (!active) return
+        setModelOptionsError(error.message || 'Could not load model options.')
+      })
+      .finally(() => {
+        if (active) setModelOptionsLoading(false)
+      })
+    return () => {
+      active = false
     }
   }, [])
 
@@ -228,6 +265,15 @@ export function useAnalysis(copy) {
       setBackendResults([])
       setBackendFrameIndex(0)
       clearFolderVideo()
+      // Also drop the previously-loaded media so the viewer doesn't keep showing an unrelated
+      // earlier upload sitting under the "unsupported file" error (audit).
+      setMedia((previous) => {
+        if (previous?.url) {
+          URL.revokeObjectURL(previous.url)
+        }
+        return null
+      })
+      setArtifactWarning(false)
       setAnalysisProgress('')
       setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
@@ -262,6 +308,7 @@ export function useAnalysis(copy) {
     setBackendResults([])
     setBackendFrameIndex(0)
     clearFolderVideo()
+    setArtifactWarning(false)
     setAnalysisError('')
     setAnalysisProgress('')
     autoRunRequestedRef.current = true
@@ -293,6 +340,17 @@ export function useAnalysis(copy) {
     event.target.value = ''
   }
 
+  function setSelectedModelId(nextModelId) {
+    const next = typeof nextModelId === 'function' ? nextModelId(selectedModelId) : nextModelId
+    if (!next || next === selectedModelId) {
+      return
+    }
+    setSelectedModelIdState(next)
+    if (media?.file) {
+      autoRunRequestedRef.current = true
+    }
+  }
+
   useEffect(() => {
     if (!autoRunRequestedRef.current || !media?.file || isAnalyzing) {
       return
@@ -312,7 +370,7 @@ export function useAnalysis(copy) {
     // listing it would re-run this effect on every render. The 0ms timer fires on the
     // next tick with an up-to-date closure, so there is no stale-closure risk.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [media?.file, isAnalyzing])
+  }, [media?.file, isAnalyzing, selectedModelId])
 
   function selectBackendFrame(index) {
     if (!backendFrames.length) {
@@ -387,6 +445,7 @@ export function useAnalysis(copy) {
     const signal = controller.signal
     setIsAnalyzing(true)
     setAnalysisError('')
+    setArtifactWarning(false)
 
     try {
       let bestScenario = null
@@ -408,7 +467,7 @@ export function useAnalysis(copy) {
       )
       const metadata = {
         runwayId: effectiveRunwayId,
-        transitionMethod,
+        modelId: selectedModelId,
         ...(hasDroneTelemetry
           ? {
               droneLatitude: droneTelemetry.latitude.trim(),
@@ -573,6 +632,7 @@ export function useAnalysis(copy) {
         )
       }
       if (resolvedArtifacts.failed > 0) {
+        setArtifactWarning(true)
         toast.warning(copy.live.artifactWarning)
       }
       // Non-blocking confirmation — the inline result panel is the primary
@@ -624,8 +684,11 @@ export function useAnalysis(copy) {
     setDroneTelemetry,
     metadataFile,
     setMetadataFile,
-    transitionMethod,
-    setTransitionMethod,
+    selectedModelId,
+    setSelectedModelId,
+    modelOptions,
+    modelOptionsLoading,
+    modelOptionsError,
     isAnalyzing,
     isExporting,
     exportError,
@@ -638,6 +701,7 @@ export function useAnalysis(copy) {
     isTransformingFolderVideo,
     analysisError,
     analysisProgress,
+    artifactWarning,
     insightsRef,
     handleMediaFiles,
     handleMediaChange,

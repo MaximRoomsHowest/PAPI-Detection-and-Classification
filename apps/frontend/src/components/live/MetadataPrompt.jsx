@@ -1,5 +1,6 @@
 import { MapPin, Upload, X } from 'lucide-react'
 import { useLiveDemo } from '../../context/liveDemoContext'
+import { FOLDER_MODE_ANGLE_SWEEP } from '../../lib/analysisMode'
 
 // The "angle metadata missing" panel: runway select + telemetry-file upload + manual
 // lat/lon/alt fields + the re-run button. Shown only after a result whose angle came
@@ -17,6 +18,7 @@ export function MetadataPrompt({ copy }) {
     setDroneTelemetry,
     metadataFile,
     setMetadataFile,
+    folderMode,
     runBackendInference,
     isAnalyzing,
   } = useLiveDemo()
@@ -39,7 +41,13 @@ export function MetadataPrompt({ copy }) {
       droneTelemetry.longitude.trim() &&
       droneTelemetry.altitudeM.trim(),
   )
-  const canApplyMetadata = Boolean(media && (metadataFile || hasManualDroneTelemetry))
+  // In folder ANGLE-SWEEP mode each image is scored against its OWN EXIF GPS, so an uploaded
+  // telemetry FILE is intentionally dropped — don't let it enable Apply (which would re-run
+  // without ever resolving the angle, looping this prompt). Manual lat/lon/alt still applies (audit).
+  const telemetryFileIgnored = media?.type === 'folder' && folderMode === FOLDER_MODE_ANGLE_SWEEP
+  const canApplyMetadata = Boolean(
+    media && ((metadataFile && !telemetryFileIgnored) || hasManualDroneTelemetry),
+  )
 
   return (
     <div className="metadata-prompt" role="region" aria-labelledby="metadata-prompt-title">
@@ -52,12 +60,13 @@ export function MetadataPrompt({ copy }) {
       </div>
 
       <div className="metadata-prompt__controls">
-        <label className="runway-select">
+        <label className="runway-select" htmlFor="metadata-runway-select">
           <span>{copy.live.runway}</span>
           <select
+            id="metadata-runway-select"
+            name="metadata-runway-select"
             value={selectedRunwayId}
             onChange={(event) => onSelectRunway(event.target.value)}
-            aria-label={copy.live.runway}
           >
             {runways.length === 0 && <option value={selectedRunwayId}>{selectedRunwayId}</option>}
             {runways.map((runway) => (
@@ -90,44 +99,64 @@ export function MetadataPrompt({ copy }) {
               <X size={16} />
             </button>
           )}
+          {telemetryFileIgnored && metadataFile && (
+            <p className="drone-telemetry__hint" role="status">
+              {copy.live.telemetryAngleSweepHint}
+            </p>
+          )}
         </div>
       </div>
 
       <span className="drone-telemetry__divider">{copy.live.telemetryOrManual}</span>
 
+      {/* Each field keeps its wrapping <label> (implicit association) and adds an explicit
+          id/name plus an aria-describedby range hint, so screen readers announce the accepted
+          bounds and the inputs participate in autofill/testing (audit F3). */}
       <div className="drone-telemetry__fields">
-        <label>
+        <label htmlFor="drone-latitude">
           <span>{copy.live.droneLatitude}</span>
           <input
+            id="drone-latitude"
+            name="drone-latitude"
             type="text"
             inputMode="decimal"
             className="mono"
             value={droneTelemetry.latitude}
             onChange={setDroneField('latitude')}
             placeholder="47.673521"
+            aria-describedby="drone-latitude-hint"
           />
+          <small id="drone-latitude-hint">{copy.live.droneLatitudeHint}</small>
         </label>
-        <label>
+        <label htmlFor="drone-longitude">
           <span>{copy.live.droneLongitude}</span>
           <input
+            id="drone-longitude"
+            name="drone-longitude"
             type="text"
             inputMode="decimal"
             className="mono"
             value={droneTelemetry.longitude}
             onChange={setDroneField('longitude')}
             placeholder="9.518154"
+            aria-describedby="drone-longitude-hint"
           />
+          <small id="drone-longitude-hint">{copy.live.droneLongitudeHint}</small>
         </label>
-        <label>
+        <label htmlFor="drone-altitude">
           <span>{copy.live.droneAltitude}</span>
           <input
+            id="drone-altitude"
+            name="drone-altitude"
             type="text"
             inputMode="decimal"
             className="mono"
             value={droneTelemetry.altitudeM}
             onChange={setDroneField('altitudeM')}
             placeholder="520"
+            aria-describedby="drone-altitude-hint"
           />
+          <small id="drone-altitude-hint">{copy.live.droneAltitudeHint}</small>
         </label>
       </div>
 
@@ -138,6 +167,13 @@ export function MetadataPrompt({ copy }) {
           className="primary-button metadata-prompt__apply"
           onClick={runBackendInference}
           disabled={!canApplyMetadata || isAnalyzing}
+          title={
+            !canApplyMetadata
+              ? copy.live.applyDisabledNoMetadata
+              : isAnalyzing
+                ? copy.live.analyzing
+                : copy.live.metadataApply
+          }
         >
           {isAnalyzing ? copy.live.analyzing : copy.live.metadataApply}
         </button>

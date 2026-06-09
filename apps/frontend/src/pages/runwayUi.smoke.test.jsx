@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../i18n/translations.js'
+import { MediaUploadControls } from '../components/live/MediaUploadControls.jsx'
+import { ResultPanel } from '../components/live/ResultPanel.jsx'
 import { RunwaySelector } from '../components/live/RunwaySelector.jsx'
 import { RunwaysPage } from './RunwaysPage.jsx'
 
@@ -57,6 +59,19 @@ function makeContext(overrides = {}) {
     addRunway: vi.fn(),
     removeRunway: vi.fn(),
     refetchRunways: vi.fn(),
+    media: null,
+    handleMediaChange: vi.fn(),
+    selectedModelId: 'small',
+    setSelectedModelId: vi.fn(),
+    modelOptions: [
+      { model_id: 'small', model_label: 'Small detector', model_role: 'detector', available: true },
+      { model_id: 'transition', model_label: 'Transition classifier', model_role: 'transition', available: false, disabled_reason: 'missing' },
+    ],
+    modelOptionsLoading: false,
+    modelOptionsError: '',
+    activeScenario: null,
+    activeState: { color: '#00a8e6', label: 'Correct glidepath', description: 'Stable' },
+    backendScenario: null,
     ...overrides,
   }
 }
@@ -132,6 +147,53 @@ describe('runway UI smoke', () => {
     })
 
     expect(setSelectedRunwayId).toHaveBeenCalledWith(builtinRunway.id)
+  })
+
+  it('renders selectable inference models and disables unavailable entries', () => {
+    const setSelectedModelId = vi.fn()
+    mocks.contextValue = makeContext({ setSelectedModelId })
+
+    const { container } = render(<MediaUploadControls copy={copy} />)
+
+    expect(container.textContent).toContain(copy.live.inferenceModel)
+    const buttons = [...container.querySelectorAll('.model-selector__option')]
+    expect(buttons.map((button) => button.textContent.trim())).toEqual([
+      'Small detector',
+      'Transition classifier',
+    ])
+    expect(buttons[1].disabled).toBe(true)
+
+    act(() => {
+      buttons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(setSelectedModelId).toHaveBeenCalledWith('small')
+  })
+
+  it('shows the model that produced a backend result', () => {
+    mocks.contextValue = makeContext({
+      backendScenario: { id: 'backend' },
+      activeScenario: {
+        summary: 'white + white + red + red',
+        stateId: 'correct',
+        lamps: [],
+        metrics: { boxConfidence: 94, latency: 42 },
+        angleSummary: { available: false },
+        rawResult: {
+          runway_id: builtinRunway.id,
+          model_id: 'nano',
+          model_label: 'Nano detector',
+          model_role: 'detector',
+          transition_method: 'tracking',
+        },
+        transitions: [],
+      },
+    })
+
+    const { container } = render(<ResultPanel copy={copy} />)
+
+    expect(container.textContent).toContain(copy.live.modelUsed)
+    expect(container.textContent).toContain('Nano detector')
   })
 
   it('confirms before deleting the active custom runway', async () => {
