@@ -1,0 +1,61 @@
+{
+  "default_model_id": "small",
+  "models": [
+    {
+      "id": "small",
+      "label": "Small detector",
+      "role": "detector",
+      "path": "models/serving/best.pt",
+      "class_count": 2,
+      "default": true,
+      "description": "Current yolo26s full-data 1280px serving detector.",
+      "card_path": "models/serving/model_card.json"
+    },
+    {
+      "id": "nano",
+      "label": "Nano detector",
+      "role": "detector",
+      "path": "models/runs/yolo26n-sequence-1280/weights/best.pt",
+      "class_count": 2,
+      "description": "Previous yolo26n sequence detector kept for fast rollback and comparison.",
+      "val_metrics": {
+        "selection": "best_fitness_epoch",
+        "epoch": 30,
+        "precision": 0.8613,
+        "recall": 0.8706,
+        "map50": 0.9141,
+        "map50_95": 0.474,
+        "note": "Validation-split box metrics from models/MODELS.md; previous serving model."
+      },
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "transition",
+      "label": "Transition classifier",
+      "role": "transition",
+      "path": "data/runs/detect/transition3class-yolo26s-1280/weights/best.pt",
+      "class_count": 3,
+      "description": "Experimental 3-class yolo26s transition-aware detector; optional local artifact.",
+      "val_metrics": {
+        "selection": "test_split_3class_eval",
+        "map50": 0.6062,
+        "map50_95": 0.3569,
+        "per_class": {
+          "red": { "precision": 0.8687, "recall": 0.8614, "f1": 0.8651, "map50": 0.8744 },
+          "white": { "precision": 0.8564, "recall": 0.9328, "f1": 0.893, "map50": 0.9442 },
+          "transition": { "precision": 0.0, "recall": 0.0, "f1": 0.0, "map50": 0.0 }
+        },
+        "note": "Per-class red/white/transition from docs/transition/evaluation_metrics.json (3-class test eval). The transition class scored 0.0 mAP (under-represented/under-trained). NOTE: that eval used the '*-1280-clean' checkpoint; this entry serves the non-clean variant, so treat these as indicative."
+      },
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White",
+        "2": "PAPI-Transition"
+      },
+      "disabled_reason": "Transition checkpoint is optional; it is available only when its weights file is present at the configured path (e.g. absent in the default Docker image)."
+    }
+  ]
+}

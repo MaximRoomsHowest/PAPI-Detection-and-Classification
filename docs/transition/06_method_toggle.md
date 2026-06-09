@@ -1,54 +1,51 @@
-# Transition-Method Toggle (backend + frontend)
+# Transition Model Selection (backend + frontend)
 
-Lets a user alternate, per analysis, between the two transition-detection methods:
+The Live Demo now selects an inference model rather than exposing a separate
+transition-method toggle. The backend still supports the older
+`transition_method` form field for API compatibility, but the UI sends only
+`model_id` so users cannot choose conflicting combinations.
 
-- **Tracking** — temporal red↔white flips on the 2-class serving model
-  (`state.detect_lamp_transitions`). The existing/default behavior.
-- **Model** — the learned transition class from the 3-class detector, grouped into per-lamp
-  events (`state.transition_events_from_state_runs` over `aggregate_transition_state_events`).
+Available selector ids come from `GET /api/models`:
 
-Both derive from the *same* ByteTrack `track_observations`; the toggle picks the derivation (and,
-for the model method, the 3-class detector).
+- `small` — current `yolo26s-fulldata-1280` detector; transitions via tracking.
+- `nano` — previous `yolo26n-sequence-1280` detector; transitions via tracking.
+- `transition` — `transition3class-yolo26s-1280`; transitions via learned model events.
 
 ## Backend
 
-- **Request:** `transition_method` form field (`"tracking"` | `"model"`) on `/api/analyze`,
-  `/api/analyze-frame`, `/api/analyze-frames`, `/api/analyze-sequence` (`AnalyzeParams`). Omitted →
-  server default (`PAPI_TRANSITION_METHOD`, default `tracking`).
-- **Model selection** (`InferenceService._resolve_transition`): "model" prefers the dedicated
-  3-class `transition_model`, then a 3-class serving model, else **gracefully falls back to
-  "tracking"** so a request never fails when no 3-class model is installed.
+- **Registry:** `models/serving/models.json` is loaded by `InferenceService`; missing registry files
+  fall back to the legacy single `PAPI_MODEL_PATH` setup.
+- **Discovery:** `GET /api/models` returns all configured selector options with `exists`, `loaded`,
+  metrics/card data, and a disabled reason when unavailable. `GET /api/model` returns the default
+  model or a requested `model_id`.
+- **Request:** optional `model_id` form field on `/api/analyze`, `/api/analyze-frame`,
+  `/api/analyze-frames`, `/api/analyze-sequence`.
+- **Selection:** unknown `model_id` returns 400. A known but missing selected weight fails cleanly
+  for direct API callers. Detector-role models default to `transition_method="tracking"`; the
+  transition-role model defaults to `transition_method="model"`.
 - **Config:** `PAPI_TRANSITION_MODEL_PATH` (optional 3-class model, lazy-loaded),
-  `PAPI_TRANSITION_METHOD` (default method). The serving model stays 2-class — no forced swap.
+  `PAPI_TRANSITION_METHOD` (legacy default), `PAPI_MODEL_REGISTRY_PATH`, and `PAPI_MODEL_PATH`.
 - **Response:** `AnalysisPayload.transition_method` echoes the method **actually used** (so a
-  fallback is visible), and each `TransitionEvent` gains `method` + span fields
-  (`transition_event_id` / `start_frame` / `end_frame` / `duration_frames`) for the model method.
-- **Single image + "model":** the 3-class model can read a lamp as `transition` in one frame
-  (the 2-class model + tracking cannot).
-- Additive + backward-compatible: `transition_method` defaults to `tracking`; **249 backend tests
-  pass** (9 new). Files: `config.py`, `services/state.py`, `services/inference/{service,
-  sequence_runner}.py`, `validation/schemas/{angle,analysis}.py`, `api/routers/analyze.py`.
+  fallback is visible). `AnalysisPayload` also includes `model_id`, `model_label`, and
+  `model_role`, which are persisted in `result_json` and exported in CSV history.
 
 ## Frontend
 
-- Segmented **Tracking | Model** control in the Live Demo header (`MediaUploadControls`), styled
-  to match the runway selector; localized en/de/nl/fr.
-- `useAnalysis` holds `transitionMethod` (default `tracking`) and adds it to the analyze
-  `metadata`; `api.js appendMetadata` sends it as `transition_method` on every endpoint.
-- `ResultPanel` shows an accent pill — *“Transitions via Tracking/Model”* — from the payload's
-  echoed method, so a fallback is obvious to the user.
-- Verified in the browser (toggle renders, switches active state, no console errors); **149
-  frontend tests pass**, eslint clean.
+- `useAnalysis` fetches `/api/models`, stores `selectedModelId`, and sends `model_id` through
+  `appendMetadata` for every analysis request.
+- `MediaUploadControls` renders an **Inference model** selector and disables unavailable entries.
+- `ResultPanel` shows **Model used** from the echoed model metadata, and still shows
+  **Transitions via ...** from the backend's effective transition method.
 
-## Enabling the "model" method end-to-end
+## Enabling the transition selector end-to-end
 
-The serving model is 2-class, so out of the box "model" falls back to "tracking". To make it
-produce learned transitions, point the backend at the 3-class model:
+The transition classifier may live under the ignored data-analysis path:
 
-```
-PAPI_TRANSITION_MODEL_PATH=/abs/path/to/transition3class-yolo26s-1280/weights/best.pt
+```text
+data/runs/detect/transition3class-yolo26s-1280/weights/best.pt
 ```
 
-(or copy that `best.pt` into a serving slot and set the path). Then "Model" in the UI uses the
-3-class detector and the pill reads *“Transitions via Model”*. Requires `ultralytics>=8.4` to load
-yolo26 (the pin was bumped accordingly).
+If the file is absent, `/api/models` marks `transition` unavailable. In Docker,
+`compose.yaml` mounts `./models` read-only by default, so enabling this selector
+requires either mounting the transition run path read-only or copying the weight
+under `./models` and overriding `PAPI_TRANSITION_MODEL_PATH`.

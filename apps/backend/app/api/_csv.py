@@ -16,7 +16,7 @@ from collections.abc import Iterable, Iterator
 CSV_COLUMNS = [
     "id", "created_at", "media_type", "runway_id", "global_state", "confidence",
     "angle_available", "elevation_angle_deg", "frame_count", "processing_ms",
-    "original_filename",
+    "model_id", "model_label", "model_role", "original_filename",
 ]
 
 
@@ -59,9 +59,12 @@ def stream_log_rows(rows: Iterable) -> Iterator[str]:
     yield _drain()
     for log in rows:
         created = log.created_at.isoformat() if hasattr(log.created_at, "isoformat") else log.created_at
+        result = log.result_json if isinstance(getattr(log, "result_json", None), dict) else {}
         writer.writerow([
             log.id, created, log.media_type, csv_safe(log.runway_id), log.global_state,
             log.confidence, log.angle_available, log.elevation_angle_deg,
-            log.frame_count, log.processing_ms, csv_safe(log.original_filename),
+            log.frame_count, log.processing_ms, csv_safe(result.get("model_id")),
+            csv_safe(result.get("model_label")), csv_safe(result.get("model_role")),
+            csv_safe(log.original_filename),
         ])
         yield _drain()

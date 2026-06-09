@@ -15,12 +15,56 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from app.config import REPO_ROOT, Settings
+
 _HASH_CHUNK_BYTES = 1024 * 1024
 _MODEL_CARD_FILENAME = "model_card.json"
+
+
+@dataclass(frozen=True)
+class ModelRegistryEntry:
+    id: str
+    label: str
+    role: str
+    path: Path
+    class_count: int
+    default: bool = False
+    description: str | None = None
+    card_path: Path | None = None
+    card: dict[str, Any] | None = None
+    disabled_reason: str | None = None
+
+    @property
+    def exists(self) -> bool:
+        return self.path.is_file()
+
+    @property
+    def available(self) -> bool:
+        return self.exists
+
+
+@dataclass(frozen=True)
+class ModelRegistry:
+    default_model_id: str
+    entries: tuple[ModelRegistryEntry, ...]
+
+    def get(self, model_id: str | None = None) -> ModelRegistryEntry:
+        resolved_id = model_id or self.default_model_id
+        for entry in self.entries:
+            if entry.id == resolved_id:
+                return entry
+        raise KeyError(resolved_id)
+
+    def transition_entry(self) -> ModelRegistryEntry | None:
+        for entry in self.entries:
+            if entry.role == "transition":
+                return entry
+        return None
 
 
 @lru_cache(maxsize=8)
@@ -63,3 +107,115 @@ def load_model_card(model_path: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _resolve_registry_path(raw: str | None, settings: Settings, registry_path: Path) -> Path | None:
+    if not raw:
+        return None
+    expanded = Path(raw).expanduser()
+    if expanded.is_absolute():
+        return expanded
+    parts = expanded.parts
+    if parts and parts[0] == "models":
+        # Local dev: REPO_ROOT/models/...
+        local = REPO_ROOT / expanded
+        if local.exists() or not settings.model_path.is_absolute():
+            return local.resolve()
+        # Docker: /models is bind-mounted while the app lives under /app/apps/backend.
+        model_root = settings.model_path.parents[1] if len(settings.model_path.parents) > 1 else registry_path.parents[1]
+        return (model_root / Path(*parts[1:])).resolve()
+    if parts and parts[0] == "data":
+        return (REPO_ROOT / expanded).resolve()
+    return (registry_path.parent / expanded).resolve()
+
+
+def _legacy_registry(settings: Settings) -> ModelRegistry:
+    card = load_model_card(settings.model_path) or {}
+    return ModelRegistry(
+        default_model_id="default",
+        entries=(
+            ModelRegistryEntry(
+                id="default",
+                label=card.get("model_id") or settings.model_path.stem,
+                role="detector",
+                path=settings.model_path,
+                class_count=len(card.get("classes", {}) or {}) or 2,
+                default=True,
+                card=card,
+            ),
+        ),
+    )
+
+
+def load_model_registry(settings: Settings) -> ModelRegistry:
+    """Load the backend-owned selectable model registry.
+
+    Missing or malformed registry data falls back to the historical single-model
+    ``PAPI_MODEL_PATH`` setup so old deployments can still start.
+    """
+    registry_path = settings.model_registry_path
+    data = _read_json(registry_path)
+    raw_entries = data.get("models") if data else None
+    if not isinstance(raw_entries, list) or not raw_entries:
+        return _legacy_registry(settings)
+
+    default_model_id = str(data.get("default_model_id") or "").strip()
+    entries: list[ModelRegistryEntry] = []
+    for raw in raw_entries:
+        if not isinstance(raw, dict):
+            continue
+        model_id = str(raw.get("id") or "").strip()
+        if not model_id:
+            continue
+        role = str(raw.get("role") or "detector").strip().lower()
+        path = _resolve_registry_path(str(raw.get("path") or ""), settings, registry_path)
+        if path is None:
+            continue
+        if raw.get("default"):
+            path = settings.model_path
+        if role == "transition" and settings.transition_model_path is not None:
+            path = settings.transition_model_path
+
+        card_path = _resolve_registry_path(str(raw.get("card_path") or ""), settings, registry_path)
+        card = _read_json(card_path) if card_path else None
+        if card is None:
+            card = dict(raw)
+        if isinstance(raw.get("val_metrics"), dict):
+            card["val_metrics"] = raw["val_metrics"]
+        if isinstance(raw.get("classes"), dict):
+            card["classes"] = raw["classes"]
+        card.setdefault("model_id", model_id)
+        card.setdefault("training_run", raw.get("training_run") or model_id)
+        card.setdefault("base_weights", raw.get("base_weights"))
+        card.setdefault("split_evaluated", raw.get("split_evaluated"))
+
+        entries.append(
+            ModelRegistryEntry(
+                id=model_id,
+                label=str(raw.get("label") or model_id),
+                role=role,
+                path=path,
+                class_count=int(raw.get("class_count") or len(card.get("classes", {}) or {}) or 2),
+                default=bool(raw.get("default")),
+                description=str(raw.get("description")) if raw.get("description") else None,
+                card_path=card_path,
+                card=card,
+                disabled_reason=str(raw.get("disabled_reason")) if raw.get("disabled_reason") else None,
+            )
+        )
+
+    if not entries:
+        return _legacy_registry(settings)
+    if not default_model_id or default_model_id not in {entry.id for entry in entries}:
+        default_entry = next((entry for entry in entries if entry.default), entries[0])
+        default_model_id = default_entry.id
+    entries = [replace(entry, default=(entry.id == default_model_id)) for entry in entries]
+    return ModelRegistry(default_model_id=default_model_id, entries=tuple(entries))

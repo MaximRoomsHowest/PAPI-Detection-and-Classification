@@ -5,6 +5,7 @@ def test_default_model_path_points_to_repo_models_serving():
     settings = Settings()
 
     assert settings.model_path == REPO_ROOT / "models" / "serving" / "best.pt"
+    assert settings.model_registry_path == REPO_ROOT / "models" / "serving" / "models.json"
 
 
 def test_documented_relative_model_override_resolves_to_repo_models_serving():

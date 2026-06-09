@@ -146,12 +146,16 @@ class AnalysisLogRepository:
         )
 
     def to_list_item(self, log: AnalysisLog) -> LogListItem:
+        result = log.result_json if isinstance(log.result_json, dict) else {}
         return LogListItem(
             id=log.id,
             media_type=log.media_type,
             runway_id=log.runway_id,
             drone_id=log.drone_id,
             original_filename=log.original_filename,
+            model_id=result.get("model_id"),
+            model_label=result.get("model_label"),
+            model_role=result.get("model_role"),
             global_state=log.global_state,
             confidence=log.confidence,
             angle_available=log.angle_available,

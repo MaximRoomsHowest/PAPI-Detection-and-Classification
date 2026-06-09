@@ -9,6 +9,9 @@ class LogListItem(BaseModel):
     runway_id: str
     drone_id: str | None
     original_filename: str
+    model_id: str | None = None
+    model_label: str | None = None
+    model_role: str | None = None
     global_state: GlobalState
     confidence: float
     angle_available: bool

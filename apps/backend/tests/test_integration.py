@@ -85,12 +85,16 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         drone_metadata=None,
         drone_samples=None,
         transition_method=None,
+        model_id=None,
     ):
         return AnalysisPayload(
             media_type=media_type,
             original_filename=original_filename,
             runway_id=runway_id,
             drone_id=drone_id,
+            model_id=model_id or "small",
+            model_label="Small detector",
+            model_role="detector",
             global_state="correct_glidepath",
             lamps=[
                 LampResult(index=1, state="white", confidence=0.95),
@@ -108,13 +112,16 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     def _fake_analyze_sequence(
         image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None,
-        drone_samples=None, transition_method=None,
+        drone_samples=None, transition_method=None, model_id=None,
     ):
         return AnalysisPayload(
             media_type="video",
             original_filename=original_filename,
             runway_id=runway_id,
             drone_id=drone_id,
+            model_id=model_id or "small",
+            model_label="Small detector",
+            model_role="detector",
             global_state="correct_glidepath",
             lamps=[
                 LampResult(index=1, state="white", confidence=0.95),
@@ -137,6 +144,10 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # (test_health_ready_returns_503_when_model_not_loaded flips this).
     fake_service.is_loaded = True
     fake_service.model_info.return_value = ModelInfo(
+        model_id="small",
+        model_label="Small detector",
+        model_role="detector",
+        is_default=True,
         model_path=str(tmp_path / "models" / "best.pt"),
         model_filename="best.pt",
         model_format="pt",
@@ -147,6 +158,24 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         device="cpu",
         loaded=False,
     )
+    fake_service.model_options.return_value = [
+        fake_service.model_info.return_value,
+        ModelInfo(
+            model_id="transition",
+            model_label="Transition classifier",
+            model_role="transition",
+            model_path=str(tmp_path / "data" / "runs" / "transition.pt"),
+            model_filename="best.pt",
+            model_format="pt",
+            backend_type="ultralytics-pytorch",
+            exists=False,
+            available=False,
+            disabled_reason="missing",
+            confidence_threshold=0.4,
+            device="cpu",
+            loaded=False,
+        ),
+    ]
 
     # Override get_session via FastAPI's mechanism (it's a real Depends).
     app.dependency_overrides[get_session] = override_get_session
@@ -426,9 +455,40 @@ def test_model_endpoint_returns_active_model_metadata(client):
     assert response.status_code == 200
     body = response.json()
     assert body["model_filename"] == "best.pt"
+    assert body["model_id"] == "small"
+    assert body["model_label"] == "Small detector"
     assert body["backend_type"] == "ultralytics-pytorch"
     assert body["confidence_threshold"] == 0.4
     assert body["device"] == "cpu"
+
+
+def test_models_endpoint_returns_selectable_models(client):
+    response = client.get("/api/models")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [model["model_id"] for model in body] == ["small", "transition"]
+    assert body[1]["available"] is False
+
+
+def test_analyze_frame_passes_model_id_to_inference_and_persists_it(client):
+    response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={"runway_id": "papi_24", "model_id": "nano"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_id"] == "nano"
+    log_id = body["log_id"]
+
+    list_body = client.get("/api/logs").json()
+    assert list_body[0]["id"] == log_id
+    assert list_body[0]["model_id"] == "nano"
+
+    detail = client.get(f"/api/logs/{log_id}").json()
+    assert detail["model_id"] == "nano"
 
 
 def test_stats_endpoint_summarizes_recent_logs(client):

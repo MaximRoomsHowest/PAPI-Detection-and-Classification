@@ -17,6 +17,9 @@ class AnalysisPayload(BaseModel):
     runway_id: str
     drone_id: str | None = None
     global_state: GlobalState
+    model_id: str | None = None
+    model_label: str | None = None
+    model_role: str | None = None
     lamps: list[LampResult]
     # Aggregate detection confidence for the analysis — a probability, so [0, 1].
     confidence: float = Field(ge=0.0, le=1.0)

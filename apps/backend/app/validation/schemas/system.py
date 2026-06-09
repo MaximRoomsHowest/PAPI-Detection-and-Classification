@@ -19,6 +19,13 @@ class ValMetrics(BaseModel):
 
 
 class ModelInfo(BaseModel):
+    model_id: str | None = None
+    model_label: str | None = None
+    model_role: str | None = None
+    is_default: bool = False
+    available: bool = True
+    disabled_reason: str | None = None
+    description: str | None = None
     model_path: str
     model_filename: str
     model_format: str
@@ -34,7 +41,7 @@ class ModelInfo(BaseModel):
     # optional — a bare-weights dev checkout (no model_card.json) returns None.
     sha256: str | None = None
     classes: dict[int, str] | None = None
-    model_id: str | None = None
+    model_card_id: str | None = None
     training_run: str | None = None
     base_weights: str | None = None
     dataset_split_evaluated: str | None = None

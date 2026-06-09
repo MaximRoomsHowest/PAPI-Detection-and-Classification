@@ -33,6 +33,18 @@ point at it, so swapping models means copying a new file into the slot,
 **not** renaming the slot. Which run is currently in the slot is recorded
 in `models/serving/model_card.json` (`model_id`) and in §3.1 below.
 
+The **runtime selector registry** is `models/serving/models.json`. The backend
+serves it through `GET /api/models`, checks whether each weight exists, and
+uses its `role` to choose the default transition derivation: 2-class detector
+models use temporal tracking, while the 3-class transition classifier uses
+learned transition events.
+
+| Selector id | Run / path | Role | Default behavior |
+| --- | --- | --- | --- |
+| `small` | `models/serving/best.pt` → `yolo26s-fulldata-1280` | detector | Default model; transitions via tracking |
+| `nano` | `models/runs/yolo26n-sequence-1280/weights/best.pt` | detector | Previous serving model; transitions via tracking |
+| `transition` | `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt` | transition | Optional ignored artifact; transitions via learned model events |
+
 ### Rename map (2026-05-31)
 
 The old Ultralytics auto-names were renamed to the convention above. The
@@ -193,9 +205,11 @@ When promoting a new run to serving:
 7. Restart the backend (`docker compose restart backend`, or the uvicorn
    process). The model is pre-warmed at startup, so a load error surfaces
    immediately.
-8. Run the backend + papi pytest suites and a smoke inference. Roll back if
+8. Confirm `models/serving/models.json` still points at the intended serving
+   slot and update any selector labels/metrics if the promoted run changes.
+9. Run the backend + papi pytest suites and a smoke inference. Roll back if
    anything fails.
-9. **Rollback**: the previous serving model is preserved in its run folder.
+10. **Rollback**: the previous serving model is preserved in its run folder.
    Restore with:
    ```powershell
    Copy-Item models\runs\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force

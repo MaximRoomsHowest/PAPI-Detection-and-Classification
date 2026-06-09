@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DATABASE_URL", "PAPI_DATABASE_URL"),
     )
     model_path: Path = Field(default=REPO_ROOT / "models" / "serving" / "best.pt", alias="PAPI_MODEL_PATH")
+    model_registry_path: Path = Field(
+        default=REPO_ROOT / "models" / "serving" / "models.json",
+        alias="PAPI_MODEL_REGISTRY_PATH",
+    )
     # Optional 3-class transition-aware model (red/white/transition) used by the "model" transition
     # method. Kept separate from model_path so the 2-class serving model and the experimental 3-class
     # model coexist without promoting one. When unset or absent, the "model" method gracefully falls
@@ -59,6 +63,14 @@ class Settings(BaseSettings):
         alias="PAPI_CORS_ORIGINS",
     )
     confidence_threshold: float = Field(default=0.4, ge=0.0, le=1.0, alias="PAPI_CONFIDENCE_THRESHOLD")
+    # Inference input size + NMS IoU, made EXPLICIT so every model runs at its trained resolution
+    # instead of relying on the checkpoint's implicit imgsz override. best.pt carries imgsz=1280 so
+    # predict already uses it, but a re-export, an ONNX export, or the registry's nano/transition
+    # checkpoints could silently fall back to Ultralytics' 640 default — which roughly quarters the
+    # pixels on the small/distant PAPI lamps and degrades recall (audit). All serving checkpoints are
+    # trained at 1280; the NMS IoU keeps the predict default 0.7.
+    inference_imgsz: int = Field(default=1280, ge=320, le=4096, alias="PAPI_INFERENCE_IMGSZ")
+    inference_iou: float = Field(default=0.7, ge=0.0, le=1.0, alias="PAPI_INFERENCE_IOU")
     # Sliding-window length backing the per-stream majority vote (deque maxlen
     # in inference._run_tracked_sequence). Must be >= 1 — maxlen=0 would make the
     # window drop every frame and break the Counter.most_common aggregation. The
@@ -108,7 +120,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("model_path", "storage_dir")
+    @field_validator("model_path", "model_registry_path", "storage_dir")
     @classmethod
     def resolve_backend_relative_path(cls, value: Path) -> Path:
         if value.is_absolute():

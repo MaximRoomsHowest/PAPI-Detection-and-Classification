@@ -26,7 +26,14 @@ from app.services.inference.frame_source import (
 from app.services.inference.overlay import LAMP_COLORS, draw_overlay
 from app.services.inference.sequence_runner import run_tracked_sequence
 from app.services.inference.video_writer import open_video_writer
-from app.services.model_registry import compute_sha256, load_model_card
+from app.services.model_registry import (
+    REPO_ROOT,
+    ModelRegistry,
+    ModelRegistryEntry,
+    compute_sha256,
+    load_model_card,
+    load_model_registry,
+)
 from app.services.state import (
     confidence_from_lamps,
     global_state_from_lamps,
@@ -46,11 +53,9 @@ from app.validation.schemas import (
 class InferenceService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._model: Any | None = None
-        # Optional 3-class transition-aware model for the "model" transition method, loaded lazily
-        # from settings.transition_model_path. None until first used (or if unconfigured/absent).
-        self._transition_model: Any | None = None
-        self._loaded_at: str | None = None
+        self._registry: ModelRegistry = load_model_registry(settings)
+        self._models: dict[str, Any] = {}
+        self._loaded_at: dict[str, str] = {}
         self._resolved_device: str | None = None
         # A single Ultralytics YOLO instance (with one shared, mutable ByteTrack
         # predictor) is NOT thread-safe. The analyze endpoints are sync `def`s run
@@ -72,6 +77,7 @@ class InferenceService:
         drone_metadata: tuple[float, float, float] | None = None,
         drone_samples: list[DroneSample] | None = None,
         transition_method: str | None = None,
+        model_id: str | None = None,
     ) -> AnalysisPayload:
         # Serialise the whole inference so concurrent threadpool requests never
         # share the YOLO/ByteTrack state mid-stream (audit H1).
@@ -79,19 +85,19 @@ class InferenceService:
             if media_type == "image":
                 return self.analyze_image(
                     media_path, runway_id, original_filename, drone_id, drone_metadata,
-                    drone_samples, transition_method,
+                    drone_samples, transition_method, model_id,
                 )
             if media_type == "video":
                 return self.analyze_video(
                     media_path, runway_id, original_filename, drone_id, drone_metadata,
-                    drone_samples, transition_method,
+                    drone_samples, transition_method, model_id,
                 )
             raise ValueError(f"Unsupported media type: {media_type}")
 
     @property
     def is_loaded(self) -> bool:
         """Whether the YOLO weights are loaded in memory (for the readiness probe)."""
-        return self._model is not None
+        return self._registry.default_model_id in self._models
 
     @property
     def device(self) -> str:
@@ -124,36 +130,39 @@ class InferenceService:
 
     @property
     def model(self) -> Any:
-        if self._model is None:
-            # Double-checked locking: re-check inside the lock so a concurrent
-            # first burst constructs the weights once, not N times (audit L1).
+        return self._load_model(self._registry.get())
+
+    @property
+    def transition_model(self) -> Any | None:
+        """The optional 3-class transition model, lazy-loaded; None when unavailable."""
+        entry = self._registry.transition_entry()
+        if entry is None or not entry.available:
+            return None
+        return self._load_model(entry)
+
+    def _load_model(self, entry: ModelRegistryEntry) -> Any:
+        if not entry.available:
+            reason = entry.disabled_reason or f"Model file not found: {entry.path}"
+            raise RuntimeError(reason)
+        if entry.id not in self._models:
             with self._lock:
-                if self._model is None:
+                if entry.id not in self._models:
+                    # Allowlist the weight type before handing the path to YOLO (which unpickles
+                    # .pt weights): only ever load .pt / .onnx, so a malformed registry entry can't
+                    # point the loader at an arbitrary file (audit: registry path lacks containment).
+                    if entry.path.suffix.lower() not in (".pt", ".onnx"):
+                        raise RuntimeError(
+                            f"Refusing to load model '{entry.id}': unsupported weight type "
+                            f"'{entry.path.suffix}' (only .pt and .onnx are allowed)."
+                        )
                     os.environ.setdefault("YOLO_AUTOINSTALL", "False")
                     try:
                         from ultralytics import YOLO
                     except ImportError as exc:
                         raise RuntimeError("Ultralytics is not installed. Run `pip install -r requirements.txt`.") from exc
-                    if not self.settings.model_path.exists():
-                        raise RuntimeError(f"Model file not found: {self.settings.model_path}")
-                    self._model = YOLO(str(self.settings.model_path))
-                    self._loaded_at = datetime.now(timezone.utc).isoformat()
-        return self._model
-
-    @property
-    def transition_model(self) -> Any | None:
-        """The optional 3-class transition model, lazy-loaded; None when unconfigured or absent."""
-        path = self.settings.transition_model_path
-        if path is None or not path.exists():
-            return None
-        if self._transition_model is None:
-            with self._lock:
-                if self._transition_model is None:
-                    os.environ.setdefault("YOLO_AUTOINSTALL", "False")
-                    from ultralytics import YOLO
-
-                    self._transition_model = YOLO(str(path))
-        return self._transition_model
+                    self._models[entry.id] = YOLO(str(entry.path))
+                    self._loaded_at[entry.id] = datetime.now(timezone.utc).isoformat()
+        return self._models[entry.id]
 
     @staticmethod
     def _is_three_class(model: Any) -> bool:
@@ -162,12 +171,7 @@ class InferenceService:
         return isinstance(names, dict) and len(names) >= 3
 
     def _resolve_transition(self, requested: str | None) -> tuple[Any, str]:
-        """Pick the (model, effective_method) for a request.
-
-        "model" needs a 3-class detector: prefer the dedicated transition model, else the serving
-        model if it is itself 3-class, else gracefully fall back to "tracking" (the temporal method)
-        on the serving model — so a request never fails just because no 3-class model is installed.
-        """
+        """Legacy resolver kept for direct unit tests and transition_method compatibility."""
         method = (requested or self.settings.default_transition_method or "tracking").strip().lower()
         if method == "model":
             transition_model = self.transition_model
@@ -178,24 +182,84 @@ class InferenceService:
             return self.model, "tracking"
         return self.model, "tracking"
 
-    def model_info(self) -> ModelInfo:
-        path = self.settings.model_path
+    def _resolve_selected_model(
+        self, model_id: str | None, transition_method: str | None
+    ) -> tuple[Any, ModelRegistryEntry, str]:
+        explicit_model = model_id is not None and str(model_id).strip() != ""
+        explicit_method = transition_method is not None and str(transition_method).strip() != ""
+
+        if explicit_model:
+            try:
+                entry = self._registry.get(str(model_id).strip())
+            except KeyError as exc:
+                raise ValueError(f"Unknown model_id: {model_id}") from exc
+            if not entry.available:
+                reason = entry.disabled_reason or "model file is missing"
+                raise ValueError(f"Model '{entry.id}' is unavailable: {reason}")
+            model = self._load_model(entry)
+            method = (transition_method or "").strip().lower() if explicit_method else None
+            if method not in ("tracking", "model", None):
+                method = "tracking"
+            if method is None:
+                method = "model" if entry.role == "transition" or entry.class_count >= 3 else "tracking"
+            if method == "model" and not self._is_three_class(model):
+                method = "tracking"
+            return model, entry, method
+
+        if explicit_method and str(transition_method).strip().lower() == "model":
+            transition_entry = self._registry.transition_entry()
+            if transition_entry is not None and transition_entry.available:
+                model = self._load_model(transition_entry)
+                if self._is_three_class(model):
+                    return model, transition_entry, "model"
+            model, effective_method = self._resolve_transition("model")
+            return model, self._registry.get(), effective_method
+
+        entry = self._registry.get()
+        model = self._load_model(entry)
+        if explicit_method:
+            # An explicit "model" is handled above; any other explicit value (e.g. "tracking")
+            # is HONOURED here instead of being silently recomputed from the entry's metadata (audit).
+            method = "tracking"
+        else:
+            method = "model" if entry.role == "transition" or entry.class_count >= 3 else "tracking"
+            # Verify the declared class_count against the loaded model so a mislabeled models.json
+            # can't select the 3-class "model" algorithm on a 2-class detector (audit).
+            if method == "model" and not self._is_three_class(model):
+                method = "tracking"
+        return model, entry, method
+
+    def _model_info_for_entry(self, entry: ModelRegistryEntry) -> ModelInfo:
+        path = entry.path
         suffix = path.suffix.lower().lstrip(".") or "unknown"
         backend_type = {
             "onnx": "ultralytics-onnxruntime",
             "pt": "ultralytics-pytorch",
         }.get(suffix, f"ultralytics-{suffix}")
-        exists = path.exists()
-        file_size_mb = round(path.stat().st_size / (1024 * 1024), 2) if exists else None
+        # stat() inside try: the file can vanish between the registry scan and now; report
+        # size-unknown rather than raising a 500 on the TOCTOU race (audit).
+        try:
+            file_size_mb = round(path.stat().st_size / (1024 * 1024), 2)
+            exists = True
+        except OSError:
+            file_size_mb = None
+            exists = False
 
         # Provenance comes from models/serving/model_card.json (audit IMP-BE-1).
         # Class names are taken from the live model when loaded (authoritative),
         # otherwise from the card, otherwise None — so the endpoint stays useful
         # whether or not the weights are present.
-        card = load_model_card(path) or {}
+        # Expose a repo-relative path, not the absolute server filesystem layout (audit).
+        try:
+            relative_path = str(path.relative_to(REPO_ROOT))
+        except ValueError:
+            relative_path = path.name
+
+        card = entry.card or load_model_card(path) or {}
         classes: dict[int, str] | None = None
-        if self._model is not None:
-            names = getattr(self._model, "names", None)
+        loaded_model = self._models.get(entry.id)
+        if loaded_model is not None:
+            names = getattr(loaded_model, "names", None)
             if isinstance(names, dict):
                 classes = {int(key): str(value) for key, value in names.items()}
         if classes is None and isinstance(card.get("classes"), dict):
@@ -203,7 +267,14 @@ class InferenceService:
         val_metrics = card.get("val_metrics")
 
         return ModelInfo(
-            model_path=str(path),
+            model_id=entry.id,
+            model_label=entry.label,
+            model_role=entry.role,
+            is_default=entry.default,
+            available=entry.available,
+            disabled_reason=None if entry.available else entry.disabled_reason or "Model file is missing.",
+            description=entry.description,
+            model_path=relative_path,
             model_filename=path.name,
             model_format=suffix,
             backend_type=backend_type,
@@ -211,16 +282,26 @@ class InferenceService:
             file_size_mb=file_size_mb,
             confidence_threshold=self.settings.confidence_threshold,
             device=self.device,
-            loaded=self._model is not None,
+            loaded=entry.id in self._models,
             sha256=compute_sha256(path),
             classes=classes,
-            model_id=card.get("model_id"),
+            model_card_id=card.get("model_id"),
             training_run=card.get("training_run"),
             base_weights=card.get("base_weights"),
             dataset_split_evaluated=card.get("split_evaluated"),
             val_metrics=ValMetrics(**val_metrics) if isinstance(val_metrics, dict) else None,
-            loaded_at=self._loaded_at,
+            loaded_at=self._loaded_at.get(entry.id),
         )
+
+    def model_info(self, model_id: str | None = None) -> ModelInfo:
+        try:
+            entry = self._registry.get(model_id)
+        except KeyError as exc:
+            raise ValueError(f"Unknown model_id: {model_id}") from exc
+        return self._model_info_for_entry(entry)
+
+    def model_options(self) -> list[ModelInfo]:
+        return [self._model_info_for_entry(entry) for entry in self._registry.entries]
 
     def warmup(self) -> None:
         """Run one dummy inference so a broken checkpoint surfaces at startup rather
@@ -244,6 +325,7 @@ class InferenceService:
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
         transition_method: str | None = None,
+        model_id: str | None = None,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -254,7 +336,7 @@ class InferenceService:
 
         # With the "model" method a 3-class detector can classify a lamp as "transition" in a
         # single frame; "tracking" uses the 2-class serving model (red/white only).
-        model, effective_method = self._resolve_transition(transition_method)
+        model, selected_model, effective_method = self._resolve_selected_model(model_id, transition_method)
         detections = self._detect_frame(frame, use_tracking=False, model=model)
         # A single image yields red/white per lamp; a "transition" requires a
         # red<->white switch across frames, so there are none here. The angle is
@@ -275,6 +357,9 @@ class InferenceService:
             original_filename=original_filename,
             runway_id=runway_id,
             drone_id=drone_id,
+            model_id=selected_model.id,
+            model_label=selected_model.label,
+            model_role=selected_model.role,
             global_state=global_state,
             lamps=lamps,
             confidence=confidence,
@@ -295,6 +380,7 @@ class InferenceService:
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
         transition_method: str | None = None,
+        model_id: str | None = None,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -336,7 +422,7 @@ class InferenceService:
             # build the per-frame angle track after the frame count is known.
             resolved_samples, angle_source = self._resolve_drone_samples(media_path, drone_metadata, drone_samples)
             angle = self._angle_from_samples(resolved_samples, angle_source, runway_id)
-            model, effective_method = self._resolve_transition(transition_method)
+            model, selected_model, effective_method = self._resolve_selected_model(model_id, transition_method)
             return self._run_tracked_sequence(
                 self._iter_video_frames(cap),
                 fps=fps,
@@ -352,6 +438,7 @@ class InferenceService:
                 too_long_message=too_long,
                 empty_message="Uploaded video did not contain readable frames.",
                 model=model,
+                selected_model=selected_model,
                 transition_method=effective_method,
             )
         finally:
@@ -371,6 +458,7 @@ class InferenceService:
         drone_metadata: tuple[float, float, float] | None,
         drone_samples: list[DroneSample] | None = None,
         transition_method: str | None = None,
+        model_id: str | None = None,
     ) -> AnalysisPayload:
         """Treat an ordered list of images as consecutive video frames (folder->video).
 
@@ -419,7 +507,7 @@ class InferenceService:
                         frame = cv2.resize(frame, (width, height))
                     yield frame
 
-            model, effective_method = self._resolve_transition(transition_method)
+            model, selected_model, effective_method = self._resolve_selected_model(model_id, transition_method)
             return self._run_tracked_sequence(
                 frames(),
                 fps=fps,
@@ -435,6 +523,7 @@ class InferenceService:
                 too_long_message=too_long,
                 empty_message="None of the uploaded images could be read.",
                 model=model,
+                selected_model=selected_model,
                 transition_method=effective_method,
             )
 
@@ -455,6 +544,7 @@ class InferenceService:
         empty_message: str,
         drone_samples: list[DroneSample] | None = None,
         model: Any | None = None,
+        selected_model: ModelRegistryEntry | None = None,
         transition_method: str = "tracking",
     ) -> AnalysisPayload:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
@@ -476,7 +566,7 @@ class InferenceService:
                 frame, use_tracking=use_tracking, reset_tracker=reset_tracker, model=model
             )
 
-        return run_tracked_sequence(
+        payload = run_tracked_sequence(
             frames,
             detect=detect,
             cv2=self._require_cv2(),
@@ -496,6 +586,11 @@ class InferenceService:
             drone_samples=drone_samples,
             transition_method=transition_method,
         )
+        if selected_model is not None:
+            payload.model_id = selected_model.id
+            payload.model_label = selected_model.label
+            payload.model_role = selected_model.role
+        return payload
 
     @staticmethod
     def _aggregate_video_lamps(
@@ -525,6 +620,8 @@ class InferenceService:
             use_tracking=use_tracking,
             reset_tracker=reset_tracker,
             conf=self.settings.confidence_threshold,
+            imgsz=self.settings.inference_imgsz,
+            iou=self.settings.inference_iou,
             device=self.device,
         )
 

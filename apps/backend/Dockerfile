@@ -47,6 +47,7 @@ FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dc
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
+    PAPI_MODEL_REGISTRY_PATH=/models/serving/models.json \
     PAPI_MODEL_PATH=/models/serving/best.pt \
     PAPI_STORAGE_DIR=/storage \
     DATABASE_URL=postgresql+psycopg://papi:papi@postgres:5432/papi_backend
