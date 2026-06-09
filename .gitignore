@@ -145,3 +145,9 @@ apps/frontend-redesigned-extracted/
 docs/papi-06-height-audit.md
 docs/papi_burndown_data.csv
 docs/**/*.pptx
+
+# Local AI/knowledge-graph tooling state: the graph output and agent/tool configs are
+# machine-generated per-clone (rebuilt by `graphify update .`) and not project sources.
+graphify-out/
+.agents/
+.codex/

@@ -1,0 +1,80 @@
+# Local and assistant-generated graph output
+graphify-out/
+AGENTS.md
+CLAUDE.md
+.agents/
+.codex/
+
+# Dependency, cache, and build output
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+node_modules/
+apps/frontend/node_modules/
+apps/frontend/dist/
+apps/frontend/coverage/
+apps/backend/storage/
+build/
+dist/
+
+# Secrets and local machine state
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.db
+compose.override.yaml
+docker-compose.override.yml
+
+# Raw data, generated datasets, CVAT work, and generated ML artifacts
+PROJECT1-PAPI/
+PAPI_*/
+data/raw/
+data/work/
+data/interim/
+data/labels/auto/
+data/labels/verified/
+data/annotations/
+data/datasets/
+data/runs/
+data/cvat/
+runs/
+models/runs/
+
+# Heavy model binaries and generated media
+*.pt
+*.onnx
+*.engine
+*.torchscript
+*.safetensors
+*.zip
+*.mp4
+*.avi
+*.mov
+
+# Images are mostly screenshots, plots, frame samples, or generated run artifacts.
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.svg
+
+# Generated presentation/document artifacts
+docs/deliverables/_build/
+docs/deliverables/charts/
+docs/**/*.pptx
+docs/timetrack-*.pdf
+
+# Local assistant/browser tooling not useful as project source
+.claude/
+.playwright-cli/
+audit-screenshots/
+apps/frontend-redesigned-extracted/

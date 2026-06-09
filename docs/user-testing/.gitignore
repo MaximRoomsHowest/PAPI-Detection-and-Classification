@@ -1,0 +1,10 @@
+# Heavy / edge inputs produced by generate.py — recreate locally, never commit.
+# (The curated real crops + telemetry built by build_media.py ARE committed.)
+media/_fullres/
+media/edge/
+media/single-image/geotagged_papi24.jpg
+media/image-batch/oversized_batch_201/
+media/image-batch/mixed_types/
+media/image-batch/sequence_papi06_night/
+media/video/over_600frames.mp4
+media/video/over_30s.mp4
