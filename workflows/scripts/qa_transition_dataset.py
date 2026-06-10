@@ -227,7 +227,10 @@ def main() -> int:
     args = parser.parse_args()
     summary = qa(args.twin)
     print(json.dumps(summary, indent=2))
-    return 1 if summary["hard_fail"] else 0
+    # Gate on the full verdict: a dataset with label-format errors (or no transition
+    # boxes in train/val) printed "Ready: NO" but still exited 0, so a scripted
+    # pipeline would train on it anyway (audit WS-8).
+    return 0 if summary["ready_for_training"] else 1
 
 
 if __name__ == "__main__":

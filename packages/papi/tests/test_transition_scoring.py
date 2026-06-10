@@ -13,13 +13,18 @@ from papi.transition_scoring import (
 )
 
 
-def test_offset_proximity_peaks_at_boundary_and_decays_symmetrically():
+def test_offset_proximity_peaks_at_boundary_pair_and_decays_symmetrically():
+    # The flip boundary is the (0, +1) frame pair (offsets measured from from_frame);
+    # decay is symmetric in distance from the NEAREST boundary frame (audit LS-3).
     assert offset_proximity(0) == 1.0
-    assert offset_proximity(1) == pytest.approx(0.82)
-    assert offset_proximity(-1) == pytest.approx(0.82)  # symmetric in |offset|
-    assert offset_proximity(2) == pytest.approx(0.64)
+    assert offset_proximity(1) == 1.0  # the to-side boundary frame
+    assert offset_proximity(-1) == pytest.approx(0.82)
+    assert offset_proximity(2) == pytest.approx(0.82)
+    assert offset_proximity(-2) == pytest.approx(0.64)
+    assert offset_proximity(3) == pytest.approx(0.64)
     # Decays to and clamps at 0 — never negative.
-    assert offset_proximity(6) == 0.0
+    assert offset_proximity(-6) == 0.0
+    assert offset_proximity(7) == 0.0  # eff offset 6, past the decay range
 
 
 def test_colour_intermediacy_zero_without_enough_pixels():
@@ -37,7 +42,9 @@ def test_colour_intermediacy_rewards_red_white_coexistence_and_clamps():
 
 def test_tier_thresholds_and_suspect_override():
     assert tier(0.80, 0, suspect=False) == TIER_HIGH
-    assert tier(0.80, 2, suspect=False) == TIER_MEDIUM  # HIGH requires |offset| <= 1
+    assert tier(0.80, 2, suspect=False) == TIER_HIGH  # +2 is 1 from the (0,+1) boundary pair
+    assert tier(0.80, -2, suspect=False) == TIER_MEDIUM  # -2 is 2 from the boundary
+    assert tier(0.80, 3, suspect=False) == TIER_MEDIUM
     assert tier(0.60, 0, suspect=False) == TIER_MEDIUM
     assert tier(0.40, 0, suspect=False) == TIER_LOW
     assert tier(0.20, 0, suspect=False) == TIER_AMBIGUOUS
@@ -107,6 +114,9 @@ def test_classify_lamp_colour_exact_threshold_boundaries():
     assert classify_lamp_colour({**white_at, "val_mean": 174.9}) == "intermediate"
     assert classify_lamp_colour({**white_at, "red_ratio": 0.101}) == "intermediate"
     assert classify_lamp_colour({**white_at, "orange_amber_ratio": 0.301}) == "intermediate"
+    # yellow counts toward the warm blend signal like the red gate (audit LS-2)
+    assert classify_lamp_colour({**white_at, "orange_amber_ratio": 0.15, "yellow_ratio": 0.16}) == "intermediate"
+    assert classify_lamp_colour({**white_at, "orange_amber_ratio": 0.15, "yellow_ratio": 0.15}) == "white"
 
     # lit gate: warm < 0.15 and white < 0.15 -> unknown; at 0.15 it judges.
     assert classify_lamp_colour({"n_px": 100, "red_ratio": 0.149, "white_ratio": 0.149}) == "unknown"

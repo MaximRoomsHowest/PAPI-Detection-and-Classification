@@ -11,7 +11,9 @@ window. The dataset-wide rule:
   so the sampled window does NOT bracket a captured colour change (the real flip fell in an
   unsampled gap) -- both sides are stable observations. (Audit 2026-06-09: the crops are solid
   red, e.g. red_ratio 0.86 three minutes from the flip; the earlier "angle-only unreliable"
-  assumption was wrong.)
+  assumption was wrong.) When such a crop nevertheless READS intermediate the signals
+  contradict each other: it keeps the tracked label but lands in a distinct
+  ``reverted_telemetry_gap_ambiguous_colour`` bucket for human review (audit WS-4).
 * crop colour is a clearly stable ``red``/``white`` -> excluded: window-edge colour bleed, not a
   transition (audit found ~205 such boxes, ~42% of the live transition labels).
 * otherwise (amber/blended crop) -> ``accepted_transition`` (flip-anchored + colour-confirmed).
@@ -58,9 +60,23 @@ def decide(review_flag: str, colour_verdict: str) -> tuple[str, str]:
     if "fallback_identity" in review_flag:
         return "ambiguous_review", "unreliable left-to-right lamp identity (zoom/mirror); excluded from training"
     if "elev_discontinuity" in review_flag:
+        if colour_verdict == "intermediate":
+            # Contradictory signals: telemetry says the window brackets no captured
+            # flip (both sides stable), but the crop READS intermediate. Asserting a
+            # stable label here is potential supervision noise — keep the tracked
+            # label but bucket distinctly so these queue for human review instead of
+            # hiding among confident reverts (audit WS-4).
+            return (
+                "reverted_telemetry_gap_ambiguous_colour",
+                "telemetry gap says stable but crop reads intermediate; kept tracked label — NEEDS HUMAN REVIEW",
+            )
         return "reverted_telemetry_gap", "flip window does not bracket a captured transition (telemetry gap); reverted to stable colour"
     if colour_verdict in ("red", "white"):
         return "reverted_stable_colour", f"crop is stable {colour_verdict} (red-dominant / not an amber blend); reverted to {colour_verdict}"
+    if colour_verdict == "unknown":
+        # Never describe an unjudgeable crop as colour-confirmed (audit WS-4): the
+        # flip anchor alone carries the acceptance.
+        return "accepted_transition", "flip-anchored; colour signal unavailable (too few lit pixels) — accepted on flip evidence alone"
     return "accepted_transition", "flip-anchored + colour-confirmed intermediate"
 
 

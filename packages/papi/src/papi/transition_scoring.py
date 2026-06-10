@@ -4,8 +4,10 @@ Every candidate already sits next to an authoritative red<->white flip, so the r
 narrower than open candidate mining: decide which window frames are most clearly the visible
 blend (vs a near-stable window edge), and surface suspect cases for human eyes. Signals:
 
-* **offset proximity** (weight 0.6) — frames at the flip boundary (offset 0, +/-1) are the most
-  likely genuinely-intermediate; window edges (+/-2) are often already near-stable.
+* **offset proximity** (weight 0.6) — frames at the flip boundary are the most likely
+  genuinely-intermediate; window edges are often already near-stable. Offsets are measured
+  from ``from_frame``, so the boundary is the (0, +1) PAIR: both score 1.0, and distance
+  decays from whichever boundary frame is nearer (audit LS-3).
 * **colour intermediacy** (weight 0.4) — red+white coexistence and amber/yellow presence inside
   the lamp. A weak per-frame signal (small overexposed lamps read amber even when stable), so it
   refines rather than drives the rank, and never sets a label.
@@ -46,9 +48,20 @@ def _finite(value: object) -> float:
     return result if math.isfinite(result) else 0.0
 
 
+def _effective_offset(frame_offset: int) -> int:
+    """Distance from the flip BOUNDARY, not from ``from_frame``.
+
+    Offsets are measured from ``from_frame`` but the flip is the (0, +1) frame pair —
+    +1 is as much "at the flip" as 0. ``abs(frame_offset)`` scored the window
+    asymmetrically (admitting -1 to HIGH while excluding +2, which is the same
+    distance from the boundary on the other side) (audit LS-3).
+    """
+    return frame_offset if frame_offset <= 0 else frame_offset - 1
+
+
 def offset_proximity(frame_offset: int) -> float:
-    """1.0 at the flip boundary, decaying ~0.18 per frame away."""
-    return _clamp(1.0 - 0.18 * abs(frame_offset))
+    """1.0 at the flip boundary pair (0, +1), decaying ~0.18 per frame away from it."""
+    return _clamp(1.0 - 0.18 * abs(_effective_offset(frame_offset)))
 
 
 def colour_intermediacy(cf: dict) -> float:
@@ -92,7 +105,10 @@ def classify_lamp_colour(cf: dict) -> str:
     red_dominance = red / warm if warm > 0 else 0.0
     if red >= RED_RATIO_MIN and red_dominance >= RED_DOMINANCE_MIN and white <= 0.20:
         return "red"
-    if white >= WHITE_RATIO_MIN and val >= WHITE_VAL_MIN and red <= 0.10 and amber <= 0.30:
+    # Warm-aware like the red gate: yellow is part of the blend signal, so a
+    # yellow-heavy crop must not be called stable white merely because its
+    # orange_amber share alone is low (audit LS-2).
+    if white >= WHITE_RATIO_MIN and val >= WHITE_VAL_MIN and red <= 0.10 and (amber + yellow) <= 0.30:
         return "white"
     return "intermediate"
 
@@ -111,7 +127,7 @@ def review_flag(quality_flags: str, runway: str) -> str:
 def tier(score_value: float, frame_offset: int, suspect: bool) -> str:
     if suspect:
         return TIER_AMBIGUOUS
-    if score_value >= 0.70 and abs(frame_offset) <= 1:
+    if score_value >= 0.70 and abs(_effective_offset(frame_offset)) <= 1:
         return TIER_HIGH
     if score_value >= 0.50:
         return TIER_MEDIUM
