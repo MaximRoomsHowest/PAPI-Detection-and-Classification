@@ -190,7 +190,10 @@ jobs:
       - name: pip-audit (Docker torch pins)
         # torch is installed in the image from torch-requirements.txt, outside
         # requirements.txt — without this it was invisible to the scan (audit IS-1).
-        run: pip-audit -r apps/backend/torch-requirements.txt
+        # PYSEC-2026-139: no fixed torch release exists as of 2026-06-10 (verified —
+        # 2.9.0 is the audit-clean floor for everything else). Revisit when a fix
+        # version appears, then drop the ignore.
+        run: pip-audit -r apps/backend/torch-requirements.txt --ignore-vuln PYSEC-2026-139
 
       - name: Set up Node 24
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

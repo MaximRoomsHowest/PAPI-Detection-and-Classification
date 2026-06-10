@@ -4,8 +4,13 @@
 # previously pinned inline in the Dockerfile and invisible to the dependency scan
 # while CVE-2025-32434 (torch.load RCE, fixed in 2.6.0) sat in the image (IS-1).
 #
-# NOTE: the local dev .venv intentionally stays on torch 2.5.1+cu121 (2.6 dropped
-# cu121 wheels); the CI docker smoke loads the real serving checkpoint on these
-# pins, which is the compatibility gate for the image.
-torch==2.6.0
-torchvision==0.21.0
+# NOTE: the local dev .venv intentionally stays on torch 2.5.1+cu121 (newer torch
+# dropped cu121 wheels); the CI docker smoke loads the real serving checkpoint on
+# these pins, which is the compatibility gate for the image.
+#
+# 2.9.0: the audit-clean floor as of 2026-06-10 — 2.6.0 carried 19 published
+# advisories with fixes spread across 2.7.0/2.7.1/2.8.0/2.9.0. The single
+# remaining advisory (PYSEC-2026-139) has no fixed release anywhere and is
+# explicitly ignore-listed in ci.yml with this justification.
+torch==2.9.0
+torchvision==0.24.0
