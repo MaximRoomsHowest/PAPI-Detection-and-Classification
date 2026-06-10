@@ -10,8 +10,9 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 60_000
 // Parse a numeric env override, falling back to the default when the value is absent
 // OR unparseable. Bare Number('abc') is NaN, which would silently disable the upload
 // guard (`size > NaN` is always false) and make setTimeout(…, NaN) fire immediately,
-// aborting every request (audit F1).
-function positiveNumberEnv(raw, fallback) {
+// aborting every request (audit F1). Exported so other env caps (e.g. the
+// useAnalysis batch-frame mirror) reuse the same negative/zero/NaN handling.
+export function positiveNumberEnv(raw, fallback) {
   const value = Number(raw)
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
@@ -240,10 +241,18 @@ export async function fetchModels() {
     headers: buildHeaders(),
   })
   if (!response.ok) {
-    throw new Error(`Could not load model options (${response.status})`)
+    // This failure renders inside the model selector's live region, but api.js has no
+    // i18n access — throw a typed code and let useAnalysis map it to the active
+    // locale's message. The English message stays for devtools/console only.
+    const error = new Error(`Could not load model options (${response.status})`)
+    error.code = MODEL_OPTIONS_ERROR_CODE
+    throw error
   }
   return parseJsonBody(response, 'Model options')
 }
+
+// Stable error code for a failed /api/models load — the UI layer owns the translation.
+export const MODEL_OPTIONS_ERROR_CODE = 'model-options-unavailable'
 
 export async function fetchStats() {
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats`, {
@@ -393,9 +402,8 @@ function appendMetadata(formData, metadata = {}) {
     drone_latitude: metadata.droneLatitude,
     drone_longitude: metadata.droneLongitude,
     drone_altitude_m: metadata.droneAltitudeM,
-    // "tracking" (temporal red<->white flips) or "model" (learned class-2 events). Omitted when
-    // empty/undefined so the backend applies its own default.
-    transition_method: metadata.transitionMethod,
+    // Omitted when null/empty (no registry entry selected yet, or /api/models failed)
+    // so the backend applies its own default model instead of rejecting an invented id.
     model_id: metadata.modelId,
   }
   for (const [key, value] of Object.entries(fields)) {

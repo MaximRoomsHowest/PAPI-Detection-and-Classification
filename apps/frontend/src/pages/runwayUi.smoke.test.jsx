@@ -161,7 +161,15 @@ describe('runway UI smoke', () => {
       'Small detector',
       'Transition classifier',
     ])
-    expect(buttons[1].disabled).toBe(true)
+    // aria-disabled, not the disabled attribute: the button stays focusable so keyboard
+    // focus isn't dropped and the disabled reason stays reachable (FE-8).
+    expect(buttons[1].disabled).toBe(false)
+    expect(buttons[1].getAttribute('aria-disabled')).toBe('true')
+
+    act(() => {
+      buttons[1].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(setSelectedModelId).not.toHaveBeenCalled()
 
     act(() => {
       buttons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))

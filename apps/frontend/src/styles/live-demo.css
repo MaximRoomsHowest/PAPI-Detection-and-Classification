@@ -341,10 +341,11 @@
   align-items: stretch;
 }
 
-/* Always-on provenance strip: which runway / transition method / telemetry source
-   produced the on-screen result. Spans the full panel width and shows for every
-   result (incl. still images / zero-transition runs), so re-running with changed
-   params is legible (audit F2). All fields are real backend echoes. */
+/* Provenance strip: which runway / telemetry source produced the on-screen result.
+   Rendered ONLY when the elevation angle is unavailable (ResultPanel's showProvenance)
+   — when the angle is available the angle-readout already surfaces runway + telemetry
+   source, so an always-on strip would duplicate them. All fields are real backend
+   echoes. */
 .result-provenance {
   grid-column: 1 / -1;
   display: flex;
@@ -366,11 +367,6 @@
 
 .result-provenance__item {
   color: var(--text-muted);
-}
-
-.result-provenance__item b {
-  color: var(--text-strong);
-  font-weight: 800;
 }
 
 /* Shown in the Live Demo result panel before any analysis has run, so the
@@ -1433,12 +1429,8 @@
     text-align: left;
   }
 
-  /* Collapse the result panel's internal 3-column grid and the telemetry inputs to a
-     single column so the 420px middle track can't force horizontal overflow (audit F7). */
-  .analysis-panel {
-    grid-template-columns: 1fr;
-  }
-
+  /* Collapse the telemetry inputs to a single column (audit F7). The result panel's
+     3-column grid already collapses at 1040px in responsive.css, which covers 760px. */
   .drone-telemetry__fields {
     grid-template-columns: 1fr;
   }

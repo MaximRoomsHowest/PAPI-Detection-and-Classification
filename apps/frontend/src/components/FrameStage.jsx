@@ -133,7 +133,9 @@ export function FrameStage({
             </button>
           </div>
         )}
-        <div className="frame-tool-controls" role="group" aria-label={copy.live.frameNav}>
+        {/* Viewer TOOLS (folder-video / play-pause / zoom / re-run) — labeled distinctly
+            from the frame NAVIGATOR group below, which owns copy.live.frameNav (FE-14). */}
+        <div className="frame-tool-controls" role="group" aria-label={copy.live.frameToolsLabel}>
           {canTransformFolderToVideo && (
             <button
               type="button"

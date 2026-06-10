@@ -290,6 +290,18 @@ describe('analyze* — multipart payload + auth', () => {
     expect(init.body.get('drone_id')).toBeNull()
     expect(init.body.get('drone_latitude')).toBeNull()
   })
+
+  it('omits model_id when no model is selected yet, so the backend default applies', async () => {
+    // Before /api/models resolves (or after it fails / on a legacy backend) the UI
+    // holds modelId=null — sending a guessed id would 400 with "Unknown model_id".
+    const file = makeFile('frame.jpg', 1_000)
+    await analyzeFrame(file, { runwayId: '24', modelId: null })
+
+    const [, init] = fetch.mock.calls[0]
+    expect(init.body.get('model_id')).toBeNull()
+    // transition_method is backend-owned now; the client never sends it.
+    expect(init.body.get('transition_method')).toBeNull()
+  })
 })
 
 describe('analyze* — optional telemetry file', () => {

@@ -171,9 +171,20 @@
     white-space: normal;
   }
 
+  /* .demo-actions is a flex row (sections.css), not a grid — wrap it and give the
+     model selector the full row so it can't force ~390px phones to overflow. */
   .demo-actions {
+    flex-wrap: wrap;
+  }
+
+  .demo-actions .model-selector {
+    width: 100%;
+  }
+
+  /* The telemetry-prompt controls grid's minmax floors sum past a phone's width —
+     collapse it to a single column. */
+  .metadata-prompt__controls {
     grid-template-columns: 1fr;
-    justify-content: stretch;
   }
 
   .history-summary-grid,

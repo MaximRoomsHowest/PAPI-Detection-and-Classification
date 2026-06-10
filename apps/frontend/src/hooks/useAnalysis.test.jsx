@@ -31,6 +31,13 @@ vi.mock('../lib/api', () => ({
   fetchRunways: mocks.fetchRunways,
   resolveMediaUrl: mocks.resolveMediaUrl,
   revokeMediaUrl: mocks.revokeMediaUrl,
+  MODEL_OPTIONS_ERROR_CODE: 'model-options-unavailable',
+  // Mirror the real implementation — useAnalysis derives its batch cap from it at
+  // module scope, so the mock must behave, not just exist.
+  positiveNumberEnv: (raw, fallback) => {
+    const value = Number(raw)
+    return Number.isFinite(value) && value > 0 ? value : fallback
+  },
 }))
 
 vi.mock('sonner', () => ({
@@ -186,5 +193,87 @@ describe('useAnalysis inference triggering', () => {
       runwayId: runway.id,
       modelId: 'nano',
     })
+  })
+
+  it('surfaces a translated error when /api/models fails and still analyzes with the backend default', async () => {
+    mocks.fetchModels.mockRejectedValueOnce(new Error('Could not load model options (503)'))
+    renderHook()
+
+    await waitForAssertion(() => {
+      expect(latest.modelOptionsError).toBe(copy.live.modelLoadError)
+    })
+    // No invented registry id: model_id stays null so api.js omits the field and the
+    // backend default applies (a guessed 'small' 400s on legacy/failed backends).
+    expect(latest.selectedModelId).toBeNull()
+
+    const file = new File(['image'], 'frame.jpg', { type: 'image/jpeg' })
+    await act(async () => {
+      latest.handleMediaFiles([file])
+      await flush()
+    })
+
+    await waitForAssertion(() => {
+      expect(mocks.analyzeFrame).toHaveBeenCalledTimes(1)
+    })
+    expect(mocks.analyzeFrame.mock.calls[0][1].modelId).toBeNull()
+  })
+
+  it('falls back to the registry default entry when no "small" id exists', async () => {
+    mocks.fetchModels.mockResolvedValueOnce([
+      { model_id: 'large', model_label: 'Large detector', available: true },
+      { model_id: 'edge', model_label: 'Edge detector', available: true, is_default: true },
+    ])
+    renderHook()
+
+    await waitForAssertion(() => {
+      expect(latest.selectedModelId).toBe('edge')
+    })
+  })
+
+  it('never auto-selects an unavailable entry, even when it is the default', async () => {
+    mocks.fetchModels.mockResolvedValueOnce([
+      { model_id: 'broken', model_label: 'Broken detector', available: false, is_default: true },
+      { model_id: 'nano', model_label: 'Nano detector', available: true },
+    ])
+    renderHook()
+
+    await waitForAssertion(() => {
+      expect(latest.selectedModelId).toBe('nano')
+    })
+  })
+
+  it('keeps the backend default (null) when every registry entry is unavailable', async () => {
+    mocks.fetchModels.mockResolvedValueOnce([
+      { model_id: 'broken', model_label: 'Broken detector', available: false, is_default: true },
+    ])
+    renderHook()
+
+    await waitForAssertion(() => {
+      expect(latest.modelOptions).toHaveLength(1)
+    })
+    expect(latest.selectedModelId).toBeNull()
+  })
+
+  it('does not arm a re-run when the same model id is selected again', async () => {
+    renderHook()
+    const file = new File(['image'], 'frame.jpg', { type: 'image/jpeg' })
+
+    await act(async () => {
+      latest.handleMediaFiles([file])
+      await flush()
+    })
+    await waitForAssertion(() => {
+      expect(mocks.analyzeFrame).toHaveBeenCalledTimes(1)
+    })
+
+    await act(async () => {
+      latest.setSelectedModelId('small')
+      await flush()
+    })
+    await act(async () => {
+      await flush()
+    })
+
+    expect(mocks.analyzeFrame).toHaveBeenCalledTimes(1)
   })
 })

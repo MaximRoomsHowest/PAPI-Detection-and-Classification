@@ -5,6 +5,7 @@ import {
   analyzeMedia,
   analyzeSequence,
   fetchModels,
+  positiveNumberEnv,
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
@@ -23,7 +24,9 @@ import { useChartExport } from './useChartExport'
 
 // Client-side mirror of the backend PAPI_MAX_BATCH_FRAMES cap so an oversized folder is
 // rejected up front instead of uploading the whole batch only to be 413'd (audit).
-const MAX_BATCH_FRAMES = Number(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES) || 200
+// positiveNumberEnv (api.js) also rejects negative/zero/NaN overrides, which a bare
+// Number(...) || 200 would let through as a nonsensical cap.
+const MAX_BATCH_FRAMES = positiveNumberEnv(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES, 200)
 
 // Owns the Live-Demo upload + backend-inference state and the handlers that drive
 // it — extracted from App.jsx so the App component is just the route shell. `copy`
@@ -80,8 +83,11 @@ export function useAnalysis(copy) {
 
   // Inference model selected from /api/models. The backend owns model availability and the
   // transition classifier's auto-"model" transition behavior; the UI sends only model_id so it
-  // cannot drift into a conflicting model/method combination.
-  const [selectedModelId, setSelectedModelIdState] = useState('small')
+  // cannot drift into a conflicting model/method combination. Starts as null — NOT a guessed
+  // registry id — so analyses fired before /api/models resolves (or after it fails, or against
+  // a legacy backend with different ids) omit model_id and get the backend default instead of
+  // 400ing on "Unknown model_id" (audit FE-1).
+  const [selectedModelId, setSelectedModelIdState] = useState(null)
   const [modelOptions, setModelOptions] = useState([])
   const [modelOptionsLoading, setModelOptionsLoading] = useState(true)
   const [modelOptionsError, setModelOptionsError] = useState('')
@@ -144,10 +150,12 @@ export function useAnalysis(copy) {
         if (!active) return
         const list = Array.isArray(options) ? options : []
         setModelOptions(list)
+        // Select the backend's default (or the first available) entry. An entry with
+        // available:false is never auto-selected; when nothing is available the
+        // selection stays null so model_id is omitted and the backend default applies.
         const fallback =
           list.find((model) => model.is_default && model.available !== false) ??
-          list.find((model) => model.available !== false) ??
-          list[0]
+          list.find((model) => model.available !== false)
         setSelectedModelIdState((current) => {
           const stillAvailable = list.some(
             (model) => model.model_id === current && model.available !== false,
@@ -155,9 +163,12 @@ export function useAnalysis(copy) {
           return stillAvailable ? current : fallback?.model_id ?? current
         })
       })
-      .catch((error) => {
+      .catch(() => {
         if (!active) return
-        setModelOptionsError(error.message || 'Could not load model options.')
+        // api.js throws a typed code (MODEL_OPTIONS_ERROR_CODE) rather than a user-facing
+        // string — every failure shape (HTTP error, timeout, malformed body) maps to the
+        // active locale's message here, since this text renders in a live region (FE-4).
+        setModelOptionsError(copy.live.modelLoadError)
       })
       .finally(() => {
         if (active) setModelOptionsLoading(false)
@@ -165,6 +176,10 @@ export function useAnalysis(copy) {
     return () => {
       active = false
     }
+    // copy is intentionally omitted: the registry fetch is mount-only and copy is read
+    // solely to localize the failure message — re-fetching /api/models on every locale
+    // switch would be wasted work for an unchanged registry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function clearResolvedArtifactUrls() {
@@ -341,14 +356,20 @@ export function useAnalysis(copy) {
   }
 
   function setSelectedModelId(nextModelId) {
-    const next = typeof nextModelId === 'function' ? nextModelId(selectedModelId) : nextModelId
-    if (!next || next === selectedModelId) {
-      return
-    }
-    setSelectedModelIdState(next)
-    if (media?.file) {
-      autoRunRequestedRef.current = true
-    }
+    // Resolve functional updaters against the CURRENT state inside the updater — the
+    // captured selectedModelId can be render-stale, which would both mis-resolve the
+    // updater and let a duplicate id slip past the no-op guard (audit FE-5). Arming the
+    // auto-run ref in here is idempotent, so a double-invoked updater stays harmless.
+    setSelectedModelIdState((current) => {
+      const next = typeof nextModelId === 'function' ? nextModelId(current) : nextModelId
+      if (!next || next === current) {
+        return current
+      }
+      if (media?.file) {
+        autoRunRequestedRef.current = true
+      }
+      return next
+    })
   }
 
   useEffect(() => {
@@ -357,11 +378,18 @@ export function useAnalysis(copy) {
     }
 
     // One-shot auto-run after a new upload commits. The request flag is a ref (not
-    // state) so clearing it here is not a setState-in-effect (eslint error) and adds no
+    // state) so consuming it is not a setState-in-effect (eslint error) and adds no
     // render; the effect still fires because media?.file changed in the same handler
-    // that set the flag.
-    autoRunRequestedRef.current = false
+    // that set the flag. The flag is consumed INSIDE the timer callback, not here: an
+    // unrelated re-render runs this effect's cleanup before the 0ms timer fires, and a
+    // flag already cleared in the effect body would make the re-run of the effect see
+    // "not armed" and silently cancel the queued run (audit FE-2). Left armed, the
+    // re-run simply schedules a fresh timer.
     const timeoutId = window.setTimeout(() => {
+      if (!autoRunRequestedRef.current) {
+        return
+      }
+      autoRunRequestedRef.current = false
       runBackendInference()
     }, 0)
 
@@ -487,7 +515,7 @@ export function useAnalysis(copy) {
         const result = await analyzeMedia(media.file, metadata, telemetryFile, signal)
         rawResults = [result]
         frameContexts.push({
-          frameLabel: `${result.frame_count ?? 0} labeled frames`,
+          frameLabel: copy.live.frameLabelLabeled.replace('{count}', String(result.frame_count ?? 0)),
           totalFrames: 1,
         })
       } else if (shouldAnalyzeFolderAsSequence(media.type, currentFolderMode)) {
@@ -504,7 +532,7 @@ export function useAnalysis(copy) {
         const result = await analyzeSequence(files, metadata, telemetryFile, signal)
         rawResults = [result]
         frameContexts.push({
-          frameLabel: `${result.frame_count ?? files.length} sequenced frames`,
+          frameLabel: copy.live.frameLabelSequenced.replace('{count}', String(result.frame_count ?? files.length)),
           totalFrames: 1,
         })
       } else {
@@ -575,7 +603,10 @@ export function useAnalysis(copy) {
 
       const scenarios = rawResults.map((result, index) =>
         scenarioFromBackendResult(result, {
-          ...(frameContexts[index] ?? { frameLabel: 'Result', totalFrames: rawResults.length }),
+          ...(frameContexts[index] ?? {
+            frameLabel: copy.live.frameLabelResult,
+            totalFrames: rawResults.length,
+          }),
           artifactUrl: resolvedArtifacts.urls[index],
         }),
       )

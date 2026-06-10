@@ -344,13 +344,18 @@
   font-weight: 600;
 }
 
-.model-selector__option:disabled {
+/* aria-disabled (not the disabled attribute) keeps blocked options focusable so
+   keyboard focus survives mid-analysis and the title reason stays reachable. */
+.model-selector__option:disabled,
+.model-selector__option[aria-disabled='true'] {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
 .model-selector__option:focus-visible {
-  outline: 2px solid var(--accent);
+  /* --focus, not --accent: the active option's background IS var(--accent), so an
+     accent outline would be invisible on it (WCAG 2.4.7). */
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
