@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 from datetime import datetime, timezone
@@ -48,6 +49,8 @@ from app.validation.schemas import (
     ModelInfo,
     ValMetrics,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class InferenceService:
@@ -192,7 +195,9 @@ class InferenceService:
             try:
                 entry = self._registry.get(str(model_id).strip())
             except KeyError as exc:
-                raise ValueError(f"Unknown model_id: {model_id}") from exc
+                # Truncate the echo: model_id is unbounded client text that flows into
+                # the 400 detail and the structured log (audit ECHO-1).
+                raise ValueError(f"Unknown model_id: {str(model_id)[:120]}") from exc
             if not entry.available:
                 reason = entry.disabled_reason or "model file is missing"
                 raise ValueError(f"Model '{entry.id}' is unavailable: {reason}")
@@ -256,15 +261,30 @@ class InferenceService:
             relative_path = path.name
 
         card = entry.card or load_model_card(path) or {}
+        # Optional metadata must never take down model discovery: a non-numeric class
+        # key or a wrong-typed val_metrics field degrades that one field to None
+        # instead of 500ing /api/models and blanking the selector (audit REG-2).
         classes: dict[int, str] | None = None
         loaded_model = self._models.get(entry.id)
         if loaded_model is not None:
             names = getattr(loaded_model, "names", None)
             if isinstance(names, dict):
-                classes = {int(key): str(value) for key, value in names.items()}
+                try:
+                    classes = {int(key): str(value) for key, value in names.items()}
+                except (TypeError, ValueError):
+                    classes = None
         if classes is None and isinstance(card.get("classes"), dict):
-            classes = {int(key): str(value) for key, value in card["classes"].items()}
+            try:
+                classes = {int(key): str(value) for key, value in card["classes"].items()}
+            except (TypeError, ValueError):
+                classes = None
         val_metrics = card.get("val_metrics")
+        parsed_val_metrics: ValMetrics | None = None
+        if isinstance(val_metrics, dict):
+            try:
+                parsed_val_metrics = ValMetrics(**val_metrics)
+            except ValueError:  # pydantic ValidationError subclasses ValueError
+                logger.warning("Ignoring malformed val_metrics for model '%s'.", entry.id)
 
         return ModelInfo(
             model_id=entry.id,
@@ -289,7 +309,7 @@ class InferenceService:
             training_run=card.get("training_run"),
             base_weights=card.get("base_weights"),
             dataset_split_evaluated=card.get("split_evaluated"),
-            val_metrics=ValMetrics(**val_metrics) if isinstance(val_metrics, dict) else None,
+            val_metrics=parsed_val_metrics,
             loaded_at=self._loaded_at.get(entry.id),
         )
 
@@ -297,11 +317,19 @@ class InferenceService:
         try:
             entry = self._registry.get(model_id)
         except KeyError as exc:
-            raise ValueError(f"Unknown model_id: {model_id}") from exc
+            raise ValueError(f"Unknown model_id: {str(model_id)[:120]}") from exc
         return self._model_info_for_entry(entry)
 
     def model_options(self) -> list[ModelInfo]:
-        return [self._model_info_for_entry(entry) for entry in self._registry.entries]
+        # Per-entry isolation: one broken entry degrades to a missing option rather
+        # than 500ing the whole selector list (audit REG-2).
+        options: list[ModelInfo] = []
+        for entry in self._registry.entries:
+            try:
+                options.append(self._model_info_for_entry(entry))
+            except Exception:  # noqa: BLE001 - discovery must degrade, never die
+                logger.exception("Skipping model option '%s': info construction failed.", entry.id)
+        return options
 
     def warmup(self) -> None:
         """Run one dummy inference so a broken checkpoint surfaces at startup rather

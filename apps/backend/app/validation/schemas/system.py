@@ -15,6 +15,11 @@ class ValMetrics(BaseModel):
     recall: float | None = None
     map50: float | None = None
     map50_95: float | None = None
+    # Per-class breakdown (e.g. {"transition": {"precision": 0.0, ...}}). The registry
+    # carries these for the 3-class transition model and pydantic's extra="ignore" was
+    # silently dropping them — hiding exactly the number a safety reviewer comparing
+    # models needs (audit PC-1).
+    per_class: dict[str, dict[str, float]] | None = None
     note: str | None = None
 
 

@@ -15,12 +15,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from app.config import REPO_ROOT, Settings
+
+logger = logging.getLogger(__name__)
 
 _HASH_CHUNK_BYTES = 1024 * 1024
 _MODEL_CARD_FILENAME = "model_card.json"
@@ -127,9 +130,13 @@ def _resolve_registry_path(raw: str | None, settings: Settings, registry_path: P
     if parts and parts[0] == "models":
         # Local dev: REPO_ROOT/models/...
         local = REPO_ROOT / expanded
-        if local.exists() or not settings.model_path.is_absolute():
+        if local.exists():
             return local.resolve()
         # Docker: /models is bind-mounted while the app lives under /app/apps/backend.
+        # parents[1] of PAPI_MODEL_PATH is the models root in both shipped layouts
+        # (REPO_ROOT/models/serving/best.pt and /models/serving/best.pt); a checkpoint
+        # mounted at a flat custom path breaks this heuristic, so the missing-weights
+        # log in load_model_registry names the resolved path for diagnosis.
         model_root = settings.model_path.parents[1] if len(settings.model_path.parents) > 1 else registry_path.parents[1]
         return (model_root / Path(*parts[1:])).resolve()
     if parts and parts[0] == "data":
@@ -171,49 +178,75 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
     entries: list[ModelRegistryEntry] = []
     for raw in raw_entries:
         if not isinstance(raw, dict):
+            logger.warning("Model registry: skipping entry that is not an object: %r", raw)
             continue
         model_id = str(raw.get("id") or "").strip()
         if not model_id:
+            logger.warning("Model registry: skipping entry without an 'id': %r", raw)
             continue
-        role = str(raw.get("role") or "detector").strip().lower()
-        path = _resolve_registry_path(str(raw.get("path") or ""), settings, registry_path)
-        if path is None:
-            continue
-        if raw.get("default"):
-            path = settings.model_path
-        if role == "transition" and settings.transition_model_path is not None:
-            path = settings.transition_model_path
+        # One malformed entry (e.g. class_count: "two") must degrade to a skipped
+        # entry with a log line — not crash InferenceService.__init__ and thereby
+        # 500 every endpoint (audit REG-1). The legacy fallback below still covers
+        # the nothing-survived case.
+        try:
+            role = str(raw.get("role") or "detector").strip().lower()
+            path = _resolve_registry_path(str(raw.get("path") or ""), settings, registry_path)
+            if path is None:
+                logger.warning("Model registry: skipping entry '%s' without a usable 'path'.", model_id)
+                continue
+            if raw.get("default"):
+                path = settings.model_path
+            if role == "transition" and settings.transition_model_path is not None:
+                path = settings.transition_model_path
 
-        card_path = _resolve_registry_path(str(raw.get("card_path") or ""), settings, registry_path)
-        card = _read_json(card_path) if card_path else None
-        if card is None:
-            card = dict(raw)
-        if isinstance(raw.get("val_metrics"), dict):
-            card["val_metrics"] = raw["val_metrics"]
-        if isinstance(raw.get("classes"), dict):
-            card["classes"] = raw["classes"]
-        card.setdefault("model_id", model_id)
-        card.setdefault("training_run", raw.get("training_run") or model_id)
-        card.setdefault("base_weights", raw.get("base_weights"))
-        card.setdefault("split_evaluated", raw.get("split_evaluated"))
+            card_path = _resolve_registry_path(str(raw.get("card_path") or ""), settings, registry_path)
+            card = _read_json(card_path) if card_path else None
+            if card is None:
+                card = dict(raw)
+            if isinstance(raw.get("val_metrics"), dict):
+                card["val_metrics"] = raw["val_metrics"]
+            if isinstance(raw.get("classes"), dict):
+                card["classes"] = raw["classes"]
+            card.setdefault("model_id", model_id)
+            card.setdefault("training_run", raw.get("training_run") or model_id)
+            card.setdefault("base_weights", raw.get("base_weights"))
+            card.setdefault("split_evaluated", raw.get("split_evaluated"))
 
-        entries.append(
-            ModelRegistryEntry(
-                id=model_id,
-                label=str(raw.get("label") or model_id),
-                role=role,
-                path=path,
-                class_count=int(raw.get("class_count") or len(card.get("classes", {}) or {}) or 2),
-                default=bool(raw.get("default")),
-                description=str(raw.get("description")) if raw.get("description") else None,
-                card_path=card_path,
-                card=card,
-                disabled_reason=str(raw.get("disabled_reason")) if raw.get("disabled_reason") else None,
+            entries.append(
+                ModelRegistryEntry(
+                    id=model_id,
+                    label=str(raw.get("label") or model_id),
+                    role=role,
+                    path=path,
+                    class_count=int(raw.get("class_count") or len(card.get("classes", {}) or {}) or 2),
+                    default=bool(raw.get("default")),
+                    description=str(raw.get("description")) if raw.get("description") else None,
+                    card_path=card_path,
+                    card=card,
+                    disabled_reason=str(raw.get("disabled_reason")) if raw.get("disabled_reason") else None,
+                )
             )
-        )
+        except (ValueError, TypeError) as exc:
+            logger.warning("Model registry: skipping malformed entry '%s': %s", model_id, exc)
+            continue
 
     if not entries:
+        logger.warning(
+            "Model registry at %s yielded no usable entries; falling back to the legacy "
+            "single-model setup (PAPI_MODEL_PATH).",
+            registry_path,
+        )
         return _legacy_registry(settings)
+    for entry in entries:
+        if not entry.exists:
+            # Silent unavailability was undiagnosable (audit PATH-1): name the resolved
+            # path once at load so a bad mount/override shows up in the startup log.
+            logger.warning(
+                "Model registry: weights for '%s' not found at %s; the entry will be "
+                "listed as unavailable.",
+                entry.id,
+                entry.path,
+            )
     if not default_model_id or default_model_id not in {entry.id for entry in entries}:
         default_entry = next((entry for entry in entries if entry.default), entries[0])
         default_model_id = default_entry.id

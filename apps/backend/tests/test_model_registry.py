@@ -181,6 +181,99 @@ def test_load_model_registry_marks_missing_transition_unavailable(tmp_path):
     assert transition.disabled_reason == "missing transition checkpoint"
 
 
+def test_load_model_registry_skips_malformed_entry_instead_of_crashing(tmp_path):
+    """One bad scalar must cost one entry, not every endpoint (audit REG-1)."""
+    serving = tmp_path / "models" / "serving"
+    serving.mkdir(parents=True)
+    small = serving / "best.pt"
+    small.write_bytes(b"small")
+    registry_path = serving / "models.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "default_model_id": "small",
+                "models": [
+                    {"id": "broken", "role": "detector", "path": "models/serving/best.pt", "class_count": "two"},
+                    {"id": "small", "label": "Small", "role": "detector", "path": "models/serving/best.pt", "default": True},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=small,
+        model_registry_path=registry_path,
+    )
+
+    registry = load_model_registry(settings)
+
+    assert [entry.id for entry in registry.entries] == ["small"]
+    assert registry.default_model_id == "small"
+
+
+def test_model_options_degrade_on_malformed_val_metrics(tmp_path):
+    """A wrong-typed optional metadata field nulls that field; it must not 500
+    the whole /api/models selector list (audit REG-2)."""
+    serving = tmp_path / "models" / "serving"
+    serving.mkdir(parents=True)
+    small = serving / "best.pt"
+    small.write_bytes(b"small")
+    registry_path = serving / "models.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "default_model_id": "small",
+                "models": [
+                    {
+                        "id": "small",
+                        "label": "Small",
+                        "role": "detector",
+                        "path": "models/serving/best.pt",
+                        "default": True,
+                        "val_metrics": {"map50": "not-a-number"},
+                        "classes": {"zero": "PAPI-Red"},
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=small,
+        model_registry_path=registry_path,
+    )
+
+    options = InferenceService(settings).model_options()
+
+    assert len(options) == 1
+    assert options[0].val_metrics is None
+    assert options[0].classes is None
+
+
+def test_shipped_models_json_loads_and_keeps_per_class_metrics():
+    """Smoke-load the real committed registry (audit DT-5): every entry parses and
+    the transition entry's per-class metrics — its most honest numbers — survive
+    schema validation instead of being silently dropped."""
+    from app.config import REPO_ROOT
+
+    registry_file = REPO_ROOT / "models" / "serving" / "models.json"
+    settings = Settings(
+        storage_dir=REPO_ROOT / "apps" / "backend" / "storage",
+        model_path=REPO_ROOT / "models" / "serving" / "best.pt",
+        model_registry_path=registry_file,
+    )
+
+    options = InferenceService(settings).model_options()
+
+    assert {opt.model_id for opt in options} >= {"small", "nano", "transition"}
+    transition = next(opt for opt in options if opt.model_id == "transition")
+    assert transition.val_metrics is not None
+    assert transition.val_metrics.per_class is not None
+    assert "transition" in transition.val_metrics.per_class
+
+
 def test_load_model_registry_falls_back_to_single_model_when_registry_absent(tmp_path):
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"single")

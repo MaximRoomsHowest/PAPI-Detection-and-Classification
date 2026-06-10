@@ -78,6 +78,14 @@ def get_log(
     log = AnalysisLogRepository(db).get(log_id)
     if log is None:
         raise HTTPException(status_code=404, detail="Analysis log not found.")
+    if not isinstance(log.result_json, dict):
+        # ** unpacking a NULL/non-dict raises TypeError before the ValidationError
+        # handler below; the list and CSV paths already isinstance-guard this
+        # (repositories/analysis_logs.py, api/_csv.py) — match them (audit LOG-1).
+        raise HTTPException(
+            status_code=422,
+            detail="Stored analysis record is incompatible with the current schema.",
+        )
     try:
         payload = AnalysisPayload(**log.result_json)
     except ValidationError as exc:

@@ -96,8 +96,10 @@ async def lifespan(_app: FastAPI):
             )
 
     # init_db + the lazy YOLO load + warmup are blocking and CPU-bound (~5 s). Run them
-    # off the event loop in a thread so the server can still answer /health while it
-    # boots, instead of stalling the single asyncio loop during startup (audit B4).
+    # off the event loop in a thread so the loop stays responsive (signal handling,
+    # cancellation) during startup. Note: uvicorn does not accept connections until
+    # lifespan startup completes, so no request — /health included — is served before
+    # this finishes either way (audit CMT-1; compose HEALTHCHECK start-period covers it).
     await asyncio.get_running_loop().run_in_executor(None, _startup_warmup)
     yield
     # Nothing to clean up on shutdown for now; placeholder for future use.
