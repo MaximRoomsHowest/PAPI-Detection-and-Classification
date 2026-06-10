@@ -117,6 +117,39 @@ describe('scenarioFromBackendResult', () => {
     expect(s.condition).toBe('Angle unavailable')
   })
 
+  it('exposes the backend angle_source as sourceId on available summaries', () => {
+    const s = scenarioFromBackendResult(makeResult(), context)
+    expect(s.angleSummary.sourceId).toBe('file_metadata')
+  })
+
+  it('keeps sourceId when telemetry was present but the angle could not be computed (FE-17)', () => {
+    const s = scenarioFromBackendResult(
+      makeResult({
+        angle: {
+          angle_available: true,
+          elevation_angle_deg: null,
+          angle_source: 'request_metadata',
+          angle_note: 'angle solve failed',
+        },
+      }),
+      context,
+    )
+    expect(s.angleSummary.available).toBe(false)
+    expect(s.angleSummary.sourceId).toBe('request_metadata')
+  })
+
+  it('leaves sourceId null when no telemetry was resolved', () => {
+    expect(
+      scenarioFromBackendResult(
+        makeResult({ angle: { angle_available: false, angle_note: 'no metadata' } }),
+        context,
+      ).angleSummary.sourceId,
+    ).toBeNull()
+    expect(
+      scenarioFromBackendResult(makeResult({ angle: undefined }), context).angleSummary.sourceId,
+    ).toBeNull()
+  })
+
   it('clamps a negative processing time to zero latency', () => {
     expect(scenarioFromBackendResult(makeResult({ processing_ms: -5 }), context).metrics.latency).toBe(0)
   })

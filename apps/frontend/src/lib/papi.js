@@ -44,6 +44,10 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
         available: true,
         value: result.angle.elevation_angle_deg.toFixed(3),
         source: result.angle.angle_source ?? 'metadata',
+        // The raw backend enum (request_metadata/file_metadata/telemetry_file/
+        // metadata) — `source` above gets localized for display, so logic that
+        // needs to know WHETHER telemetry existed keys on this instead (FE-17).
+        sourceId: result.angle.angle_source ?? null,
         note: result.angle.angle_note,
         // Runway<->metadata sanity: false when the drone fix is implausibly far from
         // the selected runway (wrong runway / datum). All ??-guarded so an older
@@ -58,6 +62,10 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
         available: false,
         value: 'N/A',
         source: 'missing metadata',
+        // Still set when telemetry WAS resolved but the angle solve failed
+        // (angle_available=true, elevation null) — the provenance strip uses
+        // it to avoid claiming "telemetry: none" in that case (FE-17).
+        sourceId: result.angle?.angle_source ?? null,
         note: result.angle?.angle_note ?? 'GPS/altitude metadata was not available.',
       }
   const latency = Math.max(0, Number(result.processing_ms) || 0)

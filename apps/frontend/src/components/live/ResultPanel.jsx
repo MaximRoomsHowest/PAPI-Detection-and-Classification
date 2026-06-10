@@ -30,6 +30,18 @@ export function ResultPanel({ copy }) {
   // result (audit: duplicate provenance / result-panel clutter).
   const showProvenance = hasResult && !activeScenario?.angleSummary?.available
 
+  // Telemetry honesty (audit FE-17): sourceId is the raw backend enum and is still
+  // set when telemetry WAS resolved but the angle solve failed. Only a genuinely
+  // absent source may claim "Telemetry: none"; otherwise name the source via the
+  // localized angleSource map (never string-match on translated text).
+  const angleSourceId = activeScenario?.angleSummary?.sourceId ?? null
+  const provenanceTelemetry = angleSourceId
+    ? copy.live.provenanceTelemetryUnused.replace(
+        '{source}',
+        copy.live.angleSource?.[angleSourceId] ?? angleSourceId,
+      )
+    : copy.live.provenanceTelemetryNone
+
   return (
     <aside className="analysis-panel" id="analysis-details" aria-busy={isAnalyzing}>
       {hasResult ? (
@@ -40,7 +52,7 @@ export function ResultPanel({ copy }) {
               <span className="result-provenance__item">
                 {copy.live.runwayUsed.replace('{runway}', usedRunwayLabel)}
               </span>
-              <span className="result-provenance__item">{copy.live.provenanceTelemetryNone}</span>
+              <span className="result-provenance__item">{provenanceTelemetry}</span>
             </div>
           )}
 

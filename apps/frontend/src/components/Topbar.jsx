@@ -134,6 +134,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
             <div
               className="language-menu"
               role="menu"
+              aria-orientation="vertical"
               aria-label={copy.a11y.languageMenu}
               tabIndex={-1}
               onKeyDown={handleLanguageMenuKeyDown}
