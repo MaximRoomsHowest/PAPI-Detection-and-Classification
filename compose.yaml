@@ -73,6 +73,13 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/papi_backend
       PAPI_MODEL_REGISTRY_PATH: /models/serving/models.json
       PAPI_MODEL_PATH: /models/serving/best.pt
+      # Optional 3-class transition classifier. Documented in the volumes note below,
+      # but previously NOT forwarded into the container, so setting it in .env was a
+      # silent no-op (audit IS-2). Empty means "not installed".
+      PAPI_TRANSITION_MODEL_PATH: ${PAPI_TRANSITION_MODEL_PATH:-}
+      # Default transition derivation when a request sends neither model_id nor
+      # transition_method: tracking | model.
+      PAPI_TRANSITION_METHOD: ${PAPI_TRANSITION_METHOD:-tracking}
       PAPI_STORAGE_DIR: /storage
       # JSON-list form: avoids the pydantic-settings CSV-parse issue that
       # crashed the container in earlier builds (audit SMOKE-CRIT-2). Only used
@@ -88,11 +95,21 @@ services:
       PAPI_MAX_IMAGE_MEGAPIXELS: ${PAPI_MAX_IMAGE_MEGAPIXELS:-80}
       PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
       PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-30}
+      # NOTE: the frontend nginx hardcodes client_max_body_size 410m
+      # (apps/frontend/nginx.conf) — raising this past ~400 MB also requires
+      # raising that limit, or proxied uploads die at nginx with a 413 before
+      # the backend ever sees them (audit IS-7).
       PAPI_MAX_BATCH_UPLOAD_MB: ${PAPI_MAX_BATCH_UPLOAD_MB:-400}
       # Aggregate cap on /api/analyze-frames batch size (audit B-MAJ-5).
       # 200 keeps a folder upload of a normal flight under a few minutes
       # of CPU inference; raise via .env if the demo needs a bigger sweep.
       PAPI_MAX_BATCH_FRAMES: ${PAPI_MAX_BATCH_FRAMES:-200}
+      # Inference tuning (previously unreachable under compose — audit IS-3).
+      # Defaults match app/config.py; imgsz/iou are explicit so a re-exported
+      # model can never silently fall back to 640.
+      PAPI_SEQUENCE_FPS: ${PAPI_SEQUENCE_FPS:-4}
+      PAPI_INFERENCE_IMGSZ: ${PAPI_INFERENCE_IMGSZ:-1280}
+      PAPI_INFERENCE_IOU: ${PAPI_INFERENCE_IOU:-0.7}
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}

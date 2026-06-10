@@ -97,3 +97,10 @@ def test_database_url_honors_unprefixed_env_var(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/papi_y")
     settings = Settings()
     assert settings.database_url == "postgresql+psycopg://u:p@db:5432/papi_y"
+
+
+def test_empty_transition_model_path_means_not_installed(monkeypatch):
+    """compose forwards PAPI_TRANSITION_MODEL_PATH with an empty default; the empty
+    string must mean None, not Path('.') resolved against the backend root (IS-2)."""
+    monkeypatch.setenv("PAPI_TRANSITION_MODEL_PATH", "")
+    assert Settings().transition_model_path is None

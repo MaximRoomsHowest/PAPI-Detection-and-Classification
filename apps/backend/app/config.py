@@ -127,6 +127,16 @@ class Settings(BaseSettings):
             return value
         return (BACKEND_ROOT / value).resolve()
 
+    @field_validator("transition_model_path", mode="before")
+    @classmethod
+    def empty_transition_path_is_none(cls, value: object) -> object:
+        # compose forwards PAPI_TRANSITION_MODEL_PATH with an empty default; an
+        # empty string must mean "not installed", not Path(".") resolved against
+        # the backend root (audit IS-2).
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator("transition_model_path")
     @classmethod
     def resolve_optional_backend_relative_path(cls, value: Path | None) -> Path | None:

@@ -22,9 +22,11 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Pre-install CPU-only torch BEFORE requirements.txt so ultralytics doesn't pull
-# the multi-hundred-MB CUDA wheel.
+# the multi-hundred-MB CUDA wheel. Pins live in torch-requirements.txt so CI's
+# pip-audit can scan them (audit IS-1).
+COPY torch-requirements.txt ./
 RUN pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.5.1 torchvision==0.20.1
+        -r torch-requirements.txt
 
 # Copy only requirements first for better layer caching.
 COPY requirements.txt ./

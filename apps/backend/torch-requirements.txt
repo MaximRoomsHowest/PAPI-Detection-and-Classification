@@ -1,0 +1,11 @@
+# CPU-only torch pins for the Docker image. Installed from the PyTorch CPU index
+# (see Dockerfile) BEFORE requirements.txt so ultralytics doesn't pull the CUDA
+# wheel. Kept in their own file so CI's pip-audit can scan them — torch was
+# previously pinned inline in the Dockerfile and invisible to the dependency scan
+# while CVE-2025-32434 (torch.load RCE, fixed in 2.6.0) sat in the image (IS-1).
+#
+# NOTE: the local dev .venv intentionally stays on torch 2.5.1+cu121 (2.6 dropped
+# cu121 wheels); the CI docker smoke loads the real serving checkpoint on these
+# pins, which is the compatibility gate for the image.
+torch==2.6.0
+torchvision==0.21.0
