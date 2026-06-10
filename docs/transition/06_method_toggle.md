@@ -24,7 +24,9 @@ Available selector ids come from `GET /api/models`:
   for direct API callers. Detector-role models default to `transition_method="tracking"`; the
   transition-role model defaults to `transition_method="model"`.
 - **Config:** `PAPI_TRANSITION_MODEL_PATH` (optional 3-class model, lazy-loaded),
-  `PAPI_TRANSITION_METHOD` (legacy default), `PAPI_MODEL_REGISTRY_PATH`, and `PAPI_MODEL_PATH`.
+  `PAPI_TRANSITION_METHOD` (default when a request sends neither `model_id` nor
+  `transition_method`; `model` routes to the transition classifier when available, else
+  falls back to tracking), `PAPI_MODEL_REGISTRY_PATH`, and `PAPI_MODEL_PATH`.
 - **Response:** `AnalysisPayload.transition_method` echoes the method **actually used** (so a
   fallback is visible). `AnalysisPayload` also includes `model_id`, `model_label`, and
   `model_role`, which are persisted in `result_json` and exported in CSV history.

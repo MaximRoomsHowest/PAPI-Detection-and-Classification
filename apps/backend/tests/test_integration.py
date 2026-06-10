@@ -491,6 +491,34 @@ def test_analyze_frame_passes_model_id_to_inference_and_persists_it(client):
     assert detail["model_id"] == "nano"
 
 
+def test_analyze_frame_unknown_model_id_returns_400(client):
+    """The unknown-model_id contract (service raises ValueError -> HTTP 400) was
+    previously unpinned because the mock echoed any id back (audit DT-4)."""
+    import app.api.routes as routes
+
+    routes.get_inference_service().analyze.side_effect = ValueError("Unknown model_id: nope")
+
+    response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={"runway_id": "papi_24", "model_id": "nope"},
+    )
+
+    assert response.status_code == 400
+    assert "Unknown model_id" in response.json()["detail"]
+
+
+def test_model_endpoint_unknown_model_id_returns_400(client):
+    import app.api.routes as routes
+
+    routes.get_inference_service().model_info.side_effect = ValueError("Unknown model_id: nope")
+
+    response = client.get("/api/model", params={"model_id": "nope"})
+
+    assert response.status_code == 400
+    assert "Unknown model_id" in response.json()["detail"]
+
+
 def test_stats_endpoint_summarizes_recent_logs(client):
     for filename in ("first.jpg", "second.jpg"):
         response = client.post(

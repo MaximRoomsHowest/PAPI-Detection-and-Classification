@@ -211,7 +211,16 @@ class InferenceService:
                 method = "tracking"
             return model, entry, method
 
-        if explicit_method and str(transition_method).strip().lower() == "model":
+        # When neither model_id nor transition_method is given, PAPI_TRANSITION_METHOD
+        # is the documented default — it must be honoured here, not just by the legacy
+        # resolver, or a deployment configured with =model silently reverts to tracking
+        # (audit TRN-1). An explicit model_id wins over the setting (handled above).
+        requested_method = (
+            str(transition_method).strip().lower()
+            if explicit_method
+            else (self.settings.default_transition_method or "tracking").strip().lower()
+        )
+        if requested_method == "model":
             transition_entry = self._registry.transition_entry()
             if transition_entry is not None and transition_entry.available:
                 model = self._load_model(transition_entry)
