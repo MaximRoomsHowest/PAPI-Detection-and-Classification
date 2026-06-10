@@ -44,7 +44,6 @@ def run_tracked_sequence(
     angle: AngleResult,
     start: float,
     max_frames: int,
-    too_long_message: str,
     empty_message: str,
     history_size: int,
     exports_dir: Path,
@@ -79,14 +78,20 @@ def run_tracked_sequence(
         raise RuntimeError("Could not write annotated video artifact.")
 
     # The annotated artifact is partially written as the loop runs. If the loop
-    # raises (in-loop too-long guard) OR finishes with no readable frames, that
-    # partial file must NOT survive as an orphan: release the writer AND unlink
-    # it before re-raising. A SUCCESSFUL run releases the writer and keeps the
+    # raises OR finishes with no readable frames, that partial file must NOT
+    # survive as an orphan: release the writer AND unlink it before re-raising.
+    # A successful (possibly truncated) run releases the writer and keeps the
     # artifact (audit: orphaned-annotated-artifact on max_frames exceeded).
+    truncated_at_frame: int | None = None
     try:
         for frame in frames:
             if frame_count >= max_frames:
-                raise ValueError(too_long_message)
+                # The source out-ran the limit mid-stream (container metadata lied
+                # or was absent — honest sources are rejected up front). Failing
+                # here would discard max_frames worth of paid inference; keep the
+                # processed prefix and SAY SO on the payload instead (audit B2).
+                truncated_at_frame = frame_count
+                break
 
             # ByteTrack reset on the first frame so state from a previous
             # request doesn't bleed in (audit B-MAJ-1). Subsequent frames
@@ -176,6 +181,7 @@ def run_tracked_sequence(
         lamps=final_lamps,
         confidence=confidence,
         frame_count=frame_count,
+        truncated_at_frame=truncated_at_frame,
         processing_ms=processing_ms,
         angle=angle,
         artifact_url=f"/media/{artifact_path.name}",

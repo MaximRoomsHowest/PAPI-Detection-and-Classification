@@ -24,6 +24,12 @@ class AnalysisPayload(BaseModel):
     # Aggregate detection confidence for the analysis — a probability, so [0, 1].
     confidence: float = Field(ge=0.0, le=1.0)
     frame_count: int
+    # Set when a video/sequence out-ran the frame limit MID-stream (container
+    # metadata lied or was absent — honestly-declared sources are rejected up
+    # front): the analysis covers frames [0, truncated_at_frame) and the UI must
+    # say so rather than present a partial result as complete (audit B2). None
+    # for complete analyses.
+    truncated_at_frame: int | None = None
     processing_ms: int
     angle: AngleResult
     artifact_url: str | None = None

@@ -514,7 +514,6 @@ class InferenceService:
                 drone_samples=resolved_samples,
                 start=start,
                 max_frames=max_frames,
-                too_long_message=too_long,
                 empty_message="Uploaded video did not contain readable frames.",
                 model=model,
                 selected_model=selected_model,
@@ -563,7 +562,6 @@ class InferenceService:
             height, width = first.shape[:2]
             fps = float(self.settings.sequence_fps)
             max_frames = max(1, self.settings.max_batch_frames)
-            too_long = f"Image sequence is too long. Limit is {max_frames} frames."
             # A geotagged folder is a descent sweep: prefer an explicit telemetry
             # track, else the first image's EXIF / the manual fix. The per-frame
             # track is built from the resolved samples after the frame count is known.
@@ -599,7 +597,6 @@ class InferenceService:
                 drone_samples=resolved_samples,
                 start=start,
                 max_frames=max_frames,
-                too_long_message=too_long,
                 empty_message="None of the uploaded images could be read.",
                 model=model,
                 selected_model=selected_model,
@@ -619,7 +616,6 @@ class InferenceService:
         angle: AngleResult,
         start: float,
         max_frames: int,
-        too_long_message: str,
         empty_message: str,
         drone_samples: list[DroneSample] | None = None,
         model: Any | None = None,
@@ -658,7 +654,6 @@ class InferenceService:
             angle=angle,
             start=start,
             max_frames=max_frames,
-            too_long_message=too_long_message,
             empty_message=empty_message,
             history_size=self.settings.video_history_size,
             exports_dir=self.settings.exports_dir,
