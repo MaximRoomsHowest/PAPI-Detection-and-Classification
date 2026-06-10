@@ -189,8 +189,12 @@ def health_ready(db: Annotated[Session, Depends(get_session)] = None) -> JSONRes
         checks["database"] = True
     except Exception:  # noqa: BLE001 - any DB error means not-ready
         checks["database"] = False
-    checks["model_file_present"] = settings.model_path.exists()
-    checks["model_loaded"] = get_inference_service().is_loaded
+    # Check the registry default's actual weights, not settings.model_path — with a
+    # registry present they can name different files and readiness must track the
+    # one the service will really load (audit DEF-1).
+    service = get_inference_service()
+    checks["model_file_present"] = service.default_weights_present
+    checks["model_loaded"] = service.is_loaded
 
     # A backend whose weights failed to load (broken checkpoint, OOM) is NOT ready:
     # the file existing on disk is necessary but not sufficient to serve a request.

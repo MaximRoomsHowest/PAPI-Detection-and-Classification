@@ -274,6 +274,64 @@ def test_shipped_models_json_loads_and_keeps_per_class_metrics():
     assert "transition" in transition.val_metrics.per_class
 
 
+def _drift_registry(tmp_path, *, default_model_id, flag_on):
+    models_root = tmp_path / "models"
+    serving = models_root / "serving"
+    serving.mkdir(parents=True)
+    small = serving / "best.pt"
+    small.write_bytes(b"small")
+    (serving / "model_card.json").write_text(
+        json.dumps({"model_id": "serving-slot-run"}), encoding="utf-8"
+    )
+    nano = models_root / "runs" / "nano" / "weights" / "best.pt"
+    nano.parent.mkdir(parents=True)
+    nano.write_bytes(b"nano")
+    registry_path = serving / "models.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "default_model_id": default_model_id,
+                "models": [
+                    {"id": "small", "role": "detector", "path": "models/serving/best.pt", "default": flag_on == "small"},
+                    {"id": "nano", "role": "detector", "path": "models/runs/nano/weights/best.pt", "default": flag_on == "nano"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=small,
+        model_registry_path=registry_path,
+    )
+    return load_model_registry(settings), small, nano
+
+
+def test_default_flag_drift_does_not_relabel_non_default_entry(tmp_path):
+    """A stray "default": true flag previously clobbered THAT entry's path with
+    PAPI_MODEL_PATH before default_model_id was resolved — serving one run's weights
+    under another run's label (audit DEF-1). The override now keys on the resolved
+    default, so the flagged-but-not-default entry keeps its declared path."""
+    registry, small, nano = _drift_registry(tmp_path, default_model_id="small", flag_on="nano")
+
+    assert registry.default_model_id == "small"
+    assert registry.get("small").path == small
+    assert registry.get("nano").path == nano  # not clobbered
+
+
+def test_resolved_default_gets_model_path_override_and_adjacent_card(tmp_path):
+    """When the resolved default's declared path differs from PAPI_MODEL_PATH, the
+    override applies to IT (legacy contract) and provenance comes from the card next
+    to the real weights, not the registry-inline card (audit DEF-1/SD-1)."""
+    registry, small, nano = _drift_registry(tmp_path, default_model_id="nano", flag_on="small")
+
+    default_entry = registry.get()
+    assert default_entry.id == "nano"
+    assert default_entry.path == small  # PAPI_MODEL_PATH wins for the default
+    assert default_entry.card is not None
+    assert default_entry.card.get("model_id") == "serving-slot-run"  # adjacent card
+
+
 def test_load_model_registry_falls_back_to_single_model_when_registry_absent(tmp_path):
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"single")

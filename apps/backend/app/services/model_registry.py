@@ -194,8 +194,6 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
             if path is None:
                 logger.warning("Model registry: skipping entry '%s' without a usable 'path'.", model_id)
                 continue
-            if raw.get("default"):
-                path = settings.model_path
             if role == "transition" and settings.transition_model_path is not None:
                 path = settings.transition_model_path
 
@@ -251,4 +249,27 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
         default_entry = next((entry for entry in entries if entry.default), entries[0])
         default_model_id = default_entry.id
     entries = [replace(entry, default=(entry.id == default_model_id)) for entry in entries]
-    return ModelRegistry(default_model_id=default_model_id, entries=tuple(entries))
+
+    # PAPI_MODEL_PATH names the weights the DEFAULT model serves (legacy contract).
+    # Apply it to the RESOLVED default — previously it keyed on the raw "default"
+    # flag, so flag/default_model_id drift could silently relabel weights or point
+    # readiness at a file the actual default never loads (audit DEF-1). When the
+    # override changes a declared path, prefer the model card sitting next to the
+    # real weights over the registry-inline card, so /api/model never pairs one
+    # file's hash with another run's provenance (audit SD-1).
+    resolved: list[ModelRegistryEntry] = []
+    for entry in entries:
+        if entry.id == default_model_id and entry.role != "transition" and entry.path != settings.model_path:
+            logger.warning(
+                "Model registry: PAPI_MODEL_PATH overrides default model '%s' path %s -> %s.",
+                entry.id,
+                entry.path,
+                settings.model_path,
+            )
+            entry = replace(
+                entry,
+                path=settings.model_path,
+                card=load_model_card(settings.model_path) or entry.card,
+            )
+        resolved.append(entry)
+    return ModelRegistry(default_model_id=default_model_id, entries=tuple(resolved))

@@ -103,6 +103,16 @@ class InferenceService:
         return self._registry.default_model_id in self._models
 
     @property
+    def default_weights_present(self) -> bool:
+        """Whether the registry default's weights exist on disk — the file the service
+        will actually load, which can differ from settings.model_path when the registry
+        designates another default (audit DEF-1; used by /health/ready)."""
+        try:
+            return self._registry.get().exists
+        except KeyError:
+            return False
+
+    @property
     def device(self) -> str:
         """The device passed to YOLO, expanding ``PAPI_DEVICE=auto`` to cuda when a
         GPU is available else cpu (audit IMP-SRV-2). Cached so torch is probed once;

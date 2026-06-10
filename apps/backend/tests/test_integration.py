@@ -143,6 +143,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Readiness gates on the model being loaded; the stub reports loaded by default
     # (test_health_ready_returns_503_when_model_not_loaded flips this).
     fake_service.is_loaded = True
+    fake_service.default_weights_present = True
     fake_service.model_info.return_value = ModelInfo(
         model_id="small",
         model_label="Small detector",
@@ -777,7 +778,10 @@ def test_health_ready_returns_503_when_model_not_loaded(client, monkeypatch):
     """
     from types import SimpleNamespace
 
-    monkeypatch.setattr("app.main.get_inference_service", lambda: SimpleNamespace(is_loaded=False))
+    monkeypatch.setattr(
+        "app.main.get_inference_service",
+        lambda: SimpleNamespace(is_loaded=False, default_weights_present=True),
+    )
     response = client.get("/health/ready")
     assert response.status_code == 503
     body = response.json()
