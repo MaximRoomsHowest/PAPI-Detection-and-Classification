@@ -23,9 +23,12 @@
 services:
   postgres:
     # Pinned by digest for reproducible builds (audit DCK-D8); tag = 18-alpine.
-    # NOTE: a v16 data dir is not readable by a v18 server — on first adoption run
-    # `docker compose down -v` to drop the ephemeral demo volume (no migration needed,
-    # the result_json column is portable JSON, not a pg-version-specific type).
+    # NOTE: a v16 data dir is not readable by a v18 server. On first adoption drop
+    # the old demo volume (no migration needed — history is ephemeral demo data):
+    #   docker compose down
+    #   docker volume rm <project>_papi_postgres_data
+    # (`docker compose down -v` also works, but additionally wipes
+    # papi_backend_storage — the uploaded originals and annotated exports.)
     image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
     container_name: papi-postgres
     environment:
@@ -40,7 +43,12 @@ services:
       # postgres via the compose network, not the host port.
       - "127.0.0.1:5434:5432"
     volumes:
-      - papi_postgres_data:/var/lib/postgresql/data
+      # 18+ images moved PGDATA to /var/lib/postgresql/18/docker and expect the
+      # mount one level up at /var/lib/postgresql. Mounting the legacy .../data
+      # path makes the server refuse to start on old data — and on an empty
+      # volume the real data dir would land in an anonymous volume (no
+      # persistence), so do not "fix" this back.
+      - papi_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d papi_backend"]
       interval: 5s
