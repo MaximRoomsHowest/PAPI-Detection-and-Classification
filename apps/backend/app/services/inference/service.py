@@ -59,6 +59,7 @@ class InferenceService:
         self._registry: ModelRegistry = load_model_registry(settings)
         self._models: dict[str, Any] = {}
         self._loaded_at: dict[str, str] = {}
+        self._loaded_sha256: dict[str, str | None] = {}
         self._resolved_device: str | None = None
         # A single Ultralytics YOLO instance (with one shared, mutable ByteTrack
         # predictor) is NOT thread-safe. The analyze endpoints are sync `def`s run
@@ -175,7 +176,27 @@ class InferenceService:
                         raise RuntimeError("Ultralytics is not installed. Run `pip install -r requirements.txt`.") from exc
                     self._models[entry.id] = YOLO(str(entry.path))
                     self._loaded_at[entry.id] = datetime.now(timezone.utc).isoformat()
+                    # Hash at load time: compose mounts ./models read-only precisely so
+                    # the checkpoint can be swapped under a running container, and the
+                    # digest must describe the weights IN MEMORY, not whatever file is
+                    # currently on disk (audit SHA-1).
+                    self._loaded_sha256[entry.id] = compute_sha256(entry.path)
         return self._models[entry.id]
+
+    def preload_available_models(self) -> list[str]:
+        """Best-effort load of every available registry entry so a corrupt optional
+        checkpoint surfaces at startup (logged) instead of mid-demo while holding the
+        inference lock (audit WARM-1). Returns the ids that loaded."""
+        loaded: list[str] = []
+        for entry in self._registry.entries:
+            if not entry.available:
+                continue
+            try:
+                self._load_model(entry)
+                loaded.append(entry.id)
+            except Exception as exc:  # noqa: BLE001 - preload must never abort startup
+                logger.warning("Startup preload of model '%s' failed: %s", entry.id, exc)
+        return loaded
 
     @staticmethod
     def _is_three_class(model: Any) -> bool:
@@ -305,6 +326,16 @@ class InferenceService:
             except ValueError:  # pydantic ValidationError subclasses ValueError
                 logger.warning("Ignoring malformed val_metrics for model '%s'.", entry.id)
 
+        # When loaded, report the digest recorded AT LOAD TIME so it always describes
+        # the in-memory model; a differing on-disk hash means an operator swapped the
+        # checkpoint under the running service and a restart is pending (audit SHA-1).
+        loaded = entry.id in self._models
+        disk_sha256 = compute_sha256(path)
+        sha256 = self._loaded_sha256.get(entry.id) if loaded else disk_sha256
+        weights_changed_on_disk = (
+            disk_sha256 != sha256 if loaded and sha256 is not None else None
+        )
+
         return ModelInfo(
             model_id=entry.id,
             model_label=entry.label,
@@ -321,8 +352,9 @@ class InferenceService:
             file_size_mb=file_size_mb,
             confidence_threshold=self.settings.confidence_threshold,
             device=self.device,
-            loaded=entry.id in self._models,
-            sha256=compute_sha256(path),
+            loaded=loaded,
+            sha256=sha256,
+            weights_changed_on_disk=weights_changed_on_disk,
             classes=classes,
             model_card_id=card.get("model_id"),
             training_run=card.get("training_run"),

@@ -274,6 +274,73 @@ def test_shipped_models_json_loads_and_keeps_per_class_metrics():
     assert "transition" in transition.val_metrics.per_class
 
 
+def test_model_info_reports_load_time_sha_after_disk_swap(tmp_path):
+    """The digest must describe the weights in memory; compose mounts ./models so the
+    file can be swapped under a running service (audit SHA-1)."""
+    model_path = tmp_path / "serving" / "best.pt"
+    model_path.parent.mkdir(parents=True)
+    model_path.write_bytes(b"original-weights")
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=model_path,
+        model_registry_path=tmp_path / "missing-registry.json",
+    )
+    service = InferenceService(settings)
+    original_sha = hashlib.sha256(b"original-weights").hexdigest()
+    # Simulate a completed load without pulling in YOLO.
+    service._models["default"] = object()
+    service._loaded_sha256["default"] = original_sha
+
+    model_path.write_bytes(b"swapped-weights")
+    info = service.model_info()
+
+    assert info.loaded is True
+    assert info.sha256 == original_sha
+    assert info.weights_changed_on_disk is True
+
+
+def test_preload_available_models_skips_missing_and_survives_failures(tmp_path, monkeypatch):
+    """Startup preload loads what it can, logs what it can't, never raises (audit WARM-1)."""
+    serving = tmp_path / "models" / "serving"
+    serving.mkdir(parents=True)
+    small = serving / "best.pt"
+    small.write_bytes(b"small")
+    nano = tmp_path / "models" / "runs" / "nano" / "weights" / "best.pt"
+    nano.parent.mkdir(parents=True)
+    nano.write_bytes(b"nano")
+    registry_path = serving / "models.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "default_model_id": "small",
+                "models": [
+                    {"id": "small", "role": "detector", "path": "models/serving/best.pt", "default": True},
+                    {"id": "nano", "role": "detector", "path": "models/runs/nano/weights/best.pt"},
+                    {"id": "transition", "role": "transition", "path": "models/runs/missing/best.pt", "class_count": 3},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=small,
+        model_registry_path=registry_path,
+    )
+    service = InferenceService(settings)
+
+    def fake_load(self, entry):
+        if entry.id == "nano":
+            raise RuntimeError("corrupt checkpoint")
+        self._models[entry.id] = object()
+
+    monkeypatch.setattr(InferenceService, "_load_model", fake_load)
+
+    loaded = service.preload_available_models()
+
+    assert loaded == ["small"]  # nano failed (logged), transition skipped (missing)
+
+
 def _drift_registry(tmp_path, *, default_model_id, flag_on):
     models_root = tmp_path / "models"
     serving = models_root / "serving"

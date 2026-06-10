@@ -45,6 +45,9 @@ class ModelInfo(BaseModel):
     # /api/model can answer "which run is serving and how accurate is it?". All
     # optional — a bare-weights dev checkout (no model_card.json) returns None.
     sha256: str | None = None
+    # True when the on-disk file no longer matches the loaded weights (checkpoint
+    # swapped under a running service; restart pending). None when not loaded.
+    weights_changed_on_disk: bool | None = None
     classes: dict[int, str] | None = None
     model_card_id: str | None = None
     training_run: str | None = None

@@ -59,6 +59,13 @@ def _startup_warmup() -> None:
         _ = service.model
         service.warmup()
         logger.info("YOLO model pre-warmed and smoke-tested at startup.")
+        # Best-effort load of the NON-default registry entries too, so a corrupt
+        # optional checkpoint (nano/transition) surfaces here as a log line instead
+        # of a mid-demo 503 while the first selecting request holds the inference
+        # lock (audit WARM-1). Failures are logged inside preload, never raised.
+        preloaded = service.preload_available_models()
+        if preloaded:
+            logger.info("Registry models loaded at startup: %s", ", ".join(preloaded))
     except RuntimeError as exc:
         logger.warning("Could not pre-warm YOLO model: %s", exc)
     except Exception as exc:  # noqa: BLE001 - warmup is best-effort; never abort startup
