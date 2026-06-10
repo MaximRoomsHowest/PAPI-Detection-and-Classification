@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 import logging
 
-from app.logging_config import JsonFormatter, configure_logging, request_id_ctx
+import pytest
+from app.logging_config import (
+    JsonFormatter,
+    configure_logging,
+    request_id_ctx,
+    sanitize_request_id,
+)
 
 
 def test_json_formatter_emits_valid_json_line():
@@ -93,3 +99,34 @@ def test_configure_logging_is_idempotent():
     configure_logging()
     handler_count_after_second = len(logging.getLogger().handlers)
     assert handler_count_after_first == handler_count_after_second == 1
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "a",
+        "test-trace-id-abc",
+        "0123456789abcdef0123456789abcdef",
+        "svc.gateway_v2-trace.001",
+        "x" * 128,
+    ],
+)
+def test_sanitize_request_id_accepts_safe_ids(value):
+    assert sanitize_request_id(value) == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "",
+        "x" * 129,  # overlong (audit B11: unbounded reflection)
+        "abc def",  # whitespace
+        "abc;rm -rf",  # shell-ish metacharacters
+        "abc\x00def",  # control byte
+        "abc\r\nSet-Cookie: x=y",  # header/log injection shape
+        "trace-ü",  # non-ASCII survives latin-1 decode but must not pass
+    ],
+)
+def test_sanitize_request_id_rejects_hostile_or_overlong(value):
+    assert sanitize_request_id(value) is None

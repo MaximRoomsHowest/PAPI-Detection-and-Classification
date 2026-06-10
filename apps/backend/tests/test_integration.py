@@ -19,6 +19,7 @@ Two substitutions in the fixture:
 
 from __future__ import annotations
 
+import re
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -251,6 +252,23 @@ def test_request_id_header_is_preserved_when_client_supplies_one(client):
     """When the caller passes X-Request-ID, the server should propagate it."""
     response = client.get("/health", headers={"X-Request-ID": "test-trace-id-abc"})
     assert response.headers.get("X-Request-ID") == "test-trace-id-abc"
+
+
+def test_oversized_request_id_is_replaced_with_minted_uuid(client):
+    """An overlong inbound id must not be reflected (audit B11) — mint instead."""
+    hostile = "a" * 300
+    response = client.get("/health", headers={"X-Request-ID": hostile})
+    echoed = response.headers.get("X-Request-ID")
+    assert echoed != hostile
+    assert re.fullmatch(r"[0-9a-f]{32}", echoed)
+
+
+def test_hostile_request_id_is_replaced(client):
+    """Ids outside the [A-Za-z0-9._-] charset are minted fresh (audit B11)."""
+    response = client.get("/health", headers={"X-Request-ID": "trace;evil"})
+    echoed = response.headers.get("X-Request-ID")
+    assert echoed != "trace;evil"
+    assert re.fullmatch(r"[0-9a-f]{32}", echoed)
 
 
 def test_analyze_frame_rejects_video_file(client):
