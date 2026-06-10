@@ -1,26 +1,31 @@
 {
-  "weights": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-yolo26s-1280-clean\\weights\\best.pt",
+  "weights": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-yolo26s-1280\\weights\\best.pt",
   "per_class": {
     "red": {
-      "precision": 0.8687,
-      "recall": 0.8614,
-      "f1": 0.8651,
-      "mAP50": 0.8744
+      "precision": 0.8435,
+      "recall": 0.7686,
+      "f1": 0.8043,
+      "mAP50": 0.8981,
+      "support": 765
     },
     "white": {
-      "precision": 0.8564,
-      "recall": 0.9328,
-      "f1": 0.893,
-      "mAP50": 0.9442
+      "precision": 0.9701,
+      "recall": 0.584,
+      "f1": 0.7291,
+      "mAP50": 0.8633,
+      "support": 625
     },
     "transition": {
-      "precision": 0.0,
-      "recall": 0.0,
-      "f1": 0.0,
-      "mAP50": 0.0
+      "precision": 0.061,
+      "recall": 0.3333,
+      "f1": 0.1032,
+      "mAP50": 0.0647,
+      "support": 6
     }
   },
-  "mAP50": 0.6062,
-  "mAP50_95": 0.3569,
+  "mAP50": 0.6087,
+  "mAP50_95": 0.3411,
+  "val_conf": 0.001,
+  "val_iou": 0.5,
   "val_dir": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-test"
 }

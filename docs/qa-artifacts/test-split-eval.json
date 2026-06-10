@@ -1,0 +1,154 @@
+{
+  "dataset": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\datasets\\transition-classification-data\\redwhite_test_view",
+  "note": "Held-out test split (flight-level, configs/split.yaml) over the 2-class view of the transition twin: human-corrected red/white boxes; the 6 test transition boxes are restored to their tracked colours. The day-zoom test flight is not part of the twin dataset, so no zoom-regime numbers exist \u2014 absent, not zero. Full PR curve (val-default conf), IoU 0.5.",
+  "models": {
+    "yolo26s-fulldata-1280": {
+      "weights": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\models\\serving\\best.pt",
+      "aggregate": {
+        "per_class": {
+          "red": {
+            "precision": 0.8806,
+            "recall": 0.9232,
+            "f1": 0.9014,
+            "mAP50": 0.9621,
+            "support": 767
+          },
+          "white": {
+            "precision": 0.9202,
+            "recall": 0.9354,
+            "f1": 0.9278,
+            "mAP50": 0.9802,
+            "support": 629
+          }
+        },
+        "precision": 0.9004,
+        "recall": 0.9293,
+        "mAP50": 0.9712,
+        "mAP50_95": 0.6513
+      },
+      "regimes": {
+        "day_wide_1000m": {
+          "per_class": {
+            "red": {
+              "precision": 0.9926,
+              "recall": 0.9926,
+              "f1": 0.9926,
+              "mAP50": 0.9946,
+              "support": 407
+            },
+            "white": {
+              "precision": 0.9839,
+              "recall": 0.9859,
+              "f1": 0.9849,
+              "mAP50": 0.9943,
+              "support": 373
+            }
+          },
+          "precision": 0.9883,
+          "recall": 0.9893,
+          "mAP50": 0.9944,
+          "mAP50_95": 0.7289
+        },
+        "night_wide_500m": {
+          "per_class": {
+            "red": {
+              "precision": 0.745,
+              "recall": 0.8639,
+              "f1": 0.8001,
+              "mAP50": 0.8398,
+              "support": 360
+            },
+            "white": {
+              "precision": 0.8213,
+              "recall": 0.8945,
+              "f1": 0.8563,
+              "mAP50": 0.9323,
+              "support": 256
+            }
+          },
+          "precision": 0.7832,
+          "recall": 0.8792,
+          "mAP50": 0.8861,
+          "mAP50_95": 0.4464
+        },
+        "day_zoom": {
+          "error": "test flight not present in the twin dataset"
+        }
+      }
+    },
+    "yolo26n-sequence-1280": {
+      "weights": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\models\\runs\\yolo26n-sequence-1280\\weights\\best.pt",
+      "aggregate": {
+        "per_class": {
+          "red": {
+            "precision": 0.8178,
+            "recall": 0.8957,
+            "f1": 0.855,
+            "mAP50": 0.9297,
+            "support": 767
+          },
+          "white": {
+            "precision": 0.9541,
+            "recall": 0.8394,
+            "f1": 0.8931,
+            "mAP50": 0.9674,
+            "support": 629
+          }
+        },
+        "precision": 0.8859,
+        "recall": 0.8676,
+        "mAP50": 0.9485,
+        "mAP50_95": 0.5841
+      },
+      "regimes": {
+        "day_wide_1000m": {
+          "per_class": {
+            "red": {
+              "precision": 0.9851,
+              "recall": 0.9951,
+              "f1": 0.99,
+              "mAP50": 0.9942,
+              "support": 407
+            },
+            "white": {
+              "precision": 0.9917,
+              "recall": 0.9631,
+              "f1": 0.9772,
+              "mAP50": 0.9926,
+              "support": 373
+            }
+          },
+          "precision": 0.9884,
+          "recall": 0.9791,
+          "mAP50": 0.9934,
+          "mAP50_95": 0.6724
+        },
+        "night_wide_500m": {
+          "per_class": {
+            "red": {
+              "precision": 0.6143,
+              "recall": 0.8139,
+              "f1": 0.7002,
+              "mAP50": 0.6873,
+              "support": 360
+            },
+            "white": {
+              "precision": 0.8261,
+              "recall": 0.7539,
+              "f1": 0.7883,
+              "mAP50": 0.8855,
+              "support": 256
+            }
+          },
+          "precision": 0.7202,
+          "recall": 0.7839,
+          "mAP50": 0.7864,
+          "mAP50_95": 0.3593
+        },
+        "day_zoom": {
+          "error": "test flight not present in the twin dataset"
+        }
+      }
+    }
+  }
+}

@@ -57,7 +57,11 @@ def evaluate(weights: Path, data: Path) -> dict:
 
     model = YOLO(str(weights))
     # workers/batch capped: source frames are 20MP, so default worker fan-out OOMs the loader.
-    metrics = model.val(data=str(data), split="test", imgsz=1280, conf=0.25, iou=0.5,
+    # conf left at the ultralytics val default (0.001): valing at the serving operating
+    # point (0.25) truncates the PR curve before AP integration and conflates "no
+    # predictions above 0.25" with "model finds nothing" (audit WS-2). Operating-point
+    # behaviour is measured separately by mine_examples/compare_transition_false_rate.
+    metrics = model.val(data=str(data), split="test", imgsz=1280, iou=0.5,
                         batch=4, workers=2,
                         project=str(REPO_ROOT / "data" / "runs" / "detect"), name="transition3class-test", exist_ok=True)
 
@@ -70,7 +74,7 @@ def evaluate(weights: Path, data: Path) -> dict:
         name: {"precision": 0.0, "recall": 0.0, "f1": 0.0, "mAP50": 0.0, "support": 0}
         for name in CLASS_NAMES.values()
     }
-    support_by_class_id = getattr(metrics.box, "nt_per_class", None)  # indexed by class id
+    support_by_class_id = getattr(metrics, "nt_per_class", None)  # on DetMetrics, indexed by class id
     for pos, raw_cls_id in enumerate(getattr(metrics.box, "ap_class_index", [])):
         cls_id = int(raw_cls_id)
         name = CLASS_NAMES.get(cls_id)
@@ -87,9 +91,9 @@ def evaluate(weights: Path, data: Path) -> dict:
                            "f1": round(f1, 4), "mAP50": round(ap50, 4), "support": support}
     return {"weights": str(weights), "per_class": per_class,
             "mAP50": round(float(metrics.box.map50), 4), "mAP50_95": round(float(metrics.box.map), 4),
-            # Record the operating point: a val run at conf=0.25 truncates the PR curve,
-            # so these numbers are NOT comparable to a default-conf val (audit WS-2).
-            "val_conf": 0.25, "val_iou": 0.5,
+            # Record the val thresholds so readers know what these numbers mean
+            # (full PR curve at the val-default conf, not the serving operating point).
+            "val_conf": 0.001, "val_iou": 0.5,
             "val_dir": str(metrics.save_dir)}
 
 
