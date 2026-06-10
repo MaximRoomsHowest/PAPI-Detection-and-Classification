@@ -132,7 +132,13 @@ def mine_examples(weights: Path, data: Path, per_cat: int = 12) -> dict:
         gt_t = [b for cls, b in gt if cls == 2]
         pr_t = [b for cls, b in preds if cls == 2]
         trans_cat = None
-        # transition correctness (a frame gets at most one transition verdict)
+        # transition correctness (a frame gets at most one transition verdict).
+        # Precedence is DELIBERATE: an unmatched prediction overrides a correct/
+        # missed verdict, so a frame with both a true hit AND a false positive is
+        # mined as a false-positive example — failure modes are what the curated
+        # set is for. Metrics are unaffected (computed by val(), not here); the
+        # only effect is bucket composition, slightly under-representing correct
+        # hits on mixed frames. Only the FIRST GT box drives correct/missed.
         for gb in gt_t:
             hit = any(_iou(gb, pb) > 0.3 for pb in pr_t)
             trans_cat = "correct_transition_examples" if hit else "missed_transition_examples"
@@ -140,6 +146,7 @@ def mine_examples(weights: Path, data: Path, per_cat: int = 12) -> dict:
         for pb in pr_t:
             if not any(_iou(gb, pb) > 0.3 for gb in gt_t):
                 trans_cat = "false_transition_examples"
+                break
         # red/white confusion (GT red matched to pred white or vice versa) is INDEPENDENT of the
         # transition verdict -- mined separately so a frame with transition boxes can't starve it.
         rw_conf = any(

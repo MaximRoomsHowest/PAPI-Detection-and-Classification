@@ -24,11 +24,13 @@ def _detect(frame, *, use_tracking, reset_tracker=False):
     ]
 
 
-def _run(frame_iter, *, max_frames, tmp_path):
+def _run(frame_iter, *, max_frames, tmp_path, cv2=None):
     return run_tracked_sequence(
         frame_iter,
         detect=_detect,
-        cv2=MagicMock(),  # writer/overlay calls are irrelevant to the truncation contract
+        # writer/overlay calls are irrelevant to the truncation contract; pass a
+        # shared mock in to assert WHICH frames were written before the cut.
+        cv2=cv2 if cv2 is not None else MagicMock(),
         fps=15.0,
         width=8,
         height=8,
@@ -46,12 +48,19 @@ def _run(frame_iter, *, max_frames, tmp_path):
 
 def test_sequence_truncates_at_max_frames_and_signals_it(tmp_path):
     frames = (np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(10))
+    fake_cv2 = MagicMock()
 
-    payload = _run(frames, max_frames=4, tmp_path=tmp_path)
+    payload = _run(frames, max_frames=4, tmp_path=tmp_path, cv2=fake_cv2)
 
     assert payload.frame_count == 4
     assert payload.truncated_at_frame == 4
     assert payload.artifact_url is not None  # the processed prefix is kept
+    # The "kept prefix" is real, not just a field: exactly the 4 pre-cut frames
+    # were handed to the video writer, and the writer was finalized (release),
+    # so the artifact on disk contains the prefix rather than being abandoned.
+    writer = fake_cv2.VideoWriter.return_value
+    assert writer.write.call_count == 4
+    assert writer.release.called
 
 
 def test_sequence_within_limit_is_not_marked_truncated(tmp_path):

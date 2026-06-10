@@ -148,6 +148,20 @@ app.add_middleware(
 app.include_router(router)
 
 
+# The artifact formats the inference pipeline actually writes. Everything
+# else served from /media falls back to application/octet-stream (download,
+# never render) — see the allowlist note inside get_media.
+_MEDIA_CONTENT_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".avi": "video/x-msvideo",
+    ".mov": "video/quicktime",
+}
+
+
 @app.get("/media/{file_path:path}")
 def get_media(
     file_path: str,
@@ -180,7 +194,14 @@ def get_media(
         raise HTTPException(status_code=404, detail="Not found") from exc
     if not target.is_file():
         raise HTTPException(status_code=404, detail="Not found")
-    return FileResponse(target)
+    # Explicit content-type allowlist instead of FileResponse's extension
+    # sniffing: artifact names are server-generated UUIDs today, but if a
+    # write path ever produced an .html artifact, extension-guessing would
+    # serve it as text/html from the API origin (stored XSS). Unknown
+    # suffixes download as octet-stream. nginx adds nosniff in the compose
+    # path; this keeps the direct-exposure mode equally safe.
+    media_type = _MEDIA_CONTENT_TYPES.get(target.suffix.lower(), "application/octet-stream")
+    return FileResponse(target, media_type=media_type)
 
 
 @app.get("/health")

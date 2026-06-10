@@ -75,6 +75,15 @@ def main() -> int:
     args = parser.parse_args()
     from ultralytics import YOLO
 
+    # Stale labels.cache files have silently poisoned re-evals after label
+    # changes more than once (MODELS.md §5b documents the rule; this enforces
+    # it). Ultralytics keys the cache on the label dir hash, but a rebuilt
+    # view with hardlinked images can leave an old cache that still matches —
+    # delete outright so every run reads the labels actually on disk.
+    for stale_cache in args.view.rglob("labels.cache"):
+        stale_cache.unlink()
+        print(f"removed stale {stale_cache}")
+
     result: dict = {
         "dataset": str(args.view),
         "note": (

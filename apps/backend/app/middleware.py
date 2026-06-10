@@ -89,6 +89,11 @@ class RequestSizeLimitMiddleware:
                 response_started = True
             await send(message)
 
+        # Topology note: ServerErrorMiddleware is the OUTERMOST wrap of the whole
+        # Starlette stack (built before user middlewares), so it can never see
+        # _BodyTooLarge before this except does — verified empirically on real
+        # uvicorn: a chunked over-cap body yields this 413, not a 500. Do not
+        # "fix" this by deriving _BodyTooLarge from BaseException.
         try:
             await self.app(scope, limited_receive, tracking_send)
         except _BodyTooLarge:
@@ -134,4 +139,4 @@ class RequestSizeLimitMiddleware:
                 ],
             }
         )
-        await send({"type": "http.response.body", "body": body})
+        await send({"type": "http.response.body", "body": body, "more_body": False})
