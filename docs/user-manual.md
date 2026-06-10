@@ -53,19 +53,28 @@ matches your data.
 
 ### 3.1 Single image upload
 
-1. Click **Upload media**.
-2. Choose an image file (`.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`).
-3. Optionally fill in the **Latitude**, **Longitude**, and
-   **Altitude (m)** fields. These enable the per-lamp elevation-angle
-   calculation — leaving them blank produces a result without the
-   viewing angle.
-4. Make sure the **Runway** dropdown matches the runway the drone
-   was facing. The default is `PAPI 24` (Friedrichshafen runway 24
-   — the lamp altitudes are confirmed). Switch to `PAPI 06` if the
+1. Make sure the **Analysis runway** selector matches the runway the
+   drone was facing. The default is `PAPI 24` (Friedrichshafen runway
+   24 — the lamp altitudes are confirmed). Switch to `PAPI 06` if the
    footage was captured on the runway 06 approach.
-5. Click **Run backend model**.
-6. The annotated frame appears in the central panel; per-lamp
-   results and metrics appear on the right.
+2. Optionally pick a different **Inference model**. The options come
+   from the backend (`GET /api/models`): the default *Small detector*
+   (current serving model), the previous *Nano detector*, and the
+   experimental *Transition classifier* — entries whose weights are
+   not installed are shown disabled with the reason.
+3. Click **Upload media** and choose an image file (`.jpg`, `.jpeg`,
+   `.png`, `.bmp`, `.webp`). **The analysis starts automatically** as
+   soon as the upload is read — there is no separate "run" button.
+4. If the image carries no GPS / altitude metadata, a **"No drone
+   metadata found"** prompt appears. Fill in **Latitude**,
+   **Longitude**, and **Altitude (m)** (or upload a telemetry file)
+   and click **Apply metadata** to re-run the analysis with the
+   per-lamp elevation-angle calculation. Dismissing it keeps the
+   result without a viewing angle.
+5. The annotated frame appears in the central panel; per-lamp
+   results and metrics appear on the right. Changing the model,
+   runway, or metadata afterwards? Click **Re-run analysis** to
+   apply it to the same upload.
 
 ### 3.2 Video upload
 
@@ -77,28 +86,38 @@ annotated video artifact.
 **Limits**: 100 MB maximum per upload, 600 frames maximum per
 video, 30 seconds maximum duration (whichever cap is lower).
 
-### 3.3 Folder upload (image sequence → one video)
+### 3.3 Folder upload (two modes)
 
-1. Click **Upload folder** instead.
-2. Pick a directory containing multiple image files. The browser
-   uploads every image in the folder as one request.
-3. The metadata fields apply to the whole sequence (the viewing
-   angle is read once, from the first image's GPS metadata or the
-   values you enter).
-4. Click **Run backend model**.
-5. The folder is analysed as a **single time-sequenced video**: the
-   images are ordered by filename and treated as consecutive frames
-   of one clip, so the lamps are tracked across frames and red↔white
-   transitions are detected over time. You get **one aggregated
-   result** plus one annotated video — not a separate result per
-   image, so there is no per-image frame stepping here. (Name the
-   files in capture order, e.g. `frame_000.jpg … frame_NNN.jpg`, so
-   the sequence plays correctly.)
+1. Click **Upload folder** instead and pick a directory containing
+   multiple image files.
+2. Choose a **Folder mode** — the two buttons next to the upload
+   controls:
 
-If you instead want an independent result for every image (one row
-per frame, no tracking), that batch mode is still available on the
-backend at `POST /api/analyze-frames` via the API docs; the folder
-button in the UI uses the time-sequenced video path described above.
+   - **Angle sweep** (the default) — every image is analysed
+     **separately**, so each frame uses its own GPS metadata and gets
+     its own viewing angle. You can step through the per-frame
+     results, and this mode is what drives the angle-vs-state charts
+     on the Insights page. A telemetry *file* is ignored here (each
+     image carries its own GPS); enter a manual drone position or
+     switch modes if you need to override it.
+   - **Video sequence** — the folder is analysed as a **single
+     time-sequenced video**: the images are ordered by filename and
+     treated as consecutive frames of one clip, so the lamps are
+     tracked across frames and red↔white transitions are detected
+     over time. You get **one aggregated result** plus one annotated
+     video — no per-image frame stepping. (Name the files in capture
+     order, e.g. `frame_000.jpg … frame_NNN.jpg`, so the sequence
+     plays correctly.) The metadata fields apply to the whole
+     sequence.
+
+3. The analysis runs automatically after the upload. If you switch
+   the folder mode afterwards, the page shows a **"Re-run to apply"**
+   prompt — click it to re-analyse in the new mode.
+
+If you instead want an independent result for every image through a
+single request, that batch mode is still available on the backend at
+`POST /api/analyze-frames` via the API docs; the folder button in the
+UI uses the two modes described above.
 
 ## 4. Reading the results
 
@@ -108,6 +127,12 @@ button in the UI uses the time-sequenced video path described above.
   state** (e.g. "Correct glidepath", "Too low").
 - The summary line below it shows the lamp pattern that produced
   this state.
+- When the result has **no computed viewing angle**, a compact
+  **"Result based on"** provenance strip appears above the summary
+  showing the runway the result was scored against and that no
+  telemetry was available. (When the angle *is* available, the
+  angle readout itself already shows the runway and telemetry
+  source, so the strip is hidden.)
 
 ### Lamp cards
 
@@ -116,9 +141,9 @@ image. Each card shows:
 
 - The lamp number (1–4) and its detected state (White / Red /
   Transition / Occluded).
-- The model's confidence in that detection (0–100 %).
-- A horizontal "transition meter" bar — visible indicator of how
-  close the elevation angle sits to the transition boundary.
+- The model's confidence in that detection (0–100 %). A real
+  detection below 50 % confidence is flagged with a ⚠ cue and amber
+  styling so a shaky verdict is not presented as certain.
 
 ### Metric cards
 
@@ -131,14 +156,14 @@ Two cards at the bottom of the right panel:
 
 These are **real measurements** from the backend, not preset values.
 
-### Demo presets
+### Live data only — no demo presets
 
-The four scenario tabs marked with an amber **"DEMO"** badge
-(`Clean example`, `Transition pause`, `Hard case`, `Edge device`)
-are **canned demonstrations** showing what a result *looks like*
-under different conditions. They do not call the model. The badge
-exists so jurors and reviewers do not mistake illustration for
-live data.
+Everything on the Live Demo page comes from a **real backend
+analysis** of your upload. Until you run one, the result panel
+simply stays empty; there are no canned demonstration scenarios.
+(Earlier builds shipped preset "DEMO" tabs — they have been removed
+so jurors and reviewers can never mistake illustration for live
+data.)
 
 ## 5. The Insights page
 

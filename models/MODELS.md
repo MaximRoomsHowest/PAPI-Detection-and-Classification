@@ -197,9 +197,10 @@ When promoting a new run to serving:
    ```powershell
    Copy-Item models\runs\detect\<new_run>\weights\best.pt models\serving\best.pt -Force
    ```
-6. Regenerate the model card so `/api/model` reports the new run:
+6. Regenerate the model card so `/api/model` reports the new run. From the
+   repo root:
    ```powershell
-   ..\..\.venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
+   .venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
      models\runs\detect\<new_run> --write-model-card models\serving\model_card.json
    ```
 7. Restart the backend (`docker compose restart backend`, or the uvicorn

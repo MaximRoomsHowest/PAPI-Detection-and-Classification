@@ -16,7 +16,7 @@ from a fresh machine. Two supported paths:
 | Git | any recent | https://git-scm.com |
 | Docker Desktop (for path 1) | 4.30+ | https://www.docker.com/products/docker-desktop |
 | Python (for path 2) | 3.10+ | https://www.python.org/downloads/ |
-| Node.js (for path 2) | 20.x | https://nodejs.org |
+| Node.js (for path 2) | 24.x | https://nodejs.org |
 | Disk space | ~ 8 GB | for Docker images + model weights |
 | RAM | ≥ 8 GB | inference is CPU-only by default |
 
@@ -189,11 +189,12 @@ python workflows/scripts/pipeline.py extract --limit 100
 
 For a real deployment (not a local demo):
 
-1. **Generate a strong API key** and set it in `.env`:
+1. **Generate a strong API key** and set it — together with the
+   production flag — in `.env`:
    ```bash
    PAPI_API_KEY=$(openssl rand -base64 32)
    echo "PAPI_API_KEY=$PAPI_API_KEY" >> .env
-   PAPI_ENV=production
+   echo "PAPI_ENV=production" >> .env
    ```
    The backend will refuse to start without a key when
    `PAPI_ENV=production` (audit B-CRIT-5). It will also refuse to

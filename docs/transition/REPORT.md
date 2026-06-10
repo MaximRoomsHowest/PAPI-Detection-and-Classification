@@ -64,17 +64,25 @@ MCP) showed per-flip montages (lamp crop across `[flip−3…flip+3]`); a **3-cl
 
 ## 12. Candidate review statistics
 
-36 flips spot-checked across all strata → evidence-based rule applied dataset-wide:
-**495 → 487 accepted_transition, 8 ambiguous_review** (zoom `fallback_identity`, reverted to
-red/white). `elev_discontinuity` kept (visual real, angle untrusted). `verification_log.csv`
-tracked in `artifacts/`.
+36 flips spot-checked across all strata → evidence-based rule applied dataset-wide. Original
+pass: **495 → 487 accepted_transition, 8 ambiguous_review** (zoom `fallback_identity`, reverted
+to red/white); `elev_discontinuity` kept (visual real, angle untrusted).
+**Update (2026-06-09 colour-gate cleanup):** `apply_verification.py` now gates every candidate on
+a per-crop colour verdict (`classify_lamp_colour`); `elev_discontinuity` windows proved to be
+telemetry gaps with stable crops and are reverted, as are stable red/white crops →
+**495 → 250 accepted_transition** (8 ambiguous_review, 205 reverted_stable_colour,
+32 reverted_telemetry_gap — 237 of the previous 487 reverted, ~49%). `verification_log.csv`
+tracked in `artifacts/`. See `04_verification.md`.
 
 ## 13. Dataset QA
 
-`dataset_qa_report.md`: 3,194 frames; boxes red 6,777 / white 5,497 / **transition 487 (3.82%)**;
-present in all splits (train 386 / val 64 / test 37); balanced per lamp (132/133/120/102); **no
-split leakage** (one split per flight); most-loaded clip share 0.19; 0 format errors after dedup.
-**Ready for training: YES.**
+`dataset_qa_report.md`, regenerated after the **2026-06-09 colour-gate cleanup**: 3,194 frames;
+boxes red 6,911 / white 5,599 / **transition 250 (1.96%; red+white : transition ≈ 50:1)**;
+present in all splits (train 216 / val 28 / test 6); per lamp 64/78/61/47; **no split leakage**
+(one split per flight); most-loaded clip share 0.30; 0 format errors after dedup.
+**Ready for training: YES.** (Before cleanup: red 6,777 / white 5,497 / transition **487
+(3.82%)**, split train 386 / val 64 / test 37 — ~49% of those transition boxes were
+stable-colour mislabels reverted by the gate.)
 
 ## 14. Training configuration
 
@@ -92,6 +100,11 @@ are flip-anchored + AI-spot-checked.
 best.pt` (git-ignored). Full metrics/plots/logs in that run dir.
 
 ## 16–18. Transition-specific evaluation (TEST split, conf=0.25) — see `evaluation.md`
+
+> **Superseded (2026-06-09):** the table below evaluates the model trained on the pre-cleanup
+> 487-box labels. After the colour-gate cleanup + retrain, current numbers live in
+> `evaluation_metrics.json` (red mAP50 0.87, white 0.94; transition 0/6 test boxes detected —
+> recall starved by the much smaller clean transition set).
 
 | class | P | R | F1 | mAP50 |
 |---|--:|--:|--:|--:|
@@ -142,7 +155,8 @@ frontend change needed until the model is promoted. See `05_frontend_reporting.m
   already beats the baseline, but the AP has headroom.
 - **Reversed lamp binding / rwy-06 angles:** transition labels are visual-correct, but per-lamp
   *angle* binding needs the corrected mapping; rwy-06 uses FAA defaults.
-- **Transition is rare (3.82%):** oversampling helps; recall on subtle/night transitions to watch.
+- **Transition is rare (1.96% after the 2026-06-09 cleanup; ~50:1 imbalance):** oversampling
+  helps; recall on subtle/night transitions to watch.
 - Interim model is **not promoted** to serving; that decision is gated on the head-to-head.
 
 ## 24. Recommended next steps
@@ -151,5 +165,7 @@ frontend change needed until the model is promoted. See `05_frontend_reporting.m
 2. Correct the lamp-order↔set-angle binding in `papi_edny.yaml`; obtain rwy-06 commissioned angles.
 3. Train the yolo26s model to convergence (~40–60 epochs, `--resume`) to lift transition mAP50,
    then promote `best.pt` to `models/serving` / set `PAPI_TRANSITION_MODEL_PATH`.
-4. The app's **transition-method toggle is already shipped** (tracking vs model — `06_method_toggle.md`);
-   flip its default to "model" once the 3-class model is promoted.
+4. The transition-method toggle was **replaced by the inference-model selector** (options from
+   `GET /api/models` — `06_method_toggle.md`). Serving the learned method means selecting the
+   `transition` model entry in the Live Demo (or setting `PAPI_TRANSITION_METHOD=model` as the
+   server default) once the 3-class model is promoted.

@@ -44,11 +44,11 @@ and regenerate the card — full procedure in [`models/MODELS.md`](MODELS.md) §
 The slot filename stays `best.pt` (the Dockerfile, compose, `.env`, and docs
 all reference it).
 
-To roll back to the previous yolo26n model:
+To roll back to the previous yolo26n model, from the repo root:
 
 ```powershell
 Copy-Item models\runs\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force
-..\..\.venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
+.venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
   models\runs\yolo26n-sequence-1280 --write-model-card models\serving\model_card.json
 ```
 

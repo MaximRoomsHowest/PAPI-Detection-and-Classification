@@ -1,5 +1,12 @@
 # Integration Test — full stack, end to end
 
+> **Historical record (noted 2026-06-10):** this test exercised the Live Demo's
+> **transition-method toggle UI**, which has since been replaced by the **inference-model
+> selector** (`GET /api/models`; the UI now sends `model_id`, while the backend keeps the
+> `transition_method` form field for API compatibility). See `06_method_toggle.md` for the
+> current behavior. The results below are kept as the integration-test record of the
+> pre-selector UI.
+
 Verified the transition pipeline + transition-method toggle work together, from the live frontend
 through the running backend to the real models and the database.
 

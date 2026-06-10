@@ -79,21 +79,32 @@ For native development (Postgres in Docker, backend + frontend run locally),
 follow the step-by-step path in
 [`docs/installation-manual.md`](docs/installation-manual.md).
 
-Open `http://127.0.0.1:5173/live-demo`, keep **Backend API** selected, and pick
-one of three upload paths:
+Open `http://127.0.0.1:5173/live-demo`, optionally pick an **Inference model**
+(the selector is fed by `GET /api/models`: the default `small` serving detector,
+the previous `nano` detector, and the experimental `transition` classifier when
+its weights are present), and pick one of three upload paths. Analysis starts
+automatically once the upload is read; **Re-run analysis** repeats it after a
+model / runway / metadata change.
 
 - **Single image** (`Upload media`): frontend calls `POST /api/analyze-frame`.
 - **Video** (`Upload media`): frontend uploads the whole clip to `POST /api/analyze`;
   the backend decodes the frames and returns one annotated video.
-- **Folder of images** (`Upload folder`): frontend uploads every image in one
-  request to `POST /api/analyze-sequence`, which treats the folder as an ordered
-  image sequence — consecutive frames of a single clip — and returns **one
-  time-sequenced annotated video** plus an aggregated verdict (the same tracked
-  pipeline as a real video upload, not an independent-frame batch). Images are
-  ordered by filename so a `frame_000.jpg … frame_NNN.jpg` capture sequence plays
-  in order; playback speed is set by `PAPI_SEQUENCE_FPS` (default 4 fps). The
-  batch endpoint `POST /api/analyze-frames` (independent per-image results) is
-  still served for callers that want one row per image.
+- **Folder of images** (`Upload folder`): two modes, switched by the **Folder
+  mode** control:
+  - **Angle sweep** (default): every image is analysed individually via
+    `POST /api/analyze-frame`, so each frame keeps its own GPS-derived viewing
+    angle — this is what powers the per-image frame stepping and the
+    angle-vs-state Insights charts.
+  - **Video sequence**: frontend uploads every image in one request to
+    `POST /api/analyze-sequence`, which treats the folder as an ordered image
+    sequence — consecutive frames of a single clip — and returns **one
+    time-sequenced annotated video** plus an aggregated verdict (the same tracked
+    pipeline as a real video upload, not an independent-frame batch). Images are
+    ordered by filename so a `frame_000.jpg … frame_NNN.jpg` capture sequence plays
+    in order; playback speed is set by `PAPI_SEQUENCE_FPS` (default 4 fps).
+
+  The batch endpoint `POST /api/analyze-frames` (independent per-image results in
+  a single request) is still served for API callers that want one row per image.
 
 All endpoints accept optional drone metadata fields (`runway_id`, `drone_id`,
 `drone_latitude`, `drone_longitude`, `drone_altitude_m`) and respect
@@ -122,7 +133,7 @@ Start here when looking for a part of the project:
 | `packages/papi/tests/` | Root `pytest` suite for ML/data code. |
 | `workflows/scripts/` | Runnable ML/data entrypoints. |
 | `workflows/notebooks/` | Notebook-first ML workflows. |
-| `models/` | Ignored local model weights. `models/base/` holds base weights; `models/serving/best.pt` is the backend runtime model. |
+| `models/` | Committed model artifacts (`base/`, `serving/`, `runs/`) — see `models/README.md`. `models/base/` holds base weights; `models/serving/best.pt` is the backend runtime model. |
 | `test_videos/` | Small MP4 fixtures for end-to-end upload smoke tests. |
 | `..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI/` | Archived raw dataset. Do not modify. |
 | `data/raw/` | Optional local junction to the archived raw dataset. |
