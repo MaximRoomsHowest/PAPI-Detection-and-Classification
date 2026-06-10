@@ -35,8 +35,14 @@ FROM nginxinc/nginx-unprivileged:alpine@sha256:85bcbc6b2edd325462560c597d784ecee
 EXPOSE 8080
 
 # SPA-aware nginx config (react-router fallback to /index.html) + security
-# headers (audit F-MAJ-13 / DCK-MAJ-6).
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# headers (audit F-MAJ-13 / DCK-MAJ-6). Shipped as a TEMPLATE: the image's
+# stock 20-envsubst-on-templates.sh renders it to /etc/nginx/conf.d/default.conf
+# at container start, substituting the body-size knob below — so the upload cap
+# can follow PAPI_MAX_BATCH_UPLOAD_MB without an image rebuild (audit IS-7).
+# Do NOT also COPY a literal conf.d/default.conf: the render would silently
+# overwrite it and mask template errors. Default = 400 MB budget + 10m headroom.
+ENV NGINX_CLIENT_MAX_BODY_SIZE=410m
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Static bundle from the build stage.
 COPY --from=build /app/dist /usr/share/nginx/html
