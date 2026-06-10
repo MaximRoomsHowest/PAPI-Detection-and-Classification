@@ -22,6 +22,7 @@ from app.api.routes import require_api_key, router
 from app.config import get_settings
 from app.database import get_session, init_db
 from app.logging_config import RequestIdMiddleware, configure_logging
+from app.middleware import RequestSizeLimitMiddleware, request_body_cap_bytes
 from app.services.inference import get_inference_service
 
 # Configure structured logging BEFORE any module-level logger is bound
@@ -114,9 +115,16 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
+# Starlette applies middlewares in reverse-insertion order — the last one
+# added is the outermost wrap. Target stack: CORS(RequestId(BodyCap(app))).
+#
+# The transport body cap is added FIRST (= innermost) so its 413s still flow
+# out through RequestIdMiddleware and carry an X-Request-ID. It backstops the
+# per-endpoint upload budgets when no nginx sits in front (audit SD-3/CI6).
+app.add_middleware(RequestSizeLimitMiddleware, max_body_bytes=request_body_cap_bytes(settings))
+
 # RequestIdMiddleware is added BEFORE CORS so the request-ID context is set
-# even for OPTIONS preflight responses. Starlette applies middlewares in
-# reverse-insertion order — the last one added is the outermost wrap.
+# even for OPTIONS preflight responses.
 app.add_middleware(RequestIdMiddleware)
 
 # allow_methods / allow_headers are explicit rather than "*" because the
