@@ -98,7 +98,7 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/laptop-best-pt.json \
+    --json-out docs/qa-artifacts/benchmarks/local-best-pt.json \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
@@ -106,7 +106,7 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/laptop-best-fp32-onnx.json \
+    --json-out docs/qa-artifacts/benchmarks/local-best-fp32-onnx.json \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
@@ -114,7 +114,7 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/laptop-best-int8-onnx.json \
+    --json-out docs/qa-artifacts/benchmarks/local-best-int8-onnx.json \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 ```
 
