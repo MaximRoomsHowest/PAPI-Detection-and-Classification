@@ -61,19 +61,35 @@ def evaluate(weights: Path, data: Path) -> dict:
                         batch=4, workers=2,
                         project=str(REPO_ROOT / "data" / "runs" / "detect"), name="transition3class-test", exist_ok=True)
 
-    per_class = {}
-    for i, name in CLASS_NAMES.items():
-        try:
-            p = float(metrics.box.p[i])
-            r = float(metrics.box.r[i])
-            ap50 = float(metrics.box.ap50[i])
-        except (IndexError, TypeError):
-            p = r = ap50 = 0.0
+    # Index per-class arrays by ap_class_index: ultralytics orders box.p/r/ap50 by
+    # POSITION among the classes present in the split's stats, not by raw class id —
+    # indexing [class_id] silently misattributes red<->white if any class is absent
+    # (audit WS-1). Absent classes keep explicit zeros with support 0 so a reader can
+    # tell "not in split" from "model finds nothing".
+    per_class = {
+        name: {"precision": 0.0, "recall": 0.0, "f1": 0.0, "mAP50": 0.0, "support": 0}
+        for name in CLASS_NAMES.values()
+    }
+    support_by_class_id = getattr(metrics.box, "nt_per_class", None)  # indexed by class id
+    for pos, raw_cls_id in enumerate(getattr(metrics.box, "ap_class_index", [])):
+        cls_id = int(raw_cls_id)
+        name = CLASS_NAMES.get(cls_id)
+        if name is None:
+            continue
+        p = float(metrics.box.p[pos])
+        r = float(metrics.box.r[pos])
+        ap50 = float(metrics.box.ap50[pos])
         f1 = (2 * p * r / (p + r)) if (p + r) > 0 else 0.0
+        support = 0
+        if support_by_class_id is not None and cls_id < len(support_by_class_id):
+            support = int(support_by_class_id[cls_id])
         per_class[name] = {"precision": round(p, 4), "recall": round(r, 4),
-                           "f1": round(f1, 4), "mAP50": round(ap50, 4)}
+                           "f1": round(f1, 4), "mAP50": round(ap50, 4), "support": support}
     return {"weights": str(weights), "per_class": per_class,
             "mAP50": round(float(metrics.box.map50), 4), "mAP50_95": round(float(metrics.box.map), 4),
+            # Record the operating point: a val run at conf=0.25 truncates the PR curve,
+            # so these numbers are NOT comparable to a default-conf val (audit WS-2).
+            "val_conf": 0.25, "val_iou": 0.5,
             "val_dir": str(metrics.save_dir)}
 
 
@@ -92,11 +108,12 @@ def mine_examples(weights: Path, data: Path, per_cat: int = 12) -> dict:
     model = YOLO(str(weights))
     counts = Counter()
     for img_path in test_list:
-        if not img_path.strip() or sum(counts[c] for c in cats) >= per_cat * len(cats):
+        if sum(counts[c] for c in cats) >= per_cat * len(cats):
+            break  # every category quota filled; no need to scan the rest (audit WS-9b)
+        if not img_path.strip():
             continue
         ip = Path(img_path)
         label = Path(img_path.replace("/images/", "/labels/")).with_suffix(".txt")
-        gt = _gt_boxes(label, 0, 0)
         if not label.exists():
             continue
         img = cv2.imread(str(ip))

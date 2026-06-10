@@ -3,8 +3,12 @@
 Runs the SAME 3-class model over each test flight with ByteTrack, then derives transition events
 two ways and scores both against the GT flips (transitions.csv):
 
-* **Track A (learned)** — runs of class-2 (transition) predictions per tracked lamp, smoothed to
-  drop 1-frame flicker => one event per run.
+* **Track A (learned)** — runs of class-2 (transition) predictions per tracked lamp => one event
+  per run. NOTE: single-frame runs COUNT as events (no flicker smoothing); gaps of <=2 frames are
+  merged into one run. The published head_to_head.json numbers were produced with exactly this
+  behavior (audit WS-5 — an earlier docstring claimed 1-frame flicker smoothing that the code
+  never performed; the doc was corrected rather than the method changed, to keep the published
+  comparison honest to what ran).
 * **Track B (temporal)** — red<->white flips in the model's red/white predictions per tracked
   lamp (class-2 ignored), majority-smoothed over a window => one event per flip. This is the
   existing post-processing method.
@@ -125,12 +129,17 @@ def run(weights: Path, twin: Path) -> dict:
         meta = sorted(_read_csv(vd / "metadata.csv"), key=lambda r: int(r["sequence_index"]))
         gt = [int(r["to_frame_index"]) for r in _read_csv(vd / "transitions.csv")] if (vd / "transitions.csv").exists() else []
         obs: dict[int, list[tuple[int, int]]] = defaultdict(list)
-        for idx, row in enumerate(meta):
+        # persist=False on the first PROCESSED frame, not metadata row 0: if row 0's
+        # image is missing, keying the reset on idx==0 would leak the previous
+        # flight's ByteTrack state into this one (audit WS-7).
+        tracker_started = False
+        for row in meta:
             img = vd / "images" / row["file"]
             if not img.exists():
                 continue
-            res = model.track(str(img), persist=(idx > 0), tracker="bytetrack.yaml",
+            res = model.track(str(img), persist=tracker_started, tracker="bytetrack.yaml",
                               imgsz=1280, conf=0.25, verbose=False)[0]
+            tracker_started = True
             if res.boxes is None or res.boxes.id is None:
                 continue
             fr = int(row["sequence_index"])

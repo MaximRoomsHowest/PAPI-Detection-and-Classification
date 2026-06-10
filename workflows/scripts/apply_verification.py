@@ -76,12 +76,20 @@ def apply(twin: Path) -> dict:
     log_rows: list[dict[str, str]] = []
     accepted: set[tuple[str, int, str]] = set()  # (source, frame, track) kept as transition
     decisions = Counter()
+    # Persisted verdicts win (reproducibility of the published dataset), but count how
+    # many disagree with the CURRENT thresholds so a threshold tune that silently
+    # applies only to verdict-less rows is visible in the summary (audit LS-7).
+    verdict_disagreements = 0
     for c in candidates:
         try:
             colour = json.loads(c.get("colour_features") or "{}")
         except json.JSONDecodeError:
             colour = {}
-        verdict = c.get("colour_verdict") or classify_lamp_colour(colour)
+        persisted_verdict = (c.get("colour_verdict") or "").strip()
+        recomputed_verdict = classify_lamp_colour(colour)
+        if persisted_verdict and persisted_verdict != recomputed_verdict:
+            verdict_disagreements += 1
+        verdict = persisted_verdict or recomputed_verdict
         decision, note = decide(c["review_flag"], verdict)
         if (c["source_id"], c["track_id"], int(c["flip_frame"])) in reviewed_keys:
             note += " [visually reviewed]"
@@ -130,8 +138,13 @@ def apply(twin: Path) -> dict:
             (vd / "labels" / (Path(file).stem + ".txt")).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     log_path = twin / "verification_log.csv"
+    # Static fieldnames: log_rows[0] IndexErrors on an empty candidates CSV (audit LS-8).
+    fieldnames = [
+        "candidate_id", "decision", "old_label", "new_label",
+        "reviewer_note", "source_id", "frame_number", "track_id",
+    ]
     with log_path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(log_rows[0].keys()))
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(log_rows)
 
@@ -139,6 +152,7 @@ def apply(twin: Path) -> dict:
         "candidates": len(candidates),
         "flips_visually_reviewed": len(reviewed_keys),
         "decisions": dict(decisions),
+        "persisted_verdicts_disagreeing_with_current_thresholds": verdict_disagreements,
         "final_transition_boxes": final_transition_boxes,
         "verification_log": str(log_path),
     }

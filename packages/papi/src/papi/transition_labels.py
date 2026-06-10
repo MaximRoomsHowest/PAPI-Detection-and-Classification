@@ -186,7 +186,13 @@ class Candidate:
             "previous_state": self.previous_state, "candidate_state": self.candidate_state,
             "next_state": self.next_state, "transition_type": self.transition_type,
             "flip_frame": str(self.flip_frame), "frame_offset": str(self.frame_offset),
-            "approach_elevation_deg": f"{self.approach_elevation_deg:.4f}",
+            # Empty string when telemetry is missing — a plausible-looking "0.0000"
+            # made missing-elevation rows indistinguishable from a genuine 0° (LS-9).
+            "approach_elevation_deg": (
+                f"{self.approach_elevation_deg:.4f}"
+                if math.isfinite(self.approach_elevation_deg)
+                else ""
+            ),
             "empirical_set_angle_deg": self.empirical_set_angle_deg, "runway": self.runway,
             "camera": self.camera, "colour_features": self.colour_features,
             "transition_score": self.transition_score, "reason_for_flagging": self.reason_for_flagging,

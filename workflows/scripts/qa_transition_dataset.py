@@ -84,7 +84,15 @@ def qa(twin: Path) -> dict:
             for label_path in sorted((video_dir / "labels").glob("*.txt")):
                 total_frames += 1
                 file = label_path.stem + ".JPG"
-                split = split_of_file.get(file, "train")
+                if file not in split_of_file:
+                    # Hard-error instead of silently bucketing into "train": a future
+                    # flight with .jpg/.png filenames would otherwise make this report
+                    # diverge from the real training split with no signal (audit WS-6a).
+                    raise SystemExit(
+                        f"QA: label {label_path} has no metadata row for '{file}' — "
+                        "filename/extension mismatch between labels/ and metadata.csv."
+                    )
+                split = split_of_file[file]
                 split_frames[split] += 1
                 try:
                     classes, errs = _validate_label(label_path)
@@ -202,8 +210,9 @@ def _write_report(s: dict, sample_errors: list[str]) -> None:
         "",
         "## Known limitations",
         "",
-        "- Transition is a small minority class (~4% of boxes); Phase 7 handles imbalance via "
-        "transition-frame oversampling + colour-safe augmentation (no hue/sat jitter).",
+        f"- Transition is a small minority class ({s['transition_pct_of_boxes']}% of boxes); "
+        "Phase 7 handles imbalance via transition-frame oversampling + colour-safe "
+        "augmentation (no hue/sat jitter).",
         "- rwy-06 transition angles use FAA defaults (commissioned set-angles pending); affects "
         "angle-binding, not the visual transition label.",
         "- Verification was an AI spot-check of 36/~150 flips + a dataset-wide rule; a fuller human "

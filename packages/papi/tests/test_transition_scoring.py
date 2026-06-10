@@ -81,6 +81,50 @@ def test_classify_lamp_colour_flags_stable_white():
     assert classify_lamp_colour(white) == "white"
 
 
+def test_classify_lamp_colour_exact_threshold_boundaries():
+    """Pin every gate constant at its boundary so a transposed threshold (0.45 ->
+    0.045) cannot survive a green suite (audit DT-7). At-threshold passes; one
+    epsilon below falls through to intermediate/unknown."""
+    # n_px gate: 16 judges, 15 does not.
+    base = {"red_ratio": 0.9, "orange_amber_ratio": 0.05, "yellow_ratio": 0.0,
+            "white_ratio": 0.0, "val_mean": 160.0}
+    assert classify_lamp_colour({**base, "n_px": 16}) == "red"
+    assert classify_lamp_colour({**base, "n_px": 15}) == "unknown"
+
+    # red gate: red_ratio >= 0.45 AND red/warm >= 0.65 AND white <= 0.20.
+    red_at = {"n_px": 100, "red_ratio": 0.45, "orange_amber_ratio": 0.242,  # dominance 0.65
+              "yellow_ratio": 0.0, "white_ratio": 0.20, "val_mean": 150.0}
+    assert classify_lamp_colour(red_at) == "red"
+    assert classify_lamp_colour({**red_at, "red_ratio": 0.449}) == "intermediate"
+    assert classify_lamp_colour({**red_at, "orange_amber_ratio": 0.25}) == "intermediate"  # dominance < 0.65
+    assert classify_lamp_colour({**red_at, "white_ratio": 0.201}) == "intermediate"
+
+    # white gate: white >= 0.30 AND val >= 175 AND red <= 0.10 AND amber <= 0.30.
+    white_at = {"n_px": 100, "red_ratio": 0.10, "orange_amber_ratio": 0.30,
+                "yellow_ratio": 0.0, "white_ratio": 0.30, "val_mean": 175.0}
+    assert classify_lamp_colour(white_at) == "white"
+    assert classify_lamp_colour({**white_at, "white_ratio": 0.299}) == "intermediate"
+    assert classify_lamp_colour({**white_at, "val_mean": 174.9}) == "intermediate"
+    assert classify_lamp_colour({**white_at, "red_ratio": 0.101}) == "intermediate"
+    assert classify_lamp_colour({**white_at, "orange_amber_ratio": 0.301}) == "intermediate"
+
+    # lit gate: warm < 0.15 and white < 0.15 -> unknown; at 0.15 it judges.
+    assert classify_lamp_colour({"n_px": 100, "red_ratio": 0.149, "white_ratio": 0.149}) == "unknown"
+    assert classify_lamp_colour({"n_px": 100, "red_ratio": 0.0, "orange_amber_ratio": 0.15,
+                                 "white_ratio": 0.0}) == "intermediate"
+
+
+def test_non_finite_colour_features_score_zero_not_maximal():
+    """NaN ratios used to clamp to 1.0 (min/max NaN poison) and rank HIGH; they must
+    read as absent signal instead (audit LS-5)."""
+    nan = float("nan")
+    assert colour_intermediacy({"n_px": 100, "red_ratio": nan, "white_ratio": nan,
+                                "orange_amber_ratio": nan, "yellow_ratio": nan}) == 0.0
+    assert classify_lamp_colour({"n_px": 100, "red_ratio": nan, "white_ratio": nan,
+                                 "orange_amber_ratio": nan, "yellow_ratio": nan,
+                                 "val_mean": nan}) == "unknown"
+
+
 def test_review_flag_maps_quality_flags_and_runway():
     assert review_flag("elev_discontinuity", "24") == "elev_discontinuity"
     assert review_flag("fallback_left_to_right", "24") == "fallback_identity"

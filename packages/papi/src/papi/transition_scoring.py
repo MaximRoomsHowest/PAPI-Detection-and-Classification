@@ -18,6 +18,8 @@ forces the ``ambiguous`` tier regardless of score; the other two annotate withou
 
 from __future__ import annotations
 
+import math
+
 TIER_HIGH = "high_confidence_transition_candidate"
 TIER_MEDIUM = "medium_confidence_transition_candidate"
 TIER_LOW = "low_confidence_transition_candidate"
@@ -30,6 +32,20 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
 
 
+def _finite(value: object) -> float:
+    """Coerce a colour-feature stat to a finite float; NaN/inf/garbage -> 0.0.
+
+    Python's min/max NaN-poison ``_clamp``: ``_clamp(nan)`` returns 1.0, so a NaN
+    ratio smuggled in via a JSON round-trip (``allow_nan=True``) would silently score
+    as MAXIMAL intermediacy and rank HIGH (audit LS-5). Treat non-finite as absent.
+    """
+    try:
+        result = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+    return result if math.isfinite(result) else 0.0
+
+
 def offset_proximity(frame_offset: int) -> float:
     """1.0 at the flip boundary, decaying ~0.18 per frame away."""
     return _clamp(1.0 - 0.18 * abs(frame_offset))
@@ -39,8 +55,8 @@ def colour_intermediacy(cf: dict) -> float:
     """Red+white coexistence and amber presence; 0 when colour is unavailable."""
     if not cf or cf.get("n_px", 0) < 4:
         return 0.0
-    amber = float(cf.get("orange_amber_ratio", 0.0)) + float(cf.get("yellow_ratio", 0.0))
-    mix = 2.0 * min(float(cf.get("red_ratio", 0.0)), float(cf.get("white_ratio", 0.0)))
+    amber = _finite(cf.get("orange_amber_ratio", 0.0)) + _finite(cf.get("yellow_ratio", 0.0))
+    mix = 2.0 * min(_finite(cf.get("red_ratio", 0.0)), _finite(cf.get("white_ratio", 0.0)))
     return _clamp(0.6 * mix + 0.4 * min(amber, 0.6))
 
 
@@ -65,11 +81,11 @@ def classify_lamp_colour(cf: dict) -> str:
     """
     if not cf or cf.get("n_px", 0) < 16:
         return "unknown"
-    red = float(cf.get("red_ratio", 0.0))
-    amber = float(cf.get("orange_amber_ratio", 0.0))
-    yellow = float(cf.get("yellow_ratio", 0.0))
-    white = float(cf.get("white_ratio", 0.0))
-    val = float(cf.get("val_mean", 0.0))
+    red = _finite(cf.get("red_ratio", 0.0))
+    amber = _finite(cf.get("orange_amber_ratio", 0.0))
+    yellow = _finite(cf.get("yellow_ratio", 0.0))
+    white = _finite(cf.get("white_ratio", 0.0))
+    val = _finite(cf.get("val_mean", 0.0))
     warm = red + amber + yellow
     if warm < 0.15 and white < 0.15:
         return "unknown"  # crop not clearly lit -> let other signals decide
