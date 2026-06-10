@@ -13,11 +13,14 @@ function runwayOptionLabel(runwayId, runways) {
 export function HistoryFilters({
   runwayFilter,
   stateFilter,
+  modelFilter,
   runwayOptions,
   stateOptions,
+  modelOptions,
   hasActiveFilters,
   onRunwayChange,
   onStateChange,
+  onModelChange,
   onClearFilters,
   onExportCsv,
   isExporting,
@@ -51,6 +54,19 @@ export function HistoryFilters({
         {stateOptions.map((stateKey) => (
           <option key={stateKey} value={stateKey}>
             {stateKey.replaceAll('_', ' ')}
+          </option>
+        ))}
+      </select>
+      <select
+        className="history-filter"
+        value={modelFilter}
+        onChange={onModelChange}
+        aria-label={copy.history.model}
+      >
+        <option value="">{copy.history.filterModel}</option>
+        {modelOptions.map((modelId) => (
+          <option key={modelId} value={modelId}>
+            {modelId}
           </option>
         ))}
       </select>

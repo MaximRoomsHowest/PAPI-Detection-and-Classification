@@ -277,6 +277,7 @@ function buildLogQuery({
   globalState,
   createdAfter,
   minConfidence,
+  modelId,
 } = {}) {
   const params = new URLSearchParams()
   if (limit != null) params.set('limit', String(limit))
@@ -286,6 +287,7 @@ function buildLogQuery({
   if (globalState) params.set('global_state', globalState)
   if (createdAfter) params.set('created_after', createdAfter)
   if (minConfidence != null && minConfidence !== '') params.set('min_confidence', String(minConfidence))
+  if (modelId) params.set('model_id', modelId)
   const qs = params.toString()
   return qs ? `?${qs}` : ''
 }

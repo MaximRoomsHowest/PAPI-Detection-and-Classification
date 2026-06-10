@@ -387,7 +387,14 @@ describe('upload size guard', () => {
 
 describe('fetchLogs — filters + total count', () => {
   it('builds a querystring from camelCase options', async () => {
-    await fetchLogs({ limit: 10, offset: 20, runwayId: 'papi_24', globalState: 'too_low', minConfidence: 0.5 })
+    await fetchLogs({
+      limit: 10,
+      offset: 20,
+      runwayId: 'papi_24',
+      globalState: 'too_low',
+      minConfidence: 0.5,
+      modelId: 'nano',
+    })
     const [url] = fetch.mock.calls[0]
     expect(url).toContain('/api/logs?')
     expect(url).toContain('limit=10')
@@ -395,6 +402,13 @@ describe('fetchLogs — filters + total count', () => {
     expect(url).toContain('runway_id=papi_24')
     expect(url).toContain('global_state=too_low')
     expect(url).toContain('min_confidence=0.5')
+    expect(url).toContain('model_id=nano')
+  })
+
+  it('omits model_id from the query when no model filter is active', async () => {
+    await fetchLogs({ limit: 10, modelId: '' })
+    const [url] = fetch.mock.calls[0]
+    expect(url).not.toContain('model_id')
   })
 
   it('returns items + total from the X-Total-Count header', async () => {

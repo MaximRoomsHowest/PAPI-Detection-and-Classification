@@ -5,6 +5,7 @@ import {
   fetchLogDetail,
   fetchLogs,
   fetchModelInfo,
+  fetchModels,
   fetchStats,
   resolveMediaUrl,
   revokeMediaUrl,
@@ -47,6 +48,7 @@ export function HistoryPage({ copy, runways = [] }) {
   const [error, setError] = useState('')
   const [runwayFilter, setRunwayFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
+  const [modelFilter, setModelFilter] = useState('')
   const [page, setPage] = useState(0)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -58,15 +60,25 @@ export function HistoryPage({ copy, runways = [] }) {
   // option list only ever grows and the active selection never disappears.
   const [runwayOptions, setRunwayOptions] = useState([])
   const [stateOptions, setStateOptions] = useState([])
+  const [modelOptions, setModelOptions] = useState([])
 
   // Model info changes rarely, so fetch it once on mount rather than on every
   // refresh or filter change (audit IMP-FE-19). A failure here is non-critical —
-  // the model card just renders "Unavailable".
+  // the model card just renders "Unavailable". The registry list seeds the model
+  // filter options the same way (logs from since-removed models are folded in by
+  // the logs effect below, so the dropdown can still name them).
   useEffect(() => {
     let ignore = false
     fetchModelInfo()
       .then((info) => {
         if (!ignore) setModelInfo(info)
+      })
+      .catch(() => {})
+    fetchModels()
+      .then((models) => {
+        if (ignore || !Array.isArray(models)) return
+        const ids = models.map((model) => model?.model_id).filter(Boolean)
+        setModelOptions((prev) => mergeOptions(prev, ids, null))
       })
       .catch(() => {})
     return () => {
@@ -85,6 +97,7 @@ export function HistoryPage({ copy, runways = [] }) {
       offset: page * HISTORY_PAGE_SIZE,
       runwayId: runwayFilter || undefined,
       globalState: stateFilter || undefined,
+      modelId: modelFilter || undefined,
     }
     Promise.all([fetchLogs(options), fetchStats()])
       .then(([logsResult, nextStats]) => {
@@ -104,6 +117,16 @@ export function HistoryPage({ copy, runways = [] }) {
         setStateOptions((prev) =>
           mergeOptions(prev, Object.keys(nextStats?.by_global_state ?? {}), stateFilter),
         )
+        // /api/stats has no by_model breakdown; fold in the ids seen on this
+        // page of logs so since-removed models stay selectable alongside the
+        // registry-seeded options from the mount effect.
+        setModelOptions((prev) =>
+          mergeOptions(
+            prev,
+            logsResult.items.map((item) => item?.model_id).filter(Boolean),
+            modelFilter,
+          ),
+        )
       })
       .catch((loadError) => {
         if (!ignore) setError(loadError.message)
@@ -117,7 +140,7 @@ export function HistoryPage({ copy, runways = [] }) {
     return () => {
       ignore = true
     }
-  }, [page, runwayFilter, stateFilter, refreshKey])
+  }, [page, runwayFilter, stateFilter, modelFilter, refreshKey])
 
   // Refresh jumps back to page 1 so freshly-logged analyses (newest first) are
   // visible, and forces a refetch via refreshKey even when already on page 1.
@@ -138,15 +161,16 @@ export function HistoryPage({ copy, runways = [] }) {
     setter(event.target.value)
   }
 
-  const hasActiveFilters = Boolean(runwayFilter || stateFilter)
+  const hasActiveFilters = Boolean(runwayFilter || stateFilter || modelFilter)
 
-  // Clear filters (audit F18) — reset both selects and return to page 1. A
+  // Clear filters (audit F18) — reset the selects and return to page 1. A
   // refetch follows automatically because the filter state changed.
   const handleClearFilters = () => {
     setIsFetching(true)
     setPage(0)
     setRunwayFilter('')
     setStateFilter('')
+    setModelFilter('')
   }
 
   const handleExportCsv = async () => {
@@ -155,11 +179,14 @@ export function HistoryPage({ copy, runways = [] }) {
     try {
       // Filter-aware filename so a filtered export isn't indistinguishable from a
       // full export once downloaded (audit FB-08).
-      const nameParts = ['papi_analysis_logs', runwayFilter, stateFilter].filter(Boolean)
+      const nameParts = ['papi_analysis_logs', runwayFilter, stateFilter, modelFilter].filter(
+        Boolean,
+      )
       await downloadLogsCsv(
         {
           runwayId: runwayFilter || undefined,
           globalState: stateFilter || undefined,
+          modelId: modelFilter || undefined,
         },
         `${nameParts.join('_')}.csv`,
       )
@@ -255,11 +282,14 @@ export function HistoryPage({ copy, runways = [] }) {
       <HistoryFilters
         runwayFilter={runwayFilter}
         stateFilter={stateFilter}
+        modelFilter={modelFilter}
         runwayOptions={runwayOptions}
         stateOptions={stateOptions}
+        modelOptions={modelOptions}
         hasActiveFilters={hasActiveFilters}
         onRunwayChange={handleFilterChange(setRunwayFilter)}
         onStateChange={handleFilterChange(setStateFilter)}
+        onModelChange={handleFilterChange(setModelFilter)}
         onClearFilters={handleClearFilters}
         onExportCsv={handleExportCsv}
         isExporting={isExporting}
