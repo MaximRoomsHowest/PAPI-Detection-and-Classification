@@ -63,7 +63,10 @@ def stream_log_rows(rows: Iterable) -> Iterator[str]:
         writer.writerow([
             log.id, created, log.media_type, csv_safe(log.runway_id), log.global_state,
             log.confidence, log.angle_available, log.elevation_angle_deg,
-            log.frame_count, log.processing_ms, csv_safe(result.get("model_id")),
+            log.frame_count, log.processing_ms,
+            # Column first, result_json fallback for pre-column rows (audit COL-1).
+            # getattr keeps the SimpleNamespace duck-rows in test_csv_export working.
+            csv_safe(getattr(log, "model_id", None) or result.get("model_id")),
             csv_safe(result.get("model_label")), csv_safe(result.get("model_role")),
             csv_safe(log.original_filename),
         ])

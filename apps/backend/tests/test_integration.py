@@ -510,6 +510,36 @@ def test_analyze_frame_passes_model_id_to_inference_and_persists_it(client):
     assert detail["model_id"] == "nano"
 
 
+def test_logs_model_id_filter_and_csv_export(client):
+    """The persisted model_id column drives a server-side filter on both the
+    list endpoint (with X-Total-Count) and the CSV export (audit COL-1)."""
+    for model_id in ("nano", None):
+        data = {"runway_id": "papi_24"}
+        if model_id:
+            data["model_id"] = model_id
+        response = client.post(
+            "/api/analyze-frame",
+            files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+            data=data,
+        )
+        assert response.status_code == 200
+
+    listed = client.get("/api/logs", params={"model_id": "nano"})
+    assert listed.status_code == 200
+    assert listed.headers["X-Total-Count"] == "1"
+    assert [item["model_id"] for item in listed.json()] == ["nano"]
+
+    csv_text = client.get("/api/logs/export.csv", params={"model_id": "nano"}).text
+    body_rows = [row for row in csv_text.strip().splitlines()[1:] if row]
+    assert len(body_rows) == 1
+    assert ",nano," in body_rows[0]
+
+    # A filter value no analysis ever used returns an empty 200, not an error.
+    empty = client.get("/api/logs", params={"model_id": "never-used"})
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+
 def test_analyze_frame_unknown_model_id_returns_400(client):
     """The unknown-model_id contract (service raises ValueError -> HTTP 400) was
     previously unpinned because the mock echoed any id back (audit DT-4)."""

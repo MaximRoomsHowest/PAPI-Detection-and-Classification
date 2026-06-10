@@ -38,8 +38,13 @@ def get_sessionmaker() -> sessionmaker:
 
 def init_db() -> None:
     from app import models  # noqa: F401
+    from app.migrations import run_startup_migrations
 
-    Base.metadata.create_all(bind=get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(bind=engine)
+    # create_all never ALTERs an existing table; additive columns for
+    # deployments that predate them are applied here (see app/migrations.py).
+    run_startup_migrations(engine)
 
 
 def get_session() -> Generator[Session, None, None]:

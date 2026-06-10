@@ -26,6 +26,9 @@ class AnalysisLogRepository:
             # (503) on Postgres and orphans the just-written artifact (SQLite tests don't
             # enforce width) — audit.
             drone_id=(payload.drone_id[:128] if payload.drone_id else None),
+            # Registry model ids are short ("small"/"nano"); the width cap mirrors
+            # drone_id above so an unexpected value can't 503 on Postgres (audit COL-1).
+            model_id=(payload.model_id[:96] if payload.model_id else None),
             # Cap at the column width (VARCHAR(512)): a pathologically long upload name
             # otherwise raises a StringDataRightTruncation 503 on Postgres while orphaning
             # the just-written artifact (SQLite tests don't enforce width) — audit.
@@ -66,6 +69,7 @@ class AnalysisLogRepository:
         global_state: str | None = None,
         created_after: datetime | None = None,
         min_confidence: float | None = None,
+        model_id: str | None = None,
     ) -> list[ColumnElement[bool]]:
         """WHERE clauses shared by list / count / export (audit IMP-BE-3)."""
         conditions: list[ColumnElement[bool]] = []
@@ -79,6 +83,10 @@ class AnalysisLogRepository:
             conditions.append(AnalysisLog.created_at >= created_after)
         if min_confidence is not None:
             conditions.append(AnalysisLog.confidence >= min_confidence)
+        if model_id:
+            # Column-only match: rows from before the model_id column stay NULL
+            # (no backfill — see app/migrations.py) and are not matched here.
+            conditions.append(AnalysisLog.model_id == model_id)
         return conditions
 
     def list_recent(self, limit: int, offset: int, **filters) -> list[AnalysisLog]:
@@ -153,7 +161,9 @@ class AnalysisLogRepository:
             runway_id=log.runway_id,
             drone_id=log.drone_id,
             original_filename=log.original_filename,
-            model_id=result.get("model_id"),
+            # Column first; result_json fallback covers rows written before the
+            # model_id column existed (audit COL-1).
+            model_id=log.model_id or result.get("model_id"),
             model_label=result.get("model_label"),
             model_role=result.get("model_role"),
             global_state=log.global_state,

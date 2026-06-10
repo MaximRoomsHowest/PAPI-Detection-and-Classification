@@ -95,6 +95,51 @@ def test_iter_filtered_for_csv_export(session):
     assert len(repo.iter_filtered(runway_id="papi_24")) == 1
 
 
+def test_create_from_payload_persists_model_id_column(session):
+    """model_id is promoted out of result_json into a real column (audit COL-1)."""
+    payload = AnalysisPayload(
+        media_type="image",
+        original_filename="frame.jpg",
+        runway_id="papi_24",
+        model_id="nano",
+        global_state="unknown",
+        lamps=[],
+        confidence=0.5,
+        frame_count=1,
+        processing_ms=1,
+        angle=AngleResult(angle_available=False, angle_note="no metadata"),
+    )
+    log = AnalysisLogRepository(session).create_from_payload(payload)
+    assert log.model_id == "nano"
+
+
+def test_to_list_item_falls_back_to_result_json_model_id_for_legacy_rows(session):
+    """Rows written before the model_id column keep NULL there; the list view
+    must still surface the id recorded in result_json (audit COL-1)."""
+    _add(session, model_id=None, result_json={"model_id": "small"})
+    repo = AnalysisLogRepository(session)
+
+    item = repo.to_list_item(repo.list_recent(1, 0)[0])
+
+    assert item.model_id == "small"
+
+
+def test_list_recent_filters_by_model_id(session):
+    _add(session, model_id="nano")
+    _add(session, model_id="small")
+    _add(session, model_id=None, result_json={"model_id": "nano"})  # legacy row
+    repo = AnalysisLogRepository(session)
+
+    rows = repo.list_recent(50, 0, model_id="nano")
+
+    # Column-only match: the legacy row (NULL column) is intentionally not
+    # matched — there is no backfill (see app/migrations.py docstring).
+    assert len(rows) == 1
+    assert rows[0].model_id == "nano"
+    assert repo.count(model_id="nano") == 1
+    assert repo.count() == 3
+
+
 def test_create_from_payload_truncates_overlong_drone_id(session):
     """An unbounded client drone_id is capped to the VARCHAR(128) column width so the
     Postgres write can't raise StringDataRightTruncation (503) and orphan the artifact
