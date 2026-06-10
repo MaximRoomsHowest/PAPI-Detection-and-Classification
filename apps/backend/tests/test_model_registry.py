@@ -412,3 +412,95 @@ def test_load_model_registry_falls_back_to_single_model_when_registry_absent(tmp
 
     assert registry.default_model_id == "default"
     assert registry.get().path == model_path
+
+
+def _card_file_registry(tmp_path, card: dict):
+    """Registry with one entry whose provenance comes from a card FILE (card_path)."""
+    serving = tmp_path / "models" / "serving"
+    serving.mkdir(parents=True)
+    small = serving / "best.pt"
+    small.write_bytes(b"small")
+    card_file = serving / "card.json"
+    card_file.write_text(json.dumps(card), encoding="utf-8")
+    registry_path = serving / "models.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "default_model_id": "small",
+                "models": [
+                    {
+                        "id": "small",
+                        "label": "Small",
+                        "role": "detector",
+                        "path": "models/serving/best.pt",
+                        "card_path": "card.json",
+                        "default": True,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=small,
+        model_registry_path=registry_path,
+    )
+
+
+def test_card_path_with_non_dict_val_metrics_degrades_to_none(tmp_path):
+    """The audit B16 acceptance case: a card FILE with val_metrics: "not-a-dict"
+    must serve the entry with val_metrics None, not 500/drop it."""
+    settings = _card_file_registry(
+        tmp_path, {"val_metrics": "not-a-dict", "training_run": "run-x"}
+    )
+
+    options = InferenceService(settings).model_options()
+
+    assert len(options) == 1
+    assert options[0].val_metrics is None
+    assert options[0].training_run == "run-x"
+
+
+def test_card_with_wrong_typed_provenance_nulls_field_not_entry(tmp_path):
+    """Wrong-typed provenance strings used to fail ModelInfo construction:
+    /api/models dropped the entry, /api/model leaked a raw pydantic 400
+    (audit B16). Now the field is nulled at load and the entry survives."""
+    settings = _card_file_registry(
+        tmp_path,
+        {"model_id": 123, "training_run": ["run-x"], "base_weights": 42},
+    )
+    service = InferenceService(settings)
+
+    options = service.model_options()
+    info = service.model_info()  # the /api/model path — must not raise
+
+    assert [opt.model_id for opt in options] == ["small"]
+    assert options[0].model_card_id is None
+    assert options[0].base_weights is None
+    assert info.training_run is None
+
+
+def test_legacy_card_with_non_dict_classes_does_not_crash_registry_load(tmp_path):
+    """len(card["classes"]) runs OUTSIDE per-entry isolation in the legacy path;
+    a non-sized value used to 500 every endpoint via InferenceService.__init__
+    (audit B16)."""
+    model_path = tmp_path / "serving" / "best.pt"
+    model_path.parent.mkdir(parents=True)
+    model_path.write_bytes(b"legacy")
+    (model_path.parent / "model_card.json").write_text(
+        json.dumps({"classes": 5, "model_id": "legacy-run"}), encoding="utf-8"
+    )
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=model_path,
+        model_registry_path=tmp_path / "missing-registry.json",
+    )
+
+    registry = load_model_registry(settings)
+
+    entry = registry.get()
+    assert entry.class_count == 2  # falls back to the 2-class default
+    assert entry.card is not None
+    assert entry.card.get("classes") is None
+    assert entry.label == "legacy-run"  # valid string fields survive

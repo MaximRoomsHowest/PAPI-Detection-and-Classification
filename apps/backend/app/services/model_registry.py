@@ -21,12 +21,48 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.config import REPO_ROOT, Settings
+from app.validation.schemas import ValMetrics
 
 logger = logging.getLogger(__name__)
 
 _HASH_CHUNK_BYTES = 1024 * 1024
 _MODEL_CARD_FILENAME = "model_card.json"
+
+# Card fields that ModelInfo consumes as plain strings. A wrong-typed value
+# used to surface only at ModelInfo construction: /api/models dropped the
+# whole entry and /api/model leaked the raw pydantic message as a 400.
+_CARD_STR_FIELDS = ("model_id", "training_run", "base_weights", "split_evaluated")
+
+
+def _sanitize_card(card: dict[str, Any], label: str) -> dict[str, Any]:
+    """Best-effort hygiene for model-card data at load time (audit B16).
+
+    A malformed optional field degrades to ``None`` with one startup-log
+    warning instead of failing later at request time. Notably ``classes``
+    must end up dict-or-None: ``len(card.get("classes", {}) or {})`` runs in
+    the legacy-registry path OUTSIDE any per-entry isolation, where a
+    non-sized value used to 500 every endpoint via InferenceService.__init__.
+    """
+    for field in _CARD_STR_FIELDS:
+        value = card.get(field)
+        if value is not None and not isinstance(value, str):
+            logger.warning("Model card %s: ignoring non-string '%s'.", label, field)
+            card[field] = None
+    classes = card.get("classes")
+    if classes is not None and not isinstance(classes, dict):
+        logger.warning("Model card %s: ignoring non-object 'classes'.", label)
+        card["classes"] = None
+    val_metrics = card.get("val_metrics")
+    if val_metrics is not None:
+        try:
+            ValMetrics.model_validate(val_metrics)
+        except ValidationError:
+            logger.warning("Model card %s: ignoring malformed 'val_metrics'.", label)
+            card["val_metrics"] = None
+    return card
 
 
 @dataclass(frozen=True)
@@ -109,7 +145,9 @@ def load_model_card(model_path: Path) -> dict[str, Any] | None:
         data = json.loads(card_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    return _sanitize_card(data, str(card_path))
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -209,6 +247,10 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
             card.setdefault("training_run", raw.get("training_run") or model_id)
             card.setdefault("base_weights", raw.get("base_weights"))
             card.setdefault("split_evaluated", raw.get("split_evaluated"))
+            # Sanitize AFTER the merge/setdefault block so wrong-typed values
+            # smuggled in from either the card file or the inline registry
+            # entry are caught in one place.
+            card = _sanitize_card(card, model_id)
 
             entries.append(
                 ModelRegistryEntry(
