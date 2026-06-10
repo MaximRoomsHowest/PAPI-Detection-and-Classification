@@ -191,6 +191,7 @@ export const translations = {
       provenanceHeading: 'Result based on',
       provenanceTelemetryNone: 'Telemetry: none (image GPS / unavailable)',
       artifactInlineWarning: 'Annotated preview unavailable',
+      truncatedAnalysis: 'Analysis truncated: the source exceeded the frame limit — results cover the first {frames} frames only.',
       runwaySelectDisabled: 'Runways are still loading…',
     },
     runways: {
@@ -589,6 +590,7 @@ export const translations = {
       provenanceHeading: 'Ergebnis basiert auf',
       provenanceTelemetryNone: 'Telemetrie: keine (Bild-GPS / nicht verfügbar)',
       artifactInlineWarning: 'Annotierte Vorschau nicht verfügbar',
+      truncatedAnalysis: 'Analyse abgeschnitten: Die Quelle überschritt das Frame-Limit — die Ergebnisse decken nur die ersten {frames} Frames ab.',
       runwaySelectDisabled: 'Pisten werden noch geladen…',
     },
     runways: {
@@ -987,6 +989,7 @@ export const translations = {
       provenanceHeading: 'Resultaat gebaseerd op',
       provenanceTelemetryNone: 'Telemetrie: geen (beeld-GPS / niet beschikbaar)',
       artifactInlineWarning: 'Geannoteerde voorvertoning niet beschikbaar',
+      truncatedAnalysis: 'Analyse afgekapt: de bron overschreed de framelimiet — de resultaten dekken alleen de eerste {frames} frames.',
       runwaySelectDisabled: 'Banen worden nog geladen…',
     },
     runways: {
@@ -1385,6 +1388,7 @@ export const translations = {
       provenanceHeading: 'Résultat basé sur',
       provenanceTelemetryNone: 'Télémétrie : aucune (GPS image / indisponible)',
       artifactInlineWarning: 'Aperçu annoté indisponible',
+      truncatedAnalysis: 'Analyse tronquée : la source a dépassé la limite d’images — les résultats ne couvrent que les {frames} premières images.',
       runwaySelectDisabled: 'Chargement des pistes…',
     },
     runways: {

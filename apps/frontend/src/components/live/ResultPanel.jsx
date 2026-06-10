@@ -44,6 +44,18 @@ export function ResultPanel({ copy }) {
             </div>
           )}
 
+          {/* Honest partial-result banner: the backend stamps truncated_at_frame when a
+              video/sequence out-ran the frame limit mid-stream (container metadata lied),
+              so the verdict below covers only the processed prefix (audit B2). */}
+          {activeScenario.rawResult?.truncated_at_frame != null && (
+            <p className="result-truncation" role="alert">
+              {copy.live.truncatedAnalysis.replace(
+                '{frames}',
+                activeScenario.rawResult.truncated_at_frame,
+              )}
+            </p>
+          )}
+
           <div className="state-summary">
             <span className="status-dot" style={{ '--dot-color': activeState.color }} />
             <div>

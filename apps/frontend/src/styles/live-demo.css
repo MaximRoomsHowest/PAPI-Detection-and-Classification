@@ -776,6 +776,19 @@
   font-weight: 600;
 }
 
+/* Partial-result banner: a video/sequence that out-ran the frame limit mid-stream
+   was truncated by the backend (truncated_at_frame on the payload); the verdict
+   covers only the processed prefix and must visibly say so (audit B2). */
+.result-truncation {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Selected-runway summary on the Live Demo — the geometric frame of reference the
    angle is scored against, shown beside the drone-position inputs. */
 .runway-summary {
