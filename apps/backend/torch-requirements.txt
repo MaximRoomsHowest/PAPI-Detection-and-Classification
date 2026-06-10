@@ -8,9 +8,14 @@
 # dropped cu121 wheels); the CI docker smoke loads the real serving checkpoint on
 # these pins, which is the compatibility gate for the image.
 #
-# 2.9.0: the audit-clean floor as of 2026-06-10 — 2.6.0 carried 19 published
-# advisories with fixes spread across 2.7.0/2.7.1/2.8.0/2.9.0. The single
-# remaining advisory (PYSEC-2026-139) has no fixed release anywhere and is
-# explicitly ignore-listed in ci.yml with this justification.
-torch==2.9.0
-torchvision==0.24.0
+# 2.11.0: the audit-clean floor as of 2026-06-10 (evening). The GitHub advisory
+# DB activated two reviewed torch advisories mid-day (2026-06-10T18:02Z):
+#   - CVE-2025-3001 (torch.lstm_cell memory corruption, local-only, LOW) —
+#     fixed in 2.10.0, so the previous 2.9.0 pin started failing pip-audit.
+#   - CVE-2025-3000 (torch.jit.script memory corruption, local-only, LOW) —
+#     NO fixed release exists in any version; ignore-listed in ci.yml.
+# 2.11.0 over 2.10.0 because PYSEC-2026-139 caps at <=2.10.x — moving to 2.11
+# clears it outright and its old ignore-list entry is removed. torchvision
+# 0.26.0 is the matching release (requires torch==2.11.0 exactly).
+torch==2.11.0
+torchvision==0.26.0
