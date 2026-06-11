@@ -106,6 +106,12 @@ class Settings(BaseSettings):
     # consecutive video frames, so this sets annotated-playback speed and the
     # transition frame-gap timing. It does not affect detection.
     sequence_fps: float = Field(default=4.0, gt=0, le=120.0, alias="PAPI_SEQUENCE_FPS")
+    # Postgres connection-pool sizing (ignored on SQLite, which uses StaticPool).
+    # SQLAlchemy's defaults (5 + 10 overflow) sit below Starlette's default
+    # 40-thread pool that runs the sync endpoints; 10 + 20 keeps headroom for a
+    # burst of logs/stats/runways requests without holding 40 idle connections.
+    db_pool_size: int = Field(default=10, ge=1, le=100, alias="PAPI_DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=20, ge=0, le=200, alias="PAPI_DB_MAX_OVERFLOW")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

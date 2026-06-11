@@ -120,6 +120,10 @@ services:
       PAPI_SEQUENCE_FPS: ${PAPI_SEQUENCE_FPS:-4}
       PAPI_INFERENCE_IMGSZ: ${PAPI_INFERENCE_IMGSZ:-1280}
       PAPI_INFERENCE_IOU: ${PAPI_INFERENCE_IOU:-0.7}
+      # Postgres connection-pool sizing (app/database.py); defaults match
+      # app/config.py. SQLite deployments ignore these.
+      PAPI_DB_POOL_SIZE: ${PAPI_DB_POOL_SIZE:-10}
+      PAPI_DB_MAX_OVERFLOW: ${PAPI_DB_MAX_OVERFLOW:-20}
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}

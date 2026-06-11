@@ -78,3 +78,37 @@ def test_max_image_megapixels_zero_rejected(monkeypatch):
 def test_max_image_megapixels_default(monkeypatch):
     monkeypatch.delenv("PAPI_MAX_IMAGE_MEGAPIXELS", raising=False)
     assert Settings().max_image_megapixels == 80
+
+
+def test_db_pool_size_zero_rejected(monkeypatch):
+    monkeypatch.setenv("PAPI_DB_POOL_SIZE", "0")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_db_max_overflow_negative_rejected(monkeypatch):
+    monkeypatch.setenv("PAPI_DB_MAX_OVERFLOW", "-1")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_db_max_overflow_zero_accepted(monkeypatch):
+    """0 overflow (a strictly fixed-size pool) is a valid operator choice."""
+    monkeypatch.setenv("PAPI_DB_MAX_OVERFLOW", "0")
+    assert Settings().db_max_overflow == 0
+
+
+def test_db_pool_defaults(monkeypatch):
+    monkeypatch.delenv("PAPI_DB_POOL_SIZE", raising=False)
+    monkeypatch.delenv("PAPI_DB_MAX_OVERFLOW", raising=False)
+    settings = Settings()
+    assert settings.db_pool_size == 10
+    assert settings.db_max_overflow == 20
+
+
+def test_db_pool_env_override(monkeypatch):
+    monkeypatch.setenv("PAPI_DB_POOL_SIZE", "25")
+    monkeypatch.setenv("PAPI_DB_MAX_OVERFLOW", "50")
+    settings = Settings()
+    assert settings.db_pool_size == 25
+    assert settings.db_max_overflow == 50
