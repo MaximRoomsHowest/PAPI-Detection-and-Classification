@@ -204,6 +204,24 @@ describe('runway UI smoke', () => {
     expect(container.textContent).toContain('Nano detector')
   })
 
+  it('rejects an add-runway submit with empty coordinate fields', async () => {
+    const addRunway = vi.fn(async () => customRunway)
+    mocks.contextValue = makeContext({ addRunway })
+
+    const { container } = render(<RunwaysPage copy={copy} />)
+
+    // Default form: altitudes prefilled, lat/lon EMPTY. Number('') is 0 — in
+    // range for every coordinate — so without the empty-field guard this
+    // submit would create lamps at (0, 0) and silently corrupt the geometry.
+    const form = container.querySelector('form')
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+
+    expect(addRunway).not.toHaveBeenCalled()
+    expect(container.textContent).toContain(copy.runways.invalidHint)
+  })
+
   it('confirms before deleting the active custom runway', async () => {
     const removeRunway = vi.fn(async () => {})
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)

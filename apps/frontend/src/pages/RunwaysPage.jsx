@@ -26,6 +26,11 @@ const emptyForm = () => ({
 // Accept a dot or comma decimal separator (a de/nl/fr user may type "47,67").
 const toNumber = (value) => Number(String(value).trim().replace(',', '.'))
 const inRange = (value, min, max) => {
+  // An EMPTY field must fail validation: Number('') is 0, which sits inside
+  // every coordinate range — a half-filled form would otherwise create a lamp
+  // at (0, 0), distinct enough to pass the backend's 4-distinct-positions
+  // check and silently corrupt the runway geometry (audit 2026-06-11).
+  if (!String(value).trim()) return false
   const n = toNumber(value)
   return Number.isFinite(n) && n >= min && n <= max
 }
