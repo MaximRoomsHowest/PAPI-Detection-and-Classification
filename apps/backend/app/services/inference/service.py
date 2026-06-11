@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -52,6 +53,13 @@ from app.validation.schemas import (
 
 logger = logging.getLogger(__name__)
 
+# Lock-wait visibility thresholds for _acquire_inference_lock. Inference is
+# serialized by design, so a request queued behind a long video analysis can
+# legitimately wait minutes — these only make that wait OBSERVABLE in the logs
+# (queued vs hung is undebuggable otherwise). Constants, not env knobs.
+_LOCK_WAIT_INFO_S = 0.1
+_LOCK_WAIT_WARN_S = 5.0
+
 
 class InferenceService:
     def __init__(self, settings: Settings):
@@ -71,6 +79,27 @@ class InferenceService:
         # costs no real throughput (audit H1 / M2 / L1).
         self._lock = threading.RLock()
 
+    @contextmanager
+    def _acquire_inference_lock(self):
+        """Acquire the serialization lock, logging how long the caller waited.
+
+        Used only at the TOP-LEVEL entry points (analyze / analyze_frame_sequence)
+        — re-entrant acquisitions inside a held lock (_load_model, self.model)
+        stay on the plain ``with self._lock`` and log nothing, since they never
+        actually wait.
+        """
+        wait_start = perf_counter()
+        with self._lock:
+            waited = perf_counter() - wait_start
+            if waited >= _LOCK_WAIT_WARN_S:
+                logger.warning(
+                    "Inference lock wait: %.1fs — request was queued behind another analysis.",
+                    waited,
+                )
+            elif waited >= _LOCK_WAIT_INFO_S:
+                logger.info("Inference lock wait: %.2fs", waited)
+            yield
+
     def analyze(
         self,
         media_path: Path,
@@ -85,7 +114,7 @@ class InferenceService:
     ) -> AnalysisPayload:
         # Serialise the whole inference so concurrent threadpool requests never
         # share the YOLO/ByteTrack state mid-stream (audit H1).
-        with self._lock:
+        with self._acquire_inference_lock():
             if media_type == "image":
                 return self.analyze_image(
                     media_path, runway_id, original_filename, drone_id, drone_metadata,
@@ -551,7 +580,7 @@ class InferenceService:
         # Serialise like analyze() does for image/video: the shared YOLO/ByteTrack
         # state is not thread-safe (audit H1). The lock is re-entrant, so self.model
         # / _detect_frame can re-acquire it while we hold it.
-        with self._lock:
+        with self._acquire_inference_lock():
             start = perf_counter()
             if not image_paths:
                 raise ValueError("No images were supplied for sequence analysis.")
