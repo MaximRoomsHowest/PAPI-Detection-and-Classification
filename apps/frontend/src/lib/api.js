@@ -261,8 +261,10 @@ export async function fetchModels() {
 // Stable error code for a failed /api/models load — the UI layer owns the translation.
 export const MODEL_OPTIONS_ERROR_CODE = 'model-options-unavailable'
 
-export async function fetchStats() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats`, {
+export async function fetchStats(options = {}) {
+  // Same camelCase filter set as fetchLogs/logsCsvUrl (limit/offset are simply
+  // absent here) — the backend aggregates the matching slice (History stats cards).
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats${buildLogQuery(options)}`, {
     headers: buildHeaders(),
   })
   if (!response.ok) {

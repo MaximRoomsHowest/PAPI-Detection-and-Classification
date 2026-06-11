@@ -117,25 +117,33 @@ class AnalysisLogRepository:
     def get(self, log_id: str) -> AnalysisLog | None:
         return self.db.get(AnalysisLog, log_id)
 
-    def stats(self) -> InferenceStats:
-        """Whole-table aggregate (audit IMP-BE-2).
+    def stats(self, **filters) -> InferenceStats:
+        """Aggregate over the (optionally filtered) analysis-log table.
 
+        Accepts the same filter set as list/count/export, so the History page's
+        summary cards can describe the filtered slice the table is showing
+        instead of always the whole table (audit IMP-BE-2 + History deep dive).
         Counts / averages / breakdowns use SQL aggregates over the indexed columns.
         Latency percentiles are computed in Python over the processing_ms column —
         portable across SQLite (tests) and Postgres (prod), and cheap at this scale.
         """
-        total = int(self.db.scalar(select(func.count()).select_from(AnalysisLog)) or 0)
+        conditions = self._filter_conditions(**filters)
+        total = int(
+            self.db.scalar(select(func.count()).select_from(AnalysisLog).where(*conditions)) or 0
+        )
         if total == 0:
             return InferenceStats(sample_size=0, total_analyses=0, image_count=0, video_count=0)
 
-        by_media = _grouped_counts(self.db, AnalysisLog.media_type)
-        by_runway = _grouped_counts(self.db, AnalysisLog.runway_id)
-        by_state = _grouped_counts(self.db, AnalysisLog.global_state)
-        avg_proc = self.db.scalar(select(func.avg(AnalysisLog.processing_ms)))
-        avg_conf = self.db.scalar(select(func.avg(AnalysisLog.confidence)))
-        first_at = self.db.scalar(select(func.min(AnalysisLog.created_at)))
-        latest_at = self.db.scalar(select(func.max(AnalysisLog.created_at)))
-        processing_times = sorted(self.db.scalars(select(AnalysisLog.processing_ms)).all())
+        by_media = _grouped_counts(self.db, AnalysisLog.media_type, conditions)
+        by_runway = _grouped_counts(self.db, AnalysisLog.runway_id, conditions)
+        by_state = _grouped_counts(self.db, AnalysisLog.global_state, conditions)
+        avg_proc = self.db.scalar(select(func.avg(AnalysisLog.processing_ms)).where(*conditions))
+        avg_conf = self.db.scalar(select(func.avg(AnalysisLog.confidence)).where(*conditions))
+        first_at = self.db.scalar(select(func.min(AnalysisLog.created_at)).where(*conditions))
+        latest_at = self.db.scalar(select(func.max(AnalysisLog.created_at)).where(*conditions))
+        processing_times = sorted(
+            self.db.scalars(select(AnalysisLog.processing_ms).where(*conditions)).all()
+        )
 
         return InferenceStats(
             sample_size=total,
@@ -205,8 +213,11 @@ def _percentile_nearest_rank(values: list[int], percentile: float) -> int | None
     return values[index]
 
 
-def _grouped_counts(db: Session, column: ColumnElement) -> dict[str, int]:
-    rows = db.execute(select(column, func.count()).group_by(column)).all()
+def _grouped_counts(
+    db: Session, column: ColumnElement, conditions: list[ColumnElement[bool]] | None = None
+) -> dict[str, int]:
+    stmt = select(column, func.count()).where(*(conditions or [])).group_by(column)
+    rows = db.execute(stmt).all()
     return {str(key): int(value) for key, value in rows}
 
 

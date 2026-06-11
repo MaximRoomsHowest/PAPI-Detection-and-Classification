@@ -154,6 +154,11 @@ describe('HistoryPage', () => {
     expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
       expect.objectContaining({ offset: 0, mediaType: 'video' }),
     )
+    // The stats cards describe the same slice (and say so).
+    expect(mocks.fetchStats).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mediaType: 'video' }),
+    )
+    expect(container.querySelector('.history-summary__scope')).not.toBeNull()
 
     const confidence = filterSelect(container, copy.history.confidence)
     act(() => {

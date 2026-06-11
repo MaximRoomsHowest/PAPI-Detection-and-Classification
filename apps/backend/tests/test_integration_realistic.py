@@ -136,6 +136,28 @@ def test_tracked_detections_survive_the_log_round_trip(make_client):
     assert [detection["class_id"] for detection in detections] == [1, 1, 0, 0]
 
 
+def test_stats_endpoint_applies_the_shared_filters(make_client):
+    client = make_client()
+
+    analyzed = client.post(
+        "/api/analyze",
+        files={"file": ("frame.jpg", BytesIO(JPEG), "image/jpeg")},
+        data={"runway_id": "papi_24"},
+    )
+    assert analyzed.status_code == 200
+
+    matching = client.get("/api/stats", params={"runway_id": "papi_24"}).json()
+    assert matching["total_analyses"] == 1
+    assert matching["by_runway"] == {"papi_24": 1}
+
+    other = client.get("/api/stats", params={"runway_id": "papi_06"}).json()
+    assert other["total_analyses"] == 0
+
+    # Malformed filters are rejected like /api/logs, not silently zeroed.
+    invalid = client.get("/api/stats", params={"global_state": "bogus"})
+    assert invalid.status_code == 400
+
+
 def test_csv_export_contains_the_realistic_row(make_client):
     client = make_client()
 

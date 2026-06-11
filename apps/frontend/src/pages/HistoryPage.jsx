@@ -97,10 +97,9 @@ export function HistoryPage({ copy }) {
     }
   }, [])
 
-  // Fetch logs + stats whenever the page, a filter, or the manual refresh key
-  // changes. Every setState runs in an async callback after the awaited fetch
-  // (never synchronously in the effect body), so there is no set-state cascade
-  // and the previous setTimeout(0) workaround is no longer needed.
+  // Fetch logs whenever the page, a filter, or the manual refresh key changes.
+  // Every setState runs in an async callback after the awaited fetch (never
+  // synchronously in the effect body), so there is no set-state cascade.
   useEffect(() => {
     let ignore = false
     const options = {
@@ -113,24 +112,11 @@ export function HistoryPage({ copy }) {
       createdAfter: dateFilter || undefined,
       minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
     }
-    Promise.all([fetchLogs(options), fetchStats()])
-      .then(([logsResult, nextStats]) => {
+    fetchLogs(options)
+      .then((logsResult) => {
         if (ignore) return
         setLogs(logsResult.items)
         setTotal(logsResult.total)
-        setStats(nextStats)
-        // Grow the stable filter-option universe from this response. We union
-        // (never replace) so options survive a narrowing filter selection, and
-        // we fold in the active selections so they stay present even if the
-        // backend has stopped reporting them (e.g. all matching rows moved to
-        // another page). Returning the previous array unchanged when nothing is
-        // new avoids a needless re-render.
-        setRunwayOptions((prev) =>
-          mergeOptions(prev, Object.keys(nextStats?.by_runway ?? {}), runwayFilter),
-        )
-        setStateOptions((prev) =>
-          mergeOptions(prev, Object.keys(nextStats?.by_global_state ?? {}), stateFilter),
-        )
         // /api/stats has no by_model breakdown; fold in the ids seen on this
         // page of logs so since-removed models stay selectable alongside the
         // registry-seeded options from the mount effect.
@@ -159,6 +145,44 @@ export function HistoryPage({ copy }) {
     // (the banner simply renders in the locale active at failure time).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, runwayFilter, stateFilter, modelFilter, mediaFilter, dateFilter, confidenceFilter, refreshKey])
+
+  // Stats describe the filtered slice, so they refetch on filter/refresh
+  // changes only — paging through results cannot change the aggregate, so it
+  // no longer triggers a stats round-trip.
+  useEffect(() => {
+    let ignore = false
+    fetchStats({
+      runwayId: runwayFilter || undefined,
+      globalState: stateFilter || undefined,
+      modelId: modelFilter || undefined,
+      mediaType: mediaFilter || undefined,
+      createdAfter: dateFilter || undefined,
+      minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
+    })
+      .then((nextStats) => {
+        if (ignore) return
+        setStats(nextStats)
+        // Grow the stable filter-option universe from this response. We union
+        // (never replace) so options survive a narrowing filter selection, and
+        // we fold in the active selections so they stay present even if the
+        // backend has stopped reporting them. Returning the previous array
+        // unchanged when nothing is new avoids a needless re-render.
+        setRunwayOptions((prev) =>
+          mergeOptions(prev, Object.keys(nextStats?.by_runway ?? {}), runwayFilter),
+        )
+        setStateOptions((prev) =>
+          mergeOptions(prev, Object.keys(nextStats?.by_global_state ?? {}), stateFilter),
+        )
+      })
+      .catch((loadError) => {
+        if (!ignore) setError(localizedErrorMessage(loadError, copy))
+      })
+    return () => {
+      ignore = true
+    }
+    // `copy` intentionally omitted — same rationale as the logs effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runwayFilter, stateFilter, modelFilter, mediaFilter, dateFilter, confidenceFilter, refreshKey])
 
   // Refresh jumps back to page 1 so freshly-logged analyses (newest first) are
   // visible, and forces a refetch via refreshKey even when already on page 1.
@@ -318,7 +342,7 @@ export function HistoryPage({ copy }) {
         </div>
       )}
 
-      <HistoryStats modelInfo={modelInfo} stats={stats} copy={copy} />
+      <HistoryStats modelInfo={modelInfo} stats={stats} isFiltered={hasActiveFilters} copy={copy} />
 
       <HistoryFilters
         runwayFilter={runwayFilter}

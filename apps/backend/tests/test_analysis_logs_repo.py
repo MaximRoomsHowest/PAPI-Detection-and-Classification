@@ -72,6 +72,37 @@ def test_stats_empty_table_is_zeroed(session):
     assert stats.avg_confidence is None
 
 
+def test_stats_respects_the_shared_filters(session):
+    _add(session, runway_id="papi_24", global_state="correct_glidepath", media_type="image", confidence=0.9, processing_ms=100)
+    _add(session, runway_id="papi_24", global_state="too_low", media_type="video", confidence=0.8, processing_ms=300)
+    _add(session, runway_id="papi_06", global_state="correct_glidepath", media_type="image", confidence=0.7, processing_ms=200)
+    repo = AnalysisLogRepository(session)
+
+    by_runway = repo.stats(runway_id="papi_24")
+    assert by_runway.total_analyses == 2
+    assert by_runway.by_runway == {"papi_24": 2}
+    assert by_runway.image_count == 1
+    assert by_runway.video_count == 1
+    # Averages describe the filtered slice, not the whole table.
+    assert by_runway.avg_confidence == pytest.approx(0.85)
+
+    by_state = repo.stats(global_state="correct_glidepath")
+    assert by_state.total_analyses == 2
+    assert by_state.by_runway == {"papi_24": 1, "papi_06": 1}
+
+    by_confidence = repo.stats(min_confidence=0.85)
+    assert by_confidence.total_analyses == 1
+    assert by_confidence.avg_confidence == pytest.approx(0.9)
+
+
+def test_stats_filtered_to_nothing_is_zeroed(session):
+    _add(session, runway_id="papi_24")
+    stats = AnalysisLogRepository(session).stats(runway_id="papi_06")
+    assert stats.total_analyses == 0
+    assert stats.by_runway == {}
+    assert stats.avg_confidence is None
+
+
 def test_filters_and_count(session):
     _add(session, runway_id="papi_24", global_state="correct_glidepath", confidence=0.9)
     _add(session, runway_id="papi_06", global_state="too_low", confidence=0.5)

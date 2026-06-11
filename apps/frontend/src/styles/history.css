@@ -123,6 +123,21 @@
   font-size: 12px;
 }
 
+/* "filtered" scope chip on the stats cards: marks aggregates that describe the
+   active filter selection rather than the whole table. */
+.history-summary__scope {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .history-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
