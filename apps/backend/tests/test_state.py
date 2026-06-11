@@ -23,6 +23,33 @@ def test_normalize_detections_sorts_lamps_left_to_right():
     assert [lamp.state for lamp in lamps] == ["white", "white", "red", "red"]
 
 
+def test_normalize_detections_keeps_top_four_by_confidence_then_resorts_by_x():
+    """Five detections: the four HIGHEST-CONFIDENCE survive, then re-sort by x.
+
+    This pins the current selection strategy — including its known limitation:
+    a high-confidence false positive displaces the lowest-confidence REAL lamp
+    (audit 2026-06-11 near-miss). If selection ever becomes cluster-aware this
+    test should be updated deliberately, not silently.
+    """
+    detections = [
+        {"class_id": 1, "confidence": 0.90, "bbox": {"x1": 100, "y1": 20, "x2": 130, "y2": 50}},
+        {"class_id": 1, "confidence": 0.91, "bbox": {"x1": 200, "y1": 20, "x2": 230, "y2": 50}},
+        # High-confidence interloper between lamps 2 and 3.
+        {"class_id": 0, "confidence": 0.95, "bbox": {"x1": 250, "y1": 20, "x2": 280, "y2": 50}},
+        {"class_id": 0, "confidence": 0.89, "bbox": {"x1": 300, "y1": 20, "x2": 330, "y2": 50}},
+        # The real fourth lamp loses the confidence cut.
+        {"class_id": 0, "confidence": 0.60, "bbox": {"x1": 400, "y1": 20, "x2": 430, "y2": 50}},
+    ]
+
+    lamps = normalize_detections(detections)
+
+    assert [lamp.index for lamp in lamps] == [1, 2, 3, 4]
+    # x-order of the four survivors: 100, 200, 250 (interloper), 300 — the real
+    # lamp at x=400 (conf 0.60) was dropped by the confidence cut.
+    assert [lamp.state for lamp in lamps] == ["white", "white", "red", "red"]
+    assert [lamp.confidence for lamp in lamps] == [0.90, 0.91, 0.95, 0.89]
+
+
 def test_global_state_mapping_uses_papi_ratios():
     assert global_state_from_lamps(normalize_detections([])) == "unknown"
     assert _state_for_classes([0]) == "unknown"

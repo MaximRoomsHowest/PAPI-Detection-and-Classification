@@ -268,12 +268,29 @@ def test_oversized_csv_field_raises_telemetry_error_not_csverror() -> None:
         parse_telemetry("big.csv", payload)
 
 
-def test_sample_count_is_capped_to_the_hard_limit() -> None:
+def test_sample_count_is_capped_to_the_hard_limit(caplog) -> None:
     # A pathologically long track is downsampled to the cap so the per-frame resample
     # stays bounded (audit: sample-count / O(frame_count x n_samples) resample DoS).
     body = b"latitude,longitude,altitude\n" + (b"47.6,9.5,500\n" * (MAX_TELEMETRY_SAMPLES + 1_000))
-    samples = parse_telemetry("huge.csv", body)
+    with caplog.at_level("WARNING", logger="app.services.telemetry"):
+        samples = parse_telemetry("huge.csv", body)
     assert len(samples) == MAX_TELEMETRY_SAMPLES
+    # The thinning is visible in the run log — a silently downsampled angle
+    # track was undiagnosable before (audit 2026-06-11).
+    assert any("downsampled" in record.getMessage() for record in caplog.records)
+
+
+def test_resample_logs_when_frame_indices_outrun_the_video(caplog) -> None:
+    # An SRT from a longer recording than the uploaded clip: every trailing frame
+    # reuses the nearest in-range fix (correct), but the log must say so.
+    samples = [
+        DroneSample(47.0, 9.0, 500.0, frame_index=0),
+        DroneSample(47.0, 9.0, 510.0, frame_index=100),
+    ]
+    with caplog.at_level("WARNING", logger="app.services.telemetry"):
+        out = resample_to_frames(samples, 10)
+    assert len(out) == 10
+    assert any("frame indices reach 100" in record.getMessage() for record in caplog.records)
 
 
 def test_resample_empty_inputs() -> None:
