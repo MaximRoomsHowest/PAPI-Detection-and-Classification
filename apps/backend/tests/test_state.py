@@ -7,7 +7,7 @@ from app.services.state import (
     normalize_detections,
     transition_events_from_state_runs,
 )
-from app.validation.schemas import AnglePerLight, AngleResult, LampResult
+from app.validation.schemas import AngleResult, LampResult
 
 
 def test_normalize_detections_sorts_lamps_left_to_right():
@@ -96,50 +96,128 @@ def test_normalize_pads_missing_lamps_as_obscured():
     assert confidence_from_lamps(lamps) == 0.9
 
 
-def test_infers_one_missing_lamp_from_angle():
-    lamps = normalize_detections(
+def _three_lamps_red_red_white():
+    """Two reds + one white via normalize_detections: slots 1..3 + slot 4 obscured."""
+    return normalize_detections(
         [
             {"class_id": 0, "confidence": 0.9, "bbox": {"x1": 10, "y1": 1, "x2": 12, "y2": 3}},
             {"class_id": 0, "confidence": 0.8, "bbox": {"x1": 20, "y1": 1, "x2": 22, "y2": 3}},
             {"class_id": 1, "confidence": 0.7, "bbox": {"x1": 30, "y1": 1, "x2": 32, "y2": 3}},
         ]
     )
-    angle = AngleResult(
+
+
+def _angle(deg):
+    return AngleResult(
         angle_available=True,
-        elevation_angle_deg=3.8,
-        per_light_angles=[AnglePerLight(runway_lamp=4, distance_m=500, elevation_angle_deg=3.8)],
+        elevation_angle_deg=deg,
         angle_source="test",
         angle_note="test",
     )
 
-    inferred = infer_single_missing_lamp_from_angle(lamps, angle)
+
+def test_infers_one_missing_lamp_from_angle():
+    """On-slope (3.0 deg) the geometry expects exactly 2 whites; with R,R,W
+    observed the missing lamp must be the second white — regardless of which
+    side of the array carries the low set angles. The EDNY rwy-24 data has the
+    image order reversed vs the config-comment convention, so a slot-indexed
+    set-angle lookup would get exactly this shape wrong."""
+    lamps = _three_lamps_red_red_white()
+
+    inferred = infer_single_missing_lamp_from_angle(lamps, _angle(3.0))
 
     assert [lamp.state for lamp in inferred] == ["red", "red", "white", "white"]
     assert inferred[3].inferred is True
     assert inferred[3].confidence == 0.0
     assert inferred[3].bbox is None
+    assert inferred[3].inference_note
     assert global_state_from_lamps(inferred) == "correct_glidepath"
 
 
+def test_infers_red_for_an_interior_slot_by_identity():
+    """A video aggregate can leave an INTERIOR slot undetected; the inferred
+    lamp must replace that exact slot (matched by identity, not position
+    arithmetic) and the completed pattern stays contiguous."""
+    lamps = [
+        LampResult(index=1, state="white", confidence=0.9),
+        LampResult(index=2, state="white", confidence=0.8),
+        LampResult(index=3, state="obscured", confidence=0.0),
+        LampResult(index=4, state="red", confidence=0.7),
+    ]
+
+    inferred = infer_single_missing_lamp_from_angle(lamps, _angle(3.0))
+
+    assert [lamp.state for lamp in inferred] == ["white", "white", "red", "red"]
+    assert inferred[2].inferred is True
+    assert inferred[2].index == 3
+
+
 def test_does_not_infer_missing_lamp_without_angle_or_near_transition():
-    lamps = normalize_detections(
-        [
-            {"class_id": 0, "confidence": 0.9, "bbox": {"x1": 10, "y1": 1, "x2": 12, "y2": 3}},
-            {"class_id": 0, "confidence": 0.8, "bbox": {"x1": 20, "y1": 1, "x2": 22, "y2": 3}},
-            {"class_id": 1, "confidence": 0.7, "bbox": {"x1": 30, "y1": 1, "x2": 32, "y2": 3}},
-        ]
-    )
+    lamps = _three_lamps_red_red_white()
     missing_angle = AngleResult(angle_available=False, angle_note="no metadata")
-    boundary_angle = AngleResult(
-        angle_available=True,
-        elevation_angle_deg=3.5,
-        per_light_angles=[AnglePerLight(runway_lamp=4, distance_m=500, elevation_angle_deg=3.5)],
-        angle_source="test",
-        angle_note="test",
-    )
+    # 3.17 deg sits in that lamp's blend zone: 2 or 3 whites are both feasible,
+    # so the missing lamp's colour is genuinely ambiguous.
+    boundary_lamps = [
+        LampResult(index=1, state="white", confidence=0.9),
+        LampResult(index=2, state="white", confidence=0.8),
+        LampResult(index=3, state="red", confidence=0.7),
+        LampResult(index=4, state="obscured", confidence=0.0),
+    ]
 
     assert infer_single_missing_lamp_from_angle(lamps, missing_angle) == lamps
-    assert infer_single_missing_lamp_from_angle(lamps, boundary_angle) == lamps
+    assert infer_single_missing_lamp_from_angle(boundary_lamps, _angle(3.17)) == boundary_lamps
+
+
+def test_does_not_infer_when_observations_contradict_geometry():
+    """Well above every set angle (3.8 deg) a healthy PAPI shows 4 whites;
+    observing two reds means the array (or the angle) is wrong — never paper
+    over that with a fabricated state. The slot-indexed approach happily
+    'inferred' a lamp for exactly this shape."""
+    lamps = _three_lamps_red_red_white()
+
+    assert infer_single_missing_lamp_from_angle(lamps, _angle(3.8)) == lamps
+
+
+def test_does_not_infer_a_spatially_impossible_pattern():
+    """Counts alone can be satisfiable while the completed pattern is not:
+    W ? W R would put the inferred red between two whites, which a healthy
+    PAPI cannot show (whites sit contiguously at one end)."""
+    lamps = [
+        LampResult(index=1, state="white", confidence=0.9),
+        LampResult(index=2, state="obscured", confidence=0.0),
+        LampResult(index=3, state="white", confidence=0.8),
+        LampResult(index=4, state="red", confidence=0.7),
+    ]
+
+    assert infer_single_missing_lamp_from_angle(lamps, _angle(3.0)) == lamps
+
+
+def test_infers_white_when_blend_zone_red_explains_the_observation():
+    """3.45 deg: three set angles are certainly below (white) and the 3.50 lamp
+    is in its blend zone. Observing W,W,R leaves only 'white' feasible for the
+    missing slot — the observed red is explained by the blend-zone lamp."""
+    lamps = [
+        LampResult(index=1, state="white", confidence=0.9),
+        LampResult(index=2, state="white", confidence=0.8),
+        LampResult(index=3, state="red", confidence=0.7),
+        LampResult(index=4, state="obscured", confidence=0.0),
+    ]
+
+    inferred = infer_single_missing_lamp_from_angle(lamps, _angle(3.45))
+
+    assert [lamp.state for lamp in inferred] == ["white", "white", "red", "white"]
+    assert inferred[3].inferred is True
+
+
+def test_does_not_infer_with_more_than_one_missing_lamp():
+    lamps = [
+        LampResult(index=1, state="red", confidence=0.9),
+        LampResult(index=2, state="red", confidence=0.8),
+        LampResult(index=3, state="obscured", confidence=0.0),
+        LampResult(index=4, state="obscured", confidence=0.0),
+    ]
+
+    assert infer_single_missing_lamp_from_angle(lamps, _angle(3.0)) == lamps
 
 
 def test_single_frame_states_are_colour_only():

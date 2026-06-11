@@ -40,7 +40,14 @@ DETECTED_LAMP_STATES = frozenset({"red", "white"})
 _OBSCURED_LAMP_STATE = "obscured"
 
 # Runtime fallback for angle-based inference when one lamp slot is missing.
-# Matches configs/papi_edny.yaml and packages/papi/src/papi/lamp_state.py.
+# VALUES match faa_default_set_angles_deg in configs/papi_edny.yaml and
+# packages/papi/src/papi/lamp_state.py — but deliberately as a SET, not a
+# per-slot binding: which image slot carries which set angle flips with the
+# approach direction (rwy 06 vs 24 view the same array from opposite sides),
+# and the EDNY transition data shows image-lamp 1 flipping at ~3.43 deg on
+# rwy 24 — the reverse of the config-comment convention. Inference therefore
+# only uses the COUNT of set angles below the viewing angle, never a
+# slot-indexed lookup (see infer_single_missing_lamp_from_angle).
 FAA_DEFAULT_SET_ANGLES_DEG = (2.50, 2.83, 3.17, 3.50)
 TRANSITION_HALF_WIDTH_DEG = 0.10
 
@@ -300,37 +307,56 @@ def global_state_from_lamps(lamps: list[LampResult]) -> str:
     return _WHITE_COUNT_TO_STATE.get(counts["white"], "unknown")
 
 
-def _expected_lamp_state_from_angle(angle_deg: float, lamp_index: int) -> str:
-    set_angle = FAA_DEFAULT_SET_ANGLES_DEG[lamp_index - 1]
-    if angle_deg > set_angle + TRANSITION_HALF_WIDTH_DEG:
-        return "white"
-    if angle_deg < set_angle - TRANSITION_HALF_WIDTH_DEG:
-        return "red"
-    return "transition"
+def _expected_white_count_range(angle_deg: float) -> tuple[int, int]:
+    """Min/max number of WHITE lamps a healthy PAPI shows at this viewing angle.
 
-
-def _angle_for_lamp(angle: AngleResult, lamp_index: int) -> float:
-    per_light = next(
-        (
-            light.elevation_angle_deg
-            for light in angle.per_light_angles
-            if light.runway_lamp == lamp_index
-        ),
-        None,
+    A lamp is certainly white above set+halfwidth and certainly red below
+    set-halfwidth; inside its blend zone it can read as either colour, so the
+    range spans the blend-zone lamps.
+    """
+    certain_white = sum(
+        1
+        for set_angle in FAA_DEFAULT_SET_ANGLES_DEG
+        if angle_deg > set_angle + TRANSITION_HALF_WIDTH_DEG
     )
-    return per_light if per_light is not None else angle.elevation_angle_deg
+    certain_red = sum(
+        1
+        for set_angle in FAA_DEFAULT_SET_ANGLES_DEG
+        if angle_deg < set_angle - TRANSITION_HALF_WIDTH_DEG
+    )
+    return certain_white, len(FAA_DEFAULT_SET_ANGLES_DEG) - certain_red
+
+
+def _is_contiguous_pattern(states: list[str]) -> bool:
+    """True when the red/white sequence has at most one colour boundary."""
+    return sum(1 for left, right in zip(states, states[1:], strict=False) if left != right) <= 1
 
 
 def infer_single_missing_lamp_from_angle(
     lamps: list[LampResult],
     angle: AngleResult,
 ) -> list[LampResult]:
-    """Infer one missing PAPI lamp from the angle-derived expected geometry.
+    """Infer one missing PAPI lamp's colour from the white-count geometry.
+
+    The drone's elevation angle fixes HOW MANY of a healthy PAPI's four lamps
+    show white (the set angles below it) — but WHICH image slot shows which
+    colour is unknowable here: the left-to-right order flips with the approach
+    direction (rwy 06 vs 24 view the same array from opposite sides), the EDNY
+    transition data shows the per-slot binding reversed vs the config comment,
+    and ``normalize_detections`` compacts 3 detections into slots 1..3 so the
+    padded "missing" slot need not be the physically missing lamp. Counting
+    sidesteps all three: the missing lamp is white exactly when the observed
+    whites fall one short of the geometric white count.
 
     Conservative by design:
     * only runs when exactly one of the four slots is obscured/unknown,
     * requires an available, plausible angle,
-    * never infers a transition-band lamp, because red/white would be ambiguous.
+    * skips when a blend-zone lamp makes both colours feasible,
+    * skips when the observed colours already contradict the geometry — that
+      mismatch can itself signal a real PAPI fault and must stay visible,
+    * skips when the completed pattern could not be spatially contiguous
+      (whites sit at one end of a healthy array; see the inline note on how
+      interior vs last-slot gaps are treated).
 
     The inferred lamp is marked `inferred=True` and confidence 0.0 so users can
     see it was calculated from geometry, not detected by the model.
@@ -343,15 +369,43 @@ def infer_single_missing_lamp_from_angle(
     if len(detected) != 3 or len(missing) != 1:
         return lamps
 
-    missing_lamp = missing[0]
-    inferred_state = _expected_lamp_state_from_angle(
-        _angle_for_lamp(angle, missing_lamp.index), missing_lamp.index
-    )
-    if inferred_state not in DETECTED_LAMP_STATES:
+    lowest, highest = _expected_white_count_range(angle.elevation_angle_deg)
+    observed_whites = sum(1 for lamp in detected if lamp.state == "white")
+    feasible = {
+        state
+        for state, white_total in (("white", observed_whites + 1), ("red", observed_whites))
+        if lowest <= white_total <= highest
+    }
+    if len(feasible) != 1:
         return lamps
 
-    next_lamps = [lamp.model_copy(deep=True) for lamp in lamps]
-    next_lamps[missing_lamp.index - 1] = LampResult(
+    missing_lamp = missing[0]
+    inferred_state = feasible.pop()
+
+    # Spatial sanity: a healthy PAPI's whites are contiguous at one end, so the
+    # completed pattern may have at most one red/white boundary. An INTERIOR
+    # missing slot sits between observed lamps, so its position is meaningful
+    # and the inferred colour must fit exactly there. A missing LAST slot is
+    # indistinguishable from normalize_detections' compaction padding (the
+    # physically missing lamp could be anywhere), so it only requires SOME
+    # insertion position to yield a contiguous pattern.
+    observed_states = [
+        lamp.state for lamp in sorted(detected, key=lambda lamp: lamp.index)
+    ]
+    interior = any(lamp.index > missing_lamp.index for lamp in detected)
+    if interior:
+        positions = [sum(1 for lamp in detected if lamp.index < missing_lamp.index)]
+    else:
+        positions = range(len(observed_states) + 1)
+    if not any(
+        _is_contiguous_pattern(
+            observed_states[:position] + [inferred_state] + observed_states[position:]
+        )
+        for position in positions
+    ):
+        return lamps
+
+    inferred = LampResult(
         index=missing_lamp.index,
         state=inferred_state,
         confidence=0.0,
@@ -362,7 +416,7 @@ def infer_single_missing_lamp_from_angle(
             "model because this lamp was not detected by the AI."
         ),
     )
-    return next_lamps
+    return [inferred if lamp is missing_lamp else lamp.model_copy(deep=True) for lamp in lamps]
 
 
 def confidence_from_lamps(lamps: list[LampResult]) -> float:
