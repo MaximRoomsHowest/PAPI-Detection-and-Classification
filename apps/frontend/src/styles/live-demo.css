@@ -645,6 +645,43 @@
   line-height: 1.5;
 }
 
+/* Measured per-class metrics table on the Insights model card (rendered only
+   when the registry card itself carries per_class values). */
+.model-per-class {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.model-per-class caption {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.model-per-class th,
+.model-per-class td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.model-per-class th[scope='row'] {
+  text-align: left;
+  font-weight: 600;
+}
+
+.model-per-class thead th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 /* Optional drone identifier (pure provenance) in the metadata prompt's
    controls row — same label/input rhythm as the position fields. */
 .drone-telemetry__id {

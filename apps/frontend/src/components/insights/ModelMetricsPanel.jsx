@@ -16,14 +16,16 @@ import {
 } from '../../catalog/plotly'
 import { backendStateId, stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
+import { lampStateLabel } from '../../lib/stateLabels'
 import { percent } from '../../lib/format'
 
 // Aggregate model/dataset panel. All values come from the backend:
 //   /api/stats  -> logged global-state distribution + throughput
-//   /api/model  -> validation-split detection metrics (box, NOT per-class)
-// Per-class precision/recall/F1 and a confusion matrix are intentionally NOT
-// shown: the backend exposes only box-detection metrics, so building them would
-// be fabrication (documented blocker).
+//   /api/model  -> the selected registry entry's card (val_metrics + provenance)
+// Per-class rows render ONLY when the card itself carries `per_class` (the
+// 3-class transition entry ships real measured ones); deriving them for cards
+// that lack them would be fabrication (documented blocker), so absent stays
+// absent.
 
 function stateLabel(rawState, copy) {
   const id = backendStateId[rawState] ?? 'unknown'
@@ -100,6 +102,7 @@ function ModelMetrics({ model, copy }) {
     )
   }
   const fmt = (value) => (Number.isFinite(value) ? value.toFixed(3) : '—')
+  const perClass = metrics.per_class && Object.entries(metrics.per_class)
   return (
     <>
       <div className="metric-grid">
@@ -115,8 +118,33 @@ function ModelMetrics({ model, copy }) {
           suffix={Number.isFinite(model.confidence_threshold) ? '%' : ''}
         />
       </div>
-      {/* The card subtitle already carries the "box detection, not per-class"
-          disclaimer; here we surface only the backend's own val_metrics note. */}
+      {/* MEASURED per-class rows from the card itself (e.g. the 3-class
+          transition entry) — localized class names, raw values verbatim. */}
+      {perClass?.length > 0 && (
+        <table className="model-per-class">
+          <caption>{copy.insights.metricPerClass}</caption>
+          <thead>
+            <tr>
+              <th scope="col" />
+              <th scope="col">{copy.insights.metricPrecision}</th>
+              <th scope="col">{copy.insights.metricRecall}</th>
+              <th scope="col">F1</th>
+              <th scope="col">{copy.insights.metricMap50}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {perClass.map(([className, row]) => (
+              <tr key={className}>
+                <th scope="row">{lampStateLabel(className, copy)}</th>
+                <td className="tnum">{fmt(row?.precision)}</td>
+                <td className="tnum">{fmt(row?.recall)}</td>
+                <td className="tnum">{fmt(row?.f1)}</td>
+                <td className="tnum">{fmt(row?.map50)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       {metrics.note ? <p className="viz-footnote">{metrics.note}</p> : null}
     </>
   )

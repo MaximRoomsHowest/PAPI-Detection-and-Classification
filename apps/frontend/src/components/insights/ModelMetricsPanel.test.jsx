@@ -103,6 +103,43 @@ describe('ModelMetricsPanel model picker', () => {
     expect(transitionButton.getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('renders the measured per-class table when the card carries one', async () => {
+    mocks.fetchModelInfo.mockImplementation(async (modelId) =>
+      card(modelId ?? 'small', {
+        val_metrics: {
+          precision: null,
+          recall: null,
+          map50: 0.6087,
+          map50_95: 0.3411,
+          per_class: {
+            red: { precision: 0.8435, recall: 0.7686, f1: 0.8043, map50: 0.8981 },
+            transition: { precision: 0.061, recall: 0.3333, f1: 0.1032, map50: 0.0647 },
+          },
+          note: 'Held-out 3-class test eval.',
+        },
+      }),
+    )
+    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+    await flush()
+    await flush()
+
+    const table = container.querySelector('.model-per-class')
+    expect(table).not.toBeNull()
+    // Localized class names, raw measured values verbatim — incl. the honest
+    // transition F1 0.103.
+    expect(table.textContent).toContain(copy.status.red)
+    expect(table.textContent).toContain(copy.status.transition)
+    expect(table.textContent).toContain('0.103')
+    expect(container.textContent).toContain('Held-out 3-class test eval.')
+  })
+
+  it('renders no per-class table for a card without one', async () => {
+    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+    await flush()
+    await flush()
+    expect(container.querySelector('.model-per-class')).toBeNull()
+  })
+
   it('renders no picker when the registry has a single entry', async () => {
     mocks.fetchModels.mockResolvedValueOnce([
       { model_id: 'small', model_label: 'Small detector', is_default: true, available: true },
