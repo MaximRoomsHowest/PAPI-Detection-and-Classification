@@ -270,27 +270,14 @@ export function useAnalysis(copy) {
     // image, and only fail once the backend returned 400 (regression
     // USERTEST-MAJ-1, papi-user-test-2026-05-28).
     if (!isFolderBatch && !isImageFile(file) && !isVideoFile(file)) {
-      // Clear any prior result so a stale result panel doesn't sit under the
-      // "unsupported file" error as if it belonged to the rejected file (audit FB-03).
-      abortInFlight()
-      runIdRef.current += 1
-      clearResolvedArtifactUrls()
-      setIsAnalyzing(false)
-      setBackendScenario(null)
-      setBackendFrames([])
-      setBackendResults([])
-      setBackendFrameIndex(0)
-      clearFolderVideo()
-      // Also drop the previously-loaded media so the viewer doesn't keep showing an unrelated
-      // earlier upload sitting under the "unsupported file" error (audit).
-      setMedia((previous) => {
-        if (previous?.url) {
-          URL.revokeObjectURL(previous.url)
-        }
-        return null
-      })
-      setArtifactWarning(false)
-      setAnalysisProgress('')
+      // Reject WITHOUT touching the current media or its result: the rejected
+      // file never becomes the displayed media, so everything on screen still
+      // belongs together and only the banner (which names the rejected file)
+      // changes. The earlier behaviour (audit FB-03) cleared media + result to
+      // avoid a stale panel "belonging" to the rejected file — but wiping a
+      // finished sweep over one mis-dropped .txt costs the user their whole
+      // analysis (user test 2026-06-11). Keeping media AND result is the
+      // consistent variant of the same honesty rule.
       setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
     }

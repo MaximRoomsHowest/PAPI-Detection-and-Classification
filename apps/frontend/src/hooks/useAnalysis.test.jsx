@@ -200,6 +200,35 @@ describe('useAnalysis inference triggering', () => {
     expect(latest.backendScenario).toBe(latest.backendFrames[1])
   })
 
+  it('rejects an unsupported file without discarding the current analysis', async () => {
+    renderHook()
+    const image = new File(['image'], 'frame.jpg', { type: 'image/jpeg' })
+
+    await act(async () => {
+      latest.handleMediaFiles([image])
+      await flush()
+    })
+    await waitForAssertion(() => {
+      expect(latest.backendScenario).not.toBeNull()
+    })
+    const scenarioBefore = latest.backendScenario
+
+    // A mis-dropped text file must only raise the banner — the media, the
+    // result, and the frames it belongs to all stay (user test 2026-06-11:
+    // the old FB-03 behaviour wiped a finished analysis over a stray .txt).
+    await act(async () => {
+      latest.handleMediaFiles([new File(['notes'], 'notes.txt', { type: 'text/plain' })])
+      await flush()
+    })
+
+    expect(latest.analysisError).toBe(
+      copy.live.unsupportedFile.replace('{name}', 'notes.txt'),
+    )
+    expect(latest.media?.name).toBe('frame.jpg')
+    expect(latest.backendScenario).toBe(scenarioBefore)
+    expect(mocks.analyzeFrame).toHaveBeenCalledTimes(1)
+  })
+
   it('re-runs the existing upload when the inference model changes', async () => {
     renderHook()
     const file = new File(['image'], 'frame.jpg', { type: 'image/jpeg' })
