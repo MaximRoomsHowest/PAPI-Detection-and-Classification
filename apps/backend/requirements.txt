@@ -35,5 +35,7 @@ onnxruntime==1.23.2
 # Azure Blob Storage is only used when PAPI_STORAGE_BACKEND=azure_blob. Local
 # Docker Compose keeps filesystem storage, but the cloud Container App streams
 # uploaded/annotated media through Blob Storage for restart-safe persistence.
-azure-storage-blob>=12.19,<13
-azure-identity>=1.17,<2
+# Pinned exactly like every other dependency here so pip-audit and image builds
+# stay reproducible.
+azure-storage-blob==12.30.0
+azure-identity==1.25.3

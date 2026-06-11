@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import mimetypes
 import posixpath
 from pathlib import Path
@@ -8,6 +9,8 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
 
 # The artifact formats the inference pipeline actually writes. /media serves
 # everything else as application/octet-stream (download, never render):
@@ -91,10 +94,11 @@ class MediaStorage:
         if self.is_azure:
             try:
                 self._container_client().delete_blob(_normalize_export_blob_name(reference))
-            except Exception:
-                # Best-effort orphan cleanup. The DB failure that triggered this
-                # cleanup is more important and should not be hidden.
-                return
+            except Exception as exc:  # noqa: BLE001 - best-effort orphan cleanup
+                # The DB failure that triggered this cleanup is more important and
+                # should not be hidden — but a silently surviving blob is an orphan
+                # an operator can only find via this log line.
+                logger.warning("Could not delete blob %r during cleanup: %s", reference, exc)
             return
         Path(reference).unlink(missing_ok=True)
 
@@ -105,7 +109,13 @@ class MediaStorage:
             try:
                 blob_name = _normalize_export_blob_name(reference)
             except ValueError:
-                return None
+                # Rows written before the backend switched to azure_blob store the
+                # artifact's absolute LOCAL path. The filename is the stable part
+                # (server-generated UUID), so map .../exports/<name> onto its blob
+                # name instead of dropping the whole History row's media.
+                blob_name = _legacy_export_blob_name(reference)
+                if blob_name is None:
+                    return None
             return f"/media/{blob_name.removeprefix('exports/')}"
         return _local_media_url_for_path(reference, self.settings)
 
@@ -189,6 +199,24 @@ def _safe_blob_name(prefix: str, name: str) -> str:
     if normalized.startswith(f"{prefix}/"):
         return normalized
     return f"{prefix}/{normalized}"
+
+
+def _legacy_export_blob_name(reference: str) -> str | None:
+    """Blob name for a pre-azure_blob DB row (absolute local artifact path), or None.
+
+    Only flat ``.../exports/<name>`` shapes map (local artifacts are written flat);
+    anything else — no exports segment, nested remainder, dot segments — stays
+    unresolvable rather than guessing.
+    """
+    normalized = reference.replace("\\", "/")
+    marker = "/exports/"
+    index = normalized.rfind(marker)
+    if index == -1:
+        return None
+    candidate = normalized[index + len(marker) :]
+    if not candidate or "/" in candidate or candidate in (".", ".."):
+        return None
+    return f"exports/{candidate}"
 
 
 def _normalize_export_blob_name(reference: str) -> str:

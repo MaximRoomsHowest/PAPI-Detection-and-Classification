@@ -84,6 +84,13 @@ def run_tracked_sequence(
     ``transition_method`` selects how transitions are derived from the SAME tracked observations:
     "tracking" = temporal red<->white flips (``detect_lamp_transitions``); "model" = learned
     class-2 transition-state runs (``transition_events_from_state_runs``, needs a 3-class model).
+
+    ``store_export`` (when given) persists the finished artifact to the configured
+    media backend and MUST return ``(reference, url)``: the storage reference that
+    goes into the analysis-log row and the public URL for the payload. ``None``
+    keeps the legacy local behaviour (``/media/<filename>``). The callable runs
+    AFTER the writer is released, so a raising implementation leaves the local
+    artifact on disk for the caller to clean up.
     """
     overlay_frame_angles = _frame_angles_from_samples(
         drone_samples,
