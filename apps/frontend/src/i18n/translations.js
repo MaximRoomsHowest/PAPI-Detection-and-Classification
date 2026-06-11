@@ -124,6 +124,8 @@ export const translations = {
       metadataApply: 'Apply metadata',
       metadataApplyHint:
         'Choose the runway and add a telemetry file or manual drone position, then apply to re-run the analysis with angle calculation.',
+      telemetryInvalidHint:
+        'Position values must be numbers: latitude -90 to 90, longitude -180 to 180, altitude -500 to 15000 m.',
       droneLatitude: 'Latitude',
       droneLongitude: 'Longitude',
       droneAltitude: 'Altitude (m)',
@@ -539,6 +541,8 @@ export const translations = {
       metadataApply: 'Metadaten anwenden',
       metadataApplyHint:
         'Wählen Sie die Piste und laden Sie eine Telemetriedatei hoch oder geben Sie die Drohnenposition manuell ein. Danach wird die Analyse mit Winkelberechnung erneut ausgeführt.',
+      telemetryInvalidHint:
+        'Positionswerte müssen Zahlen sein: Breite -90 bis 90, Länge -180 bis 180, Höhe -500 bis 15000 m.',
       droneLatitude: 'Breite',
       droneLongitude: 'Länge',
       droneAltitude: 'Höhe (m)',
@@ -954,6 +958,8 @@ export const translations = {
       metadataApply: 'Metadata toepassen',
       metadataApplyHint:
         'Kies de baan en voeg een telemetriebestand of handmatige dronepositie toe. Daarna voeren we de analyse opnieuw uit met hoekberekening.',
+      telemetryInvalidHint:
+        'Positiewaarden moeten getallen zijn: breedte -90 tot 90, lengte -180 tot 180, hoogte -500 tot 15000 m.',
       droneLatitude: 'Breedte',
       droneLongitude: 'Lengte',
       droneAltitude: 'Hoogte (m)',
@@ -1369,6 +1375,8 @@ export const translations = {
       metadataApply: 'Appliquer les métadonnées',
       metadataApplyHint:
         'Choisissez la piste et ajoutez un fichier de télémétrie ou une position drone manuelle, puis relancez l’analyse avec le calcul d’angle.',
+      telemetryInvalidHint:
+        'Les valeurs de position doivent être des nombres : latitude -90 à 90, longitude -180 à 180, altitude -500 à 15000 m.',
       droneLatitude: 'Latitude',
       droneLongitude: 'Longitude',
       droneAltitude: 'Altitude (m)',

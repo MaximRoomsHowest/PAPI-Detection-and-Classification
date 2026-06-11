@@ -183,7 +183,7 @@ describe('runway mutations — payloads and backend details', () => {
     )
 
     await expect(createRunway({})).rejects.toThrow(
-      'A runway must have exactly 4 PAPI lamps.; Lamp coordinates must be distinct.',
+      'A runway must have exactly 4 PAPI lamps. · Lamp coordinates must be distinct.',
     )
   })
 
@@ -351,6 +351,29 @@ describe('analyze* — error surfacing', () => {
       },
     })
     await expect(analyzeFrame(tinyFile(), metadata)).rejects.toThrow(/500/)
+  })
+
+  it('flattens a FastAPI 422 array detail into a readable message', async () => {
+    // Non-numeric drone telemetry produces this shape; rendering it raw used to
+    // surface "[object Object]" in the error banner (user test 2026-06-11).
+    fetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          detail: [
+            {
+              type: 'float_parsing',
+              loc: ['body', 'drone_latitude'],
+              msg: 'Input should be a valid number, unable to parse string as a number',
+              input: 'abc',
+            },
+          ],
+        },
+        { ok: false, status: 422 },
+      ),
+    )
+    await expect(analyzeFrame(tinyFile(), metadata)).rejects.toThrow(
+      'drone_latitude: Input should be a valid number, unable to parse string as a number',
+    )
   })
 })
 

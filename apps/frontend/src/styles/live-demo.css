@@ -645,6 +645,19 @@
   line-height: 1.5;
 }
 
+/* Out-of-range / non-numeric manual position: red ring on the offending field
+   plus an explanatory line above the footer (the Apply button is also gated). */
+.drone-telemetry__fields input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.drone-telemetry__invalid {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* Telemetry-file upload row: the file picker (reusing .upload-button) plus a clear
    control shown once a file is chosen. */
 .drone-telemetry__file-row {

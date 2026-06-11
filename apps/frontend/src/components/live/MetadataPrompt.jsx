@@ -41,12 +41,31 @@ export function MetadataPrompt({ copy }) {
       droneTelemetry.longitude.trim() &&
       droneTelemetry.altitudeM.trim(),
   )
+  // Client-side range check (bounds mirror the backend's): a non-numeric or
+  // out-of-range value otherwise travels to the backend and comes back as a
+  // 422 — slower and scarier than a hint under the field. A field is invalid
+  // only when it is FILLED and bad; empty fields just keep Apply gated by the
+  // all-three rule above.
+  const fieldInvalid = (value, min, max) => {
+    const trimmed = value.trim()
+    if (!trimmed) return false
+    const numeric = Number(trimmed)
+    return !Number.isFinite(numeric) || numeric < min || numeric > max
+  }
+  const invalidTelemetryFields = {
+    latitude: fieldInvalid(droneTelemetry.latitude, -90, 90),
+    longitude: fieldInvalid(droneTelemetry.longitude, -180, 180),
+    altitudeM: fieldInvalid(droneTelemetry.altitudeM, -500, 15000),
+  }
+  const telemetryInvalid = Object.values(invalidTelemetryFields).some(Boolean)
   // In folder ANGLE-SWEEP mode each image is scored against its OWN EXIF GPS, so an uploaded
   // telemetry FILE is intentionally dropped — don't let it enable Apply (which would re-run
   // without ever resolving the angle, looping this prompt). Manual lat/lon/alt still applies (audit).
   const telemetryFileIgnored = media?.type === 'folder' && folderMode === FOLDER_MODE_ANGLE_SWEEP
   const canApplyMetadata = Boolean(
-    media && ((metadataFile && !telemetryFileIgnored) || hasManualDroneTelemetry),
+    media &&
+      !telemetryInvalid &&
+      ((metadataFile && !telemetryFileIgnored) || hasManualDroneTelemetry),
   )
 
   return (
@@ -125,6 +144,7 @@ export function MetadataPrompt({ copy }) {
             onChange={setDroneField('latitude')}
             placeholder="47.673521"
             aria-describedby="drone-latitude-hint"
+            aria-invalid={invalidTelemetryFields.latitude}
           />
           <small id="drone-latitude-hint">{copy.live.droneLatitudeHint}</small>
         </label>
@@ -140,6 +160,7 @@ export function MetadataPrompt({ copy }) {
             onChange={setDroneField('longitude')}
             placeholder="9.518154"
             aria-describedby="drone-longitude-hint"
+            aria-invalid={invalidTelemetryFields.longitude}
           />
           <small id="drone-longitude-hint">{copy.live.droneLongitudeHint}</small>
         </label>
@@ -155,10 +176,17 @@ export function MetadataPrompt({ copy }) {
             onChange={setDroneField('altitudeM')}
             placeholder="520"
             aria-describedby="drone-altitude-hint"
+            aria-invalid={invalidTelemetryFields.altitudeM}
           />
           <small id="drone-altitude-hint">{copy.live.droneAltitudeHint}</small>
         </label>
       </div>
+
+      {telemetryInvalid && (
+        <p className="drone-telemetry__invalid" role="alert">
+          {copy.live.telemetryInvalidHint}
+        </p>
+      )}
 
       <div className="metadata-prompt__footer">
         <p>{copy.live.metadataApplyHint}</p>

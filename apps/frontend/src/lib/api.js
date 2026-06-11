@@ -128,6 +128,28 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
  * `response.ok`, so a parse failure here means the backend sent a 2xx with a body
  * we can't read — surface that distinctly (audit: guard the ok-path parse).
  */
+/**
+ * Flatten a backend error `detail` into a readable message. FastAPI validation
+ * errors (422) carry an ARRAY of {loc, msg} objects — rendering that raw turns
+ * the banner into "[object Object]" (user test 2026-06-11, non-numeric drone
+ * telemetry). Strings pass through; anything unusable falls back.
+ */
+function detailToMessage(detail, fallback) {
+  if (typeof detail === 'string' && detail) return detail
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((entry) => {
+        if (typeof entry === 'string') return entry
+        if (!entry?.msg) return null
+        const field = Array.isArray(entry.loc) ? entry.loc[entry.loc.length - 1] : null
+        return field ? `${field}: ${entry.msg}` : entry.msg
+      })
+      .filter(Boolean)
+    if (parts.length) return parts.join(' · ')
+  }
+  return fallback
+}
+
 async function parseJsonBody(response, label) {
   try {
     return await response.json()
@@ -202,11 +224,7 @@ export async function createRunway(payload) {
     let detail = `Could not create runway (${response.status})`
     try {
       const body = await response.json()
-      if (Array.isArray(body.detail)) {
-        detail = body.detail.map((entry) => entry.msg ?? String(entry)).join('; ')
-      } else if (body.detail) {
-        detail = body.detail
-      }
+      detail = detailToMessage(body.detail, detail)
     } catch {
       detail = response.statusText || detail
     }
@@ -225,7 +243,7 @@ export async function deleteRunway(runwayId) {
     let detail = `Could not delete runway (${response.status})`
     try {
       const body = await response.json()
-      detail = body.detail ?? detail
+      detail = detailToMessage(body.detail, detail)
     } catch {
       detail = response.statusText || detail
     }
@@ -362,7 +380,7 @@ async function parseAnalysisResponse(response) {
     let detail = `Analysis failed (${response.status})`
     try {
       const body = await response.json()
-      detail = body.detail ?? detail
+      detail = detailToMessage(body.detail, detail)
     } catch {
       detail = response.statusText || detail
     }
