@@ -41,7 +41,6 @@ def _run(frame_iter, *, max_frames, tmp_path, cv2=None):
         start=0.0,
         max_frames=max_frames,
         empty_message="empty",
-        history_size=5,
         exports_dir=tmp_path,
     )
 

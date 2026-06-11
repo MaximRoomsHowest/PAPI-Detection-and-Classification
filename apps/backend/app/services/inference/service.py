@@ -690,7 +690,6 @@ class InferenceService:
             start=start,
             max_frames=max_frames,
             empty_message=empty_message,
-            history_size=self.settings.video_history_size,
             exports_dir=self.settings.exports_dir,
             store_export=self._store_export_artifact,
             drone_samples=drone_samples,

@@ -70,7 +70,6 @@ def run_tracked_sequence(
     start: float,
     max_frames: int,
     empty_message: str,
-    history_size: int,
     exports_dir: Path,
     store_export: Callable[[Path], tuple[str, str]] | None = None,
     drone_samples: list[DroneSample] | None = None,

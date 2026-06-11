@@ -75,11 +75,6 @@ class Settings(BaseSettings):
     # trained at 1280; the NMS IoU keeps the predict default 0.7.
     inference_imgsz: int = Field(default=1280, ge=320, le=4096, alias="PAPI_INFERENCE_IMGSZ")
     inference_iou: float = Field(default=0.7, ge=0.0, le=1.0, alias="PAPI_INFERENCE_IOU")
-    # Sliding-window length backing the per-stream majority vote (deque maxlen
-    # in inference._run_tracked_sequence). Must be >= 1 — maxlen=0 would make the
-    # window drop every frame and break the Counter.most_common aggregation. The
-    # upper bound just guards against an absurd env value pinning memory.
-    video_history_size: int = Field(default=5, ge=1, le=1000, alias="PAPI_VIDEO_HISTORY_SIZE")
     # Per-file upload ceiling in megabytes (media.save_upload streams and aborts
     # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
     # env var from effectively disabling the limit.
