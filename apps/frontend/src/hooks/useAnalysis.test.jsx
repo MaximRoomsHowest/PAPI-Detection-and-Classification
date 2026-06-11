@@ -31,6 +31,9 @@ vi.mock('../lib/api', () => ({
   fetchRunways: mocks.fetchRunways,
   resolveMediaUrl: mocks.resolveMediaUrl,
   revokeMediaUrl: mocks.revokeMediaUrl,
+  // Pass-through like the keyless real implementation; the folder-sweep path
+  // resolves per-frame artifact urls through it.
+  mediaUrl: (path) => path,
   MODEL_OPTIONS_ERROR_CODE: 'model-options-unavailable',
   // Mirror the real implementation — useAnalysis derives its batch cap from it at
   // module scope, so the mock must behave, not just exist.
@@ -167,6 +170,34 @@ describe('useAnalysis inference triggering', () => {
       runwayId: runway.id,
       modelId: 'small',
     })
+  })
+
+  it('selects the best-scoring frame AND its index after a folder sweep', async () => {
+    // Second frame wins (higher confidence on a known state). The displayed
+    // scenario and the frame index must point at the SAME frame — the stage,
+    // navigator, and history panel all render from this pair (user test
+    // 2026-06-11: stage showed the best frame while the navigator read 1/x).
+    mocks.analyzeFrame
+      .mockResolvedValueOnce({ ...analysisPayload(), confidence: 0.6, original_filename: 'a.jpg' })
+      .mockResolvedValueOnce({ ...analysisPayload(), confidence: 0.9, original_filename: 'b.jpg' })
+    renderHook()
+    const files = [
+      new File(['a'], 'sweep/frame_000.jpg', { type: 'image/jpeg' }),
+      new File(['b'], 'sweep/frame_001.jpg', { type: 'image/jpeg' }),
+    ]
+
+    await act(async () => {
+      latest.handleMediaFiles(files)
+      await flush()
+    })
+
+    await waitForAssertion(() => {
+      expect(latest.analysisError).toBe('')
+      expect(mocks.analyzeFrame).toHaveBeenCalledTimes(2)
+      expect(latest.backendFrames).toHaveLength(2)
+    })
+    expect(latest.backendFrameIndex).toBe(1)
+    expect(latest.backendScenario).toBe(latest.backendFrames[1])
   })
 
   it('re-runs the existing upload when the inference model changes', async () => {

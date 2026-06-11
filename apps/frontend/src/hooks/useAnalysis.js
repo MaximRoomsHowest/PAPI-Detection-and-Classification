@@ -637,7 +637,12 @@ export function useAnalysis(copy) {
       // Remember which folder mode produced this result so the toggle can flag the result
       // stale if the user switches modes without re-running (audit P1).
       setResultFolderMode(currentFolderMode)
-      setBackendFrameIndex(0)
+      // The index must point at the scenario being SHOWN (the best-scoring frame),
+      // or the stage displays frame N while the navigator reads "1/x" and the
+      // history panel highlights frame 0 — three views of one selection
+      // disagreeing until the first manual navigation (user test 2026-06-11).
+      // bestIndex indexes rawResults == scenarios == backendFrames (sweep mode).
+      setBackendFrameIndex(keepsFrameScenarios ? bestIndex : 0)
       setBackendScenario(bestScenario)
       setActiveId('backend')
       setMedia((current) =>
