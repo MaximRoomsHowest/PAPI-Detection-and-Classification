@@ -56,7 +56,18 @@ export function HistoryTable({
                 {logs.map((log) => (
                   <tr key={log.id}>
                     <td data-label={copy.history.filename}>
-                      <button className="history-link" type="button" onClick={() => openLog(log.id)} disabled={openingLogId === log.id}>
+                      {/* aria-disabled, not the disabled attribute, while the detail is
+                          loading: disabling would drop focus to <body> BEFORE the modal
+                          opens, so useModalA11y would capture body as the "previously
+                          focused" element and restore focus there on close (same
+                          keep-focusable rationale as FE-8). The click guard lives in
+                          openLog. */}
+                      <button
+                        className="history-link"
+                        type="button"
+                        onClick={() => openLog(log.id)}
+                        aria-disabled={openingLogId === log.id}
+                      >
                         {log.original_filename}
                       </button>
                     </td>
@@ -87,7 +98,7 @@ export function HistoryTable({
                           className="history-link"
                           type="button"
                           onClick={() => openLog(log.id)}
-                          disabled={openingLogId === log.id}
+                          aria-disabled={openingLogId === log.id}
                         >
                           {copy.history.view}
                         </button>

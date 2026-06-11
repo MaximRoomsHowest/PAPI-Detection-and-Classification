@@ -142,6 +142,56 @@ describe('HistoryPage', () => {
     expect(mocks.revokeMediaUrl).toHaveBeenCalledWith(`blob:${logItem.artifact_url}`)
   })
 
+  it('restores focus to the row that opened the modal when it closes', async () => {
+    const { container } = await mountPage()
+
+    const rowButton = [...container.querySelectorAll('button.history-link')].find(
+      (button) => button.textContent === logItem.original_filename,
+    )
+    // Keyboard path: the row is focused, then activated. The button must stay
+    // focusable while the detail loads (aria-disabled, NOT disabled) or focus
+    // drops to <body> before the modal opens and never comes back to the row.
+    rowButton.focus()
+    await act(async () => {
+      rowButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    expect(container.querySelector('.history-modal')).not.toBeNull()
+    expect(rowButton.getAttribute('aria-disabled')).toBe('false')
+
+    const closeButton = container.querySelector('.history-modal button.icon-button')
+    act(() => {
+      closeButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+
+    expect(container.querySelector('.history-modal')).toBeNull()
+    expect(document.activeElement).toBe(rowButton)
+  })
+
+  it('ignores a second row activation while a detail is already loading', async () => {
+    let resolveDetail
+    mocks.fetchLogDetail.mockImplementation(
+      () => new Promise((resolve) => { resolveDetail = resolve }),
+    )
+    const { container } = await mountPage()
+
+    const buttons = [...container.querySelectorAll('button.history-link')]
+    act(() => {
+      buttons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    act(() => {
+      buttons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(mocks.fetchLogDetail).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveDetail(logDetail)
+    })
+    await flush()
+    expect(container.querySelector('.history-modal')).not.toBeNull()
+  })
+
   it('gates pagination against the total and the in-flight refetch', async () => {
     const { container } = await mountPage()
 

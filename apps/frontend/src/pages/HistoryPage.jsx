@@ -218,6 +218,9 @@ export function HistoryPage({ copy }) {
   const pageEnd = Math.min(total, (page + 1) * HISTORY_PAGE_SIZE)
 
   const openLog = async (logId) => {
+    // The row buttons stay focusable while a detail loads (aria-disabled, not
+    // disabled — see HistoryTable), so guard re-entry here instead.
+    if (openingLogId != null) return
     setError('')
     setShowRaw(false)
     setOpeningLogId(logId)
