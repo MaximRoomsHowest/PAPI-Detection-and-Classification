@@ -355,33 +355,6 @@ export async function fetchLogDetail(logId) {
   return parseJsonBody(response, `Analysis ${logId}`)
 }
 
-export async function fetchSystem() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/system`, {
-    headers: buildHeaders(),
-  })
-  if (!response.ok) {
-    throw new Error(`Could not load system info (${response.status})`)
-  }
-  return parseJsonBody(response, 'System info')
-}
-
-/**
- * Poll the backend readiness probe for a topbar status indicator (audit IMP-FE-17).
- * Resilient by design — returns ``{ ok: false }`` instead of throwing so a down
- * backend just shows "offline" rather than crashing the page.
- */
-export async function fetchReady() {
-  try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/health/ready`, {
-      headers: buildHeaders(),
-    })
-    const body = await response.json().catch(() => ({}))
-    return { ok: response.ok, ...body }
-  } catch {
-    return { ok: false, status: 'unreachable' }
-  }
-}
-
 async function parseAnalysisResponse(response) {
   if (!response.ok) {
     let detail = `Analysis failed (${response.status})`

@@ -29,10 +29,8 @@ import {
   fetchLogs,
   fetchModelInfo,
   fetchModels,
-  fetchReady,
   fetchRunways,
   fetchStats,
-  fetchSystem,
   logsCsvUrl,
   mediaUrl,
   resolveMediaUrl,
@@ -428,37 +426,11 @@ describe('fetchLogs — filters + total count', () => {
   })
 })
 
-describe('logsCsvUrl + fetchSystem + fetchReady', () => {
-  it('logsCsvUrl points at export.csv and carries filters', () => {
+describe('logsCsvUrl', () => {
+  it('points at export.csv and carries filters', () => {
     const url = logsCsvUrl({ runwayId: 'papi_06' })
     expect(url).toMatch(/\/api\/logs\/export\.csv\?/)
     expect(url).toContain('runway_id=papi_06')
-  })
-
-  it('fetchSystem targets /api/system', async () => {
-    await fetchSystem()
-    const [url] = fetch.mock.calls[0]
-    expect(url).toMatch(/\/api\/system$/)
-  })
-
-  it('fetchReady targets /health/ready and reflects ok', async () => {
-    fetch.mockResolvedValueOnce(jsonResponseWithHeaders({ status: 'ready' }, { ok: true }))
-    const result = await fetchReady()
-    const [url] = fetch.mock.calls[0]
-    expect(url).toMatch(/\/health\/ready$/)
-    expect(result.ok).toBe(true)
-    expect(result.status).toBe('ready')
-  })
-
-  it('fetchReady returns ok:false when the backend is unreachable (no throw)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new Error('connection refused')
-      }),
-    )
-    const result = await fetchReady()
-    expect(result.ok).toBe(false)
   })
 })
 
