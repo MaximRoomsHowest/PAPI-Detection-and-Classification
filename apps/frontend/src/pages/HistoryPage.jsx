@@ -54,6 +54,12 @@ export function HistoryPage({ copy }) {
   const [runwayFilter, setRunwayFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [modelFilter, setModelFilter] = useState('')
+  const [mediaFilter, setMediaFilter] = useState('')
+  // YYYY-MM-DD from the date input; sent as created_after (date-only ISO is
+  // read as UTC midnight by the backend, matching the stored-UTC convention).
+  const [dateFilter, setDateFilter] = useState('')
+  // One of '' | '0.5' | '0.75' | '0.9' (the select buckets in HistoryFilters).
+  const [confidenceFilter, setConfidenceFilter] = useState('')
   const [page, setPage] = useState(0)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -103,6 +109,9 @@ export function HistoryPage({ copy }) {
       runwayId: runwayFilter || undefined,
       globalState: stateFilter || undefined,
       modelId: modelFilter || undefined,
+      mediaType: mediaFilter || undefined,
+      createdAfter: dateFilter || undefined,
+      minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
     }
     Promise.all([fetchLogs(options), fetchStats()])
       .then(([logsResult, nextStats]) => {
@@ -149,7 +158,7 @@ export function HistoryPage({ copy }) {
     // locale switch must NOT refetch the logs, so it is intentionally omitted
     // (the banner simply renders in the locale active at failure time).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, runwayFilter, stateFilter, modelFilter, refreshKey])
+  }, [page, runwayFilter, stateFilter, modelFilter, mediaFilter, dateFilter, confidenceFilter, refreshKey])
 
   // Refresh jumps back to page 1 so freshly-logged analyses (newest first) are
   // visible, and forces a refetch via refreshKey even when already on page 1.
@@ -176,7 +185,9 @@ export function HistoryPage({ copy }) {
     setter(event.target.value)
   }
 
-  const hasActiveFilters = Boolean(runwayFilter || stateFilter || modelFilter)
+  const hasActiveFilters = Boolean(
+    runwayFilter || stateFilter || modelFilter || mediaFilter || dateFilter || confidenceFilter,
+  )
 
   // Clear filters (audit F18) — reset the selects and return to page 1. A
   // refetch follows automatically because the filter state changed.
@@ -187,6 +198,9 @@ export function HistoryPage({ copy }) {
     setRunwayFilter('')
     setStateFilter('')
     setModelFilter('')
+    setMediaFilter('')
+    setDateFilter('')
+    setConfidenceFilter('')
   }
 
   const handleExportCsv = async () => {
@@ -195,14 +209,23 @@ export function HistoryPage({ copy }) {
     try {
       // Filter-aware filename so a filtered export isn't indistinguishable from a
       // full export once downloaded (audit FB-08).
-      const nameParts = ['papi_analysis_logs', runwayFilter, stateFilter, modelFilter].filter(
-        Boolean,
-      )
+      const nameParts = [
+        'papi_analysis_logs',
+        runwayFilter,
+        stateFilter,
+        modelFilter,
+        mediaFilter,
+        dateFilter && `from_${dateFilter}`,
+        confidenceFilter && `conf_${Math.round(Number(confidenceFilter) * 100)}`,
+      ].filter(Boolean)
       await downloadLogsCsv(
         {
           runwayId: runwayFilter || undefined,
           globalState: stateFilter || undefined,
           modelId: modelFilter || undefined,
+          mediaType: mediaFilter || undefined,
+          createdAfter: dateFilter || undefined,
+          minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
         },
         `${nameParts.join('_')}.csv`,
       )
@@ -301,6 +324,9 @@ export function HistoryPage({ copy }) {
         runwayFilter={runwayFilter}
         stateFilter={stateFilter}
         modelFilter={modelFilter}
+        mediaFilter={mediaFilter}
+        dateFilter={dateFilter}
+        confidenceFilter={confidenceFilter}
         runwayOptions={runwayOptions}
         stateOptions={stateOptions}
         modelOptions={modelOptions}
@@ -308,6 +334,9 @@ export function HistoryPage({ copy }) {
         onRunwayChange={handleFilterChange(setRunwayFilter)}
         onStateChange={handleFilterChange(setStateFilter)}
         onModelChange={handleFilterChange(setModelFilter)}
+        onMediaChange={handleFilterChange(setMediaFilter)}
+        onDateChange={handleFilterChange(setDateFilter)}
+        onConfidenceChange={handleFilterChange(setConfidenceFilter)}
         onClearFilters={handleClearFilters}
         onExportCsv={handleExportCsv}
         isExporting={isExporting}

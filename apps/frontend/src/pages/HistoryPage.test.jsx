@@ -142,6 +142,72 @@ describe('HistoryPage', () => {
     expect(mocks.revokeMediaUrl).toHaveBeenCalledWith(`blob:${logItem.artifact_url}`)
   })
 
+  it('sends the media/date/confidence filters to the API and the CSV export', async () => {
+    const { container } = await mountPage()
+
+    const media = filterSelect(container, copy.history.media)
+    act(() => {
+      media.value = 'video'
+      media.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 0, mediaType: 'video' }),
+    )
+
+    const confidence = filterSelect(container, copy.history.confidence)
+    act(() => {
+      confidence.value = '0.75'
+      confidence.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ minConfidence: 0.75 }),
+    )
+
+    const date = container.querySelector('input[type="date"]')
+    act(() => {
+      // React's onChange listens to the native `input` event, and the value must
+      // go through the prototype setter so React's value tracker sees the change.
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      setValue.call(date, '2026-06-01')
+      date.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flush()
+    expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ createdAfter: '2026-06-01' }),
+    )
+
+    // The CSV export reuses every active filter (and names the file after them).
+    const exportButton = [...container.querySelectorAll('button')].find((button) =>
+      button.textContent.includes(copy.history.exportCsv),
+    )
+    await act(async () => {
+      exportButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(mocks.downloadLogsCsv).toHaveBeenCalledWith(
+      expect.objectContaining({ mediaType: 'video', createdAfter: '2026-06-01', minConfidence: 0.75 }),
+      expect.stringContaining('video'),
+    )
+
+    // Clear filters resets all six and refetches unfiltered from page 1.
+    const clear = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent.trim() === copy.history.clearFilters,
+    )
+    act(() => {
+      clear.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        offset: 0,
+        mediaType: undefined,
+        createdAfter: undefined,
+        minConfidence: undefined,
+      }),
+    )
+  })
+
   it('restores focus to the row that opened the modal when it closes', async () => {
     const { container } = await mountPage()
 
