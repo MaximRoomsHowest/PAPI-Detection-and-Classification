@@ -5,8 +5,11 @@
 # Build context must be the repository root:
 #   docker build -f apps/backend/Dockerfile.cloud -t papi-backend-cloud .
 #
-# Unlike the local Compose image, this image includes models/serving/best.pt so
-# Azure does not need a host bind mount.
+# Unlike the local Compose image, this image bakes models/serving/ (weights,
+# registry, model card) so Azure does not need a host bind mount. Keep the
+# stage structure in sync with apps/backend/Dockerfile — same digest-pinned
+# base, the torch pins shared via torch-requirements.txt (pip-audit scans
+# them in CI), and the same headless-opencv last-write fix.
 
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS builder
 
@@ -22,8 +25,11 @@ RUN apt-get update \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# CPU-only torch BEFORE requirements.txt so ultralytics doesn't pull the CUDA
+# wheel. Same single-source pins as the local image (audit IS-1).
+COPY apps/backend/torch-requirements.txt ./
 RUN pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.5.1 torchvision==0.20.1
+        -r torch-requirements.txt
 
 COPY apps/backend/requirements.txt ./
 RUN pip install -r requirements.txt \
@@ -36,6 +42,7 @@ FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dc
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
+    PAPI_MODEL_REGISTRY_PATH=/models/serving/models.json \
     PAPI_MODEL_PATH=/models/serving/best.pt \
     PAPI_STORAGE_DIR=/storage \
     YOLO_AUTOINSTALL=False
@@ -50,8 +57,10 @@ WORKDIR /app/apps/backend
 
 COPY apps/backend/app ./app
 COPY configs /app/configs
-COPY models/serving/best.pt /models/serving/best.pt
-COPY models/serving/model_card.json /models/serving/model_card.json
+# The whole serving slot: weights + registry + model card (+ the INT8 edge
+# export the registry may list). Registry entries pointing at non-baked
+# training paths (nano/transition) simply surface as available:false.
+COPY models/serving /models/serving
 
 RUN groupadd --system papi \
  && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \
