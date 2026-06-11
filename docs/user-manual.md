@@ -194,6 +194,20 @@ confidence, and annotated artifact, and reflects the backend's
 persisted analysis log. It is read straight from the backend, so it
 populates only when the backend is running.
 
+The list can be narrowed with **six filters**: runway, state, model,
+media type (images/videos), an "analyzed on or after" date, and a
+minimum-confidence threshold. The summary cards above the table
+(analysis count, average confidence, processing times) always describe
+exactly the rows the active filters select — a small **"filtered"**
+chip appears on them whenever a filter is active, while the model and
+accuracy cards keep describing the serving model itself.
+
+**Export CSV** downloads the filtered rows as a spreadsheet; the
+filename encodes the active filters so a narrowed export is
+distinguishable from a full one. Clicking a row opens the detail
+dialog with the per-lamp states, raw detections, and the annotated
+artifact.
+
 ## 5b. The Runways page
 
 The **Runways** tab lists the runway geometries the app can analyse an approach

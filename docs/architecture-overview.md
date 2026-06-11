@@ -134,6 +134,11 @@ The HTTP layer is split by concern under `apps/backend/app/api/`:
 sub-routers in `app/api/routers/` — `analyze` (the four upload/inference
 endpoints above), `logs` (list / CSV export / detail), `stats`
 (aggregate stats), and `meta` (runways / model info / system info).
+`/api/logs`, its CSV export, and `/api/stats` all accept the same six
+optional filters (`runway_id`, `media_type`, `global_state`,
+`created_after`, `min_confidence`, `model_id`), validated once in
+`app/api/_filters.py`, so the History table, its export, and its
+summary cards always describe the same slice.
 The inference engine lives in the `app/services/inference/` package: a
 `service.py` facade (`InferenceService`: model load, image / video /
 sequence) over leaf modules `aggregation` (per-lamp video verdict by
