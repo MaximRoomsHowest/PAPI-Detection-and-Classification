@@ -59,7 +59,7 @@ afterEach(() => {
 
 describe('STORAGE_KEYS', () => {
   it('exposes the namespaced keys the app reads/writes', () => {
-    expect(STORAGE_KEYS.theme).toBe('papi.theme')
+    expect(STORAGE_KEYS.theme).toBe('papi.theme.v2')
     expect(STORAGE_KEYS.language).toBe('papi.language')
     expect(STORAGE_KEYS.runway).toBe('papi.runway')
   })
@@ -121,10 +121,9 @@ describe('initialTheme', () => {
     expect(initialTheme()).toBe('dark')
   })
 
-  it('falls back to the system preference when nothing valid is stored', () => {
-    // No stored value -> consult matchMedia. Force "prefers dark".
+  it('falls back to light when nothing valid is stored, even if the system prefers dark', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true })
-    expect(initialTheme()).toBe('dark')
+    expect(initialTheme()).toBe('light')
   })
 
   it('falls back to light when nothing is stored and the system prefers light', () => {

@@ -1,0 +1,39 @@
+# Git / local environments
+.git/
+.github/
+.venv/
+venv/
+env/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+
+# Local secrets / settings
+.env
+.env.*
+!.env.example
+
+# Node dependencies and frontend build outputs
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Runtime and generated artifacts
+storage/
+backend/storage/
+data/
+docs/
+backups/
+test_videos/
+workflows/notebooks/
+models/base/
+models/runs/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lampPattern, scenarioFromBackendResult } from './papi.js'
+import { lampPattern, scenarioFromBackendResult, scenarioFromVideoFrameResult } from './papi.js'
 
 // Mirrors the backend AnalysisPayload shape (see baseline POST /api/analyze-frame:
 // far_too_low, four red lamps). Override per-test to exercise a branch.
@@ -186,5 +186,64 @@ describe('scenarioFromBackendResult', () => {
 
     expect(s.perFrame).toBe(perFrame)
     expect(s.artifactType).toBe('video')
+  })
+})
+
+describe('scenarioFromVideoFrameResult', () => {
+  it('uses the selected frame state, confidence, angle, and lamp states', () => {
+    const result = makeResult({
+      media_type: 'video',
+      frame_count: 3,
+      global_state: 'far_too_low',
+      confidence: 0.5,
+      per_frame: [
+        { frame_index: 0, state: 'far_too_low', confidence: 0.4 },
+        { frame_index: 1, state: 'correct_glidepath', confidence: 0.8 },
+        { frame_index: 2, state: 'far_too_high', confidence: 0.7 },
+      ],
+      angle_track: [
+        {
+          frame_index: 1,
+          elevation_angle_deg: 3.125,
+          lamps: [
+            { index: 1, state: 'red', confidence: 0.9 },
+            { index: 2, state: 'red', confidence: 0.8 },
+            { index: 3, state: 'white', confidence: 0.7 },
+            { index: 4, state: 'white', confidence: 0.6 },
+          ],
+        },
+      ],
+    })
+    const base = scenarioFromBackendResult(result, context)
+    const frame = scenarioFromVideoFrameResult(result, base, 1)
+
+    expect(frame.stateId).toBe('correct')
+    expect(frame.metrics.boxConfidence).toBe(80)
+    expect(frame.angleSummary).toMatchObject({ available: true, value: '3.125' })
+    expect(frame.summary).toContain('red + red + white + white')
+    expect(frame.lamps.map((lamp) => lamp.status)).toEqual(['red', 'red', 'white', 'white'])
+  })
+
+  it('fills a missing per-frame lamp as occluded instead of reusing the aggregate lamp', () => {
+    const result = makeResult({
+      media_type: 'video',
+      frame_count: 1,
+      per_frame: [{ frame_index: 0, state: 'unknown', confidence: 0.3 }],
+      angle_track: [
+        {
+          frame_index: 0,
+          elevation_angle_deg: 2.8,
+          lamps: [
+            { index: 1, state: 'red', confidence: 0.9 },
+            { index: 2, state: 'red', confidence: 0.8 },
+            { index: 3, state: 'white', confidence: 0.7 },
+          ],
+        },
+      ],
+    })
+    const frame = scenarioFromVideoFrameResult(result, scenarioFromBackendResult(result, context), 0)
+
+    expect(frame.lamps).toHaveLength(4)
+    expect(frame.lamps[3]).toMatchObject({ id: 4, status: 'occluded', confidence: 0 })
   })
 })

@@ -1,5 +1,4 @@
 from datetime import datetime
-from pathlib import Path
 
 from sqlalchemy import ColumnElement, desc, func, select
 from sqlalchemy.orm import Session
@@ -7,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import AnalysisLog
 from app.services.media import media_url_for_path
+from app.services.storage import get_media_storage
 from app.validation.schemas import AnalysisPayload, InferenceStats, LogListItem
 
 
@@ -15,8 +15,9 @@ class AnalysisLogRepository:
         self.db = db
 
     def create_from_payload(self, payload: AnalysisPayload) -> AnalysisLog:
+        settings = get_settings()
         lamp_state = {lamp.index: lamp.state for lamp in payload.lamps}
-        artifact_path = _contained_artifact_path(payload.artifact_url, get_settings().exports_dir)
+        artifact_path = _artifact_reference_from_url(payload.artifact_url, settings)
 
         log = AnalysisLog(
             media_type=payload.media_type,
@@ -57,7 +58,7 @@ class AnalysisLogRepository:
             # ``artifact_path`` is already the resolved, in-exports-tree path (or None).
             self.db.rollback()
             if artifact_path:
-                Path(artifact_path).unlink(missing_ok=True)
+                get_media_storage(settings).delete_reference(artifact_path)
             raise
         self.db.refresh(log)
         return log
@@ -185,22 +186,27 @@ class AnalysisLogRepository:
         )
 
 
-def _contained_artifact_path(artifact_url: str | None, exports_dir: Path) -> str | None:
-    """Resolve an artifact_url to an on-disk path *inside* the exports dir, or None.
+def _artifact_reference_from_url(artifact_url: str | None, settings) -> str | None:
+    """Resolve an artifact URL to the storage reference saved in the database.
 
     The happy path is a server-generated ``/media/<uuid>_annotated.<ext>`` (a bare
-    filename, see ``InferenceService``), which joins cleanly under ``exports_dir``.
+    filename, see ``InferenceService``), which joins cleanly under ``exports_dir`` in
+    local mode or maps to ``exports/<filename>`` in Azure Blob mode.
     This is a defence-in-depth guard: if a crafted ``artifact_url`` ever smuggled in
     ``..`` segments and escaped the exports tree, we store None rather than persist an
-    out-of-tree path. ``media_url_for_path`` already drops such paths on read-back; this
-    keeps them out of the column on write too. The returned string for the happy path is
-    byte-identical to the previous ``str(exports_dir / url.removeprefix("/media/"))``.
+    out-of-tree/blob path. ``media_url_for_path`` already drops such paths on read-back;
+    this keeps them out of the column on write too.
     """
     if not artifact_url:
         return None
-    candidate = exports_dir / artifact_url.removeprefix("/media/")
+    relative = artifact_url.removeprefix("/media/").replace("\\", "/").lstrip("/")
+    if not relative or relative.startswith("../") or "/../" in f"/{relative}/":
+        return None
+    if getattr(settings, "storage_backend", "local") == "azure_blob":
+        return f"exports/{relative}"
+    candidate = settings.exports_dir / relative
     try:
-        candidate.resolve().relative_to(exports_dir.resolve())
+        candidate.resolve().relative_to(settings.exports_dir.resolve())
     except ValueError:
         return None
     return str(candidate)
@@ -232,4 +238,3 @@ def _iso(value: datetime | str | None) -> str | None:
     if isinstance(value, str):
         return value
     return value.isoformat()
-

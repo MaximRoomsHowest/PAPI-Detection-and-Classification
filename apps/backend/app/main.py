@@ -12,9 +12,9 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from app.database import get_session, init_db
 from app.logging_config import RequestIdMiddleware, configure_logging
 from app.middleware import RequestSizeLimitMiddleware, request_body_cap_bytes
 from app.services.inference import get_inference_service
+from app.services.storage import get_media_storage
 
 # Configure structured logging BEFORE any module-level logger is bound
 # (audit B-IMP-4). Calling this once at import time means subsequent
@@ -55,6 +56,12 @@ def _startup_warmup() -> None:
     fatal — a missing-weights local dev env can still serve /health and /api/runways.
     """
     init_db()
+    # Azure Blob readiness is a hard dependency when configured: an unreachable
+    # or misconfigured storage account should abort startup loudly instead of
+    # failing on the first artifact write mid-demo. Runs here (worker thread)
+    # because the SDK call is blocking network I/O. Local mode is a no-op.
+    if settings.storage_backend == "azure_blob":
+        get_media_storage(settings).ensure_ready()
     try:
         service = get_inference_service()
         _ = service.model
@@ -148,25 +155,11 @@ app.add_middleware(
 app.include_router(router)
 
 
-# The artifact formats the inference pipeline actually writes. Everything
-# else served from /media falls back to application/octet-stream (download,
-# never render) — see the allowlist note inside get_media.
-_MEDIA_CONTENT_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".avi": "video/x-msvideo",
-    ".mov": "video/quicktime",
-}
-
-
 @app.get("/media/{file_path:path}")
 def get_media(
     file_path: str,
     _auth: Annotated[None, Depends(require_api_key)] = None,
-) -> FileResponse:
+) -> Response:
     """Serve annotated artifacts from the exports directory.
 
     Replaces the previous public ``app.mount("/media", StaticFiles(...))``
@@ -183,25 +176,11 @@ def get_media(
     for media display when an API key is configured — tracked as a
     follow-up to this commit.
     """
-    target = (settings.exports_dir / file_path).resolve()
-    # Path-traversal guard. The resolve()d target must live under the
-    # exports_dir root; anything else (../../etc/passwd, symlinks
-    # pointing outside) gets a 404 — never a 403, so the existence of
-    # the gate is not itself an information leak.
-    try:
-        target.relative_to(settings.exports_dir.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Not found") from exc
-    if not target.is_file():
-        raise HTTPException(status_code=404, detail="Not found")
-    # Explicit content-type allowlist instead of FileResponse's extension
-    # sniffing: artifact names are server-generated UUIDs today, but if a
-    # write path ever produced an .html artifact, extension-guessing would
-    # serve it as text/html from the API origin (stored XSS). Unknown
-    # suffixes download as octet-stream. nginx adds nosniff in the compose
-    # path; this keeps the direct-exposure mode equally safe.
-    media_type = _MEDIA_CONTENT_TYPES.get(target.suffix.lower(), "application/octet-stream")
-    return FileResponse(target, media_type=media_type)
+    # Path-traversal guard and the explicit content-type allowlist live inside
+    # MediaStorage.response_for_media so the local-filesystem and Azure Blob
+    # serving paths enforce the exact same rules (out-of-tree -> 404, unknown
+    # suffix -> application/octet-stream download).
+    return get_media_storage(settings).response_for_media(file_path)
 
 
 @app.get("/health")

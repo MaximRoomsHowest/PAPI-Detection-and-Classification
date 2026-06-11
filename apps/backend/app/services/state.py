@@ -12,7 +12,7 @@ associated with each event (it annotates the transition, it does not decide it).
 
 from collections import Counter
 
-from app.validation.schemas import BoundingBox, LampResult, TransitionEvent
+from app.validation.schemas import AngleResult, BoundingBox, LampResult, TransitionEvent
 
 DETECTION_CLASS_TO_STATE = {
     0: "red",
@@ -38,6 +38,11 @@ DETECTED_LAMP_STATES = frozenset({"red", "white"})
 # its own category instead of silently dropping the lamp. Carries no detection,
 # hence confidence 0.0 and no bbox.
 _OBSCURED_LAMP_STATE = "obscured"
+
+# Runtime fallback for angle-based inference when one lamp slot is missing.
+# Matches configs/papi_edny.yaml and packages/papi/src/papi/lamp_state.py.
+FAA_DEFAULT_SET_ANGLES_DEG = (2.50, 2.83, 3.17, 3.50)
+TRANSITION_HALF_WIDTH_DEG = 0.10
 
 
 def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
@@ -295,6 +300,71 @@ def global_state_from_lamps(lamps: list[LampResult]) -> str:
     return _WHITE_COUNT_TO_STATE.get(counts["white"], "unknown")
 
 
+def _expected_lamp_state_from_angle(angle_deg: float, lamp_index: int) -> str:
+    set_angle = FAA_DEFAULT_SET_ANGLES_DEG[lamp_index - 1]
+    if angle_deg > set_angle + TRANSITION_HALF_WIDTH_DEG:
+        return "white"
+    if angle_deg < set_angle - TRANSITION_HALF_WIDTH_DEG:
+        return "red"
+    return "transition"
+
+
+def _angle_for_lamp(angle: AngleResult, lamp_index: int) -> float:
+    per_light = next(
+        (
+            light.elevation_angle_deg
+            for light in angle.per_light_angles
+            if light.runway_lamp == lamp_index
+        ),
+        None,
+    )
+    return per_light if per_light is not None else angle.elevation_angle_deg
+
+
+def infer_single_missing_lamp_from_angle(
+    lamps: list[LampResult],
+    angle: AngleResult,
+) -> list[LampResult]:
+    """Infer one missing PAPI lamp from the angle-derived expected geometry.
+
+    Conservative by design:
+    * only runs when exactly one of the four slots is obscured/unknown,
+    * requires an available, plausible angle,
+    * never infers a transition-band lamp, because red/white would be ambiguous.
+
+    The inferred lamp is marked `inferred=True` and confidence 0.0 so users can
+    see it was calculated from geometry, not detected by the model.
+    """
+    if not angle.angle_available or angle.elevation_angle_deg is None or not angle.plausible:
+        return lamps
+
+    detected = [lamp for lamp in lamps if lamp.state in DETECTED_LAMP_STATES]
+    missing = [lamp for lamp in lamps if lamp.state not in DETECTED_LAMP_STATES]
+    if len(detected) != 3 or len(missing) != 1:
+        return lamps
+
+    missing_lamp = missing[0]
+    inferred_state = _expected_lamp_state_from_angle(
+        _angle_for_lamp(angle, missing_lamp.index), missing_lamp.index
+    )
+    if inferred_state not in DETECTED_LAMP_STATES:
+        return lamps
+
+    next_lamps = [lamp.model_copy(deep=True) for lamp in lamps]
+    next_lamps[missing_lamp.index - 1] = LampResult(
+        index=missing_lamp.index,
+        state=inferred_state,
+        confidence=0.0,
+        bbox=None,
+        inferred=True,
+        inference_note=(
+            "Inferred from the drone elevation angle and the standard PAPI set-angle "
+            "model because this lamp was not detected by the AI."
+        ),
+    )
+    return next_lamps
+
+
 def confidence_from_lamps(lamps: list[LampResult]) -> float:
     """Mean detector confidence over the lamps that were actually detected.
 
@@ -302,7 +372,11 @@ def confidence_from_lamps(lamps: list[LampResult]) -> float:
     "obscured"/"unknown" slots have no detection behind them, so averaging them in
     would dilute the score toward zero. Returns 0.0 when nothing was detected.
     """
-    detected = [lamp.confidence for lamp in lamps if lamp.state in DETECTED_LAMP_STATES]
+    detected = [
+        lamp.confidence
+        for lamp in lamps
+        if lamp.state in DETECTED_LAMP_STATES and not lamp.inferred
+    ]
     if not detected:
         return 0.0
     return round(sum(detected) / len(detected), 4)

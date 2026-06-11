@@ -11,7 +11,14 @@ export function LampCard({ lamp, copy }) {
   const isLowConfidence = status.tone !== 'occluded' && Number(lamp.confidence) < 50
 
   return (
-    <div className={clsx('lamp-card', `lamp-${status.tone}`, isLowConfidence && 'is-low-confidence')}>
+    <div
+      className={clsx(
+        'lamp-card',
+        `lamp-${status.tone}`,
+        isLowConfidence && !lamp.inferred && 'is-low-confidence',
+        lamp.inferred && 'is-inferred',
+      )}
+    >
       <div className="lamp-preview">
         <span />
         <strong>
@@ -21,8 +28,8 @@ export function LampCard({ lamp, copy }) {
       <div>
         <p>{label}</p>
         <small>
-          {isLowConfidence && <span aria-hidden="true">⚠ </span>}
-          {lamp.confidence}% {copy.live.confidenceLabel}
+          {isLowConfidence && !lamp.inferred && <span aria-hidden="true">⚠ </span>}
+          {lamp.inferred ? copy.live.inferredFromAngle : `${lamp.confidence}% ${copy.live.confidenceLabel}`}
         </small>
       </div>
     </div>

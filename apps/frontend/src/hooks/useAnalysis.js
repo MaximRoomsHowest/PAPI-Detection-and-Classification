@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   analyzeFrame,
@@ -12,7 +12,7 @@ import {
 import { localizedErrorMessage } from '../lib/errorMessages'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
-import { scenarioFromBackendResult } from '../lib/papi'
+import { scenarioFromBackendResult, scenarioFromVideoFrameResult } from '../lib/papi'
 import { createFolderVideo } from '../lib/folderVideo'
 import {
   FOLDER_MODE_ANGLE_SWEEP,
@@ -127,6 +127,7 @@ export function useAnalysis(copy) {
   // which prevents it finishing server-side and leaving a stale History row + artifact
   // (audit P2: stale backend requests can still create History rows/artifacts).
   const abortRef = useRef(null)
+  const sampleMetadataRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -258,7 +259,7 @@ export function useAnalysis(copy) {
     return { urls, createdUrls, failed }
   }
 
-  function handleMediaFiles(files) {
+  function handleMediaFiles(files, options = {}) {
     const selectedFiles = Array.from(files ?? [])
     if (!selectedFiles.length) {
       return
@@ -287,6 +288,32 @@ export function useAnalysis(copy) {
       // consistent variant of the same honesty rule.
       setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
+    }
+
+    if (options.folderMode) {
+      setFolderMode(options.folderMode)
+    }
+    if (options.runwayId) {
+      setSelectedRunwayId(options.runwayId)
+    }
+    if (options.metadataFile !== undefined) {
+      setMetadataFile(options.metadataFile)
+    }
+    if (options.droneTelemetry) {
+      setDroneTelemetry({
+        latitude: options.droneTelemetry.latitude ?? '',
+        longitude: options.droneTelemetry.longitude ?? '',
+        altitudeM: options.droneTelemetry.altitudeM ?? '',
+      })
+    } else if (options.sampleMetadata) {
+      setDroneTelemetry({ latitude: '', longitude: '', altitudeM: '' })
+    }
+    if (options.sampleMetadata) {
+      sampleMetadataRef.current = true
+    } else if (sampleMetadataRef.current) {
+      setMetadataFile(null)
+      setDroneTelemetry({ latitude: '', longitude: '', altitudeM: '' })
+      sampleMetadataRef.current = false
     }
 
     const url = URL.createObjectURL(file)
@@ -396,13 +423,21 @@ export function useAnalysis(copy) {
   }, [media?.file, isAnalyzing, selectedModelId])
 
   function selectBackendFrame(index) {
-    if (!backendFrames.length) {
+    const videoFrameCount =
+      backendResults.length === 1
+        ? (backendResults[0]?.per_frame?.length || backendResults[0]?.angle_track?.length || 0)
+        : 0
+    const frameCount = backendFrames.length || videoFrameCount
+
+    if (!frameCount) {
       return
     }
 
-    const nextIndex = Math.min(Math.max(index, 0), backendFrames.length - 1)
+    const nextIndex = Math.min(Math.max(index, 0), frameCount - 1)
     setBackendFrameIndex(nextIndex)
-    setBackendScenario(backendFrames[nextIndex])
+    if (backendFrames.length) {
+      setBackendScenario(backendFrames[nextIndex])
+    }
     setActiveId('backend')
   }
 
@@ -707,6 +742,19 @@ export function useAnalysis(copy) {
     resultFolderMode != null &&
     resultFolderMode !== folderMode
 
+  const displayBackendScenario = useMemo(() => {
+    const result = backendResults.length === 1 ? backendResults[0] : null
+    const hasVideoFrameData = result?.media_type === 'video' && (
+      result.per_frame?.length > 0 || result.angle_track?.length > 0
+    )
+
+    if (!backendScenario || !hasVideoFrameData) {
+      return backendScenario
+    }
+
+    return scenarioFromVideoFrameResult(result, backendScenario, backendFrameIndex)
+  }, [backendScenario, backendFrameIndex, backendResults])
+
   return {
     activeId,
     media,
@@ -739,7 +787,7 @@ export function useAnalysis(copy) {
     isExporting,
     exportError,
     setExportError,
-    backendScenario,
+    backendScenario: displayBackendScenario,
     backendFrames,
     backendResults,
     backendFrameIndex,

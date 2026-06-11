@@ -32,6 +32,8 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
     status: lamp.state === 'unknown' ? 'occluded' : lamp.state,
     confidence: percent(lamp.confidence),
     bbox: lamp.bbox,
+    inferred: Boolean(lamp.inferred),
+    inferenceNote: lamp.inference_note ?? null,
   }))
   // angle_available can be true while elevation_angle_deg is null (GPS present
   // but the angle solve failed), so guard the toFixed calls against null.
@@ -96,6 +98,90 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
     // Keep the raw AnalysisPayload so result-driven views (crop/zoom overlays,
     // angle-vs-state charts) can read bbox/per-light angles without re-deriving
     // them from the display-shaped scenario fields above.
+    rawResult: result,
+  }
+}
+
+function lampFromFrameState(lamp) {
+  return {
+    index: lamp.index,
+    state: lamp.state,
+    confidence: lamp.confidence,
+    bbox: lamp.bbox ?? null,
+    inferred: Boolean(lamp.inferred),
+    inference_note: lamp.inference_note ?? null,
+  }
+}
+
+function completeFrameLamps(lamps) {
+  const byIndex = new Map((lamps ?? []).map((lamp) => [lamp.index, lamp]))
+
+  return [1, 2, 3, 4].map((index) =>
+    byIndex.has(index)
+      ? lampFromFrameState(byIndex.get(index))
+      : { index, state: 'unknown', confidence: 0, bbox: null },
+  )
+}
+
+function sampleClosestToFrame(samples, frameIndex) {
+  if (!samples?.length) {
+    return null
+  }
+
+  return samples.reduce((closest, sample) => {
+    const currentDistance = Math.abs((sample.frame_index ?? 0) - frameIndex)
+    const closestDistance = Math.abs((closest.frame_index ?? 0) - frameIndex)
+    return currentDistance < closestDistance ? sample : closest
+  })
+}
+
+export function scenarioFromVideoFrameResult(
+  result,
+  baseScenario,
+  frameIndex,
+  angleUnavailableLabel = 'Angle unavailable',
+) {
+  const perFrame = result.per_frame ?? []
+  const framePoint = sampleClosestToFrame(perFrame, frameIndex)
+  const angleSample = sampleClosestToFrame(result.angle_track ?? [], frameIndex)
+  const resolvedFrameIndex = framePoint?.frame_index ?? angleSample?.frame_index ?? frameIndex
+  const globalState = framePoint?.state ?? result.global_state
+  const stateId = backendStateId[globalState] ?? 'unknown'
+  const activeState = stateCatalog.find((state) => state.id === stateId) ?? stateCatalog[stateCatalog.length - 1]
+  const frameLamps = angleSample?.lamps?.length
+    ? completeFrameLamps(angleSample.lamps)
+    : result.lamps
+  const frameResult = {
+    ...result,
+    global_state: globalState,
+    lamps: frameLamps,
+    confidence: framePoint?.confidence ?? result.confidence,
+    angle: angleSample
+      ? {
+          ...result.angle,
+          angle_available: true,
+          elevation_angle_deg: angleSample.elevation_angle_deg,
+        }
+      : result.angle,
+  }
+  const scenario = scenarioFromBackendResult(
+    frameResult,
+    {
+      frameLabel: `frame ${resolvedFrameIndex + 1}`,
+      totalFrames: result.frame_count ?? perFrame.length ?? 1,
+      artifactUrl: baseScenario?.artifactUrl,
+    },
+    angleUnavailableLabel,
+  )
+
+  return {
+    ...scenario,
+    summary: `${lampPattern(frameLamps)} = ${activeState.label.toLowerCase()}`,
+    frame: `${result.frame_count ?? perFrame.length ?? 1} labeled frames`,
+    transitions: baseScenario?.transitions ?? scenario.transitions,
+    perFrame,
+    artifactUrl: baseScenario?.artifactUrl ?? scenario.artifactUrl,
+    artifactType: baseScenario?.artifactType ?? scenario.artifactType,
     rawResult: result,
   }
 }

@@ -3,7 +3,7 @@ import { SUPPORTED_LANGUAGES } from '../i18n/translations'
 // localStorage keys for the small persistence surface. Centralising them
 // here keeps writes/reads in sync and makes them easy to grep.
 export const STORAGE_KEYS = {
-  theme: 'papi.theme',
+  theme: 'papi.theme.v2',
   language: 'papi.language',
   runway: 'papi.runway',
   cookie: 'papi.cookie',
@@ -32,16 +32,15 @@ export function readStoredChoice(key, allowed, fallback) {
   }
 }
 
-// Initial theme: persisted value -> system preference -> light. Computed
-// once via lazy initializer so the App doesn't re-read localStorage on
-// every render.
+// Initial theme: persisted value -> light. Computed once via lazy initializer so
+// the App doesn't re-read localStorage on every render. We intentionally do not
+// follow the OS dark preference for first-time visitors: the default presentation
+// mode for the project is the light theme, while an explicit user toggle still
+// persists.
 export function initialTheme() {
   const stored = readStoredChoice(STORAGE_KEYS.theme, ['light', 'dark'], null)
   if (stored) return stored
-  if (typeof window === 'undefined') return 'light'
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light'
+  return 'light'
 }
 
 // Initial language: persisted -> navigator.language two-letter prefix
