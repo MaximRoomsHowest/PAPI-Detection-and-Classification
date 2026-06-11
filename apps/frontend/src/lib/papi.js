@@ -135,16 +135,17 @@ function sampleClosestToFrame(samples, frameIndex) {
   })
 }
 
-export function scenarioFromVideoFrameResult(
-  result,
-  baseScenario,
-  frameIndex,
-  angleUnavailableLabel = 'Angle unavailable',
-) {
+// ``labels`` carries the caller's localized templates (useAnalysis passes the
+// active locale's copy.live strings); the English defaults only backstop
+// direct library use outside the app.
+export function scenarioFromVideoFrameResult(result, baseScenario, frameIndex, labels = {}) {
+  const {
+    angleUnavailable = 'Angle unavailable',
+    framesLabel = '{count} labeled frames',
+  } = labels
   const perFrame = result.per_frame ?? []
   const framePoint = sampleClosestToFrame(perFrame, frameIndex)
   const angleSample = sampleClosestToFrame(result.angle_track ?? [], frameIndex)
-  const resolvedFrameIndex = framePoint?.frame_index ?? angleSample?.frame_index ?? frameIndex
   const globalState = framePoint?.state ?? result.global_state
   const stateId = backendStateId[globalState] ?? 'unknown'
   const activeState = stateCatalog.find((state) => state.id === stateId) ?? stateCatalog[stateCatalog.length - 1]
@@ -164,20 +165,23 @@ export function scenarioFromVideoFrameResult(
         }
       : result.angle,
   }
+  // The result panel shows the aggregate count label (the per-frame position
+  // already lives in the frame navigator), so the label carries the count and
+  // totalFrames stays 1 to suppress the "of N" suffix.
+  const totalFrames = result.frame_count ?? perFrame.length ?? 1
   const scenario = scenarioFromBackendResult(
     frameResult,
     {
-      frameLabel: `frame ${resolvedFrameIndex + 1}`,
-      totalFrames: result.frame_count ?? perFrame.length ?? 1,
+      frameLabel: framesLabel.replace('{count}', String(totalFrames)),
+      totalFrames: 1,
       artifactUrl: baseScenario?.artifactUrl,
     },
-    angleUnavailableLabel,
+    angleUnavailable,
   )
 
   return {
     ...scenario,
     summary: `${lampPattern(frameLamps)} = ${activeState.label.toLowerCase()}`,
-    frame: `${result.frame_count ?? perFrame.length ?? 1} labeled frames`,
     transitions: baseScenario?.transitions ?? scenario.transitions,
     perFrame,
     artifactUrl: baseScenario?.artifactUrl ?? scenario.artifactUrl,

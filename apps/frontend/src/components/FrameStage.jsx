@@ -15,6 +15,7 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { toast } from 'sonner'
 import { FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
 
 const SAMPLE_RUNWAY_ID = 'papi_24'
@@ -24,19 +25,21 @@ const SAMPLE_METADATA_FILE = {
   type: 'application/json',
 }
 
+// Labels/descriptions are i18n keys under copy.live (resolved at render time)
+// so the picker follows the active locale like every other Live-Demo string.
 const SAMPLE_MEDIA = [
   {
     id: 'single-frame',
-    label: 'Sample image',
-    description: 'One frame with angle data',
+    labelKey: 'sampleSingleImageLabel',
+    descriptionKey: 'sampleSingleImageDescription',
     icon: Images,
     files: [{ url: '/demo-samples/papi-test-frame.jpg', name: 'papi-test-frame.jpg', type: 'image/jpeg' }],
     metadataFile: SAMPLE_METADATA_FILE,
   },
   {
     id: 'image-sequence',
-    label: 'Sample image set',
-    description: 'Five varied day/night states',
+    labelKey: 'sampleImageSetLabel',
+    descriptionKey: 'sampleImageSetDescription',
     icon: Images,
     folderMode: FOLDER_MODE_SEQUENCE,
     files: [
@@ -75,8 +78,8 @@ const SAMPLE_MEDIA = [
   },
   {
     id: 'short-video',
-    label: 'Sample video',
-    description: 'Approach clip with angle data',
+    labelKey: 'sampleVideoLabel',
+    descriptionKey: 'sampleVideoDescription',
     icon: Video,
     files: [
       {
@@ -431,6 +434,10 @@ function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
         runwayId: SAMPLE_RUNWAY_ID,
         sampleMetadata: Boolean(metadataFile),
       })
+    } catch {
+      // A failed asset fetch (offline, mis-deployed sample) must surface to the
+      // user — an unhandled rejection here left the button silently dead.
+      toast.error(copy.live.sampleLoadFailed)
     } finally {
       setLoadingSampleId(null)
     }
@@ -444,7 +451,7 @@ function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
         <span>{copy.live.dropText}</span>
         <label className="dropzone-upload-button">
           <Upload size={16} />
-          <span>Upload your own data</span>
+          <span>{copy.live.uploadOwnData}</span>
           <input
             className="dropzone-input"
             accept="image/*,video/*"
@@ -456,8 +463,8 @@ function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
             }}
           />
         </label>
-        <div className="sample-picker" aria-label="Use premade test data">
-          <span className="sample-picker__title">Or use premade test data</span>
+        <div className="sample-picker" role="group" aria-label={copy.live.samplePickerTitle}>
+          <span className="sample-picker__title">{copy.live.samplePickerTitle}</span>
           <div className="sample-picker__grid">
             {SAMPLE_MEDIA.map((sample) => {
               const SampleIcon = sample.icon
@@ -473,8 +480,8 @@ function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
                 >
                   <SampleIcon size={16} />
                   <span>
-                    <strong>{isLoading ? 'Loading...' : sample.label}</strong>
-                    <small>{sample.description}</small>
+                    <strong>{isLoading ? copy.live.sampleLoading : copy.live[sample.labelKey]}</strong>
+                    <small>{copy.live[sample.descriptionKey]}</small>
                   </span>
                 </button>
               )

@@ -246,4 +246,24 @@ describe('scenarioFromVideoFrameResult', () => {
     expect(frame.lamps).toHaveLength(4)
     expect(frame.lamps[3]).toMatchObject({ id: 4, status: 'occluded', confidence: 0 })
   })
+
+  it('renders the caller-supplied localized labels', () => {
+    const result = makeResult({
+      media_type: 'video',
+      frame_count: 3,
+      angle: { angle_available: false, angle_note: 'none' },
+      per_frame: [
+        { frame_index: 0, state: 'far_too_low', confidence: 0.4 },
+        { frame_index: 1, state: 'correct_glidepath', confidence: 0.8 },
+      ],
+    })
+    const base = scenarioFromBackendResult(result, context)
+    const frame = scenarioFromVideoFrameResult(result, base, 1, {
+      angleUnavailable: 'Winkel nicht verfügbar',
+      framesLabel: '{count} annotierte Frames',
+    })
+
+    expect(frame.frame).toBe('3 annotierte Frames')
+    expect(frame.condition).toBe('Winkel nicht verfügbar')
+  })
 })

@@ -1,8 +1,11 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { translations } from '../i18n/translations.js'
 import { FrameStage } from './FrameStage.jsx'
+
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
 const copy = translations.en
 
@@ -70,6 +73,7 @@ afterEach(() => {
   })
   document.body.replaceChildren()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('FrameStage', () => {
@@ -180,5 +184,64 @@ describe('FrameStage', () => {
     })
 
     expect(onFilesSelected).toHaveBeenCalledWith(files)
+  })
+})
+
+function sampleButton(container, label) {
+  return [...container.querySelectorAll('.sample-picker__button')].find((button) =>
+    button.textContent.includes(label),
+  )
+}
+
+describe('FrameStage sample picker', () => {
+  it('renders the three localized sample cards inside the empty dropzone', () => {
+    const { container } = render(<FrameStage {...makeProps()} />)
+
+    const picker = container.querySelector(`[role="group"][aria-label="${copy.live.samplePickerTitle}"]`)
+    expect(picker).not.toBeNull()
+    const labels = [...picker.querySelectorAll('.sample-picker__button strong')].map(
+      (node) => node.textContent,
+    )
+    expect(labels).toEqual([
+      copy.live.sampleSingleImageLabel,
+      copy.live.sampleImageSetLabel,
+      copy.live.sampleVideoLabel,
+    ])
+  })
+
+  it('loads a sample and forwards the files plus metadata options', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'image/jpeg' }) })),
+    )
+    const onFilesSelected = vi.fn()
+    const { container } = render(<FrameStage {...makeProps({ onFilesSelected })} />)
+
+    const button = sampleButton(container, copy.live.sampleSingleImageLabel)
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(onFilesSelected).toHaveBeenCalledTimes(1)
+    const [files, options] = onFilesSelected.mock.calls[0]
+    expect(files).toHaveLength(1)
+    expect(files[0].name).toBe('papi-test-frame.jpg')
+    expect(options).toMatchObject({ runwayId: 'papi_24', sampleMetadata: true })
+    expect(options.metadataFile?.name).toBe('sample-descent.json')
+  })
+
+  it('surfaces a failed sample fetch and re-enables the picker', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })))
+    const onFilesSelected = vi.fn()
+    const { container } = render(<FrameStage {...makeProps({ onFilesSelected })} />)
+
+    const button = sampleButton(container, copy.live.sampleVideoLabel)
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(onFilesSelected).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith(copy.live.sampleLoadFailed)
+    expect(button.disabled).toBe(false)
   })
 })

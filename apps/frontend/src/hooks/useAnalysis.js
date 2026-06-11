@@ -752,8 +752,13 @@ export function useAnalysis(copy) {
       return backendScenario
     }
 
-    return scenarioFromVideoFrameResult(result, backendScenario, backendFrameIndex)
-  }, [backendScenario, backendFrameIndex, backendResults])
+    // copy is a dependency so the derived frame labels re-localize on a
+    // locale switch without requiring a frame change.
+    return scenarioFromVideoFrameResult(result, backendScenario, backendFrameIndex, {
+      angleUnavailable: copy.live.angleUnavailable,
+      framesLabel: copy.live.frameLabelLabeled,
+    })
+  }, [backendScenario, backendFrameIndex, backendResults, copy])
 
   return {
     activeId,

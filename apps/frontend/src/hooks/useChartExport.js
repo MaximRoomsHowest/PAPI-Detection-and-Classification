@@ -53,6 +53,10 @@ async function imageToDataUrl(path, maxWidthPx = 520) {
         img.onerror = reject
         img.src = objectUrl
       })
+      // An SVG without intrinsic dimensions reports naturalWidth 0 in some
+      // browsers — scaling by it would paint a 1px smear into the PDF header.
+      // Fall back to the text branding instead.
+      if (!image.naturalWidth || !image.naturalHeight) return null
       const scale = Math.min(1, maxWidthPx / image.naturalWidth)
       const canvas = document.createElement('canvas')
       canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
@@ -242,6 +246,10 @@ function addChartPage(pdf, logoDataUrl, image, index, pageNo) {
 // Fully self-contained — no dependency on the analysis / media state — so it lives
 // in its own hook that the useAnalysis orchestrator and the InsightsPage both read
 // through the Live-Demo context.
+//
+// The report BODY is intentionally English-only: it is a client-facing handout
+// (Intersoft Electronics) with a fixed reference wording, unlike the UI which
+// follows the active locale. Only the toasts/errors around the export localize.
 export function useChartExport(copy) {
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState('')
