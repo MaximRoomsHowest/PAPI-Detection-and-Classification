@@ -11,6 +11,7 @@ import {
   revokeMediaUrl,
 } from '../lib/api'
 import { useModalA11y } from '../hooks/useModalA11y'
+import { useLiveDemo } from '../context/liveDemoContext'
 import { HistoryStats } from '../components/history/HistoryStats'
 import { HistoryFilters } from '../components/history/HistoryFilters'
 import { HistoryTable } from '../components/history/HistoryTable'
@@ -29,7 +30,10 @@ function mergeOptions(previous, incoming, active) {
   return [...next].sort()
 }
 
-export function HistoryPage({ copy, runways = [] }) {
+export function HistoryPage({ copy }) {
+  // Shared runway list (labels for the runway column + filter) comes from the
+  // Live-Demo provider, same source the selector and Runways page use.
+  const { runways = [] } = useLiveDemo()
   const [logs, setLogs] = useState([])
   const [total, setTotal] = useState(0)
   const [modelInfo, setModelInfo] = useState(null)

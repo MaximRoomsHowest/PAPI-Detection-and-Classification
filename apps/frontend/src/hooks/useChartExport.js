@@ -11,6 +11,17 @@ export function useChartExport(copy) {
   const [exportError, setExportError] = useState('')
   const insightsRef = useRef(null)
 
+  // Drop any stale PDF-export banner when the locale switches so it never
+  // lingers in the previous language (was App's onSelectLanguage job before the
+  // provider owned this state). Guarded set-state during render (the React
+  // "storing information from previous renders" pattern) instead of an effect,
+  // so the stale message never paints.
+  const [prevCopy, setPrevCopy] = useState(copy)
+  if (prevCopy !== copy) {
+    setPrevCopy(copy)
+    if (exportError) setExportError('')
+  }
+
   async function handleDownloadCharts() {
     if (!insightsRef.current || isExporting) {
       return

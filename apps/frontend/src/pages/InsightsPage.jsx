@@ -10,6 +10,7 @@ import { ModelMetricsPanel } from '../components/insights/ModelMetricsPanel'
 import { InsightsSummaryStrip } from '../components/insights/InsightsSummaryStrip'
 import { sessionRunwaySummary } from '../lib/runwaySelection'
 import { summarizeSession } from '../lib/insightsTransforms'
+import { useLiveDemo } from '../context/liveDemoContext'
 
 // Insights is split into two tabs: "Current analysis" (charts built from the
 // session's real results — angle-vs-state, transitions, per-light/confidence
@@ -17,16 +18,15 @@ import { summarizeSession } from '../lib/insightsTransforms'
 // Both tab panels are force-mounted (CSS parks the inactive one off-screen at
 // full size) so PDF export captures every chart and Plotly never re-initialises
 // on tab switch.
-export function InsightsPage({
-  backendResults,
-  plotTheme,
-  insightsRef,
-  isExporting,
-  exportError,
-  onDownloadCharts,
-  runways = [],
-  copy,
-}) {
+export function InsightsPage({ plotTheme, copy }) {
+  const {
+    backendResults,
+    insightsRef,
+    isExporting,
+    exportError,
+    handleDownloadCharts: onDownloadCharts,
+    runways = [],
+  } = useLiveDemo()
   // Controlled so the off-screen, force-mounted panel can be marked `inert`
   // (removed from the tab order and the a11y tree) while staying in the DOM at
   // full size for PDF export. Plotly.toImage still reads inert nodes.
