@@ -16,6 +16,8 @@ export function MetadataPrompt({ copy }) {
     setSelectedRunwayId: onSelectRunway,
     droneTelemetry,
     setDroneTelemetry,
+    droneId,
+    setDroneId,
     metadataFile,
     setMetadataFile,
     folderMode,
@@ -94,6 +96,23 @@ export function MetadataPrompt({ copy }) {
               </option>
             ))}
           </select>
+        </label>
+
+        {/* Optional aircraft identifier — pure provenance (persisted with the
+            analysis, shown in History and the CSV export); never affects the
+            angle math, so it sits outside the apply-gating below. */}
+        <label className="drone-telemetry__id" htmlFor="drone-id">
+          <span>{copy.live.droneIdLabel}</span>
+          <input
+            id="drone-id"
+            name="drone-id"
+            type="text"
+            className="mono"
+            maxLength={128}
+            value={droneId}
+            onChange={(event) => setDroneId(event.target.value)}
+            placeholder="M4E-01"
+          />
         </label>
 
         <div className="drone-telemetry__file-row">

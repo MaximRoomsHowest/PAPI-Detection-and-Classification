@@ -74,6 +74,13 @@ export function useAnalysis(copy) {
   // requires lat + lon + altitude together).
   const [droneTelemetry, setDroneTelemetry] = useState({ latitude: '', longitude: '', altitudeM: '' })
 
+  // Optional drone identifier persisted with every analysis (History/CSV
+  // provenance: which aircraft flew the approach). An INPUT like the manual
+  // telemetry — it survives media changes and travels with each run; empty
+  // means "not provided" and the field is omitted (integration audit
+  // 2026-06-11: the backend column existed but no UI could ever set it).
+  const [droneId, setDroneId] = useState('')
+
   // Optional drone-telemetry FILE (DJI .SRT / CSV / JSON) paired with the upload.
   // Parsed server-side into drone fixes that take priority over the manual fields
   // and the media's embedded EXIF; for a video it powers the per-frame angle track
@@ -493,6 +500,9 @@ export function useAnalysis(copy) {
       const metadata = {
         runwayId: effectiveRunwayId,
         modelId: selectedModelId,
+        // appendMetadata (api.js) omits empty values, so an untouched field
+        // never reaches the backend.
+        droneId: droneId.trim(),
         ...(hasDroneTelemetry
           ? {
               droneLatitude: droneTelemetry.latitude.trim(),
@@ -716,6 +726,8 @@ export function useAnalysis(copy) {
     refetchRunways,
     droneTelemetry,
     setDroneTelemetry,
+    droneId,
+    setDroneId,
     metadataFile,
     setMetadataFile,
     selectedModelId,

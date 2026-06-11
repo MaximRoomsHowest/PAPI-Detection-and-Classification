@@ -645,6 +645,28 @@
   line-height: 1.5;
 }
 
+/* Optional drone identifier (pure provenance) in the metadata prompt's
+   controls row — same label/input rhythm as the position fields. */
+.drone-telemetry__id {
+  display: grid;
+  gap: 4px;
+}
+
+.drone-telemetry__id > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.drone-telemetry__id input {
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
 /* Out-of-range / non-numeric manual position: red ring on the offending field
    plus an explanatory line above the footer (the Apply button is also gated). */
 .drone-telemetry__fields input[aria-invalid='true'] {

@@ -23,6 +23,8 @@ function makeContext(telemetry, overrides = {}) {
     setSelectedRunwayId: vi.fn(),
     droneTelemetry: telemetry,
     setDroneTelemetry: vi.fn(),
+    droneId: '',
+    setDroneId: vi.fn(),
     metadataFile: null,
     setMetadataFile: vi.fn(),
     folderMode: FOLDER_MODE_ANGLE_SWEEP,
@@ -90,6 +92,25 @@ describe('MetadataPrompt manual-position validation', () => {
 
     expect(applyButton(container).disabled).toBe(false)
     expect(container.querySelector('.drone-telemetry__invalid')).toBeNull()
+  })
+
+  it('offers the optional drone-id input and forwards typing to the hook', () => {
+    const setDroneId = vi.fn()
+    mocks.contextValue = makeContext(
+      { latitude: '', longitude: '', altitudeM: '' },
+      { setDroneId },
+    )
+
+    const { container } = render(<MetadataPrompt copy={copy} />)
+
+    const input = container.querySelector('#drone-id')
+    expect(input).not.toBeNull()
+    act(() => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      setValue.call(input, 'M4E-01')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(setDroneId).toHaveBeenCalledWith('M4E-01')
   })
 
   it('keeps Apply gated (not flagged) while fields are simply empty', () => {

@@ -266,6 +266,24 @@ describe('useAnalysis inference triggering', () => {
     expect(latest.folderVideo).toBeNull()
   })
 
+  it('sends the optional drone id with the analysis once set', async () => {
+    renderHook()
+
+    await act(async () => {
+      latest.setDroneId('M4E-01')
+      await flush()
+    })
+    await act(async () => {
+      latest.handleMediaFiles([new File(['image'], 'frame.jpg', { type: 'image/jpeg' })])
+      await flush()
+    })
+
+    await waitForAssertion(() => {
+      expect(mocks.analyzeFrame).toHaveBeenCalledTimes(1)
+    })
+    expect(mocks.analyzeFrame.mock.calls[0][1]).toMatchObject({ droneId: 'M4E-01' })
+  })
+
   it('re-runs the existing upload when the inference model changes', async () => {
     renderHook()
     const file = new File(['image'], 'frame.jpg', { type: 'image/jpeg' })
