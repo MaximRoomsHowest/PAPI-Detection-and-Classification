@@ -403,9 +403,10 @@ function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
     }
 
     const blob = await response.blob()
+    // No explicit lastModified: the File constructor defaults it to "now", and
+    // an inline Date.now() trips the react-hooks/purity compiler lint.
     const file = new File([blob], sampleFile.name, {
       type: sampleFile.type || blob.type,
-      lastModified: Date.now(),
     })
 
     if (sampleFile.path) {
