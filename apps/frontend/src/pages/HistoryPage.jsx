@@ -20,6 +20,14 @@ import { HistoryDetailModal } from '../components/history/HistoryDetailModal'
 
 const HISTORY_PAGE_SIZE = 25
 
+// The date input yields a bare YYYY-MM-DD, which the backend reads as UTC
+// midnight. A user east of UTC picking "today" would silently lose their
+// early-morning rows (local 00:00–02:00 is still "yesterday" in UTC), so the
+// LOCAL midnight is converted to a full UTC instant before it is sent.
+function createdAfterInstant(dateValue) {
+  return dateValue ? new Date(`${dateValue}T00:00:00`).toISOString() : undefined
+}
+
 // Union the existing sorted option list with the incoming keys plus the active
 // selection, returning the same array reference when nothing changed so React
 // can bail out of the state update (audit F18/F20).
@@ -109,7 +117,7 @@ export function HistoryPage({ copy }) {
       globalState: stateFilter || undefined,
       modelId: modelFilter || undefined,
       mediaType: mediaFilter || undefined,
-      createdAfter: dateFilter || undefined,
+      createdAfter: createdAfterInstant(dateFilter),
       minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
     }
     fetchLogs(options)
@@ -156,7 +164,7 @@ export function HistoryPage({ copy }) {
       globalState: stateFilter || undefined,
       modelId: modelFilter || undefined,
       mediaType: mediaFilter || undefined,
-      createdAfter: dateFilter || undefined,
+      createdAfter: createdAfterInstant(dateFilter),
       minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
     })
       .then((nextStats) => {
@@ -175,7 +183,10 @@ export function HistoryPage({ copy }) {
         )
       })
       .catch((loadError) => {
-        if (!ignore) setError(localizedErrorMessage(loadError, copy))
+        // The logs effect fires on the same triggers and reports its own
+        // failure; don't let whichever request resolves LAST overwrite the
+        // other's message — first error wins, refetch clears it.
+        if (!ignore) setError((current) => current || localizedErrorMessage(loadError, copy))
       })
     return () => {
       ignore = true
@@ -248,7 +259,7 @@ export function HistoryPage({ copy }) {
           globalState: stateFilter || undefined,
           modelId: modelFilter || undefined,
           mediaType: mediaFilter || undefined,
-          createdAfter: dateFilter || undefined,
+          createdAfter: createdAfterInstant(dateFilter),
           minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
         },
         `${nameParts.join('_')}.csv`,

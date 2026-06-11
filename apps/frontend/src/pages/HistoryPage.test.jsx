@@ -179,8 +179,11 @@ describe('HistoryPage', () => {
       date.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await flush()
+    // LOCAL midnight converted to a UTC instant — a bare date would be read as
+    // UTC midnight server-side and silently drop early-morning local rows.
+    const expectedInstant = new Date('2026-06-01T00:00:00').toISOString()
     expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
-      expect.objectContaining({ createdAfter: '2026-06-01' }),
+      expect.objectContaining({ createdAfter: expectedInstant }),
     )
 
     // The CSV export reuses every active filter (and names the file after them).
@@ -191,7 +194,7 @@ describe('HistoryPage', () => {
       exportButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(mocks.downloadLogsCsv).toHaveBeenCalledWith(
-      expect.objectContaining({ mediaType: 'video', createdAfter: '2026-06-01', minConfidence: 0.75 }),
+      expect.objectContaining({ mediaType: 'video', createdAfter: expectedInstant, minConfidence: 0.75 }),
       expect.stringContaining('video'),
     )
 
