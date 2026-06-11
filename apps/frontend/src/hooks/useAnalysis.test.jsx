@@ -47,6 +47,12 @@ vi.mock('sonner', () => ({
   toast: mocks.toast,
 }))
 
+// The real createFolderVideo records a canvas via MediaRecorder — unavailable in
+// jsdom. The toggle logic under test only needs a resolved video descriptor.
+vi.mock('../lib/folderVideo', () => ({
+  createFolderVideo: vi.fn(async () => ({ url: 'blob:folder-video', frameCount: 2, fps: 4 })),
+}))
+
 const copy = translations.en
 const runway = {
   id: 'papi_24',
@@ -227,6 +233,37 @@ describe('useAnalysis inference triggering', () => {
     expect(latest.media?.name).toBe('frame.jpg')
     expect(latest.backendScenario).toBe(scenarioBefore)
     expect(mocks.analyzeFrame).toHaveBeenCalledTimes(1)
+  })
+
+  it('toggles the folder-video preview off on the second activation', async () => {
+    mocks.analyzeFrame
+      .mockResolvedValueOnce({ ...analysisPayload(), original_filename: 'a.jpg' })
+      .mockResolvedValueOnce({ ...analysisPayload(), original_filename: 'b.jpg' })
+    renderHook()
+    const files = [
+      new File(['a'], 'sweep/frame_000.jpg', { type: 'image/jpeg' }),
+      new File(['b'], 'sweep/frame_001.jpg', { type: 'image/jpeg' }),
+    ]
+
+    await act(async () => {
+      latest.handleMediaFiles(files)
+      await flush()
+    })
+    await waitForAssertion(() => {
+      expect(latest.backendFrames).toHaveLength(2)
+    })
+
+    await act(async () => {
+      await latest.transformFolderToVideo()
+    })
+    expect(latest.folderVideo?.url).toBe('blob:folder-video')
+
+    // Second activation returns to the per-frame view (user test 2026-06-11:
+    // the preview was one-way).
+    await act(async () => {
+      await latest.transformFolderToVideo()
+    })
+    expect(latest.folderVideo).toBeNull()
   })
 
   it('re-runs the existing upload when the inference model changes', async () => {

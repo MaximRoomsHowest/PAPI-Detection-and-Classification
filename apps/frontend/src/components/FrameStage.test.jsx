@@ -141,6 +141,32 @@ describe('FrameStage', () => {
     expect(findButton(freshToggle, copy.live.viewAnnotated).getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('labels the folder-video button as a toggle that can exit the preview', () => {
+    const props = makeProps({
+      canTransformFolderToVideo: true,
+      media: { type: 'folder', url: null },
+    })
+    const { container, root } = render(<FrameStage {...props} />)
+
+    const button = container.querySelector('.frame-transform-button')
+    expect(button.textContent).toContain(copy.live.transformFolderVideo)
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+
+    act(() => {
+      root.render(
+        <FrameStage
+          {...makeProps({
+            canTransformFolderToVideo: true,
+            media: { type: 'folder', url: null },
+            folderVideo: { type: 'video', url: 'blob:folder-video' },
+          })}
+        />,
+      )
+    })
+    expect(button.textContent).toContain(copy.live.folderVideoExit)
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+  })
+
   it('forwards dropped files to onFilesSelected', () => {
     const onFilesSelected = vi.fn()
     const { container } = render(<FrameStage {...makeProps({ onFilesSelected })} />)

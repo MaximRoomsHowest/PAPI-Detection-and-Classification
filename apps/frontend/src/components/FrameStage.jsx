@@ -142,11 +142,18 @@ export function FrameStage({
               className={clsx('frame-transform-button', folderVideo && 'active')}
               onClick={onTransformFolderToVideo}
               disabled={transformingFolderVideo}
-              aria-label={copy.live.transformFolderVideo}
-              title={copy.live.transformFolderVideo}
+              aria-pressed={Boolean(folderVideo)}
+              aria-label={folderVideo ? copy.live.folderVideoExit : copy.live.transformFolderVideo}
+              title={folderVideo ? copy.live.folderVideoExit : copy.live.transformFolderVideo}
             >
               <Film size={16} />
-              <span>{transformingFolderVideo ? copy.live.folderVideoBuilding : copy.live.transformFolderVideo}</span>
+              <span>
+                {transformingFolderVideo
+                  ? copy.live.folderVideoBuilding
+                  : folderVideo
+                    ? copy.live.folderVideoExit
+                    : copy.live.transformFolderVideo}
+              </span>
             </button>
           )}
           {canControlVideo && (

@@ -404,6 +404,15 @@ export function useAnalysis(copy) {
       return
     }
 
+    // Toggle OFF: a second activation returns to the per-frame view instead of
+    // silently rebuilding the same video (user test 2026-06-11: the preview was
+    // one-way — the frame navigator stayed visible but could not change what
+    // the stage showed).
+    if (folderVideo) {
+      clearFolderVideo()
+      return
+    }
+
     const annotatedSources = backendFrames
       .map((frame, index) =>
         frame.artifactUrl
