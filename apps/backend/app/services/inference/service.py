@@ -32,6 +32,7 @@ from app.services.state import (
     global_state_from_lamps,
     normalize_detections,
 )
+from app.services.storage import get_media_storage
 from app.services.telemetry import DroneSample
 from app.validation.schemas import (
     AnalysisPayload,
@@ -268,6 +269,7 @@ class InferenceService:
         artifact_path = self.settings.exports_dir / f"{uuid4()}_annotated.jpg"
         if not cv2.imwrite(str(artifact_path), annotated):
             raise RuntimeError("Could not write annotated image artifact.")
+        _artifact_ref, artifact_url = self._store_export_artifact(artifact_path)
 
         processing_ms = int((perf_counter() - start) * 1000)
         return AnalysisPayload(
@@ -281,7 +283,7 @@ class InferenceService:
             frame_count=1,
             processing_ms=processing_ms,
             angle=angle,
-            artifact_url=f"/media/{artifact_path.name}",
+            artifact_url=artifact_url,
             detections=detections,
             transition_method=effective_method,
         )
@@ -493,9 +495,18 @@ class InferenceService:
             empty_message=empty_message,
             history_size=self.settings.video_history_size,
             exports_dir=self.settings.exports_dir,
+            store_export=self._store_export_artifact,
             drone_samples=drone_samples,
             transition_method=transition_method,
         )
+
+    def _store_export_artifact(self, artifact_path: Path) -> tuple[str, str]:
+        storage = get_media_storage(self.settings)
+        reference = storage.persist_export(artifact_path)
+        artifact_url = storage.url_for_reference(reference)
+        if artifact_url is None:
+            raise RuntimeError("Could not create media URL for annotated artifact.")
+        return reference, artifact_url
 
     @staticmethod
     def _aggregate_video_lamps(

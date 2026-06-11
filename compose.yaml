@@ -73,6 +73,10 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/papi_backend
       PAPI_MODEL_PATH: /models/serving/best.pt
       PAPI_STORAGE_DIR: /storage
+      PAPI_STORAGE_BACKEND: ${PAPI_STORAGE_BACKEND:-local}
+      PAPI_BLOB_CONTAINER: ${PAPI_BLOB_CONTAINER:-papi-media}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_ACCOUNT_URL: ${AZURE_STORAGE_ACCOUNT_URL:-}
       # JSON-list form: avoids the pydantic-settings CSV-parse issue that
       # crashed the container in earlier builds (audit SMOKE-CRIT-2). Only used
       # by a direct (non-proxied) frontend such as the Vite dev server — the

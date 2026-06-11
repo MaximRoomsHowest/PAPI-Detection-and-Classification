@@ -86,3 +86,14 @@ def test_media_url_for_path_requires_exports_dir(tmp_path):
     assert media_url_for_path(str(settings.uploads_dir / "clip.webm"), settings) is None
     assert media_url_for_path(str(settings.exports_dir / ".." / "uploads" / "clip.webm"), settings) is None
 
+
+def test_media_url_for_path_accepts_azure_export_reference(tmp_path):
+    settings = Settings(
+        storage_dir=tmp_path / "storage",
+        model_path=tmp_path / "models" / "best.pt",
+        storage_backend="azure_blob",
+    )
+
+    assert media_url_for_path("exports/clip.webm", settings) == "/media/clip.webm"
+    assert media_url_for_path("uploads/clip.webm", settings) is None
+    assert media_url_for_path("../clip.webm", settings) is None

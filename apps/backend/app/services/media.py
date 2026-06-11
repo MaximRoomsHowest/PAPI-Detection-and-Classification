@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from app.config import Settings
+from app.services.storage import get_media_storage, media_url_for_reference
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
@@ -100,17 +101,13 @@ def save_upload(upload: UploadFile, settings: Settings) -> Path:
     except Exception:
         target.unlink(missing_ok=True)
         raise
+    try:
+        get_media_storage(settings).persist_upload(target)
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
     return target
 
 
 def media_url_for_path(path: str | None, settings: Settings) -> str | None:
-    if not path:
-        return None
-    artifact = Path(path).resolve()
-    exports_dir = settings.exports_dir.resolve()
-    try:
-        relative = artifact.relative_to(exports_dir)
-    except ValueError:
-        return None
-    return f"/media/{relative.as_posix()}"
-
+    return media_url_for_reference(path, settings)

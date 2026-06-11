@@ -48,6 +48,7 @@ def run_tracked_sequence(
     empty_message: str,
     history_size: int,
     exports_dir: Path,
+    store_export: Callable[[Path], tuple[str, str]] | None = None,
     drone_samples: list[DroneSample] | None = None,
     transition_method: str = "tracking",
 ) -> AnalysisPayload:
@@ -146,6 +147,10 @@ def run_tracked_sequence(
         raise
     else:
         writer.release()
+    if store_export is not None:
+        _artifact_ref, artifact_url = store_export(artifact_path)
+    else:
+        artifact_url = f"/media/{artifact_path.name}"
 
     final_lamps = aggregate_video_lamps(track_observations)
     global_state = global_state_from_lamps(final_lamps)
@@ -178,7 +183,7 @@ def run_tracked_sequence(
         frame_count=frame_count,
         processing_ms=processing_ms,
         angle=angle,
-        artifact_url=f"/media/{artifact_path.name}",
+        artifact_url=artifact_url,
         detections=last_detections,
         transitions=transitions,
         transition_method=transition_method,

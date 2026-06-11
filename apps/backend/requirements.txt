@@ -32,3 +32,8 @@ onnx==1.21.0
 # 1.23.2 — pinning a non-existent version would break the image build, so we take
 # the installable ceiling (still a bump from 1.20.1). Revisit if the index gains 1.26.x.
 onnxruntime==1.23.2
+# Azure Blob Storage is only used when PAPI_STORAGE_BACKEND=azure_blob. Local
+# Docker Compose keeps filesystem storage, but the cloud Container App streams
+# uploaded/annotated media through Blob Storage for restart-safe persistence.
+azure-storage-blob>=12.19,<13
+azure-identity>=1.17,<2

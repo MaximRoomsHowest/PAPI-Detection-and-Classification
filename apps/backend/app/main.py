@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from app.config import get_settings
 from app.database import get_session, init_db
 from app.logging_config import RequestIdMiddleware, configure_logging
 from app.services.inference import get_inference_service
+from app.services.storage import get_media_storage
 
 # Configure structured logging BEFORE any module-level logger is bound
 # (audit B-IMP-4). Calling this once at import time means subsequent
@@ -94,6 +95,8 @@ async def lifespan(_app: FastAPI):
                 "PAPI_DATABASE_URL still uses the default 'papi:papi' credentials. "
                 "Set a real PAPI_DATABASE_URL before starting in production mode."
             )
+        if settings.storage_backend == "azure_blob":
+            get_media_storage(settings).ensure_ready()
 
     # init_db + the lazy YOLO load + warmup are blocking and CPU-bound (~5 s). Run them
     # off the event loop in a thread so the server can still answer /health while it
@@ -135,7 +138,7 @@ app.include_router(router)
 def get_media(
     file_path: str,
     _auth: Annotated[None, Depends(require_api_key)] = None,
-) -> FileResponse:
+) -> Response:
     """Serve annotated artifacts from the exports directory.
 
     Replaces the previous public ``app.mount("/media", StaticFiles(...))``
@@ -152,18 +155,10 @@ def get_media(
     for media display when an API key is configured — tracked as a
     follow-up to this commit.
     """
-    target = (settings.exports_dir / file_path).resolve()
-    # Path-traversal guard. The resolve()d target must live under the
-    # exports_dir root; anything else (../../etc/passwd, symlinks
-    # pointing outside) gets a 404 — never a 403, so the existence of
-    # the gate is not itself an information leak.
     try:
-        target.relative_to(settings.exports_dir.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail="Not found") from exc
-    if not target.is_file():
-        raise HTTPException(status_code=404, detail="Not found")
-    return FileResponse(target)
+        return get_media_storage(settings).response_for_media(file_path)
+    except HTTPException:
+        raise
 
 
 @app.get("/health")

@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     default_transition_method: str = Field(default="tracking", alias="PAPI_TRANSITION_METHOD")
     device: str = Field(default="cpu", alias="PAPI_DEVICE")
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")
+    storage_backend: str = Field(default="local", alias="PAPI_STORAGE_BACKEND")
+    blob_container: str = Field(default="papi-media", alias="PAPI_BLOB_CONTAINER")
+    azure_storage_connection_string: str | None = Field(default=None, alias="AZURE_STORAGE_CONNECTION_STRING")
+    azure_storage_account_url: str | None = Field(default=None, alias="AZURE_STORAGE_ACCOUNT_URL")
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
     # NoDecode disables pydantic-settings' built-in JSON decode for env values
     # so the @field_validator below receives the raw string and can parse
@@ -128,6 +132,14 @@ class Settings(BaseSettings):
         normalized = (value or "tracking").strip().lower()
         if normalized not in ("tracking", "model"):
             raise ValueError("default_transition_method must be 'tracking' or 'model'")
+        return normalized
+
+    @field_validator("storage_backend")
+    @classmethod
+    def validate_storage_backend(cls, value: str) -> str:
+        normalized = (value or "local").strip().lower()
+        if normalized not in ("local", "azure_blob"):
+            raise ValueError("storage_backend must be 'local' or 'azure_blob'")
         return normalized
 
     @property

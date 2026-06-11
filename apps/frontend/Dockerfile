@@ -12,7 +12,9 @@ WORKDIR /app
 # also needs the backend host added back to nginx.conf's CSP and the backend's
 # CORS allowlist.
 ARG VITE_PAPI_API_URL=
+ARG VITE_PAPI_API_KEY=
 ENV VITE_PAPI_API_URL=$VITE_PAPI_API_URL
+ENV VITE_PAPI_API_KEY=$VITE_PAPI_API_KEY
 
 # Lockfile-aware install for reproducible builds.
 # Use `npm install` rather than `npm ci` because the lockfile is generated on
@@ -36,7 +38,8 @@ EXPOSE 8080
 
 # SPA-aware nginx config (react-router fallback to /index.html) + security
 # headers (audit F-MAJ-13 / DCK-MAJ-6).
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ARG NGINX_CONF=nginx.conf
+COPY ${NGINX_CONF} /etc/nginx/conf.d/default.conf
 
 # Static bundle from the build stage.
 COPY --from=build /app/dist /usr/share/nginx/html
