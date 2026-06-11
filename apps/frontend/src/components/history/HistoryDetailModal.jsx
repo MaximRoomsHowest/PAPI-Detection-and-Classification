@@ -117,7 +117,39 @@ export function HistoryDetailModal({
             <span>{copy.history.processing}</span>
             <strong className="tnum">{selectedLog.processing_ms} ms</strong>
           </div>
+          {/* The model that PRODUCED this persisted result — without it an old
+              row is indistinguishable from a re-run with another detector
+              (integration audit 2026-06-11: stored but never shown). */}
+          {(selectedLog.model_label || selectedLog.model_id) && (
+            <div>
+              <span>{copy.live.modelUsed}</span>
+              <strong>{selectedLog.model_label || selectedLog.model_id}</strong>
+            </div>
+          )}
+          <div>
+            <span>{copy.history.media}</span>
+            <strong>
+              {selectedLog.media_type === 'video'
+                ? copy.history.mediaVideo
+                : copy.history.mediaImage}
+              {selectedLog.frame_count > 1 ? ` · ${selectedLog.frame_count}` : ''}
+            </strong>
+          </div>
+          {selectedLog.drone_id && (
+            <div>
+              <span>{copy.history.drone}</span>
+              <strong className="mono">{selectedLog.drone_id}</strong>
+            </div>
+          )}
         </div>
+
+        {/* Honest partial-result banner, same contract as the Live Demo panel:
+            the verdict covers only frames [0, truncated_at_frame). */}
+        {selectedLog.truncated_at_frame != null && (
+          <p className="result-truncation" role="alert">
+            {copy.live.truncatedAnalysis.replace('{frames}', selectedLog.truncated_at_frame)}
+          </p>
+        )}
 
         {artifact.key === selectedLog.artifact_url && artifact.url && (
           <div className="history-artifact">
@@ -200,6 +232,35 @@ export function HistoryDetailModal({
             )}
           </div>
         </div>
+
+        {/* Detected red<->white transitions — the headline output of a video
+            analysis, persisted in the payload but previously invisible here
+            (integration audit 2026-06-11). Mirrors the Live Demo readout:
+            localized lamp colours + which method produced the events. */}
+        {selectedLog.transitions?.length > 0 && (
+          <div className="history-transitions">
+            <span>{copy.live.transitionsHeading}</span>
+            {selectedLog.transition_method && (
+              <small>
+                {copy.live.transitionMethodUsed.replace(
+                  '{method}',
+                  selectedLog.transition_method === 'model'
+                    ? copy.live.transitionMethodModel
+                    : copy.live.transitionMethodTracking,
+                )}
+              </small>
+            )}
+            <ul>
+              {selectedLog.transitions.map((event, index) => (
+                <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
+                  {`${copy.live.light} ${event.lamp_index}: `}
+                  {`${lampStateLabel(event.from_state, copy)} → ${lampStateLabel(event.to_state, copy)}`}
+                  {` (${copy.history.frames.toLowerCase()} ${event.frame_index})`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="history-angle-note">
           <HistoryIcon size={16} />

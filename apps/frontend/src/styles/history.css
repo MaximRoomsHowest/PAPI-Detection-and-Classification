@@ -123,6 +123,35 @@
   font-size: 12px;
 }
 
+/* Detected-transitions block in the detail modal (mirrors the Live Demo
+   readout): heading + method note + one line per red<->white event. */
+.history-transitions {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.history-transitions > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.history-transitions small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.history-transitions ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
 /* "filtered" scope chip on the stats cards: marks aggregates that describe the
    active filter selection rather than the whole table. */
 .history-summary__scope {

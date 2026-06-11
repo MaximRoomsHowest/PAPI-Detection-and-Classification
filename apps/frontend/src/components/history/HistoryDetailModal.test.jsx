@@ -87,6 +87,46 @@ describe('HistoryDetailModal', () => {
     expect(container.querySelector('.history-artifact video')).toBeNull()
   })
 
+  it('shows the persisted video story: model, media, truncation, transitions', () => {
+    const videoLog = {
+      ...baseLog,
+      media_type: 'video',
+      frame_count: 48,
+      model_id: 'transition',
+      model_label: 'Transition classifier',
+      drone_id: 'M4E-01',
+      truncated_at_frame: 48,
+      transition_method: 'model',
+      transitions: [
+        { lamp_index: 2, from_state: 'red', to_state: 'white', frame_index: 24 },
+      ],
+    }
+    const { container } = render(<HistoryDetailModal {...makeProps({ selectedLog: videoLog })} />)
+    const text = container.textContent
+
+    expect(text).toContain('Transition classifier')
+    expect(text).toContain(`${copy.history.mediaVideo} · 48`)
+    expect(text).toContain('M4E-01')
+    expect(container.querySelector('.result-truncation')?.textContent).toBe(
+      copy.live.truncatedAnalysis.replace('{frames}', '48'),
+    )
+    const transitions = container.querySelector('.history-transitions')
+    expect(transitions.textContent).toContain(
+      copy.live.transitionMethodUsed.replace('{method}', copy.live.transitionMethodModel),
+    )
+    // Localized lamp colours, never the raw enums.
+    expect(transitions.textContent).toContain(
+      `${copy.live.light} 2: ${copy.status.red} → ${copy.status.white}`,
+    )
+  })
+
+  it('hides the optional sections when the log has no such data', () => {
+    const { container } = render(<HistoryDetailModal {...makeProps()} />)
+    expect(container.querySelector('.history-transitions')).toBeNull()
+    expect(container.querySelector('.result-truncation')).toBeNull()
+    expect(container.textContent).not.toContain(copy.history.drone)
+  })
+
   it('keeps the raw detections behind the disclosure toggle', () => {
     const onToggleRaw = vi.fn()
     const { container, root } = render(<HistoryDetailModal {...makeProps({ onToggleRaw })} />)
