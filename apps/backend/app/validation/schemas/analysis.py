@@ -28,7 +28,9 @@ class AnalysisPayload(BaseModel):
     # metadata lied or was absent — honestly-declared sources are rejected up
     # front): the analysis covers frames [0, truncated_at_frame) and the UI must
     # say so rather than present a partial result as complete (audit B2). None
-    # for complete analyses.
+    # for complete analyses. Semantics: the index of the FIRST frame that was
+    # NOT processed — equal to the number of processed frames (and therefore to
+    # frame_count), never the index of a processed frame.
     truncated_at_frame: int | None = None
     processing_ms: int
     angle: AngleResult
