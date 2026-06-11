@@ -278,6 +278,41 @@ audit trail (`verification_log.csv`). Delete `**/labels.cache` after ANY
 relabeling — Ultralytics does not invalidate it (this silently fed a stale
 label set to an earlier eval).
 
+## 5c. Enabling the optional transition classifier
+
+The 3-class `transition` registry entry ships disabled-by-default: its weights are
+an experimental local artifact (`data/runs/detect/transition3class-yolo26s-1280/`),
+not committed. The selector button in the Live Demo stays greyed out until the
+backend can see the file. Two working recipes:
+
+**Bare-metal / local uvicorn** — nothing to do if the training run is present:
+the registry path `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt`
+resolves against the repo root. (Optionally override with
+`PAPI_TRANSITION_MODEL_PATH=<path>`.)
+
+**Docker Compose** — the container only mounts `./models`, so a `data/...` path
+can NEVER resolve inside it (it lands at the unmounted `/app/data/...`). Place
+the weights inside the mount and reference the in-container path:
+
+```powershell
+New-Item -ItemType Directory -Force models\transition | Out-Null
+Copy-Item data\runs\detect\transition3class-yolo26s-1280\weights\best.pt models\transition\best.pt
+# .env (models/transition/ is gitignored, so the copy is never committed):
+#   PAPI_TRANSITION_MODEL_PATH=/models/transition/best.pt
+docker compose up -d backend   # env change only — no rebuild needed
+```
+
+Verify: the startup log prints `Registry models loaded at startup: ... transition`
+and `/api/models` reports the entry `available: true`. Selecting it in the UI
+auto-uses the learned `model` transition method (`transition_method: "model"` on
+the payload); `PAPI_TRANSITION_METHOD=model` does the same for the default model
+when the entry is available.
+
+**Honesty note**: enabling it makes the classifier *selectable*, not *good* —
+held-out transition-class F1 is 0.10 (recall 2/6, support 6; §3.1.2 / the
+registry's inline `val_metrics`). `tracking` stays the default method until the
+CVAT relabel grows the transition class (§6).
+
 ## 6. Open items
 
 - ZoomCamera `calibrated_focal_px` is `null` in `configs/papi_edny.yaml`;

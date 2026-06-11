@@ -55,7 +55,7 @@
         "1": "PAPI-White",
         "2": "PAPI-Transition"
       },
-      "disabled_reason": "Transition checkpoint is optional; it is available only when its weights file is present at the configured path (e.g. absent in the default Docker image)."
+      "disabled_reason": "Transition checkpoint is optional; it is available only when its weights file is present at the configured path (absent in the default Docker image). Enable it via models/MODELS.md section 5c."
     }
   ]
 }
