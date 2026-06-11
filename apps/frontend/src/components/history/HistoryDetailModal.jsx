@@ -2,15 +2,18 @@ import clsx from 'clsx'
 import { History as HistoryIcon, X } from 'lucide-react'
 import { formatAngle, percent } from '../../lib/format'
 import { runwayDisplayName } from '../../lib/runwaySelection'
+import { globalStateLabel, lampStateLabel } from '../../lib/stateLabels'
 
 // Mirrors the backend's DETECTION_CLASS_TO_STATE (apps/backend/app/services/state.py)
 // so the compact detections summary shows a readable lamp colour instead of a
 // bare class id. Kept tiny and explicit — falls through to the raw id otherwise.
-const DETECTION_CLASS_LABEL = { 0: 'red', 1: 'white' }
+const DETECTION_CLASS_STATE = { 0: 'red', 1: 'white' }
 
-function detectionLabel(detection) {
+function detectionLabel(detection, copy) {
   const classId = detection?.class_id
-  if (classId != null && DETECTION_CLASS_LABEL[classId]) return DETECTION_CLASS_LABEL[classId]
+  if (classId != null && DETECTION_CLASS_STATE[classId]) {
+    return lampStateLabel(DETECTION_CLASS_STATE[classId], copy)
+  }
   if (classId != null) return `class ${classId}`
   return '—'
 }
@@ -87,7 +90,7 @@ export function HistoryDetailModal({
         <div className="history-detail-grid">
           <div>
             <span>{copy.history.state}</span>
-            <strong>{selectedLog.global_state?.replaceAll('_', ' ') ?? '—'}</strong>
+            <strong>{globalStateLabel(selectedLog.global_state, copy) || '—'}</strong>
           </div>
           <div>
             <span>{copy.history.runway}</span>
@@ -134,7 +137,7 @@ export function HistoryDetailModal({
             <div className="history-lamps">
               {(selectedLog.lamps ?? []).map((lamp) => (
                 <span className={clsx('history-lamp', `history-lamp-${lamp.state}`)} key={lamp.index}>
-                  <span className="tnum">L{lamp.index}</span> · {lamp.state} · <span className="tnum">{percent(lamp.confidence)}%</span>
+                  <span className="tnum">L{lamp.index}</span> · {lampStateLabel(lamp.state, copy)} · <span className="tnum">{percent(lamp.confidence)}%</span>
                 </span>
               ))}
             </div>
@@ -158,7 +161,7 @@ export function HistoryDetailModal({
                   {detections.map((detection, index) => (
                     <tr key={detection.track_id ?? index}>
                       <td className="tnum">{index + 1}</td>
-                      <td>{detectionLabel(detection)}</td>
+                      <td>{detectionLabel(detection, copy)}</td>
                       <td className="tnum">
                         {Number.isFinite(Number(detection.confidence))
                           ? `${percent(detection.confidence)}%`

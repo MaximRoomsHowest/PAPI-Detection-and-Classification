@@ -2,23 +2,7 @@ import { memo, useMemo } from 'react'
 import { Activity } from 'lucide-react'
 import { LazyPlot } from './insights/LazyPlot'
 import { axisTitle, basePlotLayout, baseAxisStyle, plotlyConfig } from '../catalog/plotly'
-import { backendStateId, stateCatalog } from '../catalog/stateCatalog'
-import { translateState } from '../i18n/translate'
-
-// Map a backend global_state ("correct_glidepath", ...) to its localized label,
-// mirroring the Insights panels so the chart hover reads the same as the rest of
-// the app (the per-frame `state` is a backend GlobalState, not a frontend id).
-function stateLabel(rawState, copy) {
-  const id = backendStateId[rawState]
-  if (id) {
-    const entry = stateCatalog.find((state) => state.id === id)
-    if (entry) return translateState(entry, copy).label
-  }
-  // Backend global states with no entry in backendStateId / stateCatalog fall back
-  // to the localized status label, then a prettified raw value — so an unmapped raw
-  // state's hover never silently reads "Unknown".
-  return copy.status?.[rawState] ?? rawState.replace(/_/g, ' ')
-}
+import { globalStateLabel } from '../lib/stateLabels'
 
 // Frame-by-frame detection confidence for a video / folder-sequence analysis.
 // `perFrame` is the backend's raw per-frame series [{ frame_index, confidence, state }];
@@ -38,7 +22,7 @@ function VideoConfidenceChartInner({ perFrame, plotTheme, copy }) {
         mode: 'lines+markers',
         x: points.map((point) => point.frame_index),
         y: points.map((point) => Math.round(point.confidence * 100)),
-        customdata: points.map((point) => stateLabel(point.state, copy)),
+        customdata: points.map((point) => globalStateLabel(point.state, copy)),
         line: { color: plotTheme.accent, width: 2 },
         marker: { size: 6, color: plotTheme.accent },
         fill: 'tozeroy',

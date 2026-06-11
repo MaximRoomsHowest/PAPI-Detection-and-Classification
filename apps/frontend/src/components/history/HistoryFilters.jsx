@@ -1,5 +1,6 @@
 import { Download, X } from 'lucide-react'
 import { runwayDisplayName } from '../../lib/runwaySelection'
+import { globalStateLabel } from '../../lib/stateLabels'
 
 function runwayOptionLabel(runwayId, runways) {
   const label = runwayDisplayName(runwayId, runways)
@@ -53,7 +54,7 @@ export function HistoryFilters({
         <option value="">{copy.history.filterState}</option>
         {stateOptions.map((stateKey) => (
           <option key={stateKey} value={stateKey}>
-            {stateKey.replaceAll('_', ' ')}
+            {globalStateLabel(stateKey, copy)}
           </option>
         ))}
       </select>

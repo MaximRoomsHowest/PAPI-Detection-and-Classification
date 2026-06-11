@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { formatAngle, formatTimestamp, percent } from '../../lib/format'
 import { runwayDisplayName } from '../../lib/runwaySelection'
+import { globalStateLabel } from '../../lib/stateLabels'
 
 // The analyses table (with its loading/empty states + the horizontal-scroll cue)
 // and the pagination controls. Presentational — the parent owns the logs/paging
@@ -64,7 +65,7 @@ export function HistoryTable({
                     </td>
                     <td data-label={copy.history.state}>
                       <span className={clsx('state-pill', `state-pill-${log.global_state}`)}>
-                        {log.global_state.replaceAll('_', ' ')}
+                        {globalStateLabel(log.global_state, copy)}
                       </span>
                     </td>
                     <td data-label={copy.history.confidence} className="tnum">{percent(log.confidence)}%</td>
