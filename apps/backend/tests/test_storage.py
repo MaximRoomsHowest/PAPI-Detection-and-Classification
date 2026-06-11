@@ -44,23 +44,34 @@ class FakeDownloader:
         return iter([b"data"])
 
 
+class FakeBlobProperties:
+    def __init__(self, size):
+        self.size = size
+
+
 class FakeContainerClient:
     """Records calls; raises whatever exception instances it was armed with."""
 
-    def __init__(self, download_error=None, delete_error=None, create_error=None):
+    def __init__(self, download_error=None, delete_error=None, create_error=None, size=1000):
         self.download_error = download_error
         self.delete_error = delete_error
         self.create_error = create_error
+        self.size = size
         self.uploads: list[tuple[str, bytes]] = []
         self.deleted: list[str] = []
+        self.downloads: list[tuple[str, int | None, int | None]] = []
         self.created = 0
 
     def upload_blob(self, name, data, overwrite, content_settings):  # noqa: ARG002
         self.uploads.append((name, data.read()))
 
-    def download_blob(self, blob_name):  # noqa: ARG002
+    def get_blob_properties(self, blob_name):  # noqa: ARG002
+        return FakeBlobProperties(self.size)
+
+    def download_blob(self, blob_name, offset=None, length=None):
         if self.download_error is not None:
             raise self.download_error
+        self.downloads.append((blob_name, offset, length))
         return FakeDownloader()
 
     def delete_blob(self, blob_name):
@@ -169,16 +180,68 @@ def test_response_for_media_azure_streams_with_allowlisted_type(tmp_path, fake_c
 
     assert isinstance(response, StreamingResponse)
     assert response.media_type == "video/mp4"
+    # No Range header -> a full 200 that still advertises range support so the
+    # browser's video element knows it can seek.
+    assert response.status_code == 200
+    assert response.headers["accept-ranges"] == "bytes"
+    assert response.headers["content-length"] == "1000"
 
 
-def test_response_for_media_azure_download_failure_is_404(tmp_path, monkeypatch):
-    client = FakeContainerClient(download_error=RuntimeError("blob gone"))
+def test_response_for_media_azure_honors_byte_ranges(tmp_path, fake_client):
+    storage = get_media_storage(azure_settings(tmp_path))
+
+    response = storage.response_for_media("clip.mp4", range_header="bytes=0-3")
+
+    assert response.status_code == 206
+    assert response.headers["content-range"] == "bytes 0-3/1000"
+    assert response.headers["content-length"] == "4"
+    assert fake_client.downloads == [("exports/clip.mp4", 0, 4)]
+
+
+def test_response_for_media_azure_open_ended_and_suffix_ranges(tmp_path, fake_client):
+    storage = get_media_storage(azure_settings(tmp_path))
+
+    open_ended = storage.response_for_media("clip.mp4", range_header="bytes=900-")
+    suffix = storage.response_for_media("clip.mp4", range_header="bytes=-50")
+
+    assert open_ended.headers["content-range"] == "bytes 900-999/1000"
+    assert suffix.headers["content-range"] == "bytes 950-999/1000"
+    assert fake_client.downloads == [
+        ("exports/clip.mp4", 900, 100),
+        ("exports/clip.mp4", 950, 50),
+    ]
+
+
+def test_response_for_media_azure_unsatisfiable_range_is_416(tmp_path, fake_client):
+    storage = get_media_storage(azure_settings(tmp_path))
+
+    with pytest.raises(HTTPException) as excinfo:
+        storage.response_for_media("clip.mp4", range_header="bytes=2000-")
+    assert excinfo.value.status_code == 416
+    assert excinfo.value.headers["content-range"] == "bytes */1000"
+
+
+def test_response_for_media_azure_ignores_malformed_ranges(tmp_path, fake_client):
+    storage = get_media_storage(azure_settings(tmp_path))
+
+    response = storage.response_for_media("clip.mp4", range_header="bytes=abc")
+
+    # RFC 9110: a server MAY ignore an unparseable Range -> full 200.
+    assert response.status_code == 200
+    assert fake_client.downloads == [("exports/clip.mp4", None, None)]
+
+
+def test_response_for_media_azure_download_failure_is_404(tmp_path, monkeypatch, caplog):
+    client = FakeContainerClient(download_error=RuntimeError("auth expired"))
     monkeypatch.setattr(MediaStorage, "_container_client", lambda self: client)
     settings = azure_settings(tmp_path)
 
-    with pytest.raises(HTTPException) as excinfo:
-        get_media_storage(settings).response_for_media("clip.mp4")
+    with caplog.at_level("WARNING", logger="app.services.storage"):
+        with pytest.raises(HTTPException) as excinfo:
+            get_media_storage(settings).response_for_media("clip.mp4")
     assert excinfo.value.status_code == 404
+    # The public shape stays 404, but the real cause must reach the log.
+    assert any("Blob download failed" in record.message for record in caplog.records)
 
 
 # --- url_for_reference ------------------------------------------------------

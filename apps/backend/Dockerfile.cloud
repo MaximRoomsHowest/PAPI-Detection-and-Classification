@@ -10,6 +10,11 @@
 # stage structure in sync with apps/backend/Dockerfile — same digest-pinned
 # base, the torch pins shared via torch-requirements.txt (pip-audit scans
 # them in CI), and the same headless-opencv last-write fix.
+#
+# NOT built by CI (the docker job builds the compose images only — adding this
+# one would re-download torch every run without layer caching). It is built by
+# infra/azure/scripts/build-and-push.sh, so rot surfaces at deploy time: build
+# locally before pushing a deploy if this file or requirements changed.
 
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS builder
 

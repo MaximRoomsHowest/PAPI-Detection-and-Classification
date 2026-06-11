@@ -213,6 +213,29 @@ For a real deployment (not a local demo):
 5. **Restrict the backend port**. Remove the host port mapping
    for backend `:8000` and let only the reverse proxy reach it.
 
+### 7.0 Azure Container Apps (scripted, what powers the public demo)
+
+The repository ships a complete Azure deployment under `infra/azure/`
+(scripts + README): Container Registry, a Container App running the
+frontend nginx and backend as sidecars, PostgreSQL Flexible Server, and
+Azure Blob Storage for media artifacts. The public demo at
+`https://www.papivision.software` runs this path.
+
+Storage backend selection is environment-driven and defaults to the
+local filesystem — the Azure deployment sets:
+
+| Variable | Value | Purpose |
+| --- | --- | --- |
+| `PAPI_STORAGE_BACKEND` | `azure_blob` (default `local`) | Media artifacts go to Blob Storage instead of `PAPI_STORAGE_DIR`; `/media/...` URLs keep working (the backend proxies, with byte-range support for video seeking). |
+| `PAPI_BLOB_CONTAINER` | container name (default `papi-media`) | Blob container for `uploads/` and `exports/`. |
+| `AZURE_STORAGE_CONNECTION_STRING` | secret | Simplest auth for the first deploy. |
+| `AZURE_STORAGE_ACCOUNT_URL` | account URL | Alternative: managed identity (`DefaultAzureCredential`) instead of a connection string. |
+
+Follow `infra/azure/README.md` for the end-to-end recipe
+(`create-resources.sh` → `build-and-push.sh` → `deploy-containerapp.sh`
+→ `smoke-test.sh`). Local compose ignores all of this and keeps
+filesystem storage.
+
 ### 7.1 HTTPS termination — Caddy recipe (recommended)
 
 Caddy is the lowest-effort way to get a Let's Encrypt certificate

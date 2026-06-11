@@ -122,7 +122,15 @@ jq -n \
               memory: "4Gi"
             }
           }
-        ]
+        ],
+        # Pinned to exactly one replica: scale-to-zero gave the public site a
+        # ~20s cold start (torch + YOLO load), and >1 replica would multiply
+        # the 4Gi model footprint while the in-process inference lock only
+        # serializes within one replica.
+        scale: {
+          minReplicas: 1,
+          maxReplicas: 1
+        }
       }
     }
   }' > "$DEPLOY_JSON"

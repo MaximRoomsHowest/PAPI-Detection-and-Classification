@@ -169,7 +169,15 @@ export function HistoryDetailModal({
             <div className="history-lamps">
               {(selectedLog.lamps ?? []).map((lamp) => (
                 <span className={clsx('history-lamp', `history-lamp-${lamp.state}`)} key={lamp.index}>
-                  <span className="tnum">L{lamp.index}</span> · {lampStateLabel(lamp.state, copy)} · <span className="tnum">{percent(lamp.confidence)}%</span>
+                  <span className="tnum">L{lamp.index}</span> · {lampStateLabel(lamp.state, copy)} ·{' '}
+                  {/* An inferred lamp's state came from geometry, not the detector —
+                      a confidence percentage would be fabricated precision. Same
+                      disclosure rule as LampCard on the Live Demo. */}
+                  {lamp.inferred ? (
+                    <span title={lamp.inference_note ?? undefined}>{copy.live.inferredFromAngle}</span>
+                  ) : (
+                    <span className="tnum">{percent(lamp.confidence)}%</span>
+                  )}
                 </span>
               ))}
             </div>

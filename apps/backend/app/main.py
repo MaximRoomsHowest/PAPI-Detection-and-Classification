@@ -12,7 +12,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
@@ -158,6 +158,7 @@ app.include_router(router)
 @app.get("/media/{file_path:path}")
 def get_media(
     file_path: str,
+    request: Request,
     _auth: Annotated[None, Depends(require_api_key)] = None,
 ) -> Response:
     """Serve annotated artifacts from the exports directory.
@@ -179,8 +180,12 @@ def get_media(
     # Path-traversal guard and the explicit content-type allowlist live inside
     # MediaStorage.response_for_media so the local-filesystem and Azure Blob
     # serving paths enforce the exact same rules (out-of-tree -> 404, unknown
-    # suffix -> application/octet-stream download).
-    return get_media_storage(settings).response_for_media(file_path)
+    # suffix -> application/octet-stream download). The Range header is passed
+    # through because the Azure branch implements byte ranges itself (video
+    # seeking needs 206es; FileResponse covers the local branch natively).
+    return get_media_storage(settings).response_for_media(
+        file_path, range_header=request.headers.get("range")
+    )
 
 
 @app.get("/health")

@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import mimetypes
 import posixpath
+import re
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -119,14 +121,48 @@ class MediaStorage:
             return f"/media/{blob_name.removeprefix('exports/')}"
         return _local_media_url_for_path(reference, self.settings)
 
-    def response_for_media(self, file_path: str) -> Response:
+    def response_for_media(self, file_path: str, range_header: str | None = None) -> Response:
+        """Serve a media artifact; honors single byte-range requests in BOTH modes.
+
+        Local mode delegates ranges to FileResponse (Starlette implements them).
+        Azure mode implements them explicitly: browser <video> seeking — and
+        Safari playback at all — require 206 partial responses, which a plain
+        StreamingResponse would silently not provide.
+        """
         if self.is_azure:
             blob_name = _safe_export_blob_name(file_path)
+            media_type = _served_media_type(blob_name)
+            client = self._container_client()
             try:
-                downloader = self._container_client().download_blob(blob_name)
-            except Exception as exc:
+                size = client.get_blob_properties(blob_name).size
+                byte_range = _parse_byte_range(range_header, size)
+                if byte_range is None:
+                    downloader = client.download_blob(blob_name)
+                    return StreamingResponse(
+                        downloader.chunks(),
+                        media_type=media_type,
+                        headers={"accept-ranges": "bytes", "content-length": str(size)},
+                    )
+                start, end = byte_range
+                downloader = client.download_blob(blob_name, offset=start, length=end - start + 1)
+                return StreamingResponse(
+                    downloader.chunks(),
+                    status_code=206,
+                    media_type=media_type,
+                    headers={
+                        "accept-ranges": "bytes",
+                        "content-length": str(end - start + 1),
+                        "content-range": f"bytes {start}-{end}/{size}",
+                    },
+                )
+            except HTTPException:
+                raise
+            except Exception as exc:  # noqa: BLE001 - 404 is the public shape; the cause goes to the log
+                # Auth/throttle/network failures must stay diagnosable — a bare
+                # 404 with no log line made them indistinguishable from a
+                # genuinely missing artifact.
+                logger.warning("Blob download failed for %r: %s", blob_name, exc)
                 raise HTTPException(status_code=404, detail="Not found") from exc
-            return StreamingResponse(downloader.chunks(), media_type=_served_media_type(blob_name))
 
         target = (self.settings.exports_dir / file_path).resolve()
         # Path-traversal guard. The resolve()d target must live under the
@@ -142,34 +178,85 @@ class MediaStorage:
         return FileResponse(target, media_type=_served_media_type(target.name))
 
     def _container_client(self):
-        try:
-            from azure.storage.blob import BlobServiceClient
-        except ImportError as exc:
-            raise RuntimeError("Install azure-storage-blob to use PAPI_STORAGE_BACKEND=azure_blob.") from exc
-
-        if self.settings.azure_storage_connection_string:
-            service = BlobServiceClient.from_connection_string(self.settings.azure_storage_connection_string)
-        elif self.settings.azure_storage_account_url:
-            try:
-                from azure.identity import DefaultAzureCredential
-            except ImportError as exc:
-                raise RuntimeError("Install azure-identity to use managed identity for Blob Storage.") from exc
-            service = BlobServiceClient(
-                account_url=self.settings.azure_storage_account_url,
-                credential=DefaultAzureCredential(),
-            )
-        else:
-            raise RuntimeError(
-                "Set AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_URL "
-                "when PAPI_STORAGE_BACKEND=azure_blob."
-            )
-        return service.get_container_client(self.settings.blob_container)
+        # MediaStorage instances are created per call, so the (thread-safe,
+        # reuse-encouraged) SDK client is cached at module level — without this
+        # every /media request and artifact write rebuilt a BlobServiceClient
+        # and its connection pool from scratch.
+        return _cached_container_client(
+            self.settings.azure_storage_connection_string or None,
+            self.settings.azure_storage_account_url or None,
+            self.settings.blob_container,
+        )
 
     @staticmethod
     def _content_settings(content_type: str):
         from azure.storage.blob import ContentSettings
 
         return ContentSettings(content_type=content_type)
+
+
+@lru_cache(maxsize=4)
+def _cached_container_client(connection_string: str | None, account_url: str | None, container: str):
+    try:
+        from azure.storage.blob import BlobServiceClient
+    except ImportError as exc:
+        raise RuntimeError("Install azure-storage-blob to use PAPI_STORAGE_BACKEND=azure_blob.") from exc
+
+    if connection_string:
+        service = BlobServiceClient.from_connection_string(connection_string)
+    elif account_url:
+        try:
+            from azure.identity import DefaultAzureCredential
+        except ImportError as exc:
+            raise RuntimeError("Install azure-identity to use managed identity for Blob Storage.") from exc
+        service = BlobServiceClient(account_url=account_url, credential=DefaultAzureCredential())
+    else:
+        raise RuntimeError(
+            "Set AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_URL "
+            "when PAPI_STORAGE_BACKEND=azure_blob."
+        )
+    return service.get_container_client(container)
+
+
+def _parse_byte_range(header: str | None, size: int) -> tuple[int, int] | None:
+    """First satisfiable single byte-range, None for a full-body 200.
+
+    Only the single-range form (``bytes=start-end``, ``bytes=start-``,
+    ``bytes=-suffix``) is supported — exactly what browser media elements send.
+    Anything unparseable degrades to a full 200 (per RFC 9110 a server MAY
+    ignore Range); a parseable-but-unsatisfiable range raises 416 so the
+    browser can recover its position.
+    """
+    if not header or size <= 0:
+        return None
+    match = re.fullmatch(r"bytes=(\d*)-(\d*)", header.strip())
+    if not match:
+        return None
+    start_raw, end_raw = match.groups()
+    if not start_raw and not end_raw:
+        return None
+    if not start_raw:
+        # Suffix form: the last N bytes.
+        suffix = int(end_raw)
+        if suffix == 0:
+            raise HTTPException(
+                status_code=416,
+                detail="Range not satisfiable",
+                headers={"content-range": f"bytes */{size}"},
+            )
+        start = max(0, size - suffix)
+        return start, size - 1
+    start = int(start_raw)
+    if start >= size:
+        raise HTTPException(
+            status_code=416,
+            detail="Range not satisfiable",
+            headers={"content-range": f"bytes */{size}"},
+        )
+    end = min(int(end_raw), size - 1) if end_raw else size - 1
+    if end < start:
+        return None
+    return start, end
 
 
 def media_url_for_reference(reference: str | None, settings: Settings) -> str | None:
