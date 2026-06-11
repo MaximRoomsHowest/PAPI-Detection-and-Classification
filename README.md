@@ -3,4 +3,5 @@ train-2: yolo26n
 train-3: yolo26s
 train-5: yolo26s augmented dataset
 train-6: yolo26s full dataset 640x640
-train-6: yolo26s full dataset 1280x1280
+train-7: yolo26s full dataset 1280x1280
+train-9: yolo26s weather albumentations
