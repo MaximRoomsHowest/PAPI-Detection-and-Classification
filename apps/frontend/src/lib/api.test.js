@@ -37,6 +37,7 @@ import {
   mediaUrl,
   resolveMediaUrl,
 } from './api.js'
+import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages.js'
 
 /** Helper: build a Response-like object the way fetch resolves to one. */
 function jsonResponse(body, { ok = true, status = ok ? 200 : 500 } = {}) {
@@ -476,5 +477,22 @@ describe('fetchWithTimeout — abort propagation', () => {
     )
 
     await expect(fetchRunways()).rejects.toThrow(/did not respond/i)
+  })
+
+  it('tags the timeout error with the code + seconds the UI localizes from', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        const err = new Error('aborted')
+        err.name = 'AbortError'
+        throw err
+      }),
+    )
+
+    const error = await fetchRunways().catch((caught) => caught)
+    expect(error.code).toBe(REQUEST_TIMEOUT_ERROR_CODE)
+    // Default GET budget is 60 s; display sites interpolate this into the
+    // localized errors.requestTimeout string.
+    expect(error.timeoutSeconds).toBe(60)
   })
 })

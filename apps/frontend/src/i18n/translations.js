@@ -394,6 +394,10 @@ export const translations = {
       offline: 'Offline',
       checking: 'Checking',
     },
+    errors: {
+      requestTimeout:
+        'Backend did not respond within {seconds} s. The request may still finish server-side — refresh logs to verify.',
+    },
     scenarios: {
       clean: ['Clean example', 'baseline', '2 white + 2 red = correct glidepath', 'Clear evening, steady camera'],
       transition: ['Transition pause', 'yellow/orange', '2 white + 2 red = correct glidepath', 'Lamp 2 changing from white to red'],
@@ -794,6 +798,10 @@ export const translations = {
       online: 'Online',
       offline: 'Offline',
       checking: 'Prüfe',
+    },
+    errors: {
+      requestTimeout:
+        'Das Backend hat innerhalb von {seconds} s nicht geantwortet. Die Anfrage läuft möglicherweise serverseitig weiter — aktualisieren Sie den Verlauf, um das zu prüfen.',
     },
     scenarios: {
       clean: ['Sauberes Beispiel', 'Referenz', '2 weiß + 2 rot = korrekter Gleitweg', 'Klarer Abend, ruhige Kamera'],
@@ -1196,6 +1204,10 @@ export const translations = {
       offline: 'Offline',
       checking: 'Controleren',
     },
+    errors: {
+      requestTimeout:
+        'De backend reageerde niet binnen {seconds} s. Het verzoek wordt mogelijk nog aan de serverkant afgerond — vernieuw de geschiedenis om dit te controleren.',
+    },
     scenarios: {
       clean: ['Schoon voorbeeld', 'basis', '2 wit + 2 rood = correct glijpad', 'Heldere avond, stabiele camera'],
       transition: ['Overgangspauze', 'geel/oranje', '2 wit + 2 rood = correct glijpad', 'Lamp 2 verandert van wit naar rood'],
@@ -1596,6 +1608,10 @@ export const translations = {
       online: 'En ligne',
       offline: 'Hors ligne',
       checking: 'Vérification',
+    },
+    errors: {
+      requestTimeout:
+        "Le backend n'a pas répondu dans les {seconds} s. La requête peut encore aboutir côté serveur — actualisez l'historique pour le vérifier.",
     },
     scenarios: {
       clean: ['Exemple clair', 'base', '2 blancs + 2 rouges = plan correct', 'Soirée claire, caméra stable'],

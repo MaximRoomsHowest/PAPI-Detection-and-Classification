@@ -10,6 +10,7 @@ import {
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
+import { localizedErrorMessage } from '../lib/errorMessages'
 import { useModalA11y } from '../hooks/useModalA11y'
 import { useLiveDemo } from '../context/liveDemoContext'
 import { HistoryStats } from '../components/history/HistoryStats'
@@ -133,7 +134,7 @@ export function HistoryPage({ copy }) {
         )
       })
       .catch((loadError) => {
-        if (!ignore) setError(loadError.message)
+        if (!ignore) setError(localizedErrorMessage(loadError, copy))
       })
       .finally(() => {
         if (ignore) return
@@ -144,6 +145,10 @@ export function HistoryPage({ copy }) {
     return () => {
       ignore = true
     }
+    // `copy` is only read to localize a failure message inside the catch; a
+    // locale switch must NOT refetch the logs, so it is intentionally omitted
+    // (the banner simply renders in the locale active at failure time).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, runwayFilter, stateFilter, modelFilter, refreshKey])
 
   // Refresh jumps back to page 1 so freshly-logged analyses (newest first) are
@@ -202,7 +207,7 @@ export function HistoryPage({ copy }) {
         `${nameParts.join('_')}.csv`,
       )
     } catch (exportError) {
-      setError(exportError.message)
+      setError(localizedErrorMessage(exportError, copy))
     } finally {
       setIsExporting(false)
     }
@@ -220,7 +225,7 @@ export function HistoryPage({ copy }) {
       const detail = await fetchLogDetail(logId)
       setSelectedLog(detail)
     } catch (detailError) {
-      setError(detailError.message)
+      setError(localizedErrorMessage(detailError, copy))
     } finally {
       setOpeningLogId(null)
     }

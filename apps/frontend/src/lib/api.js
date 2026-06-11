@@ -1,3 +1,5 @@
+import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages'
+
 const API_BASE_URL = (import.meta.env.VITE_PAPI_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
 const API_KEY = import.meta.env.VITE_PAPI_API_KEY
 
@@ -102,10 +104,15 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
       }
       // Attach the original AbortError as the cause so devtools / Sentry
       // / future error boundaries can inspect both layers (preserve-caught-error).
-      throw new Error(
+      // The message stays English for the console; display sites localize via
+      // the code + timeoutSeconds through localizedErrorMessage().
+      const timeoutError = new Error(
         `Backend did not respond within ${Math.round(timeoutMs / 1000)} s. The request may still finish server-side — refresh logs to verify.`,
         { cause: error },
       )
+      timeoutError.code = REQUEST_TIMEOUT_ERROR_CODE
+      timeoutError.timeoutSeconds = Math.round(timeoutMs / 1000)
+      throw timeoutError
     }
     throw error
   } finally {

@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import clsx from 'clsx'
 import { Check, ChevronRight, MapPin, Trash2 } from 'lucide-react'
 import { useLiveDemo } from '../context/liveDemoContext'
+import { localizedErrorMessage } from '../lib/errorMessages'
 
 // EDNY 24 surveyed coordinates, offered as a one-click starting template so a
 // demo user can register a valid (non-degenerate) runway quickly and then tweak.
@@ -77,7 +78,7 @@ export function RunwaysPage({ copy }) {
     [openRunwayId, runways, selectedRunway],
   )
   const runwayStatusMessage = runwayError
-    ? t.loadError.replace('{message}', runwayError.message || String(runwayError))
+    ? t.loadError.replace('{message}', localizedErrorMessage(runwayError, copy))
     : runways.length > 0
       ? t.refreshing
       : t.loading
@@ -130,8 +131,9 @@ export function RunwaysPage({ copy }) {
       toast.success(t.added.replace('{label}', created.label))
       setForm(emptyForm())
     } catch (caught) {
-      setError(caught.message || t.errorGeneric)
-      toast.error(caught.message || t.errorGeneric)
+      const message = localizedErrorMessage(caught, copy) || t.errorGeneric
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -147,7 +149,7 @@ export function RunwaysPage({ copy }) {
       await removeRunway(runway.id)
       toast.success(t.deleted.replace('{label}', label))
     } catch (caught) {
-      toast.error(caught.message || t.errorGeneric)
+      toast.error(localizedErrorMessage(caught, copy) || t.errorGeneric)
     }
   }
 

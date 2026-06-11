@@ -9,6 +9,7 @@ import {
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
+import { localizedErrorMessage } from '../lib/errorMessages'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
 import { scenarioFromBackendResult } from '../lib/papi'
@@ -675,9 +676,10 @@ export function useAnalysis(copy) {
       if (runIdRef.current !== runId) {
         return
       }
-      setAnalysisError(error.message)
+      const message = localizedErrorMessage(error, copy)
+      setAnalysisError(message)
       setAnalysisProgress('')
-      toast.error(error.message)
+      toast.error(message)
     } finally {
       if (runIdRef.current === runId) {
         setIsAnalyzing(false)
