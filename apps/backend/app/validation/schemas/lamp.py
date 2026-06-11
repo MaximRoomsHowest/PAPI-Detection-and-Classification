@@ -29,6 +29,11 @@ class LampResult(BaseModel):
     state: LampState
     confidence: float = Field(ge=0.0, le=1.0)
     bbox: BoundingBox | None = None
+    # True when the state was inferred from runway geometry + drone angle rather
+    # than directly detected by YOLO. The state still carries the inferred red/white
+    # value so the global PAPI verdict can use it, while the UI can disclose it.
+    inferred: bool = False
+    inference_note: str | None = None
     # Measured red-channel redness of this lamp (0-255, high=red); None when the
     # crop pixels weren't available. Additive — drives the Redness-vs-angle chart.
     redness: float | None = Field(default=None, ge=0.0)

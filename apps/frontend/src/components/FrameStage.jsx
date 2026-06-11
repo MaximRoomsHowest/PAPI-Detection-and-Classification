@@ -3,15 +3,90 @@ import {
   ChevronLeft,
   ChevronRight,
   Film,
+  Images,
   Pause,
   Play,
   Radar,
   RotateCcw,
   Upload,
+  Video,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
+
+const SAMPLE_RUNWAY_ID = 'papi_24'
+const SAMPLE_METADATA_FILE = {
+  url: '/demo-samples/sample-descent.json',
+  name: 'sample-descent.json',
+  type: 'application/json',
+}
+
+const SAMPLE_MEDIA = [
+  {
+    id: 'single-frame',
+    label: 'Sample image',
+    description: 'One frame with angle data',
+    icon: Images,
+    files: [{ url: '/demo-samples/papi-test-frame.jpg', name: 'papi-test-frame.jpg', type: 'image/jpeg' }],
+    metadataFile: SAMPLE_METADATA_FILE,
+  },
+  {
+    id: 'image-sequence',
+    label: 'Sample image set',
+    description: 'Five varied day/night states',
+    icon: Images,
+    folderMode: FOLDER_MODE_SEQUENCE,
+    files: [
+      {
+        url: '/demo-samples/folder-frame-001.jpg',
+        name: 'frame_001.jpg',
+        type: 'image/jpeg',
+        path: 'sample-papi-frames/frame_001.jpg',
+      },
+      {
+        url: '/demo-samples/folder-frame-002.jpg',
+        name: 'frame_002.jpg',
+        type: 'image/jpeg',
+        path: 'sample-papi-frames/frame_002.jpg',
+      },
+      {
+        url: '/demo-samples/folder-frame-003.jpg',
+        name: 'frame_003.jpg',
+        type: 'image/jpeg',
+        path: 'sample-papi-frames/frame_003.jpg',
+      },
+      {
+        url: '/demo-samples/folder-frame-004.jpg',
+        name: 'frame_004.jpg',
+        type: 'image/jpeg',
+        path: 'sample-papi-frames/frame_004.jpg',
+      },
+      {
+        url: '/demo-samples/folder-frame-005.jpg',
+        name: 'frame_005.jpg',
+        type: 'image/jpeg',
+        path: 'sample-papi-frames/frame_005.jpg',
+      },
+    ],
+    metadataFile: SAMPLE_METADATA_FILE,
+  },
+  {
+    id: 'short-video',
+    label: 'Sample video',
+    description: 'Approach clip with angle data',
+    icon: Video,
+    files: [
+      {
+        url: '/demo-samples/daytime-approach-smoke.mp4',
+        name: 'daytime-approach-smoke.mp4',
+        type: 'video/mp4',
+      },
+    ],
+    metadataFile: SAMPLE_METADATA_FILE,
+  },
+]
 
 export function FrameStage({
   scenario,
@@ -50,7 +125,12 @@ export function FrameStage({
       : canToggleView && viewerMode === 'original'
       ? originalSource
       : annotatedSource ?? originalSource ?? media
-  const canNavigateFrames = backendFrames.length > 1
+  const timelineFrameCount =
+    displayMedia?.type === 'video'
+      ? (scenario.perFrame?.length || scenario.rawResult?.angle_track?.length || folderVideo?.frameCount || 0)
+      : 0
+  const frameNavCount = backendFrames.length || timelineFrameCount
+  const canNavigateFrames = frameNavCount > 1
   const canZoom = displayMedia?.type === 'image' || displayMedia?.type === 'video'
   const canControlVideo = displayMedia?.type === 'video'
 
@@ -82,6 +162,38 @@ export function FrameStage({
     } else {
       video.pause()
       setIsPaused(true)
+    }
+  }
+
+  const seekVideoToFrame = (index) => {
+    const video = videoRef.current
+    if (!video || !timelineFrameCount || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return
+    }
+
+    const clamped = Math.min(Math.max(index, 0), timelineFrameCount - 1)
+    video.currentTime = (clamped / timelineFrameCount) * video.duration
+  }
+
+  const selectFrame = (index) => {
+    seekVideoToFrame(index)
+    onBackendFrameChange?.(index)
+  }
+
+  const syncVideoFrame = () => {
+    const video = videoRef.current
+    if (!video || !timelineFrameCount || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return
+    }
+
+    const progress = video.currentTime / video.duration
+    const nextIndex = Math.min(
+      timelineFrameCount - 1,
+      Math.max(0, Math.floor(progress * timelineFrameCount)),
+    )
+
+    if (nextIndex !== backendFrameIndex) {
+      onBackendFrameChange?.(nextIndex)
     }
   }
 
@@ -181,19 +293,19 @@ export function FrameStage({
           <div className="frame-nav-controls" role="group" aria-label={copy.live.frameNav}>
             <button
               type="button"
-              onClick={() => onBackendFrameChange?.(backendFrameIndex - 1)}
+              onClick={() => selectFrame(backendFrameIndex - 1)}
               disabled={backendFrameIndex === 0}
               aria-label={copy.live.previousFrame}
             >
               <ChevronLeft size={16} />
             </button>
             <strong>
-              {backendFrameIndex + 1}/{backendFrames.length}
+              {backendFrameIndex + 1}/{frameNavCount}
             </strong>
             <button
               type="button"
-              onClick={() => onBackendFrameChange?.(backendFrameIndex + 1)}
-              disabled={backendFrameIndex === backendFrames.length - 1}
+              onClick={() => selectFrame(backendFrameIndex + 1)}
+              disabled={backendFrameIndex === frameNavCount - 1}
               aria-label={copy.live.nextFrame}
             >
               <ChevronRight size={16} />
@@ -224,6 +336,9 @@ export function FrameStage({
             controls
             onPlay={() => setIsPaused(false)}
             onPause={() => setIsPaused(true)}
+            onTimeUpdate={syncVideoFrame}
+            onSeeked={syncVideoFrame}
+            onLoadedMetadata={syncVideoFrame}
           />
         ) : displayMedia?.type === 'image' ? (
           <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />
@@ -249,29 +364,97 @@ export function FrameStage({
 }
 
 function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
-  // <label> + hidden <input> so the whole empty surface is one accessible
-  // upload control: clicking anywhere (or Tab + Enter/Space) opens the native
-  // picker, reusing the same handler and accept types as the LiveDemo upload
-  // button. The drag-and-drop handlers live on the parent .video-surface, so
-  // they keep working. event.target.value is cleared so picking the same file
-  // twice still fires onChange.
+  const [loadingSampleId, setLoadingSampleId] = useState(null)
+
+  async function fileFromSampleAsset(sampleFile) {
+    const response = await fetch(sampleFile.url)
+    if (!response.ok) {
+      throw new Error(`Could not load ${sampleFile.name}`)
+    }
+
+    const blob = await response.blob()
+    const file = new File([blob], sampleFile.name, {
+      type: sampleFile.type || blob.type,
+      lastModified: Date.now(),
+    })
+
+    if (sampleFile.path) {
+      Object.defineProperty(file, 'webkitRelativePath', {
+        configurable: true,
+        value: sampleFile.path,
+      })
+    }
+
+    return file
+  }
+
+  async function loadSample(sample) {
+    if (loadingSampleId) {
+      return
+    }
+
+    setLoadingSampleId(sample.id)
+    try {
+      const files = await Promise.all(sample.files.map(fileFromSampleAsset))
+      const metadataFile = sample.metadataFile ? await fileFromSampleAsset(sample.metadataFile) : null
+
+      onFilesSelected?.(files, {
+        folderMode: sample.folderMode,
+        metadataFile,
+        runwayId: SAMPLE_RUNWAY_ID,
+        sampleMetadata: Boolean(metadataFile),
+      })
+    } finally {
+      setLoadingSampleId(null)
+    }
+  }
+
   return (
-    <label className={clsx('dropzone-placeholder', isDragActive && 'active')}>
-      <input
-        className="dropzone-input"
-        accept="image/*,video/*"
-        type="file"
-        aria-label={copy.live.dropTitle}
-        onChange={(event) => {
-          onFilesSelected?.(event.target.files)
-          event.target.value = ''
-        }}
-      />
+    <div className={clsx('dropzone-placeholder', isDragActive && 'active')}>
       <div className="dropzone-card">
         <Upload size={28} />
         <strong>{copy.live.dropTitle}</strong>
         <span>{copy.live.dropText}</span>
+        <label className="dropzone-upload-button">
+          <Upload size={16} />
+          <span>Upload your own data</span>
+          <input
+            className="dropzone-input"
+            accept="image/*,video/*"
+            type="file"
+            aria-label={copy.live.dropTitle}
+            onChange={(event) => {
+              onFilesSelected?.(event.target.files)
+              event.target.value = ''
+            }}
+          />
+        </label>
+        <div className="sample-picker" aria-label="Use premade test data">
+          <span className="sample-picker__title">Or use premade test data</span>
+          <div className="sample-picker__grid">
+            {SAMPLE_MEDIA.map((sample) => {
+              const SampleIcon = sample.icon
+              const isLoading = loadingSampleId === sample.id
+
+              return (
+                <button
+                  key={sample.id}
+                  type="button"
+                  className="sample-picker__button"
+                  disabled={Boolean(loadingSampleId)}
+                  onClick={() => loadSample(sample)}
+                >
+                  <SampleIcon size={16} />
+                  <span>
+                    <strong>{isLoading ? 'Loading...' : sample.label}</strong>
+                    <small>{sample.description}</small>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
-    </label>
+    </div>
   )
 }

@@ -7,13 +7,13 @@ dependency one-way (leaf -> service). Everything else it needs (writer, overlay,
 aggregation, angle track, state) is a stateless leaf import.
 """
 
-from collections import Counter, deque
 from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
+from app.services.angle import compute_elevation_angles
 from app.services.inference.aggregation import aggregate_video_lamps
 from app.services.inference.angle_resolver import build_angle_track
 from app.services.inference.overlay import draw_overlay
@@ -23,11 +23,36 @@ from app.services.state import (
     confidence_from_lamps,
     detect_lamp_transitions,
     global_state_from_lamps,
+    infer_single_missing_lamp_from_angle,
     normalize_detections,
     transition_events_from_state_runs,
 )
-from app.services.telemetry import DroneSample
+from app.services.telemetry import DroneSample, resample_to_frames
 from app.validation.schemas import AnalysisPayload, AngleResult, FramePoint
+
+
+def _frame_angles_from_samples(
+    drone_samples: list[DroneSample] | None,
+    runway_id: str,
+    frame_count: int | None,
+) -> dict[int, float]:
+    if not drone_samples or len(drone_samples) < 2 or not frame_count or frame_count <= 0:
+        return {}
+
+    angles: dict[int, float] = {}
+    cache: dict[tuple[float, float, float], float | None] = {}
+    for frame_index, sample in enumerate(resample_to_frames(drone_samples, frame_count)):
+        key = (sample.latitude, sample.longitude, sample.altitude_m)
+        if key not in cache:
+            cache[key] = compute_elevation_angles(
+                sample.latitude,
+                sample.longitude,
+                sample.altitude_m,
+                runway_id,
+            ).elevation_angle_deg
+        if cache[key] is not None:
+            angles[frame_index] = round(cache[key], 6)
+    return angles
 
 
 def run_tracked_sequence(
@@ -51,6 +76,7 @@ def run_tracked_sequence(
     store_export: Callable[[Path], tuple[str, str]] | None = None,
     drone_samples: list[DroneSample] | None = None,
     transition_method: str = "tracking",
+    expected_frame_count: int | None = None,
 ) -> AnalysisPayload:
     """Run ByteTrack detection per frame, write the annotated artifact, and aggregate
     the final per-lamp verdict + transitions by STABLE track identity.
@@ -60,7 +86,11 @@ def run_tracked_sequence(
     "tracking" = temporal red<->white flips (``detect_lamp_transitions``); "model" = learned
     class-2 transition-state runs (``transition_events_from_state_runs``, needs a 3-class model).
     """
-    history = deque(maxlen=history_size)
+    overlay_frame_angles = _frame_angles_from_samples(
+        drone_samples,
+        runway_id,
+        expected_frame_count,
+    )
     # ByteTrack id -> [(frame_index, color_state, center_x, confidence, redness)].
     # Drives BOTH temporal transition detection AND the final per-lamp verdict,
     # so both reference the same stable track identity (not per-frame rank).
@@ -122,15 +152,13 @@ def run_tracked_sequence(
                 FramePoint(frame_index=frame_count, confidence=frame_confidence, state=frame_state)
             )
 
-            history.append(frame_state)
-            smoothed_state = Counter(history).most_common(1)[0][0]
             annotated = draw_overlay(
                 cv2,
                 frame,
                 lamps,
-                smoothed_state,
+                frame_state,
                 frame_confidence,
-                angle.elevation_angle_deg,
+                overlay_frame_angles.get(frame_count, angle.elevation_angle_deg),
             )
             writer.write(annotated)
 
@@ -152,7 +180,7 @@ def run_tracked_sequence(
     else:
         artifact_url = f"/media/{artifact_path.name}"
 
-    final_lamps = aggregate_video_lamps(track_observations)
+    final_lamps = infer_single_missing_lamp_from_angle(aggregate_video_lamps(track_observations), angle)
     global_state = global_state_from_lamps(final_lamps)
     confidence = confidence_from_lamps(final_lamps)
     # Per-frame angle track from the resolved telemetry (empty when no fixes or a

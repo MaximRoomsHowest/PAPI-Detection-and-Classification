@@ -209,6 +209,18 @@
     flex-direction: column;
   }
 
+  .video-surface {
+    height: clamp(320px, 52dvh, 520px);
+  }
+
+  .dropzone-card {
+    padding: 16px;
+  }
+
+  .sample-picker__grid {
+    grid-template-columns: 1fr;
+  }
+
   /* Larger frame-step buttons on touch viewports (closer to the 44px target). */
   .frame-tool-controls button,
   .frame-nav-controls button {

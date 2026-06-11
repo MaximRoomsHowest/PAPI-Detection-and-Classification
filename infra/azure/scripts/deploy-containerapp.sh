@@ -13,6 +13,7 @@ BLOB_CONTAINER="${PAPI_BLOB_CONTAINER:-papi-media}"
 CONTAINERAPPS_ENV="${CONTAINERAPPS_ENV:-${APP_NAME}-env}"
 BACKEND_TAG="${BACKEND_TAG:-cloud}"
 FRONTEND_TAG="${FRONTEND_TAG:-cloud}"
+DEPLOY_VERSION="${DEPLOY_VERSION:-$(date -u +%Y%m%d%H%M%S)}"
 
 ACR_LOGIN_SERVER="$(az acr show --resource-group "$RESOURCE_GROUP" --name "$ACR_NAME" --query loginServer --output tsv)"
 ACR_USERNAME="$(az acr credential show --name "$ACR_NAME" --query username --output tsv)"
@@ -23,6 +24,13 @@ ENVIRONMENT_ID="$(az containerapp env show --resource-group "$RESOURCE_GROUP" --
 SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
 RESOURCE_ID="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${APP_NAME}"
 API_VERSION="${CONTAINERAPP_API_VERSION:-2025-01-01}"
+EXISTING_CUSTOM_DOMAINS="$(
+  az containerapp show \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$APP_NAME" \
+    --query properties.configuration.ingress.customDomains \
+    --output json 2>/dev/null || printf 'null'
+)"
 
 DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_FQDN}:5432/papi_backend?sslmode=require"
 BACKEND_IMAGE="${ACR_LOGIN_SERVER}/papi-backend:${BACKEND_TAG}"
@@ -42,17 +50,27 @@ jq -n \
   --arg frontend_image "$FRONTEND_IMAGE" \
   --arg backend_image "$BACKEND_IMAGE" \
   --arg blob_container "$BLOB_CONTAINER" \
+  --arg deploy_version "$DEPLOY_VERSION" \
+  --argjson custom_domains "${EXISTING_CUSTOM_DOMAINS:-null}" \
   '{
     location: $location,
     properties: {
       managedEnvironmentId: $environment_id,
       configuration: {
         activeRevisionsMode: "Single",
-        ingress: {
-          external: true,
-          targetPort: 8080,
-          transport: "Auto"
-        },
+        ingress: (
+          {
+            external: true,
+            targetPort: 8080,
+            transport: "Auto"
+          } + (
+            if (($custom_domains | type) == "array" and ($custom_domains | length) > 0) then
+              {customDomains: $custom_domains}
+            else
+              {}
+            end
+          )
+        ),
         registries: [
           {
             server: $acr_login_server,
@@ -72,6 +90,9 @@ jq -n \
           {
             name: "frontend",
             image: $frontend_image,
+            env: [
+              {name: "PAPI_DEPLOY_VERSION", value: $deploy_version}
+            ],
             resources: {
               cpu: 0.5,
               memory: "1Gi"
@@ -93,7 +114,8 @@ jq -n \
               {name: "PAPI_CONFIDENCE_THRESHOLD", value: "0.4"},
               {name: "PAPI_MAX_UPLOAD_MB", value: "100"},
               {name: "PAPI_MAX_BATCH_UPLOAD_MB", value: "400"},
-              {name: "PAPI_MAX_BATCH_FRAMES", value: "200"}
+              {name: "PAPI_MAX_BATCH_FRAMES", value: "200"},
+              {name: "PAPI_DEPLOY_VERSION", value: $deploy_version}
             ],
             resources: {
               cpu: 2.0,

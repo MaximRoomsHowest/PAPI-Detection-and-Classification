@@ -191,8 +191,8 @@
 
 .video-surface {
   position: relative;
-  min-height: min(78vh, 880px);
-  aspect-ratio: 16 / 9;
+  height: clamp(420px, 56dvh, 680px);
+  min-height: 0;
   overflow: hidden;
   background: #0b1521;
 }
@@ -217,11 +217,13 @@
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-items: start center;
+  box-sizing: border-box;
+  padding: clamp(24px, 5vh, 56px) 16px 24px;
+  overflow-y: auto;
   background: rgba(9, 17, 27, 0.72);
   border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
   color: #ffffff;
-  cursor: pointer;
   z-index: 1;
   transition:
     background 160ms ease,
@@ -249,9 +251,8 @@
     #08111d;
 }
 
-/* Invisible file input covering the whole dropzone: it is the real click /
-   keyboard target (Tab + Enter/Space opens the native picker) while staying
-   visually hidden. Drag-and-drop is handled by the parent .video-surface. */
+/* Invisible file input covering its visible label. Drag-and-drop is handled by
+   the parent .video-surface, so sample buttons remain normal buttons. */
 .dropzone-input {
   position: absolute;
   inset: 0;
@@ -268,9 +269,11 @@
 .dropzone-card {
   text-align: center;
   display: grid;
-  gap: 10px;
-  /* Let clicks fall through to the .dropzone-input beneath the card content. */
-  pointer-events: none;
+  justify-items: center;
+  gap: 12px;
+  width: min(720px, calc(100% - 32px));
+  padding: 24px;
+  pointer-events: auto;
 }
 
 .dropzone-card strong {
@@ -282,6 +285,97 @@
 .dropzone-card span {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.75);
+}
+
+.dropzone-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: 2px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 52%, transparent);
+  border-radius: 4px;
+  background: rgba(5, 18, 31, 0.82);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.dropzone-upload-button:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 66, 110, 0.5);
+}
+
+.sample-picker {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 640px);
+  margin-top: 10px;
+}
+
+.sample-picker__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.sample-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sample-picker__button {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sample-picker__button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-cyan) 58%, transparent);
+  background: rgba(0, 168, 230, 0.14);
+}
+
+.sample-picker__button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.sample-picker__button span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sample-picker__button strong,
+.sample-picker__button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sample-picker__button strong {
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.sample-picker__button small {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .analyzing-layer {
@@ -441,6 +535,16 @@
   background: var(--lamp-red);
   border-color: var(--lamp-red-border);
   box-shadow: none;
+}
+
+.lamp-card.is-inferred {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+}
+
+.lamp-card.is-inferred small {
+  color: var(--warn);
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .lamp-transition .lamp-preview span {

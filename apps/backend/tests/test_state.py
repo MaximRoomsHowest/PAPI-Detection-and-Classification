@@ -3,10 +3,11 @@ from app.services.state import (
     confidence_from_lamps,
     detect_lamp_transitions,
     global_state_from_lamps,
+    infer_single_missing_lamp_from_angle,
     normalize_detections,
     transition_events_from_state_runs,
 )
-from app.validation.schemas import LampResult
+from app.validation.schemas import AnglePerLight, AngleResult, LampResult
 
 
 def test_normalize_detections_sorts_lamps_left_to_right():
@@ -44,6 +45,17 @@ def test_confidence_ignores_unknown_lamps():
     assert confidence_from_lamps(lamps) == 0.7
 
 
+def test_confidence_ignores_inferred_lamps():
+    lamps = [
+        LampResult(index=1, state="red", confidence=0.8),
+        LampResult(index=2, state="red", confidence=0.6),
+        LampResult(index=3, state="white", confidence=0.7),
+        LampResult(index=4, state="white", confidence=0.0, inferred=True),
+    ]
+
+    assert confidence_from_lamps(lamps) == 0.7
+
+
 def test_normalize_pads_missing_lamps_as_obscured():
     """Fewer than 4 detections -> the empty slots are 'obscured' (a real, charted
     category for 'detector found nothing here'), not the generic 'unknown'."""
@@ -55,6 +67,52 @@ def test_normalize_pads_missing_lamps_as_obscured():
     assert global_state_from_lamps(lamps) == "unknown"
     # Obscured slots carry no detection, so confidence reflects only the white lamp.
     assert confidence_from_lamps(lamps) == 0.9
+
+
+def test_infers_one_missing_lamp_from_angle():
+    lamps = normalize_detections(
+        [
+            {"class_id": 0, "confidence": 0.9, "bbox": {"x1": 10, "y1": 1, "x2": 12, "y2": 3}},
+            {"class_id": 0, "confidence": 0.8, "bbox": {"x1": 20, "y1": 1, "x2": 22, "y2": 3}},
+            {"class_id": 1, "confidence": 0.7, "bbox": {"x1": 30, "y1": 1, "x2": 32, "y2": 3}},
+        ]
+    )
+    angle = AngleResult(
+        angle_available=True,
+        elevation_angle_deg=3.8,
+        per_light_angles=[AnglePerLight(runway_lamp=4, distance_m=500, elevation_angle_deg=3.8)],
+        angle_source="test",
+        angle_note="test",
+    )
+
+    inferred = infer_single_missing_lamp_from_angle(lamps, angle)
+
+    assert [lamp.state for lamp in inferred] == ["red", "red", "white", "white"]
+    assert inferred[3].inferred is True
+    assert inferred[3].confidence == 0.0
+    assert inferred[3].bbox is None
+    assert global_state_from_lamps(inferred) == "correct_glidepath"
+
+
+def test_does_not_infer_missing_lamp_without_angle_or_near_transition():
+    lamps = normalize_detections(
+        [
+            {"class_id": 0, "confidence": 0.9, "bbox": {"x1": 10, "y1": 1, "x2": 12, "y2": 3}},
+            {"class_id": 0, "confidence": 0.8, "bbox": {"x1": 20, "y1": 1, "x2": 22, "y2": 3}},
+            {"class_id": 1, "confidence": 0.7, "bbox": {"x1": 30, "y1": 1, "x2": 32, "y2": 3}},
+        ]
+    )
+    missing_angle = AngleResult(angle_available=False, angle_note="no metadata")
+    boundary_angle = AngleResult(
+        angle_available=True,
+        elevation_angle_deg=3.5,
+        per_light_angles=[AnglePerLight(runway_lamp=4, distance_m=500, elevation_angle_deg=3.5)],
+        angle_source="test",
+        angle_note="test",
+    )
+
+    assert infer_single_missing_lamp_from_angle(lamps, missing_angle) == lamps
+    assert infer_single_missing_lamp_from_angle(lamps, boundary_angle) == lamps
 
 
 def test_single_frame_states_are_colour_only():

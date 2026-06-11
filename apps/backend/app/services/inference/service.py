@@ -30,6 +30,7 @@ from app.services.model_registry import compute_sha256, load_model_card
 from app.services.state import (
     confidence_from_lamps,
     global_state_from_lamps,
+    infer_single_missing_lamp_from_angle,
     normalize_detections,
 )
 from app.services.storage import get_media_storage
@@ -261,7 +262,7 @@ class InferenceService:
         # red<->white switch across frames, so there are none here. The angle is
         # still computed for display / transition association.
         angle = self._angle_for_media(media_path, runway_id, drone_metadata, drone_samples)
-        lamps = normalize_detections(detections)
+        lamps = infer_single_missing_lamp_from_angle(normalize_detections(detections), angle)
         global_state = global_state_from_lamps(lamps)
         confidence = confidence_from_lamps(lamps)
 
@@ -355,6 +356,7 @@ class InferenceService:
                 empty_message="Uploaded video did not contain readable frames.",
                 model=model,
                 transition_method=effective_method,
+                expected_frame_count=source_frame_count or None,
             )
         finally:
             cap.release()
@@ -438,6 +440,7 @@ class InferenceService:
                 empty_message="None of the uploaded images could be read.",
                 model=model,
                 transition_method=effective_method,
+                expected_frame_count=len(image_paths),
             )
 
     def _run_tracked_sequence(
@@ -458,6 +461,7 @@ class InferenceService:
         drone_samples: list[DroneSample] | None = None,
         model: Any | None = None,
         transition_method: str = "tracking",
+        expected_frame_count: int | None = None,
     ) -> AnalysisPayload:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
         ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
@@ -498,6 +502,7 @@ class InferenceService:
             store_export=self._store_export_artifact,
             drone_samples=drone_samples,
             transition_method=transition_method,
+            expected_frame_count=expected_frame_count,
         )
 
     def _store_export_artifact(self, artifact_path: Path) -> tuple[str, str]:
