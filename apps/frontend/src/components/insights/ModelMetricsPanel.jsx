@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { Cpu, Target } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
 import { InlineMetric } from '../InlineMetric'
 import { useFetch } from '../../hooks/useFetch'
-import { fetchModelInfo, fetchStats } from '../../lib/api'
+import { fetchModelInfo, fetchModels, fetchStats } from '../../lib/api'
 import {
   axisTitle,
   basePlotLayout,
@@ -123,7 +124,15 @@ function ModelMetrics({ model, copy }) {
 
 export function ModelMetricsPanel({ plotTheme, copy }) {
   const stats = useFetch(fetchStats, [])
-  const model = useFetch(fetchModelInfo, [])
+  // Every registry model's card is inspectable, not only the backend default —
+  // /api/model?model_id always supported this; the UI never sent an id
+  // (integration audit 2026-06-11). null = the backend default's card.
+  const [selectedId, setSelectedId] = useState(null)
+  const models = useFetch(fetchModels, [])
+  const model = useFetch(() => fetchModelInfo(selectedId ?? undefined), [selectedId], {
+    keepPreviousData: true,
+  })
+  const pickerOptions = Array.isArray(models.data) ? models.data : []
 
   return (
     <>
@@ -167,12 +176,47 @@ export function ModelMetricsPanel({ plotTheme, copy }) {
             <p>{copy.insights.modelMetricsText}</p>
           </div>
         </div>
-        {model.loading ? (
+        {pickerOptions.length > 1 && (
+          <div className="model-selector" role="group" aria-label={copy.insights.modelPicker}>
+            <span className="model-selector__label">{copy.insights.modelPicker}</span>
+            <div className="model-selector__options">
+              {pickerOptions.map((option) => {
+                const active =
+                  selectedId === option.model_id || (selectedId === null && option.is_default)
+                return (
+                  <button
+                    key={option.model_id}
+                    type="button"
+                    className={`model-selector__option${active ? ' is-active' : ''}`}
+                    aria-pressed={active}
+                    // Unavailable entries stay selectable ON PURPOSE: their card
+                    // (provenance + val_metrics) comes from the registry, not the
+                    // weights file — exactly what a reviewer wants to inspect.
+                    title={option.description || option.model_role || undefined}
+                    onClick={() => setSelectedId(option.model_id)}
+                  >
+                    {option.model_label || option.model_id}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {model.loading && !model.data ? (
           <ChartSkeleton copy={copy} />
         ) : model.error ? (
           <AngleEmptyState icon={<Cpu size={26} aria-hidden="true" />} message={copy.insights.loadError} />
         ) : (
-          <ModelMetrics model={model.data} copy={copy} />
+          <>
+            {model.data && (
+              <p className="viz-footnote">
+                {`${model.data.model_label || model.data.model_id || ''}`}
+                {model.data.training_run ? ` · ${copy.history.trainingRun}: ${model.data.training_run}` : ''}
+                {model.data.dataset_split_evaluated ? ` · ${model.data.dataset_split_evaluated} split` : ''}
+              </p>
+            )}
+            <ModelMetrics model={model.data} copy={copy} />
+          </>
         )}
       </article>
     </>

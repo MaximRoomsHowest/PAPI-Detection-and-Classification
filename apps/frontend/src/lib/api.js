@@ -251,8 +251,11 @@ export async function deleteRunway(runwayId) {
   }
 }
 
-export async function fetchModelInfo() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/model`, {
+export async function fetchModelInfo(modelId) {
+  // No id -> the backend default's card; with an id -> that registry entry's
+  // card (provenance + val_metrics), powering the Insights per-model view.
+  const query = modelId ? `?model_id=${encodeURIComponent(modelId)}` : ''
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/model${query}`, {
     headers: buildHeaders(),
   })
   if (!response.ok) {
