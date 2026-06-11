@@ -155,11 +155,17 @@ export function HistoryPage({ copy }) {
     setRefreshKey((key) => key + 1)
   }
 
+  const closeModal = useCallback(() => setSelectedLog(null), [])
+
   // Mark a refetch in flight from the handlers that trigger it (filter change,
   // pagination) rather than inside the effect — keeps the loading cue + pagination
   // gating without a synchronous setState in the effect body. The effect's
-  // finally() always clears it (audit FB-01/FB-02).
+  // finally() always clears it (audit FB-01/FB-02). Each also closes the detail
+  // modal: the fixed backdrop normally makes them unreachable while it is open,
+  // but if focus ever escapes the trap (browser chrome re-entry) the modal must
+  // not sit over a list it no longer belongs to. No-op when already closed.
   const handleFilterChange = (setter) => (event) => {
+    closeModal()
     setIsFetching(true)
     setPage(0)
     setter(event.target.value)
@@ -170,6 +176,7 @@ export function HistoryPage({ copy }) {
   // Clear filters (audit F18) — reset the selects and return to page 1. A
   // refetch follows automatically because the filter state changed.
   const handleClearFilters = () => {
+    closeModal()
     setIsFetching(true)
     setPage(0)
     setRunwayFilter('')
@@ -220,7 +227,6 @@ export function HistoryPage({ copy }) {
   }
 
   const modalRef = useRef(null)
-  const closeModal = useCallback(() => setSelectedLog(null), [])
 
   // Modal a11y/UX (audit IMP-FE-11): close on Escape, move focus into the dialog
   // on open, and restore focus to the trigger on close.
@@ -315,10 +321,12 @@ export function HistoryPage({ copy }) {
         pageStart={pageStart}
         pageEnd={pageEnd}
         onPrev={() => {
+          closeModal()
           setIsFetching(true)
           setPage((current) => Math.max(0, current - 1))
         }}
         onNext={() => {
+          closeModal()
           setIsFetching(true)
           setPage((current) => current + 1)
         }}
