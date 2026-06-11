@@ -82,6 +82,10 @@ function App() {
 
   useEffect(() => {
     safeLocalStorageSet(STORAGE_KEYS.language, language)
+    // Keep <html lang> in sync so screen readers switch voices with the UI and
+    // locale-aware CSS/formatting sees the active language (index.html ships
+    // lang="en" statically).
+    document.documentElement.lang = language
   }, [language])
 
   return (

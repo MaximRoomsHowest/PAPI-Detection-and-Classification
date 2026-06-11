@@ -8,11 +8,13 @@ export function percent(value) {
   return Math.round(clamp(Number(value) || 0, 0, 1) * 100)
 }
 
-export function formatTimestamp(value) {
+export function formatTimestamp(value, locale) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString([], {
+  // `locale` is the app language's BCP 47 tag (translations[lang].locale) so a
+  // German UI shows "11. Juni"-style dates; without it the browser default wins.
+  return date.toLocaleString(locale ?? [], {
     month: 'short',
     day: '2-digit',
     hour: '2-digit',

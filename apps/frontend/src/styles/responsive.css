@@ -252,8 +252,17 @@
     overflow-x: visible;
   }
 
+  /* display:block (table AND row group): with display:table, `width: 100%` is
+     only a MINIMUM — the table still expands to its content min-width and
+     overflowed the viewport by ~30px on phones. Card mode does not need table
+     layout at all. */
   .history-table {
+    display: block;
     min-width: 0;
+  }
+
+  .history-table tbody {
+    display: block;
   }
 
   .history-table thead {

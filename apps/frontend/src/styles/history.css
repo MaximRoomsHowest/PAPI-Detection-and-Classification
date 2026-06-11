@@ -172,6 +172,11 @@
 }
 
 .history-link {
+  /* Long pathless filenames ("sweep_papi24_300m_day/frame_001.jpg") have no
+     break opportunities; without this they overflow the phone card rows (the
+     flex min-width:auto default also blocks shrinking). */
+  min-width: 0;
+  overflow-wrap: anywhere;
   border: 0;
   background: transparent;
   color: var(--accent);

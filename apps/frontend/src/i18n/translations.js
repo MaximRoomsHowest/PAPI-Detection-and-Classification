@@ -2,6 +2,9 @@ export const LANGUAGE_LABELS = { en: 'English', de: 'Deutsch', nl: 'Nederlands',
 
 export const translations = {
   en: {
+    // BCP 47 tag for locale-aware formatting (dates in HistoryTable) and the
+    // <html lang> attribute. en-GB keeps the established day-first "11 Jun" look.
+    locale: 'en-GB',
     footer: {
       project: 'PAPI Vision student project',
       description:
@@ -415,6 +418,7 @@ export const translations = {
     },
   },
   de: {
+    locale: 'de-DE',
     footer: {
       project: 'PAPI Vision Studentenprojekt',
       description:
@@ -828,6 +832,7 @@ export const translations = {
     },
   },
   nl: {
+    locale: 'nl-NL',
     footer: {
       project: 'PAPI Vision studentenproject',
       description:
@@ -1241,6 +1246,7 @@ export const translations = {
     },
   },
   fr: {
+    locale: 'fr-FR',
     footer: {
       project: 'Projet étudiant PAPI Vision',
       description:

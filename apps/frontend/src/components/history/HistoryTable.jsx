@@ -91,7 +91,7 @@ export function HistoryTable({
                     </td>
                     <td data-label={copy.history.frames} className="history-col-secondary tnum">{log.frame_count}</td>
                     <td data-label={copy.history.processing} className="history-col-secondary tnum">{log.processing_ms} ms</td>
-                    <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at)}</td>
+                    <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at, copy.locale)}</td>
                     <td data-label={copy.history.artifact}>
                       {log.artifact_url ? (
                         <button
