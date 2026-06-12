@@ -103,7 +103,8 @@ def main() -> int:
     video_track = json.loads((OUT / "sample-video.json").read_text(encoding="utf-8"))["samples"]
     mismatched = [
         i
-        for i, (s, r) in enumerate(zip(video_track, video_rows))
+        # Truncation is fine: the length is asserted separately in the check below.
+        for i, (s, r) in enumerate(zip(video_track, video_rows, strict=False))
         if s["frame_index"] != i
         or abs(s["latitude"] - float(r["lat"])) > 1e-7
         or abs(s["longitude"] - float(r["lon"])) > 1e-7
@@ -115,7 +116,8 @@ def main() -> int:
     sweep_rows = pick(rows, 10, 0.30, 0.97)
     sweep_track = json.loads((OUT / "sample-sweep.json").read_text(encoding="utf-8"))["samples"]
     sweep_ok = len(sweep_track) == 10 and all(
-        abs(s["altitude_m"] - float(r["alt_ellipsoidal_m"])) <= 1e-3 for s, r in zip(sweep_track, sweep_rows)
+        abs(s["altitude_m"] - float(r["alt_ellipsoidal_m"])) <= 1e-3
+        for s, r in zip(sweep_track, sweep_rows, strict=False)
     )
     check(sweep_ok, "sample-sweep.json: 10 fixes equal the sweep picks 1:1")
 

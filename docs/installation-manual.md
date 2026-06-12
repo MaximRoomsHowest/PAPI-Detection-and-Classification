@@ -15,7 +15,7 @@ from a fresh machine. Two supported paths:
 | --- | --- | --- |
 | Git | any recent | https://git-scm.com |
 | Docker Desktop (for path 1) | 4.30+ | https://www.docker.com/products/docker-desktop |
-| Python (for path 2) | 3.10+ | https://www.python.org/downloads/ |
+| Python (for path 2) | 3.10+ (3.12 recommended) | https://www.python.org/downloads/ |
 | Node.js (for path 2) | 24.x | https://nodejs.org |
 | Disk space | ~ 8 GB | for Docker images + model weights |
 | RAM | ≥ 8 GB | inference is CPU-only by default |

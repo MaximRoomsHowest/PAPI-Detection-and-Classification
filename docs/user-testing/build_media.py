@@ -92,8 +92,8 @@ def _emit_telemetry(rows: list[dict], stem: str, runway: str, note: str, single:
     if single:  # one fix -> a bare {lat,lon,alt} JSON for the single-image upload test
         _, lat, lon, alt = pts[len(pts) // 2]
         (tel / "json" / f"{stem}.json").write_text(
-            '{\n  "runway": "%s",\n  "note": "%s",\n  "latitude": %.8f,\n  "longitude": %.8f,\n'
-            '  "altitude_m": %.3f\n}\n' % (runway, note, lat, lon, alt),
+            f'{{\n  "runway": "{runway}",\n  "note": "{note}",\n  "latitude": {lat:.8f},\n'
+            f'  "longitude": {lon:.8f},\n  "altitude_m": {alt:.3f}\n}}\n',
             encoding="utf-8",
         )
         return
@@ -108,7 +108,7 @@ def _emit_telemetry(rows: list[dict], stem: str, runway: str, note: str, single:
         for idx, lat, lon, alt in pts
     )
     (tel / "json" / f"{stem}.json").write_text(
-        '{\n  "runway": "%s",\n  "note": "%s",\n  "samples": [\n%s\n  ]\n}\n' % (runway, note, samples),
+        f'{{\n  "runway": "{runway}",\n  "note": "{note}",\n  "samples": [\n{samples}\n  ]\n}}\n',
         encoding="utf-8",
     )
 

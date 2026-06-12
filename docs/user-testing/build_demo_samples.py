@@ -16,9 +16,9 @@ training distribution and the detector finds nothing).
 Outputs:
   papi-test-frame.jpg + sample-point.json     on-slope single frame + its own fix
   folder-frame-001..010.jpg + sample-sweep.json   10-frame sweep (30%..97% span)
-  papi24-angle-sweep.mp4 + sample-video.json      ~2-minute clip: 120 evenly
-      picked frames over the WHOLE climb at 1 fps (H.264 yuv420p faststart —
-      browser-playable AND OpenCV-decodable), with a 1:1 120-fix telemetry file.
+  papi24-angle-sweep.mp4 + sample-video.json      2-minute clip: 60 evenly
+      picked frames over the WHOLE climb at 0.5 fps (H.264 yuv420p faststart —
+      browser-playable AND OpenCV-decodable), with a 1:1 60-fix telemetry file.
       NOTE: needs PAPI_MAX_VIDEO_SECONDS >= 120 (default raised to 150).
 
 Run from the repo root (uses the repo .venv: PIL + imageio-ffmpeg):

@@ -11,10 +11,11 @@ Services BV**, May–June 2026.
 
 ## Setup
 
-Requires **Python 3.10+**.
+Requires **Python 3.10+** (3.12 recommended — the version the team
+develops and deploys with).
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -e .[dev]
 ```

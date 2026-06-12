@@ -104,7 +104,16 @@ frame in sequence. Output is a single aggregate result with an
 annotated video artifact.
 
 **Limits**: 100 MB maximum per upload, 600 frames maximum per
-video, 30 seconds maximum duration (whichever cap is lower).
+video, 150 seconds maximum duration (whichever cap is lower; defaults,
+configurable via `PAPI_MAX_VIDEO_FRAMES` / `PAPI_MAX_VIDEO_SECONDS`).
+
+If a video stops decoding partway (a damaged or partially
+downloaded file), the result carries a **decode warning**: the
+banner states how many of the promised frames could be decoded, and
+the verdict covers only those frames. The same warning appears on
+the History detail view, and partial analyses are marked with a
+**Partial** badge in the History table and flagged in the CSV
+export (`truncated_at_frame` / `decode_shortfall` columns).
 
 ### 3.3 Folder upload (two modes)
 
@@ -188,23 +197,35 @@ data.)
 ## 5. The Insights page
 
 Click **Insights** in the top navigation. Every chart here is built
-from **real backend output** of your most recent analysis — there is
-no synthetic data. The page is split into two tabs:
+from **real backend output** — there is no synthetic data. By default
+the page reviews the latest Live Demo analysis in the current browser
+session; opening a row from History loads that persisted run at
+`/insights?log=...` instead.
 
 - **Current analysis** — visualisations of the run you just executed
-  on the Live Demo page:
-  - **Angle vs. light state** — how each lamp's state relates to the
-    computed elevation angle.
-  - **Light transitions** — the red↔white transition events detected
-    across the analysed frames.
-  - **Session summary** — aggregate counts / breakdown for the run.
+  on the Live Demo page, or the History log loaded into Insights:
+  - **Measured transition angle per light** — where each lamp crossed
+    red↔white, with the observed blend zone. FAA default set angles
+    are reference lines only until commissioned per-lamp values are
+    wired to the frontend.
+  - **Redness vs. angle** — one graph per lamp, plotting the measured
+    red-channel redness against real elevation angle. This is the
+    client-facing transition evidence view.
+  - **Lamp state over the sweep** and **Elevation angle over frame** —
+    the frame-by-frame descent evidence when telemetry is available.
+  - **Session distributions** — per-light state mix and detection
+    confidence for the reviewed run.
 - **Model & dataset** — the live model and dataset facts (identity,
-  classes, and validation metrics) read from the backend.
+  role, training run, split, threshold, and validation metrics) read
+  from the backend. These metrics describe box detection quality; they
+  are not a commissioned-angle verdict.
 
 Use **Download charts (PDF)** in the top right to export the rendered
-charts as a multi-page PDF for inclusion in reports. If you have not
-run an analysis yet, the Current-analysis charts stay empty and ask
-you to upload geotagged imagery and run the model first.
+charts as a multi-page PDF for inclusion in reports. When transition
+events exist, **Download transitions (CSV)** exports the raw event
+rows with source, log id, lamp, frame, angle, method, and flicker
+status. If you have not run or loaded an analysis yet, the page points
+you back to Live Demo.
 
 ## 5a. The History page
 
@@ -226,7 +247,8 @@ accuracy cards keep describing the serving model itself.
 filename encodes the active filters so a narrowed export is
 distinguishable from a full one. Clicking a row opens the detail
 dialog with the per-lamp states, raw detections, and the annotated
-artifact.
+artifact. Use the row's **Insights** action to open that persisted
+analysis in the Insights page without rerunning inference.
 
 ## 5b. The Runways page
 
@@ -261,6 +283,8 @@ Top-right corner:
 | Backend returns 503 "Model file not found" | `models/serving/best.pt` missing on the host | Copy a model into `models/serving/` per the install guide |
 | Backend returns 400 "Provide drone_latitude / longitude / altitude_m together" | Filled in some metadata fields but not all three | Either fill all three or clear all three |
 | Backend returns 413 / "Upload exceeds 100 MB" | Input file too large | Compress / trim, or raise `PAPI_MAX_UPLOAD_MB` in `.env` |
+| Backend returns 429 "Rate limit exceeded" | Too many requests from one client per minute (default: 60 analyze, 600 other) | Wait for the `Retry-After` interval, or adjust `PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE` / `PAPI_RATE_LIMIT_PER_MINUTE` in `.env` |
+| Result shows "Only N of M source frames could be decoded" | Damaged or partially transferred media file | Re-export / re-upload the source; the verdict covers the decoded frames only |
 | "Angle unavailable" on the result | The uploaded file had no GPS / altitude metadata | Supply the values manually in the metadata fields |
 | Folder upload only shows one image | Browser couldn't read the directory | Try a different browser (Firefox & Edge both support `webkitdirectory`) |
 | Page title shows "frontend" not "PAPI Lights Detection and Classification" | Old browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |
