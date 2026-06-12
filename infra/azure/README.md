@@ -50,6 +50,61 @@ bash infra/azure/scripts/smoke-test.sh
 
 The deploy script prints the public site URL at the end.
 
+## Redeploying new code to the EXISTING environment
+
+Skip `create-resources.sh` entirely — only the owner of the original
+deployment (whose `az login` can see the resource group) needs to run this.
+
+1. Check out the branch to ship and log in:
+
+   ```bash
+   git checkout code-review && git pull
+   az login
+   ```
+
+2. Re-export the deployment variables. If the original shell is gone, the
+   generated names are rediscoverable:
+
+   ```bash
+   export RESOURCE_GROUP=rg-papi-vision-demo
+   export APP_NAME=papi-vision-demo
+   export ACR_NAME=$(az acr list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+   export POSTGRES_SERVER=$(az postgres flexible-server list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+   export STORAGE_ACCOUNT=$(az storage account list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+   ```
+
+3. Two values only you have:
+   - `POSTGRES_PASSWORD` must be the **original** one — the database keeps
+     its password and the deploy script rewrites the connection-string
+     secret from this variable, so a wrong value breaks DB connectivity.
+     If it is lost, reset it first:
+     `az postgres flexible-server update -g $RESOURCE_GROUP -n $POSTGRES_SERVER --admin-password <new>` —
+     then export the new one.
+   - `PAPI_API_KEY` may be the original OR a fresh value — the SAME shell
+     export feeds both the frontend build (baked into the bundle) and the
+     backend secret, so as long as both scripts below run from this shell
+     the two sides stay consistent.
+
+4. Build, push, deploy, verify (no local Docker needed with ACR Tasks):
+
+   ```bash
+   USE_ACR_TASKS=true bash infra/azure/scripts/build-and-push.sh
+   bash infra/azure/scripts/deploy-containerapp.sh
+   bash infra/azure/scripts/smoke-test.sh
+   ```
+
+   Rebuild **both** images: the sample picker and its assets live in the
+   frontend image; the two-minute sample video needs the backend image for
+   the raised `PAPI_MAX_VIDEO_SECONDS` default and the `/media` byte-range
+   support (video seeking). Custom domains on the app are preserved.
+
+5. Confirm the new build is live (anonymous, no key needed):
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' https://www.papivision.software/demo-samples/sample-video.json   # 200 = samples shipped
+   curl -s -o /dev/null -w '%{http_code}\n' https://www.papivision.software/api/models                        # 401 = new backend (the old build returns 404)
+   ```
+
 ## Important notes
 
 - The frontend is public. The backend is not exposed directly; nginx proxies `/api`, `/media`, and health checks to the backend sidecar.
