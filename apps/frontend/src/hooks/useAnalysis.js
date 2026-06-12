@@ -55,9 +55,12 @@ export function useAnalysis(copy) {
     refetchRunways,
   } = useRunwayManagement()
 
-  // Insights PDF export (independent of the analysis state).
+  // Insights PDF export. The ref hands the CURRENT session data to the export
+  // at download time (results + runway labels for the report's data pages)
+  // without coupling the export hook to analysis re-renders.
+  const exportSessionRef = useRef({ results: [], runways: [], selectedRunwayId: null })
   const { insightsRef, isExporting, exportError, setExportError, handleDownloadCharts } =
-    useChartExport(copy)
+    useChartExport(copy, exportSessionRef)
 
   const [activeId, setActiveId] = useState('clean')
   const [media, setMedia] = useState(null)
@@ -128,6 +131,13 @@ export function useAnalysis(copy) {
   // (audit P2: stale backend requests can still create History rows/artifacts).
   const abortRef = useRef(null)
   const sampleMetadataRef = useRef(false)
+
+  // Latest-value mirror for the PDF export's data pages (read on download click,
+  // never during render). An effect (not a render-time write) keeps the React
+  // Compiler's purity rules happy.
+  useEffect(() => {
+    exportSessionRef.current = { results: backendResults, runways, selectedRunwayId: effectiveRunwayId }
+  })
 
   useEffect(() => {
     return () => {

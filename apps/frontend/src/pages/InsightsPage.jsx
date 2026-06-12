@@ -116,8 +116,11 @@ export function InsightsPage({ plotTheme, copy }) {
             inert={tab !== 'current'}
           >
             <div className="insights-grid">
-              <AngleVsStateCharts backendResults={backendResults} plotTheme={plotTheme} copy={copy} />
+              {/* The measured transition angles lead — they are the commissioning
+                  deliverable; the per-lamp evidence (state bands, redness sweeps)
+                  and session distributions follow. */}
               <TransitionCharts backendResults={backendResults} plotTheme={plotTheme} copy={copy} />
+              <AngleVsStateCharts backendResults={backendResults} plotTheme={plotTheme} copy={copy} />
               <SessionSummaryCharts backendResults={backendResults} plotTheme={plotTheme} copy={copy} />
             </div>
           </Tabs.Content>

@@ -72,11 +72,53 @@
 }
 
 /* ---------- Angle vs. light state ---------- */
-/* One full-width chart per lamp, stacked (PAPI A-D), like the client's tool. */
+/* One chart per lamp (PAPI A-D, the client's tool view) — but in a 2x2 grid on
+   desktop instead of four full-width rows: the per-lamp story reads side by
+   side and the section takes half the scroll. Collapses to one column when the
+   cards drop below a readable width. */
 .angle-stack {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 16px;
+}
+
+/* ---------- Lamp state bands ---------- */
+/* Plain chips naming the heatmap band colours (the heatmap has no Plotly
+   legend of its own). aria-hidden — the chart's aria-label carries the info. */
+.band-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.band-legend__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.band-legend__swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--band-color);
+}
+
+/* Per-light group header rows inside the transition events table. */
+.transition-table .transition-group-row th {
+  padding: 10px 8px 6px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
 }
 
 .angle-chart {

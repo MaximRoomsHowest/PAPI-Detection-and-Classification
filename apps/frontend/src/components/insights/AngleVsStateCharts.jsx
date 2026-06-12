@@ -26,6 +26,51 @@ function lampName(lampIndex, copy) {
   return `${copy.live.light} ${lampIndex}`
 }
 
+// Contiguous same-state runs over the angle-sorted points -> background rects.
+// The redness amplitude can be subtle on day footage, so the classified-state
+// context is painted BEHIND the line: red runs tinted red, the blend zone amber.
+function stateRunShapes(points, axisMin, axisMax) {
+  const tints = {
+    red: 'rgba(255, 69, 69, 0.08)',
+    transition: 'rgba(255, 177, 31, 0.12)',
+  }
+  const shapes = []
+  let run = null
+  const flush = (endAngle) => {
+    if (run && tints[run.state]) {
+      shapes.push({
+        type: 'rect',
+        xref: 'x',
+        yref: 'paper',
+        x0: run.start,
+        x1: endAngle,
+        y0: 0,
+        y1: 1,
+        fillcolor: tints[run.state],
+        line: { width: 0 },
+        layer: 'below',
+      })
+    }
+  }
+  for (const point of points) {
+    if (!run) {
+      run = { state: point.state, start: axisMin }
+      continue
+    }
+    if (point.state !== run.state) {
+      // Hand over halfway between the last point of the old run and this one.
+      const boundary = (run.lastAngle + point.angle) / 2
+      flush(boundary)
+      run = { state: point.state, start: boundary }
+    }
+    run.lastAngle = point.angle
+  }
+  if (run) {
+    flush(axisMax)
+  }
+  return shapes
+}
+
 const RednessChart = memo(function RednessChart({ lampIndex, points, transitionAngle, plotTheme, copy }) {
   const name = lampName(lampIndex, copy)
   const reddable = points.filter((point) => Number.isFinite(point.redness))
@@ -51,12 +96,14 @@ const RednessChart = memo(function RednessChart({ lampIndex, points, transitionA
   const data = [
     {
       type: 'scatter',
-      mode: reddable.length > 3 ? 'lines' : 'lines+markers',
+      // Markers up to a real sweep's length keep individual frames honest;
+      // beyond that the line alone reads better.
+      mode: reddable.length > 3 && reddable.length <= 80 ? 'lines+markers' : reddable.length > 80 ? 'lines' : 'lines+markers',
       name,
       x: reddable.map((point) => point.angle),
       y: reddable.map((point) => point.redness),
       line: { color, width: 2 },
-      marker: { color, size: 4 },
+      marker: { color, size: 3 },
       customdata: reddable.map((point) => copy.status?.[point.state] ?? point.state),
       hovertemplate:
         `${copy.insights.angleAxis}: %{x:.2f}°<br>` +
@@ -101,6 +148,23 @@ const RednessChart = memo(function RednessChart({ lampIndex, points, transitionA
       title: axisTitle(copy.insights.rednessAxis, plotTheme),
       gridcolor: plotTheme.grid,
     }),
+    // Classified-state context painted behind the redness line.
+    shapes: stateRunShapes(reddable, axisMin, axisMax),
+    // The detected crossing, labelled with its value right on the line.
+    annotations: Number.isFinite(transitionAngle)
+      ? [
+          {
+            xref: 'x',
+            yref: 'paper',
+            x: transitionAngle,
+            y: 1.02,
+            text: `${transitionAngle.toFixed(2)}°`,
+            showarrow: false,
+            font: { color: TRANSITION_COLOR, size: 11 },
+            xanchor: 'left',
+          },
+        ]
+      : [],
     showlegend: true,
   })
 
