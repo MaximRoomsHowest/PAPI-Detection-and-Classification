@@ -105,7 +105,7 @@ services:
       PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
       PAPI_MAX_IMAGE_MEGAPIXELS: ${PAPI_MAX_IMAGE_MEGAPIXELS:-80}
       PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
-      PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-30}
+      PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-150}
       # NOTE: raising this past ~400 MB also requires raising the frontend
       # nginx cap (PAPI_NGINX_MAX_BODY_SIZE on the frontend service below,
       # default 410m — env-templated, no rebuild needed), or proxied uploads

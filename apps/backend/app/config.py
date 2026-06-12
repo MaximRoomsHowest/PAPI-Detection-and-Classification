@@ -90,7 +90,10 @@ class Settings(BaseSettings):
     # Duration-based frame cap (combined with max_video_frames, the lower wins).
     # 0 is a supported sentinel meaning "no duration cap" (inference._video_frame_limit),
     # so the lower bound stays ge=0 rather than gt=0. Upper bound guards against typos.
-    max_video_seconds: int = Field(default=30, ge=0, le=86400, alias="PAPI_MAX_VIDEO_SECONDS")
+    # 150 admits the two-minute low-fps demo sweep (papi24-angle-sweep.mp4: 60
+    # frames @ 0.5 fps) while max_video_frames keeps normal-fps uploads bounded
+    # exactly as before — a 150 s clip at 30 fps still hits the 600-frame cap.
+    max_video_seconds: int = Field(default=150, ge=0, le=86400, alias="PAPI_MAX_VIDEO_SECONDS")
     # Aggregate upper bound on a single POST /api/analyze-frames call. The
     # backend processes frames sequentially per request, so an unbounded
     # list would hold the worker for minutes; per-file size is checked,
