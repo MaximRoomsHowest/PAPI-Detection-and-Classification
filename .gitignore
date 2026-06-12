@@ -155,3 +155,6 @@ docs/**/*.pptx
 graphify-out/
 .agents/
 .codex/
+AGENTS.md
+CLAUDE.md
+.graphifyignore
