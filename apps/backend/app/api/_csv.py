@@ -14,8 +14,9 @@ from collections.abc import Iterable, Iterator
 # add/remove is a one-line change and the header row + value row can never
 # drift apart.
 CSV_COLUMNS = [
-    "id", "created_at", "media_type", "runway_id", "global_state", "confidence",
-    "angle_available", "elevation_angle_deg", "frame_count", "processing_ms",
+    "id", "created_at", "media_type", "runway_id", "drone_id", "global_state", "confidence",
+    "angle_available", "elevation_angle_deg", "frame_count", "truncated_at_frame",
+    "decode_shortfall", "processing_ms",
     "model_id", "model_label", "model_role", "original_filename",
 ]
 
@@ -61,9 +62,17 @@ def stream_log_rows(rows: Iterable) -> Iterator[str]:
         created = log.created_at.isoformat() if hasattr(log.created_at, "isoformat") else log.created_at
         result = log.result_json if isinstance(getattr(log, "result_json", None), dict) else {}
         writer.writerow([
-            log.id, created, log.media_type, csv_safe(log.runway_id), log.global_state,
+            log.id, created, log.media_type, csv_safe(log.runway_id),
+            # drone_id is client-supplied free text — escape like the other
+            # attacker-controlled columns.
+            csv_safe(getattr(log, "drone_id", None)),
+            log.global_state,
             log.confidence, log.angle_available, log.elevation_angle_deg,
-            log.frame_count, log.processing_ms,
+            log.frame_count,
+            # Partial-result flags only exist in result_json (no columns); empty
+            # cell = complete analysis.
+            result.get("truncated_at_frame"), result.get("decode_shortfall"),
+            log.processing_ms,
             # Column first, result_json fallback for pre-column rows (audit COL-1).
             # getattr keeps the SimpleNamespace duck-rows in test_csv_export working.
             csv_safe(getattr(log, "model_id", None) or result.get("model_id")),

@@ -112,3 +112,30 @@ def test_db_pool_env_override(monkeypatch):
     settings = Settings()
     assert settings.db_pool_size == 25
     assert settings.db_max_overflow == 50
+
+
+def test_rate_limit_defaults(monkeypatch):
+    monkeypatch.delenv("PAPI_RATE_LIMIT_ENABLED", raising=False)
+    monkeypatch.delenv("PAPI_RATE_LIMIT_PER_MINUTE", raising=False)
+    monkeypatch.delenv("PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE", raising=False)
+    settings = Settings()
+    assert settings.rate_limit_enabled is True
+    assert settings.rate_limit_per_minute == 600
+    assert settings.analyze_rate_limit_per_minute == 60
+
+
+def test_rate_limit_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("PAPI_RATE_LIMIT_ENABLED", "false")
+    assert Settings().rate_limit_enabled is False
+
+
+def test_rate_limit_zero_rejected(monkeypatch):
+    monkeypatch.setenv("PAPI_RATE_LIMIT_PER_MINUTE", "0")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_analyze_rate_limit_zero_rejected(monkeypatch):
+    monkeypatch.setenv("PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE", "0")
+    with pytest.raises(ValidationError):
+        Settings()

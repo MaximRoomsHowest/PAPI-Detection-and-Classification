@@ -25,6 +25,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import threading
+from collections import deque
+from time import monotonic
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -136,6 +140,126 @@ class RequestSizeLimitMiddleware:
                     (b"content-type", b"application/json"),
                     (b"content-length", str(len(body)).encode("latin-1")),
                     (b"connection", b"close"),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body, "more_body": False})
+
+
+class RateLimitMiddleware:
+    """Small in-memory sliding-window limiter for demo/API abuse protection.
+
+    This is intentionally process-local: the app runs as one backend container in
+    the supported Compose/Azure shapes, and avoiding Redis keeps the handoff
+    simple. If the backend is horizontally scaled later, replace this with a
+    shared-store limiter at the edge or application layer.
+    """
+
+    def __init__(
+        self,
+        app,
+        *,
+        enabled: bool,
+        general_limit_per_minute: int,
+        analyze_limit_per_minute: int,
+        window_seconds: int = 60,
+    ) -> None:
+        self.app = app
+        self.enabled = enabled
+        self.general_limit_per_minute = general_limit_per_minute
+        self.analyze_limit_per_minute = analyze_limit_per_minute
+        self.window_seconds = window_seconds
+        self._hits: dict[tuple[str, str], deque[float]] = {}
+        self._lock = threading.Lock()
+        self._next_sweep = monotonic() + window_seconds
+
+    async def __call__(self, scope, receive, send) -> None:
+        if not self.enabled or scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope.get("method", "").upper()
+        path = scope.get("path", "")
+        if method == "OPTIONS" or path.startswith(("/health", "/docs", "/openapi.json")):
+            await self.app(scope, receive, send)
+            return
+
+        bucket, limit = self._bucket_and_limit(path)
+        client_id = self._client_id(scope)
+        allowed, remaining, reset_after = self._record_hit(client_id, bucket, limit)
+        if not allowed:
+            await self._send_429(send, limit=limit, retry_after=reset_after)
+            return
+
+        async def rate_limit_send(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.extend(
+                    [
+                        (b"x-ratelimit-limit", str(limit).encode("latin-1")),
+                        (b"x-ratelimit-remaining", str(remaining).encode("latin-1")),
+                        (b"x-ratelimit-reset", str(reset_after).encode("latin-1")),
+                    ]
+                )
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, rate_limit_send)
+
+    def _bucket_and_limit(self, path: str) -> tuple[str, int]:
+        if path.startswith("/api/analyze"):
+            return "analyze", self.analyze_limit_per_minute
+        return "general", self.general_limit_per_minute
+
+    @staticmethod
+    def _client_id(scope) -> str:
+        client = scope.get("client")
+        if client and client[0]:
+            return str(client[0])
+        return "unknown"
+
+    def _record_hit(self, client_id: str, bucket: str, limit: int) -> tuple[bool, int, int]:
+        now = monotonic()
+        cutoff = now - self.window_seconds
+        key = (client_id, bucket)
+        with self._lock:
+            if now >= self._next_sweep:
+                # Per-key pruning below only touches clients that come back, so
+                # without this sweep every IP ever seen keeps its deque for the
+                # process lifetime. Once per window is enough to bound the dict.
+                self._next_sweep = now + self.window_seconds
+                for stale_key in [k for k, dq in self._hits.items() if not dq or dq[-1] <= cutoff]:
+                    del self._hits[stale_key]
+            hits = self._hits.setdefault(key, deque())
+            while hits and hits[0] <= cutoff:
+                hits.popleft()
+            if len(hits) >= limit:
+                retry_after = max(1, math.ceil(self.window_seconds - (now - hits[0])))
+                return False, 0, retry_after
+            hits.append(now)
+            retry_after = max(1, math.ceil(self.window_seconds - (now - hits[0])))
+            return True, max(0, limit - len(hits)), retry_after
+
+    @staticmethod
+    async def _send_429(send, *, limit: int, retry_after: int) -> None:
+        body = json.dumps(
+            {
+                "detail": (
+                    f"Rate limit exceeded. Limit is {limit} requests per minute for this client."
+                )
+            }
+        ).encode("utf-8")
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 429,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("latin-1")),
+                    (b"retry-after", str(retry_after).encode("latin-1")),
+                    (b"x-ratelimit-limit", str(limit).encode("latin-1")),
+                    (b"x-ratelimit-remaining", b"0"),
+                    (b"x-ratelimit-reset", str(retry_after).encode("latin-1")),
                 ],
             }
         )

@@ -21,7 +21,10 @@ class AnalysisLogRepository:
 
         log = AnalysisLog(
             media_type=payload.media_type,
-            runway_id=payload.runway_id,
+            # Width-cap like its siblings below: add_runway now caps derived ids,
+            # but a pre-cap stored custom runway (or a future id source) must not
+            # 503 the log commit on Postgres (StringDataRightTruncation).
+            runway_id=payload.runway_id[:96],
             # Cap at the column width (VARCHAR(128)), like original_filename below: an
             # unbounded client-supplied drone_id otherwise raises StringDataRightTruncation
             # (503) on Postgres and orphans the just-written artifact (SQLite tests don't
@@ -181,6 +184,11 @@ class AnalysisLogRepository:
             elevation_angle_deg=log.elevation_angle_deg,
             frame_count=log.frame_count,
             processing_ms=log.processing_ms,
+            # Partial-result flags live only in result_json (no dedicated columns);
+            # without them the list/CSV showed a half-decoded or cap-truncated
+            # analysis as indistinguishable from a complete one (audit 2026-06-12).
+            truncated_at_frame=result.get("truncated_at_frame"),
+            decode_shortfall=result.get("decode_shortfall"),
             artifact_url=media_url_for_path(log.artifact_path, get_settings()),
             created_at=log.created_at.isoformat(),
         )

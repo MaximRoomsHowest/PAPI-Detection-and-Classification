@@ -18,5 +18,10 @@ class LogListItem(BaseModel):
     elevation_angle_deg: float | None
     frame_count: int
     processing_ms: int
+    # Partial-result flags mirrored from result_json so the history list and UI
+    # badges can mark cap-truncated / decode-shortfall analyses without fetching
+    # every log's detail payload.
+    truncated_at_frame: int | None = None
+    decode_shortfall: int | None = None
     artifact_url: str | None = None
     created_at: str

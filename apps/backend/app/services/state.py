@@ -364,6 +364,14 @@ def infer_single_missing_lamp_from_angle(
     if not angle.angle_available or angle.elevation_angle_deg is None or not angle.plausible:
         return lamps
 
+    # A "transition" lamp is a REAL 3-class-model detection, not an empty slot.
+    # Without this guard it falls into ``missing`` below (it is outside
+    # DETECTED_LAMP_STATES) and gets overwritten by a fabricated red/white —
+    # destroying measured evidence. Geometry can't help here anyway: a lamp
+    # mid-blend makes the white count genuinely ambiguous.
+    if any(lamp.state == "transition" for lamp in lamps):
+        return lamps
+
     detected = [lamp for lamp in lamps if lamp.state in DETECTED_LAMP_STATES]
     missing = [lamp for lamp in lamps if lamp.state not in DETECTED_LAMP_STATES]
     if len(detected) != 3 or len(missing) != 1:

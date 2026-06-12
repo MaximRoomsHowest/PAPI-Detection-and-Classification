@@ -144,6 +144,24 @@ def test_create_from_payload_persists_model_id_column(session):
     assert log.model_id == "nano"
 
 
+def test_to_list_item_surfaces_partial_result_flags_from_result_json(session):
+    """truncated_at_frame / decode_shortfall have no dedicated columns; the
+    list view mirrors them from result_json so History can badge partial
+    analyses without per-row detail fetches (audit 2026-06-12)."""
+    _add(session, original_filename="partial.mp4",
+         result_json={"truncated_at_frame": 120, "decode_shortfall": 30})
+    _add(session, original_filename="complete.mp4", result_json={})
+    repo = AnalysisLogRepository(session)
+
+    items = {item.original_filename: item
+             for item in (repo.to_list_item(log) for log in repo.list_recent(2, 0))}
+
+    assert items["complete.mp4"].truncated_at_frame is None
+    assert items["complete.mp4"].decode_shortfall is None
+    assert items["partial.mp4"].truncated_at_frame == 120
+    assert items["partial.mp4"].decode_shortfall == 30
+
+
 def test_to_list_item_falls_back_to_result_json_model_id_for_legacy_rows(session):
     """Rows written before the model_id column keep NULL there; the list view
     must still surface the id recorded in result_json (audit COL-1)."""

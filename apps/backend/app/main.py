@@ -22,7 +22,7 @@ from app.api.routes import require_api_key, router
 from app.config import get_settings
 from app.database import get_session, init_db
 from app.logging_config import RequestIdMiddleware, configure_logging
-from app.middleware import RequestSizeLimitMiddleware, request_body_cap_bytes
+from app.middleware import RateLimitMiddleware, RequestSizeLimitMiddleware, request_body_cap_bytes
 from app.services.inference import get_inference_service
 from app.services.storage import get_media_storage
 
@@ -123,12 +123,22 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 # Starlette applies middlewares in reverse-insertion order — the last one
-# added is the outermost wrap. Target stack: CORS(RequestId(BodyCap(app))).
+# added is the outermost wrap. Target stack:
+# CORS(RequestId(RateLimit(BodyCap(app)))).
 #
 # The transport body cap is added FIRST (= innermost) so its 413s still flow
 # out through RequestIdMiddleware and carry an X-Request-ID. It backstops the
 # per-endpoint upload budgets when no nginx sits in front (audit SD-3/CI6).
 app.add_middleware(RequestSizeLimitMiddleware, max_body_bytes=request_body_cap_bytes(settings))
+
+# Rate limiting sits outside the body cap so repeated expensive analyze calls
+# can be rejected before the backend reads the upload body.
+app.add_middleware(
+    RateLimitMiddleware,
+    enabled=settings.rate_limit_enabled,
+    general_limit_per_minute=settings.rate_limit_per_minute,
+    analyze_limit_per_minute=settings.analyze_rate_limit_per_minute,
+)
 
 # RequestIdMiddleware is added BEFORE CORS so the request-ID context is set
 # even for OPTIONS preflight responses.
@@ -149,7 +159,16 @@ app.add_middleware(
     allow_credentials=_cors_allow_credentials,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-API-Key"],
-    expose_headers=["X-Request-ID", "X-Total-Count"],
+    # Rate-limit headers exposed so a cross-origin client can see its budget
+    # instead of discovering the limiter via a surprise 429.
+    expose_headers=[
+        "X-Request-ID",
+        "X-Total-Count",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+        "Retry-After",
+    ],
 )
 
 app.include_router(router)

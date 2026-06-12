@@ -73,23 +73,6 @@ class MediaStorage:
         local_path.unlink(missing_ok=True)
         return blob_name
 
-    def persist_upload(self, local_path: Path) -> str:
-        if not self.is_azure:
-            return str(local_path)
-
-        blob_name = _safe_blob_name("uploads", local_path.name)
-        content_type = mimetypes.guess_type(local_path.name)[0] or "application/octet-stream"
-        with local_path.open("rb") as handle:
-            self._container_client().upload_blob(
-                name=blob_name,
-                data=handle,
-                overwrite=True,
-                content_settings=self._content_settings(content_type),
-            )
-        # Keep the local file: OpenCV/EXIF readers still need a filesystem path
-        # for the current request.
-        return blob_name
-
     def delete_reference(self, reference: str | None) -> None:
         if not reference:
             return

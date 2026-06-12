@@ -4,7 +4,7 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from app.config import Settings
-from app.services.storage import get_media_storage, media_url_for_reference
+from app.services.storage import media_url_for_reference
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
@@ -101,11 +101,10 @@ def save_upload(upload: UploadFile, settings: Settings) -> Path:
     except Exception:
         target.unlink(missing_ok=True)
         raise
-    try:
-        get_media_storage(settings).persist_upload(target)
-    except Exception:
-        target.unlink(missing_ok=True)
-        raise
+    # No blob copy of the original: inference reads the local file and the routes
+    # delete it after processing (the documented retention contract). The old
+    # azure persist_upload mirrored every original to an `uploads/` blob that no
+    # read/delete path ever touched — a write-only, unbounded retention leak.
     return target
 
 

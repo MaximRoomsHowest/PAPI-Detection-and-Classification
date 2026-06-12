@@ -75,6 +75,7 @@ def run_tracked_sequence(
     drone_samples: list[DroneSample] | None = None,
     transition_method: str = "tracking",
     expected_frame_count: int | None = None,
+    shortfall_tolerance: int = 0,
 ) -> AnalysisPayload:
     """Run ByteTrack detection per frame, write the annotated artifact, and aggregate
     the final per-lamp verdict + transitions by STABLE track identity.
@@ -90,6 +91,14 @@ def run_tracked_sequence(
     keeps the legacy local behaviour (``/media/<filename>``). The callable runs
     AFTER the writer is released, so a raising implementation leaves the local
     artifact on disk for the caller to clean up.
+
+    ``expected_frame_count`` + ``shortfall_tolerance`` drive the decode-shortfall
+    contract: a source that yields MORE than ``expected_frame_count - tolerance``
+    frames fewer than promised gets ``decode_shortfall`` stamped on the payload
+    (a mid-stream decode failure reads like EOF, so without this a half-decoded
+    file would present as a normal, complete, shorter analysis). The caller picks
+    the tolerance because only it knows how trustworthy the count is: exact for
+    an image list, approximate for video container metadata.
     """
     overlay_frame_angles = _frame_angles_from_samples(
         drone_samples,
@@ -191,6 +200,15 @@ def run_tracked_sequence(
     else:
         artifact_url = f"/media/{artifact_path.name}"
 
+    # Decode shortfall: the source promised more frames than it delivered and we
+    # did NOT stop on purpose (cap truncation above). Stamped past the caller's
+    # tolerance so approximate video metadata doesn't cry wolf (audit 2026-06-12).
+    decode_shortfall: int | None = None
+    if truncated_at_frame is None and expected_frame_count:
+        missing = expected_frame_count - frame_count
+        if missing > max(0, shortfall_tolerance):
+            decode_shortfall = missing
+
     final_lamps = infer_single_missing_lamp_from_angle(aggregate_video_lamps(track_observations), angle)
     global_state = global_state_from_lamps(final_lamps)
     confidence = confidence_from_lamps(final_lamps)
@@ -221,6 +239,7 @@ def run_tracked_sequence(
         confidence=confidence,
         frame_count=frame_count,
         truncated_at_frame=truncated_at_frame,
+        decode_shortfall=decode_shortfall,
         processing_ms=processing_ms,
         angle=angle,
         artifact_url=artifact_url,

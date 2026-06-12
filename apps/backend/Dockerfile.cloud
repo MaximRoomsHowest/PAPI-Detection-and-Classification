@@ -76,6 +76,12 @@ USER papi
 
 EXPOSE 8000
 
+# Azure Container Apps ingress (Envoy) fronts this container; trust its
+# X-Forwarded-For so the rate limiter buckets per real client instead of
+# per-ingress-pod. The container is only reachable through the ingress in the
+# supported deployment, so "*" does not widen the spoofing surface there.
+ENV FORWARDED_ALLOW_IPS="*"
+
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 

@@ -127,6 +127,20 @@ services:
       # app/config.py. SQLite deployments ignore these.
       PAPI_DB_POOL_SIZE: ${PAPI_DB_POOL_SIZE:-10}
       PAPI_DB_MAX_OVERFLOW: ${PAPI_DB_MAX_OVERFLOW:-20}
+      # Process-local API throttling. The stricter analyze bucket protects
+      # CPU/GPU inference from accidental refresh loops or simple abuse.
+      PAPI_RATE_LIMIT_ENABLED: ${PAPI_RATE_LIMIT_ENABLED:-true}
+      PAPI_RATE_LIMIT_PER_MINUTE: ${PAPI_RATE_LIMIT_PER_MINUTE:-600}
+      PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE: ${PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE:-60}
+      # Trust X-Forwarded-For from the in-network nginx proxy so the rate
+      # limiter buckets by real client IP instead of lumping every browser
+      # user into the proxy's single bucket. uvicorn reads this env natively.
+      # "*" is safe in THIS topology: the backend port binds to loopback (see
+      # ports below), so only the compose-network proxy and the host itself
+      # can connect. Direct host callers could spoof XFF to dodge the limiter
+      # — acceptable for the demo threat model; tighten to the proxy IP/CIDR
+      # if the port is ever LAN-exposed.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}

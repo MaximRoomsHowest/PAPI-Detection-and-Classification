@@ -92,6 +92,12 @@ The older `transition_method` field is still accepted for compatibility.
 
 The single-frame endpoints return their results immediately and store a lightweight database log with result metadata, not the uploaded image/video bytes. Uploaded originals are deleted after processing; annotated exports stay in `storage/exports`.
 
+All HTTP responses include rate-limit headers when `PAPI_RATE_LIMIT_ENABLED`
+is true. The default buckets are broad for dashboard/API traffic
+(`PAPI_RATE_LIMIT_PER_MINUTE=600`) and stricter for expensive
+`/api/analyze*` inference requests (`PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE=60`).
+Exceeded buckets return a JSON `429` with `Retry-After`.
+
 ## Structure
 
 ```text

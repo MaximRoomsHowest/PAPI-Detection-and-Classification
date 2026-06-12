@@ -32,6 +32,15 @@ class AnalysisPayload(BaseModel):
     # NOT processed — equal to the number of processed frames (and therefore to
     # frame_count), never the index of a processed frame.
     truncated_at_frame: int | None = None
+    # Mirror of truncated_at_frame for the OPPOSITE failure: the source ended
+    # EARLY. A mid-stream video decode error reads like EOF, and unreadable
+    # images in a sequence are silently skipped, so fewer frames get processed
+    # than the source promised. Value = how many promised frames never decoded;
+    # the verdict covers only the decoded frames and the UI must say so. None =
+    # no meaningful shortfall (video containers report approximate counts, so
+    # the service applies a small tolerance before stamping; image-sequence
+    # counts are exact and stamp on any skipped file).
+    decode_shortfall: int | None = None
     processing_ms: int
     angle: AngleResult
     artifact_url: str | None = None

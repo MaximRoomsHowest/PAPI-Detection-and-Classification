@@ -114,6 +114,16 @@ class Settings(BaseSettings):
     # burst of logs/stats/runways requests without holding 40 idle connections.
     db_pool_size: int = Field(default=10, ge=1, le=100, alias="PAPI_DB_POOL_SIZE")
     db_max_overflow: int = Field(default=20, ge=0, le=200, alias="PAPI_DB_MAX_OVERFLOW")
+    # Process-local abuse throttle. Analyze endpoints are expensive CPU/GPU work
+    # and get a lower bucket than read-only dashboard/API traffic.
+    rate_limit_enabled: bool = Field(default=True, alias="PAPI_RATE_LIMIT_ENABLED")
+    rate_limit_per_minute: int = Field(default=600, ge=1, le=100000, alias="PAPI_RATE_LIMIT_PER_MINUTE")
+    analyze_rate_limit_per_minute: int = Field(
+        default=60,
+        ge=1,
+        le=100000,
+        alias="PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE",
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -168,6 +168,25 @@ def test_does_not_infer_missing_lamp_without_angle_or_near_transition():
     assert infer_single_missing_lamp_from_angle(boundary_lamps, _angle(3.17)) == boundary_lamps
 
 
+def test_does_not_infer_over_a_real_transition_detection():
+    """A 3-class model's "transition" lamp is a REAL detection, not an empty
+    slot. It sits outside DETECTED_LAMP_STATES, so without an explicit guard it
+    is treated as the missing lamp and overwritten with a fabricated red/white
+    — destroying measured evidence (audit 2026-06-12)."""
+    lamps = [
+        LampResult(index=1, state="red", confidence=0.9),
+        LampResult(index=2, state="red", confidence=0.8),
+        LampResult(index=3, state="transition", confidence=0.7),
+        LampResult(index=4, state="white", confidence=0.7),
+    ]
+
+    result = infer_single_missing_lamp_from_angle(lamps, _angle(3.0))
+
+    assert result == lamps
+    assert result[2].state == "transition"
+    assert not any(lamp.inferred for lamp in result)
+
+
 def test_does_not_infer_when_observations_contradict_geometry():
     """Well above every set angle (3.8 deg) a healthy PAPI shows 4 whites;
     observing two reds means the array (or the angle) is wrong — never paper

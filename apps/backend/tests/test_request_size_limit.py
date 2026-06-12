@@ -206,9 +206,10 @@ def test_under_cap_request_reaches_endpoint():
 
 
 def test_real_app_middleware_order_keeps_body_cap_innermost():
-    """CORS(RequestId(BodyCap(app))): 413s must still carry X-Request-ID."""
+    """CORS(RequestId(RateLimit(BodyCap(app)))): 413s still carry X-Request-ID."""
     classes = [m.cls.__name__ for m in real_app.user_middleware]
     assert classes.index("RequestSizeLimitMiddleware") > classes.index("RequestIdMiddleware")
+    assert classes.index("RequestSizeLimitMiddleware") > classes.index("RateLimitMiddleware")
 
 
 def test_real_app_cap_tracks_batch_upload_budget():

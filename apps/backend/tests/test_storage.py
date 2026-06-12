@@ -297,17 +297,38 @@ def test_persist_export_azure_uploads_and_removes_local_copy(tmp_path, fake_clie
     assert not artifact.exists()
 
 
-def test_persist_upload_azure_keeps_local_copy_for_inference(tmp_path, fake_client):
+def test_failed_persist_export_cleans_up_local_artifact(tmp_path, monkeypatch):
+    """A raising persist_export (e.g. transient Blob outage) must not leak the
+    finished local artifact: the request 503s and no DB row will ever reference
+    the file, so InferenceService._store_export_artifact deletes it (audit
+    2026-06-12)."""
+    from app.services.inference import InferenceService
+
+    settings = local_settings(tmp_path)
+    artifact = settings.exports_dir / "frame.jpg"
+    artifact.write_bytes(b"jpeg")
+
+    def _boom(self, local_path):  # noqa: ARG001
+        raise RuntimeError("blob storage down")
+
+    monkeypatch.setattr(MediaStorage, "persist_export", _boom)
+
+    with pytest.raises(RuntimeError, match="blob storage down"):
+        InferenceService(settings)._store_export_artifact(artifact)
+
+    assert not artifact.exists()
+
+
+def test_storage_never_uploads_originals(tmp_path, fake_client):
+    """Retention contract: originals are local-only and deleted after processing.
+
+    The removed ``persist_upload`` used to mirror every original to an
+    ``uploads/`` blob that no read/delete path ever touched (write-only
+    retention leak, contradicting the README). Pin its absence.
+    """
     settings = azure_settings(tmp_path)
-    upload = settings.uploads_dir / "raw.jpg"
-    upload.write_bytes(b"jpeg")
-
-    reference = get_media_storage(settings).persist_upload(upload)
-
-    assert reference == "uploads/raw.jpg"
-    assert fake_client.uploads == [("uploads/raw.jpg", b"jpeg")]
-    # OpenCV/EXIF readers still need the filesystem path for the current request.
-    assert upload.exists()
+    assert not hasattr(get_media_storage(settings), "persist_upload")
+    assert fake_client.uploads == []
 
 
 # --- delete_reference -------------------------------------------------------

@@ -551,6 +551,10 @@ class InferenceService:
                 selected_model=selected_model,
                 transition_method=effective_method,
                 expected_frame_count=source_frame_count or None,
+                # CAP_PROP_FRAME_COUNT is container metadata and can be off by a
+                # few frames (VFR / sloppy muxers) — only a >5% (and >2 frame)
+                # gap is a real mid-stream decode failure worth flagging.
+                shortfall_tolerance=max(2, source_frame_count // 20),
             )
         finally:
             cap.release()
@@ -634,7 +638,10 @@ class InferenceService:
                 model=model,
                 selected_model=selected_model,
                 transition_method=effective_method,
+                # The image list is exact (unlike video container metadata), so
+                # ANY skipped unreadable file is a reportable shortfall.
                 expected_frame_count=len(image_paths),
+                shortfall_tolerance=0,
             )
 
     def _run_tracked_sequence(
@@ -656,6 +663,7 @@ class InferenceService:
         selected_model: ModelRegistryEntry | None = None,
         transition_method: str = "tracking",
         expected_frame_count: int | None = None,
+        shortfall_tolerance: int = 0,
     ) -> AnalysisPayload:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
         ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
@@ -695,6 +703,7 @@ class InferenceService:
             drone_samples=drone_samples,
             transition_method=transition_method,
             expected_frame_count=expected_frame_count,
+            shortfall_tolerance=shortfall_tolerance,
         )
         if selected_model is not None:
             payload.model_id = selected_model.id
@@ -704,7 +713,16 @@ class InferenceService:
 
     def _store_export_artifact(self, artifact_path: Path) -> tuple[str, str]:
         storage = get_media_storage(self.settings)
-        reference = storage.persist_export(artifact_path)
+        try:
+            reference = storage.persist_export(artifact_path)
+        except Exception:
+            # Azure-mode persist_export only unlinks the local file AFTER a
+            # successful blob upload; on failure the request 503s and nothing
+            # references the finished artifact — delete it instead of leaking
+            # one orphan per transient Blob failure (local mode never raises
+            # here, so this path can't delete a servable local artifact).
+            artifact_path.unlink(missing_ok=True)
+            raise
         artifact_url = storage.url_for_reference(reference)
         if artifact_url is None:
             raise RuntimeError("Could not create media URL for annotated artifact.")
