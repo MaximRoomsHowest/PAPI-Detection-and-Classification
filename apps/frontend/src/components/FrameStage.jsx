@@ -19,11 +19,32 @@ import { toast } from 'sonner'
 import { FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
 
 const SAMPLE_RUNWAY_ID = 'papi_24'
-const SAMPLE_METADATA_FILE = {
-  url: '/demo-samples/sample-descent.json',
-  name: 'sample-descent.json',
+// Real EDNY rwy-24 assets from the user-testing kit (sweep_papi24_300m_day):
+// a stationary ~300 m stand-off while the drone climbs through every set
+// angle (1.9deg -> 3.8deg), so the analysis walks all five PAPI states and
+// shows genuine lamp transitions. Each sample ships the telemetry that was
+// actually recorded with its frames — angle and lamp states agree.
+const SAMPLE_SWEEP_METADATA = {
+  url: '/demo-samples/sample-sweep.json',
+  name: 'sample-sweep.json',
   type: 'application/json',
 }
+// Single on-slope fix matching papi-test-frame.jpg (sweep frame 5, 2.8deg).
+const SAMPLE_POINT_METADATA = {
+  url: '/demo-samples/sample-point.json',
+  name: 'sample-point.json',
+  type: 'application/json',
+}
+
+const SAMPLE_SWEEP_FRAMES = Array.from({ length: 10 }, (_, index) => {
+  const frame = String(index + 1).padStart(3, '0')
+  return {
+    url: `/demo-samples/folder-frame-${frame}.jpg`,
+    name: `frame_${frame}.jpg`,
+    type: 'image/jpeg',
+    path: `sample-papi-frames/frame_${frame}.jpg`,
+  }
+})
 
 // Labels/descriptions are i18n keys under copy.live (resolved at render time)
 // so the picker follows the active locale like every other Live-Demo string.
@@ -34,7 +55,7 @@ const SAMPLE_MEDIA = [
     descriptionKey: 'sampleSingleImageDescription',
     icon: Images,
     files: [{ url: '/demo-samples/papi-test-frame.jpg', name: 'papi-test-frame.jpg', type: 'image/jpeg' }],
-    metadataFile: SAMPLE_METADATA_FILE,
+    metadataFile: SAMPLE_POINT_METADATA,
   },
   {
     id: 'image-sequence',
@@ -42,39 +63,8 @@ const SAMPLE_MEDIA = [
     descriptionKey: 'sampleImageSetDescription',
     icon: Images,
     folderMode: FOLDER_MODE_SEQUENCE,
-    files: [
-      {
-        url: '/demo-samples/folder-frame-001.jpg',
-        name: 'frame_001.jpg',
-        type: 'image/jpeg',
-        path: 'sample-papi-frames/frame_001.jpg',
-      },
-      {
-        url: '/demo-samples/folder-frame-002.jpg',
-        name: 'frame_002.jpg',
-        type: 'image/jpeg',
-        path: 'sample-papi-frames/frame_002.jpg',
-      },
-      {
-        url: '/demo-samples/folder-frame-003.jpg',
-        name: 'frame_003.jpg',
-        type: 'image/jpeg',
-        path: 'sample-papi-frames/frame_003.jpg',
-      },
-      {
-        url: '/demo-samples/folder-frame-004.jpg',
-        name: 'frame_004.jpg',
-        type: 'image/jpeg',
-        path: 'sample-papi-frames/frame_004.jpg',
-      },
-      {
-        url: '/demo-samples/folder-frame-005.jpg',
-        name: 'frame_005.jpg',
-        type: 'image/jpeg',
-        path: 'sample-papi-frames/frame_005.jpg',
-      },
-    ],
-    metadataFile: SAMPLE_METADATA_FILE,
+    files: SAMPLE_SWEEP_FRAMES,
+    metadataFile: SAMPLE_SWEEP_METADATA,
   },
   {
     id: 'short-video',
@@ -88,7 +78,7 @@ const SAMPLE_MEDIA = [
         type: 'video/mp4',
       },
     ],
-    metadataFile: SAMPLE_METADATA_FILE,
+    metadataFile: SAMPLE_SWEEP_METADATA,
   },
 ]
 

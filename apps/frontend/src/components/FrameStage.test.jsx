@@ -227,7 +227,9 @@ describe('FrameStage sample picker', () => {
     expect(files).toHaveLength(1)
     expect(files[0].name).toBe('papi-test-frame.jpg')
     expect(options).toMatchObject({ runwayId: 'papi_24', sampleMetadata: true })
-    expect(options.metadataFile?.name).toBe('sample-descent.json')
+    // The single image ships its own POINT fix (not the sweep track) so the
+    // displayed angle matches what the frame actually shows.
+    expect(options.metadataFile?.name).toBe('sample-point.json')
   })
 
   it('surfaces a failed sample fetch and re-enables the picker', async () => {
