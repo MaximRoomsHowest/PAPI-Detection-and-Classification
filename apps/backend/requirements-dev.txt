@@ -6,4 +6,4 @@
 
 pytest==9.0.3
 # httpx2 backs FastAPI's TestClient (Starlette). Test-only — no runtime import.
-httpx2==2.3.0
+httpx2==2.4.0
