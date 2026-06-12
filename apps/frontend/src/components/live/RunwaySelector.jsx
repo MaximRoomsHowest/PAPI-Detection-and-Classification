@@ -38,6 +38,7 @@ export function RunwaySelector({ copy }) {
             onChange={(event) => setSelectedRunwayId(event.target.value)}
             disabled={!canChoose}
             aria-label={copy.live.runway}
+            title={!canChoose ? copy.live.runwaySelectDisabled : copy.live.runway}
           >
             {runways.length === 0 && <option value={selectedRunwayId}>{selectedLabel}</option>}
             {runways.map((runway) => (

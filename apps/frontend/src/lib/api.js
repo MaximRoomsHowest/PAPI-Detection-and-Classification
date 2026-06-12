@@ -1,3 +1,5 @@
+import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages'
+
 const API_BASE_URL = (import.meta.env.VITE_PAPI_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
 const API_KEY = import.meta.env.VITE_PAPI_API_KEY
 
@@ -10,8 +12,9 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 60_000
 // Parse a numeric env override, falling back to the default when the value is absent
 // OR unparseable. Bare Number('abc') is NaN, which would silently disable the upload
 // guard (`size > NaN` is always false) and make setTimeout(…, NaN) fire immediately,
-// aborting every request (audit F1).
-function positiveNumberEnv(raw, fallback) {
+// aborting every request (audit F1). Exported so other env caps (e.g. the
+// useAnalysis batch-frame mirror) reuse the same negative/zero/NaN handling.
+export function positiveNumberEnv(raw, fallback) {
   const value = Number(raw)
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
@@ -101,10 +104,15 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
       }
       // Attach the original AbortError as the cause so devtools / Sentry
       // / future error boundaries can inspect both layers (preserve-caught-error).
-      throw new Error(
+      // The message stays English for the console; display sites localize via
+      // the code + timeoutSeconds through localizedErrorMessage().
+      const timeoutError = new Error(
         `Backend did not respond within ${Math.round(timeoutMs / 1000)} s. The request may still finish server-side — refresh logs to verify.`,
         { cause: error },
       )
+      timeoutError.code = REQUEST_TIMEOUT_ERROR_CODE
+      timeoutError.timeoutSeconds = Math.round(timeoutMs / 1000)
+      throw timeoutError
     }
     throw error
   } finally {
@@ -120,6 +128,28 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS
  * `response.ok`, so a parse failure here means the backend sent a 2xx with a body
  * we can't read — surface that distinctly (audit: guard the ok-path parse).
  */
+/**
+ * Flatten a backend error `detail` into a readable message. FastAPI validation
+ * errors (422) carry an ARRAY of {loc, msg} objects — rendering that raw turns
+ * the banner into "[object Object]" (user test 2026-06-11, non-numeric drone
+ * telemetry). Strings pass through; anything unusable falls back.
+ */
+function detailToMessage(detail, fallback) {
+  if (typeof detail === 'string' && detail) return detail
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((entry) => {
+        if (typeof entry === 'string') return entry
+        if (!entry?.msg) return null
+        const field = Array.isArray(entry.loc) ? entry.loc[entry.loc.length - 1] : null
+        return field ? `${field}: ${entry.msg}` : entry.msg
+      })
+      .filter(Boolean)
+    if (parts.length) return parts.join(' · ')
+  }
+  return fallback
+}
+
 async function parseJsonBody(response, label) {
   try {
     return await response.json()
@@ -194,11 +224,7 @@ export async function createRunway(payload) {
     let detail = `Could not create runway (${response.status})`
     try {
       const body = await response.json()
-      if (Array.isArray(body.detail)) {
-        detail = body.detail.map((entry) => entry.msg ?? String(entry)).join('; ')
-      } else if (body.detail) {
-        detail = body.detail
-      }
+      detail = detailToMessage(body.detail, detail)
     } catch {
       detail = response.statusText || detail
     }
@@ -217,7 +243,7 @@ export async function deleteRunway(runwayId) {
     let detail = `Could not delete runway (${response.status})`
     try {
       const body = await response.json()
-      detail = body.detail ?? detail
+      detail = detailToMessage(body.detail, detail)
     } catch {
       detail = response.statusText || detail
     }
@@ -225,8 +251,11 @@ export async function deleteRunway(runwayId) {
   }
 }
 
-export async function fetchModelInfo() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/model`, {
+export async function fetchModelInfo(modelId) {
+  // No id -> the backend default's card; with an id -> that registry entry's
+  // card (provenance + val_metrics), powering the Insights per-model view.
+  const query = modelId ? `?model_id=${encodeURIComponent(modelId)}` : ''
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/model${query}`, {
     headers: buildHeaders(),
   })
   if (!response.ok) {
@@ -235,8 +264,28 @@ export async function fetchModelInfo() {
   return parseJsonBody(response, 'Model info')
 }
 
-export async function fetchStats() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats`, {
+export async function fetchModels() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/models`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    // This failure renders inside the model selector's live region, but api.js has no
+    // i18n access — throw a typed code and let useAnalysis map it to the active
+    // locale's message. The English message stays for devtools/console only.
+    const error = new Error(`Could not load model options (${response.status})`)
+    error.code = MODEL_OPTIONS_ERROR_CODE
+    throw error
+  }
+  return parseJsonBody(response, 'Model options')
+}
+
+// Stable error code for a failed /api/models load — the UI layer owns the translation.
+export const MODEL_OPTIONS_ERROR_CODE = 'model-options-unavailable'
+
+export async function fetchStats(options = {}) {
+  // Same camelCase filter set as fetchLogs/logsCsvUrl (limit/offset are simply
+  // absent here) — the backend aggregates the matching slice (History stats cards).
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/stats${buildLogQuery(options)}`, {
     headers: buildHeaders(),
   })
   if (!response.ok) {
@@ -258,6 +307,7 @@ function buildLogQuery({
   globalState,
   createdAfter,
   minConfidence,
+  modelId,
 } = {}) {
   const params = new URLSearchParams()
   if (limit != null) params.set('limit', String(limit))
@@ -267,6 +317,7 @@ function buildLogQuery({
   if (globalState) params.set('global_state', globalState)
   if (createdAfter) params.set('created_after', createdAfter)
   if (minConfidence != null && minConfidence !== '') params.set('min_confidence', String(minConfidence))
+  if (modelId) params.set('model_id', modelId)
   const qs = params.toString()
   return qs ? `?${qs}` : ''
 }
@@ -327,39 +378,12 @@ export async function fetchLogDetail(logId) {
   return parseJsonBody(response, `Analysis ${logId}`)
 }
 
-export async function fetchSystem() {
-  const response = await fetchWithTimeout(`${API_BASE_URL}/api/system`, {
-    headers: buildHeaders(),
-  })
-  if (!response.ok) {
-    throw new Error(`Could not load system info (${response.status})`)
-  }
-  return parseJsonBody(response, 'System info')
-}
-
-/**
- * Poll the backend readiness probe for a topbar status indicator (audit IMP-FE-17).
- * Resilient by design — returns ``{ ok: false }`` instead of throwing so a down
- * backend just shows "offline" rather than crashing the page.
- */
-export async function fetchReady() {
-  try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/health/ready`, {
-      headers: buildHeaders(),
-    })
-    const body = await response.json().catch(() => ({}))
-    return { ok: response.ok, ...body }
-  } catch {
-    return { ok: false, status: 'unreachable' }
-  }
-}
-
 async function parseAnalysisResponse(response) {
   if (!response.ok) {
     let detail = `Analysis failed (${response.status})`
     try {
       const body = await response.json()
-      detail = body.detail ?? detail
+      detail = detailToMessage(body.detail, detail)
     } catch {
       detail = response.statusText || detail
     }
@@ -383,9 +407,9 @@ function appendMetadata(formData, metadata = {}) {
     drone_latitude: metadata.droneLatitude,
     drone_longitude: metadata.droneLongitude,
     drone_altitude_m: metadata.droneAltitudeM,
-    // "tracking" (temporal red<->white flips) or "model" (learned class-2 events). Omitted when
-    // empty/undefined so the backend applies its own default.
-    transition_method: metadata.transitionMethod,
+    // Omitted when null/empty (no registry entry selected yet, or /api/models failed)
+    // so the backend applies its own default model instead of rejecting an invented id.
+    model_id: metadata.modelId,
   }
   for (const [key, value] of Object.entries(fields)) {
     if (value !== undefined && value !== null && value !== '') {

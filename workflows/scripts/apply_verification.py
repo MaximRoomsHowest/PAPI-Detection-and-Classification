@@ -1,14 +1,22 @@
-"""Apply Phase 5 verification verdicts to the twin and write the verification log.
+"""Apply verification verdicts to the twin and write the verification log.
 
-Verdicts come from a visual spot-check of per-flip montages (review_assets/review_page_*.png,
-36 flips across all strata). The review established an evidence-based rule, applied dataset-wide:
+Verdicts combine the per-flip review flags with the per-crop colour verdict
+(``papi.transition_scoring.classify_lamp_colour``) so a flip-anchored box is only kept as class 2
+when it is *visibly* an amber blend, not a stable colour that merely sits inside a flip's frame
+window. The dataset-wide rule:
 
-* ``fallback_identity`` (left-to-right lamp id on zoom/mirrored geometry) -> ``ambiguous_review``:
-  identity unreliable, the "flip" may be a tracking artifact -> revert that box to its original
-  red/white label (excluded from the transition class).
-* ``elev_discontinuity`` -> ``accepted_transition`` with note ``angle_unreliable``: the visual
-  red<->white change is genuine; only the telemetry angle at the flip is untrustworthy.
-* otherwise -> ``accepted_transition`` (flip-anchored + colour-confirmed).
+* ``fallback_identity`` (left-to-right lamp id on zoom/mirrored geometry) -> excluded: identity
+  unreliable, the "flip" may be a tracking artifact -> revert that box to its red/white label.
+* ``elev_discontinuity`` -> excluded: the flip's from/to frames are at very different elevations,
+  so the sampled window does NOT bracket a captured colour change (the real flip fell in an
+  unsampled gap) -- both sides are stable observations. (Audit 2026-06-09: the crops are solid
+  red, e.g. red_ratio 0.86 three minutes from the flip; the earlier "angle-only unreliable"
+  assumption was wrong.) When such a crop nevertheless READS intermediate the signals
+  contradict each other: it keeps the tracked label but lands in a distinct
+  ``reverted_telemetry_gap_ambiguous_colour`` bucket for human review (audit WS-4).
+* crop colour is a clearly stable ``red``/``white`` -> excluded: window-edge colour bleed, not a
+  transition (audit found ~205 such boxes, ~42% of the live transition labels).
+* otherwise (amber/blended crop) -> ``accepted_transition`` (flip-anchored + colour-confirmed).
 
 Reverting rewrites only the affected lamp's class back to the human red/white label from
 tracks.csv; accepted boxes keep class 2. Writes verification_log.csv (brief schema) and a summary.
@@ -25,6 +33,8 @@ import csv
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
+
+from papi.transition_scoring import classify_lamp_colour
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "data" / "datasets" / "transition-classification-data"
@@ -46,12 +56,28 @@ def _video_dir(twin: Path, source_id: str) -> Path | None:
     return None
 
 
-def decide(review_flag: str) -> tuple[str, str]:
+def decide(review_flag: str, colour_verdict: str) -> tuple[str, str]:
     if "fallback_identity" in review_flag:
         return "ambiguous_review", "unreliable left-to-right lamp identity (zoom/mirror); excluded from training"
     if "elev_discontinuity" in review_flag:
-        return "accepted_transition", "visual transition genuine; angle_unreliable (telemetry discontinuity)"
-    return "accepted_transition", "flip-anchored + colour-confirmed"
+        if colour_verdict == "intermediate":
+            # Contradictory signals: telemetry says the window brackets no captured
+            # flip (both sides stable), but the crop READS intermediate. Asserting a
+            # stable label here is potential supervision noise — keep the tracked
+            # label but bucket distinctly so these queue for human review instead of
+            # hiding among confident reverts (audit WS-4).
+            return (
+                "reverted_telemetry_gap_ambiguous_colour",
+                "telemetry gap says stable but crop reads intermediate; kept tracked label — NEEDS HUMAN REVIEW",
+            )
+        return "reverted_telemetry_gap", "flip window does not bracket a captured transition (telemetry gap); reverted to stable colour"
+    if colour_verdict in ("red", "white"):
+        return "reverted_stable_colour", f"crop is stable {colour_verdict} (red-dominant / not an amber blend); reverted to {colour_verdict}"
+    if colour_verdict == "unknown":
+        # Never describe an unjudgeable crop as colour-confirmed (audit WS-4): the
+        # flip anchor alone carries the acceptance.
+        return "accepted_transition", "flip-anchored; colour signal unavailable (too few lit pixels) — accepted on flip evidence alone"
+    return "accepted_transition", "flip-anchored + colour-confirmed intermediate"
 
 
 def apply(twin: Path) -> dict:
@@ -66,8 +92,21 @@ def apply(twin: Path) -> dict:
     log_rows: list[dict[str, str]] = []
     accepted: set[tuple[str, int, str]] = set()  # (source, frame, track) kept as transition
     decisions = Counter()
+    # Persisted verdicts win (reproducibility of the published dataset), but count how
+    # many disagree with the CURRENT thresholds so a threshold tune that silently
+    # applies only to verdict-less rows is visible in the summary (audit LS-7).
+    verdict_disagreements = 0
     for c in candidates:
-        decision, note = decide(c["review_flag"])
+        try:
+            colour = json.loads(c.get("colour_features") or "{}")
+        except json.JSONDecodeError:
+            colour = {}
+        persisted_verdict = (c.get("colour_verdict") or "").strip()
+        recomputed_verdict = classify_lamp_colour(colour)
+        if persisted_verdict and persisted_verdict != recomputed_verdict:
+            verdict_disagreements += 1
+        verdict = persisted_verdict or recomputed_verdict
+        decision, note = decide(c["review_flag"], verdict)
         if (c["source_id"], c["track_id"], int(c["flip_frame"])) in reviewed_keys:
             note += " [visually reviewed]"
         decisions[decision] += 1
@@ -115,8 +154,13 @@ def apply(twin: Path) -> dict:
             (vd / "labels" / (Path(file).stem + ".txt")).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     log_path = twin / "verification_log.csv"
+    # Static fieldnames: log_rows[0] IndexErrors on an empty candidates CSV (audit LS-8).
+    fieldnames = [
+        "candidate_id", "decision", "old_label", "new_label",
+        "reviewer_note", "source_id", "frame_number", "track_id",
+    ]
     with log_path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(log_rows[0].keys()))
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(log_rows)
 
@@ -124,6 +168,7 @@ def apply(twin: Path) -> dict:
         "candidates": len(candidates),
         "flips_visually_reviewed": len(reviewed_keys),
         "decisions": dict(decisions),
+        "persisted_verdicts_disagreeing_with_current_thresholds": verdict_disagreements,
         "final_transition_boxes": final_transition_boxes,
         "verification_log": str(log_path),
     }

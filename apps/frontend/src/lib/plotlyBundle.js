@@ -17,7 +17,7 @@
 // live in exactly one module imported by both; never duplicate it.
 let plotlyBundlePromise
 
-export function unwrapDefault(mod) {
+function unwrapDefault(mod) {
   if (mod == null) return mod
   if (typeof mod === 'function') return mod
   const first = mod.default !== undefined ? mod.default : mod
@@ -29,7 +29,7 @@ export function unwrapDefault(mod) {
   return first
 }
 
-export function requireFunction(value, label) {
+function requireFunction(value, label) {
   if (typeof value !== 'function') {
     const keys =
       value && typeof value === 'object'

@@ -122,6 +122,38 @@
   line-height: 1;
 }
 
+/* Labeled re-run button — mirrors .frame-transform-button so the restart control
+   shows visible text ("Re-run analysis") instead of an icon-only button (audit F1). */
+.frame-tool-controls .frame-restart-button {
+  width: auto;
+  min-width: 0;
+  padding: 0 10px;
+  grid-auto-flow: column;
+  gap: 7px;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.frame-restart-button span {
+  line-height: 1;
+}
+
+/* Inline "annotated preview unavailable" badge — surfaces an artifact-fetch failure
+   in the toolbar instead of only as a transient toast (audit F6). */
+.frame-artifact-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(200, 130, 31, 0.12);
+  color: #c8821f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .frame-tool-controls button:disabled,
 .frame-nav-controls button:disabled {
   opacity: 0.42;
@@ -191,8 +223,8 @@
 
 .video-surface {
   position: relative;
-  min-height: min(78vh, 880px);
-  aspect-ratio: 16 / 9;
+  height: clamp(420px, 56dvh, 680px);
+  min-height: 0;
   overflow: hidden;
   background: #0b1521;
 }
@@ -217,11 +249,13 @@
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-items: start center;
+  box-sizing: border-box;
+  padding: clamp(24px, 5vh, 56px) 16px 24px;
+  overflow-y: auto;
   background: rgba(9, 17, 27, 0.72);
   border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
   color: #ffffff;
-  cursor: pointer;
   z-index: 1;
   transition:
     background 160ms ease,
@@ -249,9 +283,8 @@
     #08111d;
 }
 
-/* Invisible file input covering the whole dropzone: it is the real click /
-   keyboard target (Tab + Enter/Space opens the native picker) while staying
-   visually hidden. Drag-and-drop is handled by the parent .video-surface. */
+/* Invisible file input covering its visible label. Drag-and-drop is handled by
+   the parent .video-surface, so sample buttons remain normal buttons. */
 .dropzone-input {
   position: absolute;
   inset: 0;
@@ -268,9 +301,11 @@
 .dropzone-card {
   text-align: center;
   display: grid;
-  gap: 10px;
-  /* Let clicks fall through to the .dropzone-input beneath the card content. */
-  pointer-events: none;
+  justify-items: center;
+  gap: 12px;
+  width: min(720px, calc(100% - 32px));
+  padding: 24px;
+  pointer-events: auto;
 }
 
 .dropzone-card strong {
@@ -282,6 +317,97 @@
 .dropzone-card span {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.75);
+}
+
+.dropzone-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: 2px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 52%, transparent);
+  border-radius: 4px;
+  background: rgba(5, 18, 31, 0.82);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.dropzone-upload-button:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 66, 110, 0.5);
+}
+
+.sample-picker {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 640px);
+  margin-top: 10px;
+}
+
+.sample-picker__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.sample-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sample-picker__button {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sample-picker__button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent-cyan) 58%, transparent);
+  background: rgba(0, 168, 230, 0.14);
+}
+
+.sample-picker__button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.sample-picker__button span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sample-picker__button strong,
+.sample-picker__button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sample-picker__button strong {
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.sample-picker__button small {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .analyzing-layer {
@@ -307,6 +433,34 @@
   grid-template-columns: minmax(240px, 0.9fr) minmax(420px, 1.7fr) minmax(260px, 0.8fr);
   gap: 16px;
   align-items: stretch;
+}
+
+/* Provenance strip: which runway / telemetry source produced the on-screen result.
+   Rendered ONLY when the elevation angle is unavailable (ResultPanel's showProvenance)
+   — when the angle is available the angle-readout already surfaces runway + telemetry
+   source, so an always-on strip would duplicate them. All fields are real backend
+   echoes. */
+.result-provenance {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+
+.result-provenance__heading {
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.result-provenance__item {
+  color: var(--text-muted);
 }
 
 /* Shown in the Live Demo result panel before any analysis has run, so the
@@ -443,6 +597,16 @@
   box-shadow: none;
 }
 
+.lamp-card.is-inferred {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+}
+
+.lamp-card.is-inferred small {
+  color: var(--warn);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .lamp-transition .lamp-preview span {
   background: var(--lamp-transition);
   border-color: color-mix(in srgb, var(--lamp-transition) 70%, var(--border-strong));
@@ -458,6 +622,42 @@
   grid-template-columns: 1fr;
   gap: 9px;
   margin-top: 0;
+}
+
+.model-readout {
+  display: grid;
+  gap: 5px;
+  /* Pack to the top: the panel grid stretches this cell to its tallest row
+     sibling (the transitions list), and without this the grid distributed the
+     surplus BETWEEN the three lines — label, name and role floated apart with
+     huge voids. */
+  align-content: start;
+  margin-top: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.model-readout span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.model-readout strong {
+  color: var(--text-strong);
+  font-size: 17px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.model-readout p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: capitalize;
 }
 
 .inline-metric {
@@ -539,9 +739,89 @@
   outline-offset: 2px;
 }
 
+/* Range hint under each lat/lon/alt input — clarifies the accepted bounds and is
+   wired via aria-describedby for screen readers (audit F3). */
+.drone-telemetry__fields small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .drone-telemetry__hint {
   margin: 8px 0 0;
   color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Measured per-class metrics table on the Insights model card (rendered only
+   when the registry card itself carries per_class values). */
+.model-per-class {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.model-per-class caption {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.model-per-class th,
+.model-per-class td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.model-per-class th[scope='row'] {
+  text-align: left;
+  font-weight: 600;
+}
+
+.model-per-class thead th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* Optional drone identifier (pure provenance) in the metadata prompt's
+   controls row — same label/input rhythm as the position fields. */
+.drone-telemetry__id {
+  display: grid;
+  gap: 4px;
+}
+
+.drone-telemetry__id > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.drone-telemetry__id input {
+  min-width: 140px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+/* Out-of-range / non-numeric manual position: red ring on the offending field
+   plus an explanatory line above the footer (the Apply button is also gated). */
+.drone-telemetry__fields input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.drone-telemetry__invalid {
+  margin: 10px 0 0;
+  color: var(--danger);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -613,6 +893,9 @@
 .angle-readout {
   display: grid;
   gap: 5px;
+  /* Same top-packing as .model-readout: stretched by the panel grid, the
+     surplus height must collect below the content, not between the lines. */
+  align-content: start;
   margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -674,6 +957,19 @@
 
 .angle-readout p.angle-readout__warning {
   color: var(--warn);
+  font-weight: 600;
+}
+
+/* Partial-result banner: a video/sequence that out-ran the frame limit mid-stream
+   was truncated by the backend (truncated_at_frame on the payload); the verdict
+   covers only the processed prefix and must visibly say so (audit B2). */
+.result-truncation {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -847,6 +1143,38 @@
   color: #c8821f;
   font-size: 12px;
   font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* Inline "Re-run to apply" action inside the stale-mode warning, so the user can
+   act on the drift in one click instead of hunting for the restart control (audit F4). */
+.folder-mode__rerun {
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.folder-mode__rerun:not(:disabled):hover {
+  background: rgba(200, 130, 31, 0.16);
+}
+
+.folder-mode__rerun:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.folder-mode__rerun:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Active-metadata notice: surfaces persisted telemetry / a telemetry file that will
@@ -1296,5 +1624,11 @@
 
   .history-confidence {
     text-align: left;
+  }
+
+  /* Collapse the telemetry inputs to a single column (audit F7). The result panel's
+     3-column grid already collapses at 1040px in responsive.css, which covers 760px. */
+  .drone-telemetry__fields {
+    grid-template-columns: 1fr;
   }
 }

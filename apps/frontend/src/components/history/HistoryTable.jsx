@@ -1,6 +1,8 @@
 import clsx from 'clsx'
+import { Link } from 'react-router-dom'
 import { formatAngle, formatTimestamp, percent } from '../../lib/format'
 import { runwayDisplayName } from '../../lib/runwaySelection'
+import { globalStateLabel } from '../../lib/stateLabels'
 
 // The analyses table (with its loading/empty states + the horizontal-scroll cue)
 // and the pagination controls. Presentational — the parent owns the logs/paging
@@ -49,13 +51,25 @@ export function HistoryTable({
                   <th scope="col" className="history-col-secondary">{copy.history.processing}</th>
                   <th scope="col">{copy.history.created}</th>
                   <th scope="col">{copy.history.artifact}</th>
+                  <th scope="col">{copy.history.insights}</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
                   <tr key={log.id}>
                     <td data-label={copy.history.filename}>
-                      <button className="history-link" type="button" onClick={() => openLog(log.id)} disabled={openingLogId === log.id}>
+                      {/* aria-disabled, not the disabled attribute, while the detail is
+                          loading: disabling would drop focus to <body> BEFORE the modal
+                          opens, so useModalA11y would capture body as the "previously
+                          focused" element and restore focus there on close (same
+                          keep-focusable rationale as FE-8). The click guard lives in
+                          openLog. */}
+                      <button
+                        className="history-link"
+                        type="button"
+                        onClick={() => openLog(log.id)}
+                        aria-disabled={openingLogId === log.id}
+                      >
                         {log.original_filename}
                       </button>
                     </td>
@@ -64,7 +78,7 @@ export function HistoryTable({
                     </td>
                     <td data-label={copy.history.state}>
                       <span className={clsx('state-pill', `state-pill-${log.global_state}`)}>
-                        {log.global_state.replaceAll('_', ' ')}
+                        {globalStateLabel(log.global_state, copy)}
                       </span>
                     </td>
                     <td data-label={copy.history.confidence} className="tnum">{percent(log.confidence)}%</td>
@@ -77,22 +91,39 @@ export function HistoryTable({
                         ? formatAngle(log.elevation_angle_deg)
                         : '—'}
                     </td>
-                    <td data-label={copy.history.frames} className="history-col-secondary tnum">{log.frame_count}</td>
+                    <td data-label={copy.history.frames} className="history-col-secondary tnum">
+                      {log.frame_count}
+                      {/* Partial-result badge: the backend mirrors truncated_at_frame /
+                          decode_shortfall into the list payload so a capped or
+                          half-decoded analysis is visible without opening the row. */}
+                      {(log.truncated_at_frame != null || log.decode_shortfall != null) && (
+                        <span className="history-partial-badge" title={copy.history.partialBadgeHint}>
+                          {copy.history.partialBadge}
+                        </span>
+                      )}
+                    </td>
                     <td data-label={copy.history.processing} className="history-col-secondary tnum">{log.processing_ms} ms</td>
-                    <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at)}</td>
+                    <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at, copy.locale)}</td>
                     <td data-label={copy.history.artifact}>
                       {log.artifact_url ? (
                         <button
                           className="history-link"
                           type="button"
                           onClick={() => openLog(log.id)}
-                          disabled={openingLogId === log.id}
+                          aria-disabled={openingLogId === log.id}
                         >
                           {copy.history.view}
                         </button>
                       ) : (
                         copy.history.unavailable
                       )}
+                    </td>
+                    <td data-label={copy.history.insights}>
+                      {/* Router Link, not a raw <a>: a hard navigation remounts the
+                          whole SPA and wipes the in-memory live-demo session. */}
+                      <Link className="history-link" to={`/insights?log=${encodeURIComponent(log.id)}`}>
+                        {copy.history.openInsights}
+                      </Link>
                     </td>
                   </tr>
                 ))}

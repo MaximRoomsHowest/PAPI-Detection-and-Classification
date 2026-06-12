@@ -153,6 +153,34 @@ def test_media_404s_on_missing_file(client, monkeypatch: pytest.MonkeyPatch, tmp
     assert response.status_code == 404
 
 
+def test_media_unknown_extension_downloads_as_octet_stream(
+    client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """/media must never let extension sniffing render a non-artifact format:
+    an .html file (or anything outside the known artifact set) is served as
+    application/octet-stream so a hostile artifact can't become stored XSS on
+    the API origin. Known artifact extensions keep their real type."""
+    monkeypatch.setattr(main_module.settings, "api_key", None, raising=True)
+    _seed_export(monkeypatch, tmp_path, filename="payload.html")
+
+    response = client.get("/media/payload.html")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/octet-stream")
+
+
+def test_media_known_artifact_extension_keeps_real_content_type(
+    client, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(main_module.settings, "api_key", None, raising=True)
+    _seed_export(monkeypatch, tmp_path, filename="annotated.webm")
+
+    response = client.get("/media/annotated.webm")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("video/webm")
+
+
 # ---------------------------------------------------------------------------
 # API-key gate on the data routes (previously only /media was covered)
 # ---------------------------------------------------------------------------

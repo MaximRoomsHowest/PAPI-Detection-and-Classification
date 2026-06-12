@@ -1,0 +1,14 @@
+{
+  "runway": "papi_06",
+  "note": "Real per-frame drone fixes for sweep_papi06_300m_night (EDNY papi_06).",
+  "samples": [
+    { "frame_index": 0, "latitude": 47.66748573, "longitude": 9.50045295, "altitude_m": 465.862 },
+    { "frame_index": 1, "latitude": 47.66748544, "longitude": 9.50045300, "altitude_m": 467.189 },
+    { "frame_index": 2, "latitude": 47.66748521, "longitude": 9.50045273, "altitude_m": 468.796 },
+    { "frame_index": 3, "latitude": 47.66748483, "longitude": 9.50045238, "altitude_m": 470.568 },
+    { "frame_index": 4, "latitude": 47.66748537, "longitude": 9.50045209, "altitude_m": 472.322 },
+    { "frame_index": 5, "latitude": 47.66748546, "longitude": 9.50045186, "altitude_m": 473.433 },
+    { "frame_index": 6, "latitude": 47.66748514, "longitude": 9.50045217, "altitude_m": 474.427 },
+    { "frame_index": 7, "latitude": 47.66748535, "longitude": 9.50045273, "altitude_m": 475.298 }
+  ]
+}

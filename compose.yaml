@@ -23,9 +23,12 @@
 services:
   postgres:
     # Pinned by digest for reproducible builds (audit DCK-D8); tag = 18-alpine.
-    # NOTE: a v16 data dir is not readable by a v18 server — on first adoption run
-    # `docker compose down -v` to drop the ephemeral demo volume (no migration needed,
-    # the result_json column is portable JSON, not a pg-version-specific type).
+    # NOTE: a v16 data dir is not readable by a v18 server. On first adoption drop
+    # the old demo volume (no migration needed — history is ephemeral demo data):
+    #   docker compose down
+    #   docker volume rm <project>_papi_postgres_data
+    # (`docker compose down -v` also works, but additionally wipes
+    # papi_backend_storage — the uploaded originals and annotated exports.)
     image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
     container_name: papi-postgres
     environment:
@@ -40,7 +43,12 @@ services:
       # postgres via the compose network, not the host port.
       - "127.0.0.1:5434:5432"
     volumes:
-      - papi_postgres_data:/var/lib/postgresql/data
+      # 18+ images moved PGDATA to /var/lib/postgresql/18/docker and expect the
+      # mount one level up at /var/lib/postgresql. Mounting the legacy .../data
+      # path makes the server refuse to start on old data — and on an empty
+      # volume the real data dir would land in an anonymous volume (no
+      # persistence), so do not "fix" this back.
+      - papi_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d papi_backend"]
       interval: 5s
@@ -71,8 +79,20 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/papi_backend
+      PAPI_MODEL_REGISTRY_PATH: /models/serving/models.json
       PAPI_MODEL_PATH: /models/serving/best.pt
+      # Optional 3-class transition classifier. Documented in the volumes note below,
+      # but previously NOT forwarded into the container, so setting it in .env was a
+      # silent no-op (audit IS-2). Empty means "not installed".
+      PAPI_TRANSITION_MODEL_PATH: ${PAPI_TRANSITION_MODEL_PATH:-}
+      # Default transition derivation when a request sends neither model_id nor
+      # transition_method: tracking | model.
+      PAPI_TRANSITION_METHOD: ${PAPI_TRANSITION_METHOD:-tracking}
       PAPI_STORAGE_DIR: /storage
+      PAPI_STORAGE_BACKEND: ${PAPI_STORAGE_BACKEND:-local}
+      PAPI_BLOB_CONTAINER: ${PAPI_BLOB_CONTAINER:-papi-media}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_ACCOUNT_URL: ${AZURE_STORAGE_ACCOUNT_URL:-}
       # JSON-list form: avoids the pydantic-settings CSV-parse issue that
       # crashed the container in earlier builds (audit SMOKE-CRIT-2). Only used
       # by a direct (non-proxied) frontend such as the Vite dev server — the
@@ -82,16 +102,45 @@ services:
       # in .env to use a GPU when the host and container runtime expose one.
       PAPI_DEVICE: ${PAPI_DEVICE:-cpu}
       PAPI_CONFIDENCE_THRESHOLD: ${PAPI_CONFIDENCE_THRESHOLD:-0.4}
-      PAPI_VIDEO_HISTORY_SIZE: ${PAPI_VIDEO_HISTORY_SIZE:-5}
       PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
       PAPI_MAX_IMAGE_MEGAPIXELS: ${PAPI_MAX_IMAGE_MEGAPIXELS:-80}
       PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
-      PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-30}
+      PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-150}
+      # NOTE: raising this past ~400 MB also requires raising the frontend
+      # nginx cap (PAPI_NGINX_MAX_BODY_SIZE on the frontend service below,
+      # default 410m — env-templated, no rebuild needed), or proxied uploads
+      # die at nginx with a 413 before the backend ever sees them (audit IS-7).
+      # The backend's own transport cap follows this value + 10 MB headroom
+      # automatically (app/middleware.py).
       PAPI_MAX_BATCH_UPLOAD_MB: ${PAPI_MAX_BATCH_UPLOAD_MB:-400}
       # Aggregate cap on /api/analyze-frames batch size (audit B-MAJ-5).
       # 200 keeps a folder upload of a normal flight under a few minutes
       # of CPU inference; raise via .env if the demo needs a bigger sweep.
       PAPI_MAX_BATCH_FRAMES: ${PAPI_MAX_BATCH_FRAMES:-200}
+      # Inference tuning (previously unreachable under compose — audit IS-3).
+      # Defaults match app/config.py; imgsz/iou are explicit so a re-exported
+      # model can never silently fall back to 640.
+      PAPI_SEQUENCE_FPS: ${PAPI_SEQUENCE_FPS:-4}
+      PAPI_INFERENCE_IMGSZ: ${PAPI_INFERENCE_IMGSZ:-1280}
+      PAPI_INFERENCE_IOU: ${PAPI_INFERENCE_IOU:-0.7}
+      # Postgres connection-pool sizing (app/database.py); defaults match
+      # app/config.py. SQLite deployments ignore these.
+      PAPI_DB_POOL_SIZE: ${PAPI_DB_POOL_SIZE:-10}
+      PAPI_DB_MAX_OVERFLOW: ${PAPI_DB_MAX_OVERFLOW:-20}
+      # Process-local API throttling. The stricter analyze bucket protects
+      # CPU/GPU inference from accidental refresh loops or simple abuse.
+      PAPI_RATE_LIMIT_ENABLED: ${PAPI_RATE_LIMIT_ENABLED:-true}
+      PAPI_RATE_LIMIT_PER_MINUTE: ${PAPI_RATE_LIMIT_PER_MINUTE:-600}
+      PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE: ${PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE:-60}
+      # Trust X-Forwarded-For from the in-network nginx proxy so the rate
+      # limiter buckets by real client IP instead of lumping every browser
+      # user into the proxy's single bucket. uvicorn reads this env natively.
+      # "*" is safe in THIS topology: the backend port binds to loopback (see
+      # ports below), so only the compose-network proxy and the host itself
+      # can connect. Direct host callers could spoof XFF to dodge the limiter
+      # — acceptable for the demo threat model; tighten to the proxy IP/CIDR
+      # if the port is ever LAN-exposed.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}
@@ -111,12 +160,21 @@ services:
       # ./models read-only so you can swap the checkpoint on the host and have
       # the container pick it up without a rebuild.
       - ./models:/models:ro
+      # The optional transition classifier is registered at
+      # data/runs/detect/transition3class-yolo26s-1280/weights/best.pt, but
+      # data/runs is ignored and not mounted here by default. To enable that
+      # selector in Docker, add a read-only mount for that run path or copy the
+      # weight under ./models and override PAPI_TRANSITION_MODEL_PATH.
       # Runway geometry YAML — read-only. Without this the backend silently
       # falls back to a hardcoded runway copy (audit DCK-D7).
       - ./configs:/app/configs:ro
       # Uploaded originals + annotated exports persist across container
       # restarts in a named volume.
       - papi_backend_storage:/storage
+    # uvicorn waits for in-flight requests after SIGTERM, but compose SIGKILLs
+    # after 10s by default — mid-flight 150s video analyses died on every
+    # `compose restart`. Give them time to finish instead.
+    stop_grace_period: 3m
     healthcheck:
       # Readiness via the stdlib (no curl in the slim image). This keeps the
       # frontend from starting until DB + model readiness pass.
@@ -153,6 +211,13 @@ services:
         # URL only for a direct, non-proxied deployment.
         VITE_PAPI_API_URL: ${FRONTEND_PAPI_API_URL:-}
     container_name: papi-frontend
+    environment:
+      # Proxy-level request-body cap, rendered into nginx's client_max_body_size
+      # by the image's envsubst entrypoint at container start (audit IS-7). Must
+      # track PAPI_MAX_BATCH_UPLOAD_MB (+ ~10m multipart headroom) or nginx 413s
+      # a legal batch upload before the backend sees it. NEVER name frontend env
+      # vars after nginx runtime variables (host, uri, scheme, ...).
+      NGINX_CLIENT_MAX_BODY_SIZE: ${PAPI_NGINX_MAX_BODY_SIZE:-410m}
     depends_on:
       backend:
         condition: service_healthy

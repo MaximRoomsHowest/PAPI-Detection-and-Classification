@@ -15,8 +15,8 @@ from a fresh machine. Two supported paths:
 | --- | --- | --- |
 | Git | any recent | https://git-scm.com |
 | Docker Desktop (for path 1) | 4.30+ | https://www.docker.com/products/docker-desktop |
-| Python (for path 2) | 3.10+ | https://www.python.org/downloads/ |
-| Node.js (for path 2) | 20.x | https://nodejs.org |
+| Python (for path 2) | 3.10+ (3.12 recommended) | https://www.python.org/downloads/ |
+| Node.js (for path 2) | 24.x | https://nodejs.org |
 | Disk space | ~ 8 GB | for Docker images + model weights |
 | RAM | ≥ 8 GB | inference is CPU-only by default |
 
@@ -189,11 +189,12 @@ python workflows/scripts/pipeline.py extract --limit 100
 
 For a real deployment (not a local demo):
 
-1. **Generate a strong API key** and set it in `.env`:
+1. **Generate a strong API key** and set it — together with the
+   production flag — in `.env`:
    ```bash
    PAPI_API_KEY=$(openssl rand -base64 32)
    echo "PAPI_API_KEY=$PAPI_API_KEY" >> .env
-   PAPI_ENV=production
+   echo "PAPI_ENV=production" >> .env
    ```
    The backend will refuse to start without a key when
    `PAPI_ENV=production` (audit B-CRIT-5). It will also refuse to
@@ -211,6 +212,29 @@ For a real deployment (not a local demo):
    configured for HTTPS by itself.
 5. **Restrict the backend port**. Remove the host port mapping
    for backend `:8000` and let only the reverse proxy reach it.
+
+### 7.0 Azure Container Apps (scripted, what powers the public demo)
+
+The repository ships a complete Azure deployment under `infra/azure/`
+(scripts + README): Container Registry, a Container App running the
+frontend nginx and backend as sidecars, PostgreSQL Flexible Server, and
+Azure Blob Storage for media artifacts. The public demo at
+`https://www.papivision.software` runs this path.
+
+Storage backend selection is environment-driven and defaults to the
+local filesystem — the Azure deployment sets:
+
+| Variable | Value | Purpose |
+| --- | --- | --- |
+| `PAPI_STORAGE_BACKEND` | `azure_blob` (default `local`) | Media artifacts go to Blob Storage instead of `PAPI_STORAGE_DIR`; `/media/...` URLs keep working (the backend proxies, with byte-range support for video seeking). |
+| `PAPI_BLOB_CONTAINER` | container name (default `papi-media`) | Blob container for `uploads/` and `exports/`. |
+| `AZURE_STORAGE_CONNECTION_STRING` | secret | Simplest auth for the first deploy. |
+| `AZURE_STORAGE_ACCOUNT_URL` | account URL | Alternative: managed identity (`DefaultAzureCredential`) instead of a connection string. |
+
+Follow `infra/azure/README.md` for the end-to-end recipe
+(`create-resources.sh` → `build-and-push.sh` → `deploy-containerapp.sh`
+→ `smoke-test.sh`). Local compose ignores all of this and keeps
+filesystem storage.
 
 ### 7.1 HTTPS termination — Caddy recipe (recommended)
 

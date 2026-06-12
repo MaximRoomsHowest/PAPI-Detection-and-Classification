@@ -6,7 +6,12 @@ classification.
 ## What is included
 
 - Media upload for image, video, or folder-of-images test input, analysed
-  by the FastAPI inference service.
+  by the FastAPI inference service (analysis auto-runs on upload; a labelled
+  **Re-run analysis** button repeats it).
+- An **Inference model** selector backed by `GET /api/models` (`small` serving
+  detector by default, `nano` previous detector, `transition` 3-class
+  classifier); unavailable models are shown disabled, and every analyze request
+  carries the selected `model_id`.
 - Detected PAPI bounding box overlay.
 - Four individual lamp statuses: white, red, transition, or obscured.
 - Five-state global glidepath result.
@@ -42,13 +47,15 @@ Stop-Process -Id $pid
 Set `VITE_PAPI_API_URL` in `.env` if the backend is not running on
 `http://127.0.0.1:8000`. The frontend calls:
 
-- `POST /api/analyze-frame` for a single uploaded image.
+- `POST /api/analyze-frame` for a single uploaded image — and once per image of
+  a folder upload in the default **Angle sweep** folder mode, so every frame
+  keeps its own GPS-derived viewing angle.
 - `POST /api/analyze` for an uploaded video (the whole clip is uploaded and the
   backend decodes and analyses its frames).
-- `POST /api/analyze-sequence` for a folder of images (`Upload folder`): the
-  whole folder is uploaded in one request and analysed as one time-sequenced
-  video — a single aggregated result plus one annotated video artifact, not a
-  per-image batch.
+- `POST /api/analyze-sequence` for a folder upload in **Video sequence** mode:
+  the whole folder is uploaded in one request and analysed as one
+  time-sequenced video — a single aggregated result plus one annotated video
+  artifact, not a per-image batch.
 
 The UI maps the backend response into the dashboard cards:
 

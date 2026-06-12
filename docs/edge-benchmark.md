@@ -98,7 +98,7 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/laptop-best-pt.json \
+    --json-out docs/qa-artifacts/benchmarks/local-best-pt.json \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
@@ -106,7 +106,7 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/laptop-best-fp32-onnx.json \
+    --json-out docs/qa-artifacts/benchmarks/local-best-fp32-onnx.json \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
@@ -114,7 +114,7 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/laptop-best-int8-onnx.json \
+    --json-out docs/qa-artifacts/benchmarks/local-best-int8-onnx.json \
     --csv-out docs/qa-artifacts/benchmarks/results.csv
 ```
 
@@ -128,22 +128,43 @@ P95 + P99**, not just mean — outliers matter for the
 
 | Device | Model | p50 | p95 | p99 | fps@p50 |
 | --- | --- | ---: | ---: | ---: | ---: |
-| Local Windows CPU (smoke, 1 frame) | best.pt | 2667.752 | 2667.752 | 2667.752 | 0.375 |
-| Local Windows CPU (smoke, 1 frame) | best.onnx fp32 | 2452.559 | 2452.559 | 2452.559 | 0.408 |
-| Local Windows CPU (smoke, 1 frame) | best_int8.onnx | failed | failed | failed | failed |
+| Project laptop CPU (30 frames × 3 runs, 2026-06-10) | best.pt (yolo26s) | 316.1 | 414.2 | 455.4 | 3.16 |
+| Project laptop CPU (30 frames × 3 runs, 2026-06-10) | yolo26n best.pt | 142.3 | 214.7 | 220.9 | 7.03 |
+| Project laptop RTX 4070 (30 frames × 3 runs, 2026-06-10) | best.pt (yolo26s) | 29.1 | 35.6 | 36.4 | 34.4 |
+| Local Windows CPU (smoke, 1 frame, 2026-05-28) | best.pt | 2667.752 | 2667.752 | 2667.752 | 0.375 |
+| Local Windows CPU (smoke, 1 frame, 2026-05-28) | best.onnx fp32 | 2452.559 | 2452.559 | 2452.559 | 0.408 |
+| Local Windows CPU (smoke, 1 frame, 2026-05-28) | best_int8.onnx | failed | failed | failed | failed |
 | Raspberry Pi 5 | best.pt | [TODO] | [TODO] | [TODO] | [TODO] |
 | Raspberry Pi 5 | best_int8.onnx | [TODO] | [TODO] | [TODO] | [TODO] |
 | Jetson Orin Nano (FP16) | best.pt | [TODO] | [TODO] | [TODO] | [TODO] |
 | Jetson Orin Nano (INT8) | best_int8.onnx | [TODO] | [TODO] | [TODO] | [TODO] |
 | Intel NUC i7 | best.pt | [TODO] | [TODO] | [TODO] | [TODO] |
 
+> **Reading these honestly** (2026-06-10): rows above measure BARE model inference
+> (`model.predict`, warm) via `edge_benchmark.py` — artifacts in
+> `docs/qa-artifacts/benchmarks/yolo26{s,n}-{cpu,gpu}.json`. The older
+> "smoke, 1 frame" rows and the ~0.4 fps figure quoted elsewhere describe the
+> FULL serialized request pipeline (decode → detect → overlay → artifact write)
+> including cold start — both are real, they measure different things. Bare
+> inference on GPU-class hardware (34 fps on a laptop RTX 4070) clears the
+> 10 fps real-time target with margin; CPU-only does not (3.2 fps bare,
+> ≤~1 fps end-to-end). [TODO] rows stay open pending the client's WL051
+> workstation specs — no edge-tier numbers are invented here.
+
 ### 5.2 Memory footprint (RSS, MB)
 
 | Device | Model | Baseline (no model) | After load | Steady-state inference |
 | --- | --- | ---: | ---: | ---: |
+| Project laptop CPU (2026-06-10) | best.pt (yolo26s) | 2235.5 | 2289.1 | 2548.5 |
+| Project laptop CPU (2026-06-10) | yolo26n best.pt | 2235.5 | 2252.6 | 2426.1 |
+| Project laptop RTX 4070 (2026-06-10) | best.pt (yolo26s) | 2235.3 | 2288.8 | 2930.2 |
 | Local Windows CPU (smoke, 1 frame) | best.pt | 418.07 | 435.53 | 621.98 |
 | Local Windows CPU (smoke, 1 frame) | best.onnx fp32 | 418.29 | 418.29 | 544.96 |
 | Local Windows CPU (smoke, 1 frame) | best_int8.onnx | 463.43 | failed | failed |
+
+> The 2026-06-10 baselines are ~2.2 GB because the dev venv imports the
+> CUDA-enabled torch build; the slim CPU-only Docker image (smoke rows) starts
+> near 0.4 GB. Compare deltas within a row, not baselines across environments.
 | Raspberry Pi 5 | best.pt | [TODO] | [TODO] | [TODO] |
 | Raspberry Pi 5 | best_int8.onnx | [TODO] | [TODO] | [TODO] |
 | Jetson Orin Nano | best_int8.onnx | [TODO] | [TODO] | [TODO] |
@@ -156,10 +177,10 @@ INT8 path may not be deployable.
 
 | Model | Detection F1 | Per-lamp state F1 |
 | --- | ---: | ---: |
-| best.pt (FP32 reference) | [TODO] | [TODO] |
-| best.onnx fp32 | [TODO] | [TODO] |
-| best_int8.onnx | not runnable on local CPU ORT | not runnable on local CPU ORT |
-| Δ | [TODO] | [TODO] |
+| best.pt (FP32 reference) | 0.915 (held-out test — `docs/qa-artifacts/test-split-eval.json`) | red 0.901 / white 0.928 |
+| best.onnx fp32 (yolo26s export, 2026-06-10) | identical detections to best.pt on the 10-frame parity sample (40/40 boxes, max conf drift 0.03) | identical |
+| best_int8.onnx | no working artifact — see MODELS.md §3.2.1 (old yolo26n export CPU-broken; yolo26s re-quantisation crashed the quantiser) | — |
+| Δ (fp32 ONNX vs torch) | none observed on the parity sample | none observed |
 
 Local smoke note (2026-05-28): `best_int8.onnx` reaches ONNX Runtime
 but fails on CPU with `ConvInteger(10)` not implemented. Keep the

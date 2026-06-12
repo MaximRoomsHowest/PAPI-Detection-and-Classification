@@ -13,8 +13,12 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
   const languageTriggerRef = useRef(null)
   // Stable ref store keyed by the language code (not a render-time array index),
   // so the ref callback never mutates an array during render. Each option's
-  // callback sets its own entry on mount and clears it on unmount.
-  const languageOptionRefs = useRef(new Map())
+  // callback sets its own entry on mount and clears it on unmount. Initialised
+  // lazily so the Map isn't rebuilt and discarded on every render.
+  const languageOptionRefs = useRef(null)
+  if (languageOptionRefs.current === null) {
+    languageOptionRefs.current = new Map()
+  }
   // Resolve an option's DOM node by its position in SUPPORTED_LANGUAGES. Reads only
   // the (stable) ref Map and the module-level option list, so it's safe to keep
   // referentially stable and list as a hook dependency.
@@ -134,6 +138,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
             <div
               className="language-menu"
               role="menu"
+              aria-orientation="vertical"
               aria-label={copy.a11y.languageMenu}
               tabIndex={-1}
               onKeyDown={handleLanguageMenuKeyDown}

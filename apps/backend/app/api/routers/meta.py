@@ -12,7 +12,7 @@ import platform as platform_module
 from importlib.metadata import PackageNotFoundError, version
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 import app.api.routes as routes
 from app.services.runways import RunwayLimitError, add_runway, delete_runway, list_runways
@@ -65,8 +65,19 @@ def remove_runway(
 
 
 @router.get("/model", response_model=ModelInfo)
-def get_model_info(_auth: Annotated[None, Depends(routes.require_api_key)] = None) -> ModelInfo:
-    return routes.get_inference_service().model_info()
+def get_model_info(
+    model_id: Annotated[str | None, Query()] = None,
+    _auth: Annotated[None, Depends(routes.require_api_key)] = None,
+) -> ModelInfo:
+    try:
+        return routes.get_inference_service().model_info(model_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/models", response_model=list[ModelInfo])
+def get_model_options(_auth: Annotated[None, Depends(routes.require_api_key)] = None) -> list[ModelInfo]:
+    return routes.get_inference_service().model_options()
 
 
 @router.get("/system", response_model=SystemInfo)

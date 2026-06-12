@@ -57,23 +57,43 @@ def evaluate(weights: Path, data: Path) -> dict:
 
     model = YOLO(str(weights))
     # workers/batch capped: source frames are 20MP, so default worker fan-out OOMs the loader.
-    metrics = model.val(data=str(data), split="test", imgsz=1280, conf=0.25, iou=0.5,
+    # conf left at the ultralytics val default (0.001): valing at the serving operating
+    # point (0.25) truncates the PR curve before AP integration and conflates "no
+    # predictions above 0.25" with "model finds nothing" (audit WS-2). Operating-point
+    # behaviour is measured separately by mine_examples/compare_transition_false_rate.
+    metrics = model.val(data=str(data), split="test", imgsz=1280, iou=0.5,
                         batch=4, workers=2,
                         project=str(REPO_ROOT / "data" / "runs" / "detect"), name="transition3class-test", exist_ok=True)
 
-    per_class = {}
-    for i, name in CLASS_NAMES.items():
-        try:
-            p = float(metrics.box.p[i])
-            r = float(metrics.box.r[i])
-            ap50 = float(metrics.box.ap50[i])
-        except (IndexError, TypeError):
-            p = r = ap50 = 0.0
+    # Index per-class arrays by ap_class_index: ultralytics orders box.p/r/ap50 by
+    # POSITION among the classes present in the split's stats, not by raw class id —
+    # indexing [class_id] silently misattributes red<->white if any class is absent
+    # (audit WS-1). Absent classes keep explicit zeros with support 0 so a reader can
+    # tell "not in split" from "model finds nothing".
+    per_class = {
+        name: {"precision": 0.0, "recall": 0.0, "f1": 0.0, "mAP50": 0.0, "support": 0}
+        for name in CLASS_NAMES.values()
+    }
+    support_by_class_id = getattr(metrics, "nt_per_class", None)  # on DetMetrics, indexed by class id
+    for pos, raw_cls_id in enumerate(getattr(metrics.box, "ap_class_index", [])):
+        cls_id = int(raw_cls_id)
+        name = CLASS_NAMES.get(cls_id)
+        if name is None:
+            continue
+        p = float(metrics.box.p[pos])
+        r = float(metrics.box.r[pos])
+        ap50 = float(metrics.box.ap50[pos])
         f1 = (2 * p * r / (p + r)) if (p + r) > 0 else 0.0
+        support = 0
+        if support_by_class_id is not None and cls_id < len(support_by_class_id):
+            support = int(support_by_class_id[cls_id])
         per_class[name] = {"precision": round(p, 4), "recall": round(r, 4),
-                           "f1": round(f1, 4), "mAP50": round(ap50, 4)}
+                           "f1": round(f1, 4), "mAP50": round(ap50, 4), "support": support}
     return {"weights": str(weights), "per_class": per_class,
             "mAP50": round(float(metrics.box.map50), 4), "mAP50_95": round(float(metrics.box.map), 4),
+            # Record the val thresholds so readers know what these numbers mean
+            # (full PR curve at the val-default conf, not the serving operating point).
+            "val_conf": 0.001, "val_iou": 0.5,
             "val_dir": str(metrics.save_dir)}
 
 
@@ -92,11 +112,12 @@ def mine_examples(weights: Path, data: Path, per_cat: int = 12) -> dict:
     model = YOLO(str(weights))
     counts = Counter()
     for img_path in test_list:
-        if not img_path.strip() or sum(counts[c] for c in cats) >= per_cat * len(cats):
+        if sum(counts[c] for c in cats) >= per_cat * len(cats):
+            break  # every category quota filled; no need to scan the rest (audit WS-9b)
+        if not img_path.strip():
             continue
         ip = Path(img_path)
         label = Path(img_path.replace("/images/", "/labels/")).with_suffix(".txt")
-        gt = _gt_boxes(label, 0, 0)
         if not label.exists():
             continue
         img = cv2.imread(str(ip))
@@ -110,27 +131,36 @@ def mine_examples(weights: Path, data: Path, per_cat: int = 12) -> dict:
 
         gt_t = [b for cls, b in gt if cls == 2]
         pr_t = [b for cls, b in preds if cls == 2]
-        cat = None
-        # transition correctness
+        trans_cat = None
+        # transition correctness (a frame gets at most one transition verdict).
+        # Precedence is DELIBERATE: an unmatched prediction overrides a correct/
+        # missed verdict, so a frame with both a true hit AND a false positive is
+        # mined as a false-positive example — failure modes are what the curated
+        # set is for. Metrics are unaffected (computed by val(), not here); the
+        # only effect is bucket composition, slightly under-representing correct
+        # hits on mixed frames. Only the FIRST GT box drives correct/missed.
         for gb in gt_t:
             hit = any(_iou(gb, pb) > 0.3 for pb in pr_t)
-            cat = "correct_transition_examples" if hit else "missed_transition_examples"
+            trans_cat = "correct_transition_examples" if hit else "missed_transition_examples"
             break
         for pb in pr_t:
             if not any(_iou(gb, pb) > 0.3 for gb in gt_t):
-                cat = "false_transition_examples"
-        # red/white confusion (GT red matched to pred white or vice versa)
-        if cat is None:
-            for cls, gb in gt:
-                if cls not in (0, 1):
-                    continue
-                for pc, pb in preds:
-                    if pc in (0, 1) and pc != cls and _iou(gb, pb) > 0.4:
-                        cat = "red_white_confusion_examples"
-        if cat and counts[cat] < per_cat:
-            counts[cat] += 1
-            annotated = res.plot()
-            cv2.imwrite(str(EXAMPLES / cat / f"{ip.parent.parent.name}__{ip.stem}.jpg"), annotated)
+                trans_cat = "false_transition_examples"
+                break
+        # red/white confusion (GT red matched to pred white or vice versa) is INDEPENDENT of the
+        # transition verdict -- mined separately so a frame with transition boxes can't starve it.
+        rw_conf = any(
+            cls in (0, 1) and pc in (0, 1) and pc != cls and _iou(gb, pb) > 0.4
+            for cls, gb in gt
+            for pc, pb in preds
+        )
+        annotated = None
+        for cat in (trans_cat, "red_white_confusion_examples" if rw_conf else None):
+            if cat and counts[cat] < per_cat:
+                if annotated is None:
+                    annotated = res.plot()
+                counts[cat] += 1
+                cv2.imwrite(str(EXAMPLES / cat / f"{ip.parent.parent.name}__{ip.stem}.jpg"), annotated)
     return dict(counts)
 
 

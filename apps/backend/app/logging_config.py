@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import uuid
 from contextvars import ContextVar
@@ -112,13 +113,29 @@ def configure_logging(level: str = "INFO") -> None:
     logging.getLogger("uvicorn.access").setLevel("WARNING")
 
 
+# Inbound request IDs are reflected into the response header, the logging
+# contextvar, and every JSON log line, so they must stay boring: a bounded
+# length of URL-safe characters. Anything else gets a minted UUID instead
+# (audit B11 — reject-and-mint rather than truncate, because truncating an
+# arbitrary latin-1 string can still smuggle hostile bytes into the logs).
+_REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,128}")
+
+
+def sanitize_request_id(value: str | None) -> str | None:
+    """Return ``value`` only when it is a safe trace id, else ``None``."""
+    if value and _REQUEST_ID_RE.fullmatch(value):
+        return value
+    return None
+
+
 class RequestIdMiddleware:
     """ASGI middleware that injects an X-Request-ID per request.
 
     Reads an inbound ``X-Request-ID`` header if the client already supplied
     one (useful for tracing across services); otherwise generates a fresh
-    UUIDv4. The ID is stored in ``request_id_ctx`` for the duration of the
-    request and added to the response headers so the caller can correlate.
+    UUIDv4. Inbound IDs are sanitized first — see ``sanitize_request_id``.
+    The ID is stored in ``request_id_ctx`` for the duration of the request
+    and added to the response headers so the caller can correlate.
     """
 
     def __init__(self, app):
@@ -130,13 +147,14 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Pull X-Request-ID from inbound headers if present, otherwise mint one.
+        # Pull X-Request-ID from inbound headers if present; mint one when the
+        # header is absent or fails sanitization (overlong / hostile charset).
         inbound: str | None = None
         for name, value in scope.get("headers", []):
             if name == b"x-request-id":
                 inbound = value.decode("latin-1")
                 break
-        rid = inbound or uuid.uuid4().hex
+        rid = sanitize_request_id(inbound) or uuid.uuid4().hex
         token = request_id_ctx.set(rid)
 
         # Wrap the send callable so we can inject the X-Request-ID response header.

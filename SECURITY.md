@@ -16,6 +16,8 @@ GitHub. Please do not file public issues for security problems.
   credentials. The key is compared in constant time.
 - Uploaded media is validated by type and size; annotated artifacts are served
   from a path-traversal-guarded route behind the same API key.
+- Process-local rate limiting is enabled by default, with a stricter bucket for
+  expensive `/api/analyze*` inference requests and `Retry-After` on 429s.
 - Drone metadata (latitude / longitude / altitude) is range-validated before it
   reaches the geometry math.
 - Postgres is bound to loopback in the bundled `compose.yaml`, the backend API
@@ -32,8 +34,8 @@ blocking before final hand-off, once the initial findings are triaged.
 
 ## Known gaps (tracked, not yet implemented)
 
-Rate limiting, secret scanning, and a formal threat model are tracked
-improvements in the project audit notes.
+Secret scanning and a formal threat model are tracked improvements in the
+project audit notes.
 
 ## Third-party licensing
 

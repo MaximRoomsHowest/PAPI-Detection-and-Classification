@@ -1,0 +1,91 @@
+# syntax=docker/dockerfile:1.7
+
+# Cloud backend image for Azure Container Apps.
+#
+# Build context must be the repository root:
+#   docker build -f apps/backend/Dockerfile.cloud -t papi-backend-cloud .
+#
+# Unlike the local Compose image, this image bakes models/serving/ (weights,
+# registry, model card) so Azure does not need a host bind mount. Keep the
+# stage structure in sync with apps/backend/Dockerfile — same digest-pinned
+# base, the torch pins shared via torch-requirements.txt (pip-audit scans
+# them in CI), and the same headless-opencv last-write fix.
+#
+# NOT built by CI (the docker job builds the compose images only — adding this
+# one would re-download torch every run without layer caching). It is built by
+# infra/azure/scripts/build-and-push.sh, so rot surfaces at deploy time: build
+# locally before pushing a deploy if this file or requirements changed.
+
+FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# CPU-only torch BEFORE requirements.txt so ultralytics doesn't pull the CUDA
+# wheel. Same single-source pins as the local image (audit IS-1).
+COPY apps/backend/torch-requirements.txt ./
+RUN pip install --index-url https://download.pytorch.org/whl/cpu \
+        -r torch-requirements.txt
+
+COPY apps/backend/requirements.txt ./
+RUN pip install -r requirements.txt \
+ && opencv_pin="$(sed -n 's/^opencv-python-headless==//p' requirements.txt)" \
+ && pip uninstall -y opencv-python opencv-python-headless \
+ && pip install "opencv-python-headless==${opencv_pin}"
+
+FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PAPI_MODEL_REGISTRY_PATH=/models/serving/models.json \
+    PAPI_MODEL_PATH=/models/serving/best.pt \
+    PAPI_STORAGE_DIR=/storage \
+    YOLO_AUTOINSTALL=False
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libglib2.0-0 \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app/apps/backend
+
+COPY apps/backend/app ./app
+COPY configs /app/configs
+# The whole serving slot: weights + registry + model card (+ the INT8 edge
+# export the registry may list). Registry entries pointing at non-baked
+# training paths (nano/transition) simply surface as available:false.
+COPY models/serving /models/serving
+
+RUN groupadd --system papi \
+ && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \
+ && mkdir -p /storage /models \
+ && chown -R papi:papi /app /storage /models /home/papi
+
+USER papi
+
+EXPOSE 8000
+
+# Azure Container Apps ingress (Envoy) fronts this container; trust its
+# X-Forwarded-For so the rate limiter buckets per real client instead of
+# per-ingress-pod. The container is only reachable through the ingress in the
+# supported deployment, so "*" does not widen the spoofing surface there.
+ENV FORWARDED_ALLOW_IPS="*"
+
+# /health/ready (DB + model), matching the compose healthcheck — the bare
+# /health liveness stub would report healthy with the database unreachable.
+# ACA configures its own HTTP probes; this matters for plain `docker run`.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')" || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

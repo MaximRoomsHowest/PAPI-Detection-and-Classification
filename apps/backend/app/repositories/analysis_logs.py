@@ -1,5 +1,4 @@
 from datetime import datetime
-from pathlib import Path
 
 from sqlalchemy import ColumnElement, desc, func, select
 from sqlalchemy.orm import Session
@@ -7,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models import AnalysisLog
 from app.services.media import media_url_for_path
+from app.services.storage import get_media_storage
 from app.validation.schemas import AnalysisPayload, InferenceStats, LogListItem
 
 
@@ -15,17 +15,24 @@ class AnalysisLogRepository:
         self.db = db
 
     def create_from_payload(self, payload: AnalysisPayload) -> AnalysisLog:
+        settings = get_settings()
         lamp_state = {lamp.index: lamp.state for lamp in payload.lamps}
-        artifact_path = _contained_artifact_path(payload.artifact_url, get_settings().exports_dir)
+        artifact_path = _artifact_reference_from_url(payload.artifact_url, settings)
 
         log = AnalysisLog(
             media_type=payload.media_type,
-            runway_id=payload.runway_id,
+            # Width-cap like its siblings below: add_runway now caps derived ids,
+            # but a pre-cap stored custom runway (or a future id source) must not
+            # 503 the log commit on Postgres (StringDataRightTruncation).
+            runway_id=payload.runway_id[:96],
             # Cap at the column width (VARCHAR(128)), like original_filename below: an
             # unbounded client-supplied drone_id otherwise raises StringDataRightTruncation
             # (503) on Postgres and orphans the just-written artifact (SQLite tests don't
             # enforce width) — audit.
             drone_id=(payload.drone_id[:128] if payload.drone_id else None),
+            # Registry model ids are short ("small"/"nano"); the width cap mirrors
+            # drone_id above so an unexpected value can't 503 on Postgres (audit COL-1).
+            model_id=(payload.model_id[:96] if payload.model_id else None),
             # Cap at the column width (VARCHAR(512)): a pathologically long upload name
             # otherwise raises a StringDataRightTruncation 503 on Postgres while orphaning
             # the just-written artifact (SQLite tests don't enforce width) — audit.
@@ -54,7 +61,7 @@ class AnalysisLogRepository:
             # ``artifact_path`` is already the resolved, in-exports-tree path (or None).
             self.db.rollback()
             if artifact_path:
-                Path(artifact_path).unlink(missing_ok=True)
+                get_media_storage(settings).delete_reference(artifact_path)
             raise
         self.db.refresh(log)
         return log
@@ -66,6 +73,7 @@ class AnalysisLogRepository:
         global_state: str | None = None,
         created_after: datetime | None = None,
         min_confidence: float | None = None,
+        model_id: str | None = None,
     ) -> list[ColumnElement[bool]]:
         """WHERE clauses shared by list / count / export (audit IMP-BE-3)."""
         conditions: list[ColumnElement[bool]] = []
@@ -79,6 +87,10 @@ class AnalysisLogRepository:
             conditions.append(AnalysisLog.created_at >= created_after)
         if min_confidence is not None:
             conditions.append(AnalysisLog.confidence >= min_confidence)
+        if model_id:
+            # Column-only match: rows from before the model_id column stay NULL
+            # (no backfill — see app/migrations.py) and are not matched here.
+            conditions.append(AnalysisLog.model_id == model_id)
         return conditions
 
     def list_recent(self, limit: int, offset: int, **filters) -> list[AnalysisLog]:
@@ -109,25 +121,33 @@ class AnalysisLogRepository:
     def get(self, log_id: str) -> AnalysisLog | None:
         return self.db.get(AnalysisLog, log_id)
 
-    def stats(self) -> InferenceStats:
-        """Whole-table aggregate (audit IMP-BE-2).
+    def stats(self, **filters) -> InferenceStats:
+        """Aggregate over the (optionally filtered) analysis-log table.
 
+        Accepts the same filter set as list/count/export, so the History page's
+        summary cards can describe the filtered slice the table is showing
+        instead of always the whole table (audit IMP-BE-2 + History deep dive).
         Counts / averages / breakdowns use SQL aggregates over the indexed columns.
         Latency percentiles are computed in Python over the processing_ms column —
         portable across SQLite (tests) and Postgres (prod), and cheap at this scale.
         """
-        total = int(self.db.scalar(select(func.count()).select_from(AnalysisLog)) or 0)
+        conditions = self._filter_conditions(**filters)
+        total = int(
+            self.db.scalar(select(func.count()).select_from(AnalysisLog).where(*conditions)) or 0
+        )
         if total == 0:
             return InferenceStats(sample_size=0, total_analyses=0, image_count=0, video_count=0)
 
-        by_media = _grouped_counts(self.db, AnalysisLog.media_type)
-        by_runway = _grouped_counts(self.db, AnalysisLog.runway_id)
-        by_state = _grouped_counts(self.db, AnalysisLog.global_state)
-        avg_proc = self.db.scalar(select(func.avg(AnalysisLog.processing_ms)))
-        avg_conf = self.db.scalar(select(func.avg(AnalysisLog.confidence)))
-        first_at = self.db.scalar(select(func.min(AnalysisLog.created_at)))
-        latest_at = self.db.scalar(select(func.max(AnalysisLog.created_at)))
-        processing_times = sorted(self.db.scalars(select(AnalysisLog.processing_ms)).all())
+        by_media = _grouped_counts(self.db, AnalysisLog.media_type, conditions)
+        by_runway = _grouped_counts(self.db, AnalysisLog.runway_id, conditions)
+        by_state = _grouped_counts(self.db, AnalysisLog.global_state, conditions)
+        avg_proc = self.db.scalar(select(func.avg(AnalysisLog.processing_ms)).where(*conditions))
+        avg_conf = self.db.scalar(select(func.avg(AnalysisLog.confidence)).where(*conditions))
+        first_at = self.db.scalar(select(func.min(AnalysisLog.created_at)).where(*conditions))
+        latest_at = self.db.scalar(select(func.max(AnalysisLog.created_at)).where(*conditions))
+        processing_times = sorted(
+            self.db.scalars(select(AnalysisLog.processing_ms).where(*conditions)).all()
+        )
 
         return InferenceStats(
             sample_size=total,
@@ -146,39 +166,55 @@ class AnalysisLogRepository:
         )
 
     def to_list_item(self, log: AnalysisLog) -> LogListItem:
+        result = log.result_json if isinstance(log.result_json, dict) else {}
         return LogListItem(
             id=log.id,
             media_type=log.media_type,
             runway_id=log.runway_id,
             drone_id=log.drone_id,
             original_filename=log.original_filename,
+            # Column first; result_json fallback covers rows written before the
+            # model_id column existed (audit COL-1).
+            model_id=log.model_id or result.get("model_id"),
+            model_label=result.get("model_label"),
+            model_role=result.get("model_role"),
             global_state=log.global_state,
             confidence=log.confidence,
             angle_available=log.angle_available,
             elevation_angle_deg=log.elevation_angle_deg,
             frame_count=log.frame_count,
             processing_ms=log.processing_ms,
+            # Partial-result flags live only in result_json (no dedicated columns);
+            # without them the list/CSV showed a half-decoded or cap-truncated
+            # analysis as indistinguishable from a complete one (audit 2026-06-12).
+            truncated_at_frame=result.get("truncated_at_frame"),
+            decode_shortfall=result.get("decode_shortfall"),
             artifact_url=media_url_for_path(log.artifact_path, get_settings()),
             created_at=log.created_at.isoformat(),
         )
 
 
-def _contained_artifact_path(artifact_url: str | None, exports_dir: Path) -> str | None:
-    """Resolve an artifact_url to an on-disk path *inside* the exports dir, or None.
+def _artifact_reference_from_url(artifact_url: str | None, settings) -> str | None:
+    """Resolve an artifact URL to the storage reference saved in the database.
 
     The happy path is a server-generated ``/media/<uuid>_annotated.<ext>`` (a bare
-    filename, see ``InferenceService``), which joins cleanly under ``exports_dir``.
+    filename, see ``InferenceService``), which joins cleanly under ``exports_dir`` in
+    local mode or maps to ``exports/<filename>`` in Azure Blob mode.
     This is a defence-in-depth guard: if a crafted ``artifact_url`` ever smuggled in
     ``..`` segments and escaped the exports tree, we store None rather than persist an
-    out-of-tree path. ``media_url_for_path`` already drops such paths on read-back; this
-    keeps them out of the column on write too. The returned string for the happy path is
-    byte-identical to the previous ``str(exports_dir / url.removeprefix("/media/"))``.
+    out-of-tree/blob path. ``media_url_for_path`` already drops such paths on read-back;
+    this keeps them out of the column on write too.
     """
     if not artifact_url:
         return None
-    candidate = exports_dir / artifact_url.removeprefix("/media/")
+    relative = artifact_url.removeprefix("/media/").replace("\\", "/").lstrip("/")
+    if not relative or relative.startswith("../") or "/../" in f"/{relative}/":
+        return None
+    if getattr(settings, "storage_backend", "local") == "azure_blob":
+        return f"exports/{relative}"
+    candidate = settings.exports_dir / relative
     try:
-        candidate.resolve().relative_to(exports_dir.resolve())
+        candidate.resolve().relative_to(settings.exports_dir.resolve())
     except ValueError:
         return None
     return str(candidate)
@@ -191,8 +227,11 @@ def _percentile_nearest_rank(values: list[int], percentile: float) -> int | None
     return values[index]
 
 
-def _grouped_counts(db: Session, column: ColumnElement) -> dict[str, int]:
-    rows = db.execute(select(column, func.count()).group_by(column)).all()
+def _grouped_counts(
+    db: Session, column: ColumnElement, conditions: list[ColumnElement[bool]] | None = None
+) -> dict[str, int]:
+    stmt = select(column, func.count()).where(*(conditions or [])).group_by(column)
+    rows = db.execute(stmt).all()
     return {str(key): int(value) for key, value in rows}
 
 
@@ -207,4 +246,3 @@ def _iso(value: datetime | str | None) -> str | None:
     if isinstance(value, str):
         return value
     return value.isoformat()
-

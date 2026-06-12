@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import clsx from 'clsx'
 import { Check, ChevronRight, MapPin, Trash2 } from 'lucide-react'
 import { useLiveDemo } from '../context/liveDemoContext'
+import { localizedErrorMessage } from '../lib/errorMessages'
 
 // EDNY 24 surveyed coordinates, offered as a one-click starting template so a
 // demo user can register a valid (non-degenerate) runway quickly and then tweak.
@@ -25,6 +26,11 @@ const emptyForm = () => ({
 // Accept a dot or comma decimal separator (a de/nl/fr user may type "47,67").
 const toNumber = (value) => Number(String(value).trim().replace(',', '.'))
 const inRange = (value, min, max) => {
+  // An EMPTY field must fail validation: Number('') is 0, which sits inside
+  // every coordinate range — a half-filled form would otherwise create a lamp
+  // at (0, 0), distinct enough to pass the backend's 4-distinct-positions
+  // check and silently corrupt the runway geometry (audit 2026-06-11).
+  if (!String(value).trim()) return false
   const n = toNumber(value)
   return Number.isFinite(n) && n >= min && n <= max
 }
@@ -77,7 +83,7 @@ export function RunwaysPage({ copy }) {
     [openRunwayId, runways, selectedRunway],
   )
   const runwayStatusMessage = runwayError
-    ? t.loadError.replace('{message}', runwayError.message || String(runwayError))
+    ? t.loadError.replace('{message}', localizedErrorMessage(runwayError, copy))
     : runways.length > 0
       ? t.refreshing
       : t.loading
@@ -130,8 +136,9 @@ export function RunwaysPage({ copy }) {
       toast.success(t.added.replace('{label}', created.label))
       setForm(emptyForm())
     } catch (caught) {
-      setError(caught.message || t.errorGeneric)
-      toast.error(caught.message || t.errorGeneric)
+      const message = localizedErrorMessage(caught, copy) || t.errorGeneric
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -147,7 +154,7 @@ export function RunwaysPage({ copy }) {
       await removeRunway(runway.id)
       toast.success(t.deleted.replace('{label}', label))
     } catch (caught) {
-      toast.error(caught.message || t.errorGeneric)
+      toast.error(localizedErrorMessage(caught, copy) || t.errorGeneric)
     }
   }
 

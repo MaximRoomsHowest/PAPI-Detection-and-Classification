@@ -22,9 +22,11 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Pre-install CPU-only torch BEFORE requirements.txt so ultralytics doesn't pull
-# the multi-hundred-MB CUDA wheel.
+# the multi-hundred-MB CUDA wheel. Pins live in torch-requirements.txt so CI's
+# pip-audit can scan them (audit IS-1).
+COPY torch-requirements.txt ./
 RUN pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch==2.5.1 torchvision==0.20.1
+        -r torch-requirements.txt
 
 # Copy only requirements first for better layer caching.
 COPY requirements.txt ./
@@ -44,12 +46,16 @@ RUN pip install -r requirements.txt \
 # Slim final image: no compilers, no GUI libs, no curl, no test tooling.
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
 
+# No DATABASE_URL here: baking even the default dev credentials into image ENV
+# exposes them to every `docker inspect`/registry scan, and compose always supplies
+# the real value. The identical app-level default in config.py covers standalone
+# runs (audit IS-8).
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
+    PAPI_MODEL_REGISTRY_PATH=/models/serving/models.json \
     PAPI_MODEL_PATH=/models/serving/best.pt \
-    PAPI_STORAGE_DIR=/storage \
-    DATABASE_URL=postgresql+psycopg://papi:papi@postgres:5432/papi_backend
+    PAPI_STORAGE_DIR=/storage
 
 # Never let ultralytics pip-install the full opencv-python at runtime — keeps the
 # headless guarantee robust even if an import path changes (audit DCK-RE BACKEND-2).

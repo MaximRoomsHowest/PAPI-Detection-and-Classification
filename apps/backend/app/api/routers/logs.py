@@ -34,6 +34,7 @@ def list_logs(
     global_state: str | None = None,
     created_after: str | None = None,
     min_confidence: float | None = None,
+    model_id: str | None = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> list[LogListItem]:
@@ -42,7 +43,9 @@ def list_logs(
     Optional filters plus an ``X-Total-Count`` header so the History page can paginate
     ("page N of M") instead of fetching everything and slicing client-side (audit IMP-BE-3).
     """
-    filters = parse_log_filters(runway_id, media_type, global_state, created_after, min_confidence)
+    filters = parse_log_filters(
+        runway_id, media_type, global_state, created_after, min_confidence, model_id
+    )
     repository = AnalysisLogRepository(db)
     response.headers["X-Total-Count"] = str(repository.count(**filters))
     return [repository.to_list_item(log) for log in repository.list_recent(limit, offset, **filters)]
@@ -55,6 +58,7 @@ def export_logs_csv(
     global_state: str | None = None,
     created_after: str | None = None,
     min_confidence: float | None = None,
+    model_id: str | None = None,
     db: Annotated[Session, Depends(get_session)] = None,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> StreamingResponse:
@@ -62,7 +66,9 @@ def export_logs_csv(
 
     Declared before ``/logs/{log_id}`` so the literal path is not captured as an id.
     """
-    filters = parse_log_filters(runway_id, media_type, global_state, created_after, min_confidence)
+    filters = parse_log_filters(
+        runway_id, media_type, global_state, created_after, min_confidence, model_id
+    )
     rows = AnalysisLogRepository(db).iter_filtered(**filters)
 
     headers = {"Content-Disposition": "attachment; filename=papi_analysis_logs.csv"}
@@ -78,6 +84,14 @@ def get_log(
     log = AnalysisLogRepository(db).get(log_id)
     if log is None:
         raise HTTPException(status_code=404, detail="Analysis log not found.")
+    if not isinstance(log.result_json, dict):
+        # ** unpacking a NULL/non-dict raises TypeError before the ValidationError
+        # handler below; the list and CSV paths already isinstance-guard this
+        # (repositories/analysis_logs.py, api/_csv.py) — match them (audit LOG-1).
+        raise HTTPException(
+            status_code=422,
+            detail="Stored analysis record is incompatible with the current schema.",
+        )
     try:
         payload = AnalysisPayload(**log.result_json)
     except ValidationError as exc:

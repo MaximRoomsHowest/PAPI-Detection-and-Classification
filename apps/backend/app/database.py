@@ -23,12 +23,21 @@ def get_engine() -> Engine:
     uvicorn run") needs ``check_same_thread=False`` + ``StaticPool`` so the FastAPI threadpool can
     share one connection instead of a fresh empty DB per checkout; the Postgres path is unchanged.
     """
-    url = get_settings().database_url
+    settings = get_settings()
+    url = settings.database_url
     if url.startswith("sqlite"):
         from sqlalchemy.pool import StaticPool
 
         return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    return create_engine(url, pool_pre_ping=True)
+    # Explicit pool sizing (PAPI_DB_POOL_SIZE / PAPI_DB_MAX_OVERFLOW): the
+    # SQLAlchemy defaults (5 + 10) can starve under Starlette's 40-thread sync
+    # pool when many history/stats requests land at once.
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -38,8 +47,13 @@ def get_sessionmaker() -> sessionmaker:
 
 def init_db() -> None:
     from app import models  # noqa: F401
+    from app.migrations import run_startup_migrations
 
-    Base.metadata.create_all(bind=get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(bind=engine)
+    # create_all never ALTERs an existing table; additive columns for
+    # deployments that predate them are applied here (see app/migrations.py).
+    run_startup_migrations(engine)
 
 
 def get_session() -> Generator[Session, None, None]:

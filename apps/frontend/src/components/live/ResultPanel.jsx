@@ -10,7 +10,8 @@ import { useLiveDemo } from '../../context/liveDemoContext'
 // any red<->white transitions. Falls back to the empty prompt until a backend
 // analysis has produced a result. Reads the active scenario/state from context.
 export function ResultPanel({ copy }) {
-  const { activeScenario, activeState, runways, selectedRunwayId, backendScenario } = useLiveDemo()
+  const { activeScenario, activeState, runways, selectedRunwayId, backendScenario, isAnalyzing } =
+    useLiveDemo()
 
   // The Live Demo shows real backend output only. Until an analysis has run the
   // result panel stays empty rather than displaying a canned "demo" preset.
@@ -23,10 +24,65 @@ export function ResultPanel({ copy }) {
   const usedRunwayLabel =
     runways.find((runway) => runway.id === usedRunwayId)?.label ?? usedRunwayId
 
+  // The angle-readout below already shows the runway + telemetry source whenever the angle is
+  // AVAILABLE, so an always-on provenance strip just duplicates them. Show a compact strip ONLY
+  // when the angle is unavailable — the one case where the runway isn't otherwise surfaced on a
+  // result (audit: duplicate provenance / result-panel clutter).
+  const showProvenance = hasResult && !activeScenario?.angleSummary?.available
+
+  // Telemetry honesty (audit FE-17): sourceId is the raw backend enum and is still
+  // set when telemetry WAS resolved but the angle solve failed. Only a genuinely
+  // absent source may claim "Telemetry: none"; otherwise name the source via the
+  // localized angleSource map (never string-match on translated text).
+  const angleSourceId = activeScenario?.angleSummary?.sourceId ?? null
+  const provenanceTelemetry = angleSourceId
+    ? copy.live.provenanceTelemetryUnused.replace(
+        '{source}',
+        copy.live.angleSource?.[angleSourceId] ?? angleSourceId,
+      )
+    : copy.live.provenanceTelemetryNone
+
   return (
-    <aside className="analysis-panel" id="analysis-details">
+    <aside className="analysis-panel" id="analysis-details" aria-busy={isAnalyzing}>
       {hasResult ? (
         <>
+          {showProvenance && (
+            <div className="result-provenance">
+              <span className="result-provenance__heading">{copy.live.provenanceHeading}</span>
+              <span className="result-provenance__item">
+                {copy.live.runwayUsed.replace('{runway}', usedRunwayLabel)}
+              </span>
+              <span className="result-provenance__item">{provenanceTelemetry}</span>
+            </div>
+          )}
+
+          {/* Honest partial-result banner: the backend stamps truncated_at_frame when a
+              video/sequence out-ran the frame limit mid-stream (container metadata lied),
+              so the verdict below covers only the processed prefix (audit B2). */}
+          {activeScenario.rawResult?.truncated_at_frame != null && (
+            <p className="result-truncation" role="alert">
+              {copy.live.truncatedAnalysis.replace(
+                '{frames}',
+                activeScenario.rawResult.truncated_at_frame,
+              )}
+            </p>
+          )}
+
+          {/* The opposite partial-result case: the source ended EARLY (mid-stream
+              decode failure / unreadable sequence images), so the backend stamps
+              decode_shortfall = promised-but-undecoded frame count. */}
+          {activeScenario.rawResult?.decode_shortfall != null && (
+            <p className="result-truncation" role="alert">
+              {copy.live.decodeShortfall
+                .replace('{decoded}', activeScenario.rawResult.frame_count)
+                .replace(
+                  '{expected}',
+                  activeScenario.rawResult.frame_count +
+                    activeScenario.rawResult.decode_shortfall,
+                )}
+            </p>
+          )}
+
           <div className="state-summary">
             <span className="status-dot" style={{ '--dot-color': activeState.color }} />
             <div>
@@ -71,6 +127,19 @@ export function ResultPanel({ copy }) {
               suffix={formatDurationMs(activeScenario.metrics.latency).suffix}
             />
           </div>
+
+          {(activeScenario.rawResult?.model_label || activeScenario.rawResult?.model_id) && (
+            <div className="model-readout">
+              <span>{copy.live.modelUsed}</span>
+              <strong>{activeScenario.rawResult.model_label || activeScenario.rawResult.model_id}</strong>
+              {activeScenario.rawResult.model_role && (
+                <p>
+                  {copy.live.modelRole?.[activeScenario.rawResult.model_role] ??
+                    activeScenario.rawResult.model_role}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* PAPI elevation angle — real WGS-84 geometry from the drone GPS /
               manual telemetry vs the runway's surveyed lamps. "Unavailable"
@@ -141,11 +210,26 @@ export function ResultPanel({ copy }) {
                   )}
                 </small>
               )}
+              {/* Total count up front: the list itself scrolls inside a capped
+                  box (a long sweep produces dozens of flips), so the size of
+                  the evidence must be readable without scrolling. */}
+              <small className="transition-readout__count tnum">
+                {activeScenario.transitions.length}
+              </small>
               <ul>
                 {activeScenario.transitions.map((event, index) => (
                   <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
                     {`${copy.live.light} ${event.lamp_index}: `}
                     {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
+                    {/* The flip's viewing angle is the actual evidence (which set
+                        angle the lamp crossed) — show it whenever the backend
+                        resolved one. The frame alone would be cryptic; angles are
+                        what the PAPI verification workflow reasons in. */}
+                    {event.elevation_angle_deg != null && (
+                      <span className="transition-readout__angle tnum">
+                        {` · ${Number(event.elevation_angle_deg).toFixed(2)}°`}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

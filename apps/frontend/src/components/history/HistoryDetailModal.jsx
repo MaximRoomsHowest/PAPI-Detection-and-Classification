@@ -2,15 +2,18 @@ import clsx from 'clsx'
 import { History as HistoryIcon, X } from 'lucide-react'
 import { formatAngle, percent } from '../../lib/format'
 import { runwayDisplayName } from '../../lib/runwaySelection'
+import { globalStateLabel, lampStateLabel } from '../../lib/stateLabels'
 
 // Mirrors the backend's DETECTION_CLASS_TO_STATE (apps/backend/app/services/state.py)
 // so the compact detections summary shows a readable lamp colour instead of a
 // bare class id. Kept tiny and explicit — falls through to the raw id otherwise.
-const DETECTION_CLASS_LABEL = { 0: 'red', 1: 'white' }
+const DETECTION_CLASS_STATE = { 0: 'red', 1: 'white' }
 
-function detectionLabel(detection) {
+function detectionLabel(detection, copy) {
   const classId = detection?.class_id
-  if (classId != null && DETECTION_CLASS_LABEL[classId]) return DETECTION_CLASS_LABEL[classId]
+  if (classId != null && DETECTION_CLASS_STATE[classId]) {
+    return lampStateLabel(DETECTION_CLASS_STATE[classId], copy)
+  }
   if (classId != null) return `class ${classId}`
   return '—'
 }
@@ -35,26 +38,14 @@ export function HistoryDetailModal({
     <div className="history-modal-backdrop">
       {/* Click-the-backdrop-to-dismiss as a real, keyboard-focusable control
           instead of an onClick on a non-interactive <div> (which had no
-          keyboard path). It sits behind the dialog as a full-bleed layer;
-          Escape also closes via useModalA11y, and the focus trap keeps Tab
-          inside the dialog. Inline-positioned because CSS for this overlay
-          lives elsewhere and this component owns no stylesheet. */}
+          keyboard path). It sits behind the dialog as a full-bleed layer
+          (.history-modal-dismiss); Escape also closes via useModalA11y, and
+          the focus trap keeps Tab inside the dialog. */}
       <button
         type="button"
         className="history-modal-dismiss"
         aria-label={copy.history.close}
         onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          border: 0,
-          padding: 0,
-          margin: 0,
-          background: 'transparent',
-          cursor: 'default',
-        }}
       />
       <section
         className="history-modal"
@@ -63,11 +54,6 @@ export function HistoryDetailModal({
         aria-labelledby="history-detail-title"
         ref={modalRef}
         tabIndex={-1}
-        // position:relative so the dialog paints above the absolutely-
-        // positioned backdrop-dismiss button (which would otherwise stack on
-        // top and swallow clicks). The .history-modal CSS sets no position,
-        // so this is purely additive.
-        style={{ position: 'relative' }}
       >
         <div className="history-modal-heading">
           <div>
@@ -87,7 +73,7 @@ export function HistoryDetailModal({
         <div className="history-detail-grid">
           <div>
             <span>{copy.history.state}</span>
-            <strong>{selectedLog.global_state?.replaceAll('_', ' ') ?? '—'}</strong>
+            <strong>{globalStateLabel(selectedLog.global_state, copy) || '—'}</strong>
           </div>
           <div>
             <span>{copy.history.runway}</span>
@@ -114,12 +100,54 @@ export function HistoryDetailModal({
             <span>{copy.history.processing}</span>
             <strong className="tnum">{selectedLog.processing_ms} ms</strong>
           </div>
+          {/* The model that PRODUCED this persisted result — without it an old
+              row is indistinguishable from a re-run with another detector
+              (integration audit 2026-06-11: stored but never shown). */}
+          {(selectedLog.model_label || selectedLog.model_id) && (
+            <div>
+              <span>{copy.live.modelUsed}</span>
+              <strong>{selectedLog.model_label || selectedLog.model_id}</strong>
+            </div>
+          )}
+          <div>
+            <span>{copy.history.media}</span>
+            <strong>
+              {selectedLog.media_type === 'video'
+                ? copy.history.mediaVideo
+                : copy.history.mediaImage}
+              {selectedLog.frame_count > 1 ? ` · ${selectedLog.frame_count}` : ''}
+            </strong>
+          </div>
+          {selectedLog.drone_id && (
+            <div>
+              <span>{copy.history.drone}</span>
+              <strong className="mono">{selectedLog.drone_id}</strong>
+            </div>
+          )}
         </div>
+
+        {/* Honest partial-result banner, same contract as the Live Demo panel:
+            the verdict covers only frames [0, truncated_at_frame). */}
+        {selectedLog.truncated_at_frame != null && (
+          <p className="result-truncation" role="alert">
+            {copy.live.truncatedAnalysis.replace('{frames}', selectedLog.truncated_at_frame)}
+          </p>
+        )}
+
+        {/* Decode shortfall: the source ended early (damaged file / unreadable
+            sequence images) — fewer frames decoded than the source promised. */}
+        {selectedLog.decode_shortfall != null && (
+          <p className="result-truncation" role="alert">
+            {copy.live.decodeShortfall
+              .replace('{decoded}', selectedLog.frame_count)
+              .replace('{expected}', selectedLog.frame_count + selectedLog.decode_shortfall)}
+          </p>
+        )}
 
         {artifact.key === selectedLog.artifact_url && artifact.url && (
           <div className="history-artifact">
             {selectedLog.media_type === 'video' ? (
-              <video src={artifact.url} controls>
+              <video src={artifact.url} controls aria-label={selectedLog.original_filename}>
                 <track kind="captions" />
               </video>
             ) : (
@@ -134,7 +162,15 @@ export function HistoryDetailModal({
             <div className="history-lamps">
               {(selectedLog.lamps ?? []).map((lamp) => (
                 <span className={clsx('history-lamp', `history-lamp-${lamp.state}`)} key={lamp.index}>
-                  <span className="tnum">L{lamp.index}</span> · {lamp.state} · <span className="tnum">{percent(lamp.confidence)}%</span>
+                  <span className="tnum">L{lamp.index}</span> · {lampStateLabel(lamp.state, copy)} ·{' '}
+                  {/* An inferred lamp's state came from geometry, not the detector —
+                      a confidence percentage would be fabricated precision. Same
+                      disclosure rule as LampCard on the Live Demo. */}
+                  {lamp.inferred ? (
+                    <span title={lamp.inference_note ?? undefined}>{copy.live.inferredFromAngle}</span>
+                  ) : (
+                    <span className="tnum">{percent(lamp.confidence)}%</span>
+                  )}
                 </span>
               ))}
             </div>
@@ -158,7 +194,7 @@ export function HistoryDetailModal({
                   {detections.map((detection, index) => (
                     <tr key={detection.track_id ?? index}>
                       <td className="tnum">{index + 1}</td>
-                      <td>{detectionLabel(detection)}</td>
+                      <td>{detectionLabel(detection, copy)}</td>
                       <td className="tnum">
                         {Number.isFinite(Number(detection.confidence))
                           ? `${percent(detection.confidence)}%`
@@ -197,6 +233,35 @@ export function HistoryDetailModal({
             )}
           </div>
         </div>
+
+        {/* Detected red<->white transitions — the headline output of a video
+            analysis, persisted in the payload but previously invisible here
+            (integration audit 2026-06-11). Mirrors the Live Demo readout:
+            localized lamp colours + which method produced the events. */}
+        {selectedLog.transitions?.length > 0 && (
+          <div className="history-transitions">
+            <span>{copy.live.transitionsHeading}</span>
+            {selectedLog.transition_method && (
+              <small>
+                {copy.live.transitionMethodUsed.replace(
+                  '{method}',
+                  selectedLog.transition_method === 'model'
+                    ? copy.live.transitionMethodModel
+                    : copy.live.transitionMethodTracking,
+                )}
+              </small>
+            )}
+            <ul>
+              {selectedLog.transitions.map((event, index) => (
+                <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
+                  {`${copy.live.light} ${event.lamp_index}: `}
+                  {`${lampStateLabel(event.from_state, copy)} → ${lampStateLabel(event.to_state, copy)}`}
+                  {` (${copy.history.frames.toLowerCase()} ${event.frame_index})`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="history-angle-note">
           <HistoryIcon size={16} />

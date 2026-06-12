@@ -27,9 +27,19 @@ copy .env.example .env
 The API will run at `http://127.0.0.1:8000`. Interactive docs at
 `http://127.0.0.1:8000/docs`.
 
-## Model
+## Models
 
-The serving model lives at:
+Selectable inference models are owned by the backend registry:
+
+```text
+../../models/serving/models.json
+```
+
+`GET /api/models` returns the configured choices, whether each weight exists,
+whether it is loaded, and why a choice is disabled. `GET /api/model` stays
+backward-compatible and returns the default model unless `model_id` is supplied.
+
+The default model still lives at:
 
 ```text
 ../../models/serving/best.pt
@@ -43,7 +53,11 @@ a trained model, copy a base weight into the serving slot:
 Copy-Item ..\..\models\base\yolo26s.pt ..\..\models\serving\best.pt -Force
 ```
 
-For project-quality demos, replace `models/serving/best.pt` with the intended trained PAPI checkpoint.
+For project-quality demos, replace `models/serving/best.pt` with the intended
+trained PAPI checkpoint and keep `models/serving/models.json` aligned. The
+registered `transition` classifier points at an ignored `data/runs/...` artifact;
+if that file is absent, the API reports it as unavailable and the Live Demo
+disables it instead of failing startup.
 
 ## Endpoints
 
@@ -55,9 +69,15 @@ For project-quality demos, replace `models/serving/best.pt` with the intended tr
 - `POST /api/analyze-sequence`
 - `GET /api/logs` · `GET /api/logs/export.csv` · `GET /api/logs/{id}`
 - `GET /api/stats`
-- `GET /api/runways` · `GET /api/model` · `GET /api/system`
+- `GET /api/runways` · `GET /api/model` · `GET /api/models` · `GET /api/system`
 
-`POST /api/analyze` accepts a form upload named `file`, plus optional `runway_id`, `drone_id`, `drone_latitude`, `drone_longitude`, and `drone_altitude_m`.
+`POST /api/analyze` accepts a form upload named `file`, plus optional `runway_id`, `model_id`, `drone_id`, `drone_latitude`, `drone_longitude`, and `drone_altitude_m`.
+
+All analyze endpoints accept optional `model_id`. Unknown ids return 400. Missing
+selected weights fail cleanly for direct API callers; unavailable registry entries
+are disabled by the frontend. Selecting a `transition` role model defaults to
+learned transition events, while detector models default to temporal tracking.
+The older `transition_method` field is still accepted for compatibility.
 
 `POST /api/analyze-frame` is the single-image endpoint the frontend uses for an image upload (`Upload media` with an image). It accepts one image plus the same optional drone metadata and runs exactly two tasks for that frame:
 
@@ -71,6 +91,12 @@ For project-quality demos, replace `models/serving/best.pt` with the intended tr
 `POST /api/analyze-sequence` is the **folder-to-video** variant and powers the frontend folder-upload workflow. It also accepts a multipart upload named `files` (plural) plus the same optional drone metadata, but instead of treating the images as independent frames it treats them as **consecutive frames of a single clip**: the images are ordered by filename, fed through the same ByteTrack-tracked pipeline as a real video (per-lamp identity carried across frames, temporal red↔white transitions), and the response is a single `AnalysisPayload` with one aggregated verdict and one annotated **WebM video** artifact. Playback speed / transition frame-gap timing is set by `PAPI_SEQUENCE_FPS` (default 4 fps); it does not affect detection. The viewing angle is read once from the first image (its EXIF, or the request's drone telemetry), mirroring the one-angle-per-video model. Both `/api/analyze-frames` and `/api/analyze-sequence` are bounded by `PAPI_MAX_BATCH_FRAMES` (default 200) frames per request.
 
 The single-frame endpoints return their results immediately and store a lightweight database log with result metadata, not the uploaded image/video bytes. Uploaded originals are deleted after processing; annotated exports stay in `storage/exports`.
+
+All HTTP responses include rate-limit headers when `PAPI_RATE_LIMIT_ENABLED`
+is true. The default buckets are broad for dashboard/API traffic
+(`PAPI_RATE_LIMIT_PER_MINUTE=600`) and stricter for expensive
+`/api/analyze*` inference requests (`PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE=60`).
+Exceeded buckets return a JSON `429` with `Retry-After`.
 
 ## Structure
 

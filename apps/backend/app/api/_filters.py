@@ -37,17 +37,22 @@ def parse_log_filters(
     global_state: str | None,
     created_after: str | None,
     min_confidence: float | None,
+    model_id: str | None = None,
 ) -> dict:
     """Validate + normalise the shared log query filters (audit IMP-BE-3).
 
     Values are validated before they hit the repository so the list and CSV
     endpoints reject the same malformed filters instead of silently returning
     empty result sets for impossible states or out-of-range confidence values.
+
+    ``model_id`` is intentionally NOT validated against the live registry:
+    logs may reference a model that has since been removed from models.json.
     """
     runway_id = _clean_optional_text(runway_id, "runway_id")
     media_type = _clean_optional_text(media_type, "media_type")
     global_state = _clean_optional_text(global_state, "global_state")
     created_after = _clean_optional_text(created_after, "created_after")
+    model_id = _clean_optional_text(model_id, "model_id")
 
     if media_type is not None and media_type not in _MEDIA_TYPES:
         raise HTTPException(status_code=400, detail="media_type must be one of: image, video.")
@@ -82,4 +87,5 @@ def parse_log_filters(
         "global_state": global_state,
         "created_after": parsed_after,
         "min_confidence": min_confidence,
+        "model_id": model_id,
     }

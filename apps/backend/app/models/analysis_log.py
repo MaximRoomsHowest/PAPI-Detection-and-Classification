@@ -41,10 +41,16 @@ class AnalysisLog(Base):
     # derived from RunwayCreate.id, so 32 would overflow and raise a Postgres
     # StringDataRightTruncation → 503 that orphans the just-written artifact (SQLite
     # ignores VARCHAR width, so this only bites on Postgres). create_all only widens a
-    # FRESH table; an existing deployment needs a manual
-    # ALTER TABLE analysis_logs ALTER COLUMN runway_id TYPE VARCHAR(96) (audit C2).
+    # FRESH table; existing Postgres deployments are widened automatically at startup
+    # by app/migrations.py (audit C2).
     runway_id: Mapped[str] = mapped_column(String(96), default="papi_24", index=True)
     drone_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Which registry model produced this analysis ("small"/"nano"/"transition"),
+    # promoted out of result_json so History can filter server-side (audit COL-1).
+    # Width matches runway_id's VARCHAR(96). NULL on rows written before the column
+    # existed — readers fall back to result_json. No index: low cardinality at demo
+    # scale. Existing tables gain the column via app/migrations.py at startup.
+    model_id: Mapped[str | None] = mapped_column(String(96), nullable=True)
     original_filename: Mapped[str] = mapped_column(String(512))
     artifact_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     global_state: Mapped[str] = mapped_column(String(64))

@@ -12,7 +12,9 @@ WORKDIR /app
 # also needs the backend host added back to nginx.conf's CSP and the backend's
 # CORS allowlist.
 ARG VITE_PAPI_API_URL=
+ARG VITE_PAPI_API_KEY=
 ENV VITE_PAPI_API_URL=$VITE_PAPI_API_URL
+ENV VITE_PAPI_API_KEY=$VITE_PAPI_API_KEY
 
 # Lockfile-aware install for reproducible builds.
 # Use `npm install` rather than `npm ci` because the lockfile is generated on
@@ -35,8 +37,20 @@ FROM nginxinc/nginx-unprivileged:alpine@sha256:85bcbc6b2edd325462560c597d784ecee
 EXPOSE 8080
 
 # SPA-aware nginx config (react-router fallback to /index.html) + security
-# headers (audit F-MAJ-13 / DCK-MAJ-6).
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# headers (audit F-MAJ-13 / DCK-MAJ-6). Shipped as a TEMPLATE: the image's
+# stock 20-envsubst-on-templates.sh renders it to /etc/nginx/conf.d/default.conf
+# at container start, substituting the body-size knob below — so the upload cap
+# can follow PAPI_MAX_BATCH_UPLOAD_MB without an image rebuild (audit IS-7).
+# Do NOT also COPY a literal conf.d/default.conf: the render would silently
+# overwrite it and mask template errors. Default = 400 MB budget + 10m headroom.
+# NGINX_CONF selects WHICH template ships in the image: the default proxies
+# /api + /media to the compose backend; the Azure Container Apps build passes
+# NGINX_CONF=nginx.azure.conf.template (sidecar backend on localhost:8000).
+# envsubst only substitutes variables that exist in the container environment,
+# so nginx runtime vars ($uri, $host, ...) pass through untouched.
+ENV NGINX_CLIENT_MAX_BODY_SIZE=410m
+ARG NGINX_CONF=nginx.conf.template
+COPY ${NGINX_CONF} /etc/nginx/templates/default.conf.template
 
 # Static bundle from the build stage.
 COPY --from=build /app/dist /usr/share/nginx/html

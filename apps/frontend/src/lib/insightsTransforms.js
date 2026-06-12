@@ -8,6 +8,14 @@
 // the graphs). A bare "unknown" has no tier and is intentionally dropped.
 const STATE_NUM = { obscured: -1, red: 0, transition: 1, white: 2 }
 
+// FAA-standard set angles for a 3.0 deg glideslope — DISPLAY REFERENCE ONLY.
+// EDNY's commissioned per-lamp values are still unconfirmed (the comparison the
+// summary strip calls "pending"), and the image lamp order is known to flip with
+// the approach direction, so charts must compare these SORTED-to-SORTED, never
+// slot-by-slot. Mirrors faa_default_set_angles_deg in the backend's state.py /
+// configs/papi_edny.yaml.
+export const FAA_DEFAULT_SET_ANGLES_DEG = [2.5, 2.83, 3.17, 3.5]
+
 // --- Angle vs. light state ---------------------------------------------------
 
 // Per-light angle resolution: prefer the lamp's own elevation angle, fall back
@@ -149,16 +157,142 @@ export function angleVsStateSeries(results) {
 
 // --- Transitions -------------------------------------------------------------
 
-// Count red↔white switches per light from backend transitions[].
-export function transitionCountSeries(transitions) {
-  const counts = [0, 0, 0, 0]
-  for (const event of transitions ?? []) {
-    const index = event.lamp_index
-    if (index >= 1 && index <= 4) {
-      counts[index - 1] += 1
+// The headline PAPI-verification numbers, one entry per light:
+//   settledAngle — the lamp's detected red<->white crossing angle (the SAME value
+//                  the redness charts draw as a dashed line; single source of truth
+//                  via angleVsStateSeries/detectTransitionAngle), null if the lamp
+//                  never crossed in this session;
+//   bandMin/bandMax — the blend zone: lowest/highest angle at which the tracker
+//                  logged ANY flip for this lamp (real lamps flicker through a
+//                  small angular band rather than switching at one exact angle);
+//   flips        — how many raw red<->white switches the tracker logged (the old
+//                  "transitions per light" count, now a detail, not a chart).
+export function transitionAngleSummary(results) {
+  const states = angleVsStateSeries(results)
+  const bands = [1, 2, 3, 4].map(() => ({ flips: 0, bandMin: null, bandMax: null }))
+  for (const result of results ?? []) {
+    for (const event of result?.transitions ?? []) {
+      const index = event.lamp_index
+      if (!(index >= 1 && index <= 4)) {
+        continue
+      }
+      const entry = bands[index - 1]
+      entry.flips += 1
+      const angle = event.elevation_angle_deg
+      if (Number.isFinite(angle)) {
+        entry.bandMin = entry.bandMin === null ? angle : Math.min(entry.bandMin, angle)
+        entry.bandMax = entry.bandMax === null ? angle : Math.max(entry.bandMax, angle)
+      }
     }
   }
-  return { lamps: [1, 2, 3, 4], counts }
+  return states.map((lamp, i) => ({
+    lampIndex: lamp.lampIndex,
+    settledAngle: Number.isFinite(lamp.transitionAngle) ? lamp.transitionAngle : null,
+    bandMin: bands[i].bandMin,
+    bandMax: bands[i].bandMax,
+    flips: bands[i].flips,
+  }))
+}
+
+export function transitionFlickerStatus(flipCount) {
+  if (!Number.isFinite(flipCount) || flipCount <= 0) return 'no_crossing'
+  if (flipCount === 1) return 'clean_crossing'
+  return 'review_flicker'
+}
+
+function csvCell(value) {
+  if (value === null || value === undefined) return ''
+  const text = String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+export function transitionCsv(results, source = {}) {
+  const headers = [
+    'source',
+    'log_id',
+    'runway_id',
+    'original_filename',
+    'transition_method',
+    'lamp_index',
+    'from_state',
+    'to_state',
+    'frame_index',
+    'elevation_angle_deg',
+    'method',
+    'flicker_status',
+  ]
+  const rows = []
+  for (const result of results ?? []) {
+    const counts = new Map()
+    for (const event of result?.transitions ?? []) {
+      if (Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= 4) {
+        counts.set(event.lamp_index, (counts.get(event.lamp_index) ?? 0) + 1)
+      }
+    }
+    for (const event of result?.transitions ?? []) {
+      if (!Number.isInteger(event?.lamp_index) || event.lamp_index < 1 || event.lamp_index > 4) {
+        continue
+      }
+      rows.push([
+        source.mode ?? '',
+        result?.log_id ?? source.logId ?? '',
+        result?.runway_id ?? '',
+        result?.original_filename ?? '',
+        result?.transition_method ?? '',
+        event.lamp_index,
+        event.from_state ?? '',
+        event.to_state ?? '',
+        event.frame_index ?? '',
+        Number.isFinite(event.elevation_angle_deg) ? event.elevation_angle_deg : '',
+        event.method ?? '',
+        transitionFlickerStatus(counts.get(event.lamp_index) ?? 0),
+      ])
+    }
+  }
+  return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+}
+
+// --- Per-frame lamp-state bands ------------------------------------------------
+
+// z-code order for the state-band heatmap. Index IS the code: a lamp slot absent
+// from a frame's detections is 'unknown' (0) — honest "not seen this frame".
+export const STATE_BAND_CODES = ['unknown', 'obscured', 'red', 'transition', 'white']
+const STATE_BAND_CODE = Object.fromEntries(STATE_BAND_CODES.map((state, code) => [state, code]))
+
+// One band block per analysed video/sequence that carried a per-frame track:
+// frames/angles on x, Lights 1..4 as rows, z[lampRow][frameCol] = state code.
+// This is the "what was every lamp showing at every moment" view the flip-marker
+// timeline could not give — flicker shows up as thin alternating stripes exactly
+// where the lamp passes through its blend zone.
+export function stateBandSeries(results) {
+  const blocks = []
+  for (const result of results ?? []) {
+    const track = result?.angle_track
+    if (!Array.isArray(track) || track.length === 0) {
+      continue
+    }
+    const frames = []
+    const angles = []
+    const z = [[], [], [], []]
+    for (const sample of track) {
+      if (!Number.isFinite(sample?.frame_index)) {
+        continue
+      }
+      frames.push(sample.frame_index)
+      angles.push(Number.isFinite(sample?.elevation_angle_deg) ? sample.elevation_angle_deg : null)
+      for (let lampIndex = 1; lampIndex <= 4; lampIndex += 1) {
+        const lamp = (sample.lamps ?? []).find((entry) => entry.index === lampIndex)
+        z[lampIndex - 1].push(STATE_BAND_CODE[lamp?.state] ?? STATE_BAND_CODE.unknown)
+      }
+    }
+    if (frames.length > 0) {
+      const label =
+        result?.original_filename ??
+        (result?.log_id ? `log ${result.log_id.slice(0, 8)}` : `series ${blocks.length + 1}`)
+      blocks.push({ label, frames, angles, z })
+    }
+  }
+  return blocks
 }
 
 // --- Session distributions ---------------------------------------------------
@@ -167,10 +301,30 @@ export function transitionCountSeries(transitions) {
 // allow-list below: a lamp whose state isn't one of these keys is ignored.
 const emptyStateBucket = () => ({ white: 0, red: 0, transition: 0, obscured: 0, unknown: 0 })
 
-// Per-light state counts across the session's results (real lamps[].state).
+// Per-light state counts across the session. A result that carries a per-frame
+// angle_track is counted PER FRAME (the honest mix for a sweep — the old
+// aggregate-only counting showed "100% red" for a video whose lamps spent 40%
+// of frames white, because the aggregate verdict is one majority state per
+// lamp). A lamp slot absent from a frame's detections counts as 'unknown'.
+// Results without a track keep the aggregate lamps[] counting.
 export function perLightStateSeries(results) {
   const counts = [1, 2, 3, 4].map(emptyStateBucket)
   for (const result of results ?? []) {
+    const track = result?.angle_track
+    if (Array.isArray(track) && track.length > 0) {
+      for (const sample of track) {
+        for (let lampIndex = 1; lampIndex <= 4; lampIndex += 1) {
+          const lamp = (sample?.lamps ?? []).find((entry) => entry.index === lampIndex)
+          const bucket = counts[lampIndex - 1]
+          if (lamp === undefined) {
+            bucket.unknown += 1
+          } else if (bucket[lamp.state] !== undefined) {
+            bucket[lamp.state] += 1
+          }
+        }
+      }
+      continue
+    }
     for (const lamp of result?.lamps ?? []) {
       const bucket = lamp.index >= 1 && lamp.index <= 4 ? counts[lamp.index - 1] : null
       // The `!== undefined` check keeps an unexpected state from creating a

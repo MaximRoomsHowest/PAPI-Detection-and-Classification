@@ -51,6 +51,8 @@ def detect_frame(
     reset_tracker: bool,
     conf: float,
     device: str,
+    imgsz: int = 1280,
+    iou: float = 0.7,
 ) -> list[dict]:
     """Run YOLO on a single frame.
 
@@ -71,6 +73,8 @@ def detect_frame(
             persist=not reset_tracker,
             tracker="bytetrack.yaml",
             conf=conf,
+            iou=iou,
+            imgsz=imgsz,
             device=device,
             verbose=False,
         )
@@ -78,6 +82,8 @@ def detect_frame(
         results = model.predict(
             frame,
             conf=conf,
+            iou=iou,
+            imgsz=imgsz,
             device=device,
             verbose=False,
         )

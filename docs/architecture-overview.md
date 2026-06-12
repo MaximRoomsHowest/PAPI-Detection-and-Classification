@@ -27,7 +27,7 @@ pieces fit together and why specific design choices were made.
 ┌──────────────────────────────────────────────────────────────────┐
 │  ONLINE  (Docker compose: postgres + backend + frontend)         │
 │                                                                  │
-│   Browser  ── HTTPS ──►  Nginx (apps/frontend, port 8080)        │
+│   Browser  ── HTTP* ──►  Nginx (apps/frontend, port 8080)        │
 │      │                         │                                 │
 │      │                         ▼                                 │
 │      │              Static React/Vite bundle                     │
@@ -41,6 +41,9 @@ pieces fit together and why specific design choices were made.
 │                                  analysis_logs (one row/request) │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+\* Plain HTTP on localhost in the compose setup; TLS terminates at the Azure
+Container Apps ingress in the cloud deployment.
 
 ## 2. Repository layout
 
@@ -80,10 +83,10 @@ pyproject.toml       Editable install for the papi package
 | --- | --- | --- |
 | Backend framework | **FastAPI 0.115** | Async first-class, Pydantic v2 schemas, OpenAPI docs free |
 | ORM | **SQLAlchemy 2.0 (typed)** | Postgres native UUID + JSON support; mature |
-| Database | **Postgres 16** | Reliable, transactional, free; the team has no NoSQL data shape |
+| Database | **Postgres 18** | Reliable, transactional, free; the team has no NoSQL data shape |
 | ML library | **ultralytics 8.3 (YOLO)** | De-facto standard for one-shot detection; INT8 ONNX path |
 | Frontend | **React 19 + Vite 8** | Component model + fast dev loop; team familiarity |
-| Charts | **Plotly (lazy-loaded)** | Interactive, accessible, deep matplotlib parity |
+| Charts | **Plotly (lazy-loaded partial bundle)** | Re-evaluated 2026-06 against ECharts, Vega-Lite, Recharts and Observable Plot with built prototypes: alternatives save at most ~174 kB gz on an already lazy, cached chunk, but force rewriting all nine charts plus the `Plotly.toImage` PDF-export path. Kept Plotly (core + scatter/bar/heatmap/histogram only) |
 | Routing | **React Router 6 (v7 future flags)** | Stable, forward-compat |
 | Reverse proxy | **Nginx (unprivileged)** | Battle-tested, small image, supports SPA fallback |
 | Geodesy | **pymap3d** | Pure-Python WGS84; no proj/gdal headache |
@@ -134,6 +137,11 @@ The HTTP layer is split by concern under `apps/backend/app/api/`:
 sub-routers in `app/api/routers/` — `analyze` (the four upload/inference
 endpoints above), `logs` (list / CSV export / detail), `stats`
 (aggregate stats), and `meta` (runways / model info / system info).
+`/api/logs`, its CSV export, and `/api/stats` all accept the same six
+optional filters (`runway_id`, `media_type`, `global_state`,
+`created_after`, `min_confidence`, `model_id`), validated once in
+`app/api/_filters.py`, so the History table, its export, and its
+summary cards always describe the same slice.
 The inference engine lives in the `app/services/inference/` package: a
 `service.py` facade (`InferenceService`: model load, image / video /
 sequence) over leaf modules `aggregation` (per-lamp video verdict by
@@ -313,6 +321,11 @@ to `/api/analyze-sequence` for the folder→video path.
   - `PAPI_ENV=production` makes `PAPI_API_KEY` mandatory at startup.
   - nginx ships baseline security headers (CSP, X-Frame-Options,
     Referrer-Policy, Permissions-Policy, X-Content-Type-Options).
+  - Process-local rate limiting per client IP (defaults: 600
+    requests/min general, 60/min on the analyze endpoints; returns
+    429 + `Retry-After`). uvicorn trusts the proxy's
+    `X-Forwarded-For` (`FORWARDED_ALLOW_IPS`) so buckets track real
+    clients, not the nginx hop.
 - **CI**: GitHub Actions runs pytest + ruff + npm lint + npm build +
   Docker build on every push (`.github/workflows/ci.yml`).
 

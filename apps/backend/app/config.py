@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DATABASE_URL", "PAPI_DATABASE_URL"),
     )
     model_path: Path = Field(default=REPO_ROOT / "models" / "serving" / "best.pt", alias="PAPI_MODEL_PATH")
+    model_registry_path: Path = Field(
+        default=REPO_ROOT / "models" / "serving" / "models.json",
+        alias="PAPI_MODEL_REGISTRY_PATH",
+    )
     # Optional 3-class transition-aware model (red/white/transition) used by the "model" transition
     # method. Kept separate from model_path so the 2-class serving model and the experimental 3-class
     # model coexist without promoting one. When unset or absent, the "model" method gracefully falls
@@ -43,6 +47,10 @@ class Settings(BaseSettings):
     default_transition_method: str = Field(default="tracking", alias="PAPI_TRANSITION_METHOD")
     device: str = Field(default="cpu", alias="PAPI_DEVICE")
     storage_dir: Path = Field(default=BACKEND_ROOT / "storage", alias="PAPI_STORAGE_DIR")
+    storage_backend: str = Field(default="local", alias="PAPI_STORAGE_BACKEND")
+    blob_container: str = Field(default="papi-media", alias="PAPI_BLOB_CONTAINER")
+    azure_storage_connection_string: str | None = Field(default=None, alias="AZURE_STORAGE_CONNECTION_STRING")
+    azure_storage_account_url: str | None = Field(default=None, alias="AZURE_STORAGE_ACCOUNT_URL")
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
     # NoDecode disables pydantic-settings' built-in JSON decode for env values
     # so the @field_validator below receives the raw string and can parse
@@ -59,11 +67,14 @@ class Settings(BaseSettings):
         alias="PAPI_CORS_ORIGINS",
     )
     confidence_threshold: float = Field(default=0.4, ge=0.0, le=1.0, alias="PAPI_CONFIDENCE_THRESHOLD")
-    # Sliding-window length backing the per-stream majority vote (deque maxlen
-    # in inference._run_tracked_sequence). Must be >= 1 — maxlen=0 would make the
-    # window drop every frame and break the Counter.most_common aggregation. The
-    # upper bound just guards against an absurd env value pinning memory.
-    video_history_size: int = Field(default=5, ge=1, le=1000, alias="PAPI_VIDEO_HISTORY_SIZE")
+    # Inference input size + NMS IoU, made EXPLICIT so every model runs at its trained resolution
+    # instead of relying on the checkpoint's implicit imgsz override. best.pt carries imgsz=1280 so
+    # predict already uses it, but a re-export, an ONNX export, or the registry's nano/transition
+    # checkpoints could silently fall back to Ultralytics' 640 default — which roughly quarters the
+    # pixels on the small/distant PAPI lamps and degrades recall (audit). All serving checkpoints are
+    # trained at 1280; the NMS IoU keeps the predict default 0.7.
+    inference_imgsz: int = Field(default=1280, ge=320, le=4096, alias="PAPI_INFERENCE_IMGSZ")
+    inference_iou: float = Field(default=0.7, ge=0.0, le=1.0, alias="PAPI_INFERENCE_IOU")
     # Per-file upload ceiling in megabytes (media.save_upload streams and aborts
     # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
     # env var from effectively disabling the limit.
@@ -79,7 +90,10 @@ class Settings(BaseSettings):
     # Duration-based frame cap (combined with max_video_frames, the lower wins).
     # 0 is a supported sentinel meaning "no duration cap" (inference._video_frame_limit),
     # so the lower bound stays ge=0 rather than gt=0. Upper bound guards against typos.
-    max_video_seconds: int = Field(default=30, ge=0, le=86400, alias="PAPI_MAX_VIDEO_SECONDS")
+    # 150 admits the two-minute low-fps demo sweep (papi24-angle-sweep.mp4: 60
+    # frames @ 0.5 fps) while max_video_frames keeps normal-fps uploads bounded
+    # exactly as before — a 150 s clip at 30 fps still hits the 600-frame cap.
+    max_video_seconds: int = Field(default=150, ge=0, le=86400, alias="PAPI_MAX_VIDEO_SECONDS")
     # Aggregate upper bound on a single POST /api/analyze-frames call. The
     # backend processes frames sequentially per request, so an unbounded
     # list would hold the worker for minutes; per-file size is checked,
@@ -94,6 +108,22 @@ class Settings(BaseSettings):
     # consecutive video frames, so this sets annotated-playback speed and the
     # transition frame-gap timing. It does not affect detection.
     sequence_fps: float = Field(default=4.0, gt=0, le=120.0, alias="PAPI_SEQUENCE_FPS")
+    # Postgres connection-pool sizing (ignored on SQLite, which uses StaticPool).
+    # SQLAlchemy's defaults (5 + 10 overflow) sit below Starlette's default
+    # 40-thread pool that runs the sync endpoints; 10 + 20 keeps headroom for a
+    # burst of logs/stats/runways requests without holding 40 idle connections.
+    db_pool_size: int = Field(default=10, ge=1, le=100, alias="PAPI_DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=20, ge=0, le=200, alias="PAPI_DB_MAX_OVERFLOW")
+    # Process-local abuse throttle. Analyze endpoints are expensive CPU/GPU work
+    # and get a lower bucket than read-only dashboard/API traffic.
+    rate_limit_enabled: bool = Field(default=True, alias="PAPI_RATE_LIMIT_ENABLED")
+    rate_limit_per_minute: int = Field(default=600, ge=1, le=100000, alias="PAPI_RATE_LIMIT_PER_MINUTE")
+    analyze_rate_limit_per_minute: int = Field(
+        default=60,
+        ge=1,
+        le=100000,
+        alias="PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE",
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -108,12 +138,22 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("model_path", "storage_dir")
+    @field_validator("model_path", "model_registry_path", "storage_dir")
     @classmethod
     def resolve_backend_relative_path(cls, value: Path) -> Path:
         if value.is_absolute():
             return value
         return (BACKEND_ROOT / value).resolve()
+
+    @field_validator("transition_model_path", mode="before")
+    @classmethod
+    def empty_transition_path_is_none(cls, value: object) -> object:
+        # compose forwards PAPI_TRANSITION_MODEL_PATH with an empty default; an
+        # empty string must mean "not installed", not Path(".") resolved against
+        # the backend root (audit IS-2).
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("transition_model_path")
     @classmethod
@@ -128,6 +168,14 @@ class Settings(BaseSettings):
         normalized = (value or "tracking").strip().lower()
         if normalized not in ("tracking", "model"):
             raise ValueError("default_transition_method must be 'tracking' or 'model'")
+        return normalized
+
+    @field_validator("storage_backend")
+    @classmethod
+    def validate_storage_backend(cls, value: str) -> str:
+        normalized = (value or "local").strip().lower()
+        if normalized not in ("local", "azure_blob"):
+            raise ValueError("storage_backend must be 'local' or 'azure_blob'")
         return normalized
 
     @property

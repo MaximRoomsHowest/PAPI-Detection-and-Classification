@@ -33,6 +33,18 @@ point at it, so swapping models means copying a new file into the slot,
 **not** renaming the slot. Which run is currently in the slot is recorded
 in `models/serving/model_card.json` (`model_id`) and in §3.1 below.
 
+The **runtime selector registry** is `models/serving/models.json`. The backend
+serves it through `GET /api/models`, checks whether each weight exists, and
+uses its `role` to choose the default transition derivation: 2-class detector
+models use temporal tracking, while the 3-class transition classifier uses
+learned transition events.
+
+| Selector id | Run / path | Role | Default behavior |
+| --- | --- | --- | --- |
+| `small` | `models/serving/best.pt` → `yolo26s-fulldata-1280` | detector | Default model; transitions via tracking |
+| `nano` | `models/runs/yolo26n-sequence-1280/weights/best.pt` | detector | Previous serving model; transitions via tracking |
+| `transition` | `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt` | transition | Optional ignored artifact; transitions via learned model events |
+
 ### Rename map (2026-05-31)
 
 The old Ultralytics auto-names were renamed to the convention above. The
@@ -110,14 +122,26 @@ from the evaluation notebook (`04_*`), which the team owns.
 
 #### 3.1.2 Held-out test eval (per regime / per state)
 
-| Metric | Day rwy 24 Wide | Night rwy 06 Wide | Day rwy 24 Zoom | Aggregate |
-| --- | ---: | ---: | ---: | ---: |
-| Detection F1 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| Per-state F1 — red | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| Per-state F1 — white | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| mAP@0.5 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
+Measured 2026-06-10 on the flight-level test split (`configs/split.yaml`) via
+`workflows/scripts/run_redwhite_test_eval.py` over the 2-class test view built by
+`workflows/scripts/build_redwhite_test_view.py` (same frames and human-corrected
+red/white boxes as the sequence dataset; the 6 test transition boxes restored to
+their tracked colours). Full PR curve (val-default conf), IoU 0.5. Artifact:
+`docs/qa-artifacts/test-split-eval.json`.
 
-Fill from `04_yolov26n_sequence_model_evaluation.ipynb` after the final eval run.
+| Metric | Day rwy 24 Wide (1000 m) | Night rwy 06 Wide (500 m) | Day rwy 24 Zoom | Aggregate |
+| --- | ---: | ---: | ---: | ---: |
+| Detection F1 | 0.989 | 0.828 | not evaluated\* | 0.915 |
+| Per-state F1 — red | 0.993 (n=407) | 0.800 (n=360) | not evaluated\* | 0.901 (n=767) |
+| Per-state F1 — white | 0.985 (n=373) | 0.856 (n=256) | not evaluated\* | 0.928 (n=629) |
+| mAP@0.5 | 0.994 | 0.886 | not evaluated\* | 0.971 |
+
+\* The day-zoom test flight is not part of the evaluated twin dataset (ZoomCamera
+`calibrated_focal_px` still pending from Intersoft) — reported absent, not zero.
+Night-wide is the hard test regime; (n) are GT box counts, so the night numbers
+rest on 616 boxes, not a handful. The previous serving model's numbers on the same
+split are in §3.2.1a — yolo26s wins the night regime by ~10 mAP@0.5 points, which
+is the promotion justification on held-out data.
 
 ### 3.2 `yolo26n-sequence-1280` — previous serving (superseded 2026-05-31)
 
@@ -132,15 +156,35 @@ Fill from `04_yolov26n_sequence_model_evaluation.ipynb` after the final eval run
 | **Val metrics** | best (epoch 30): P 0.8613, R 0.8706, mAP@0.5 0.9141, mAP@0.5:0.95 0.4740 |
 | **Why retired** | yolo26s-fulldata-1280 beats it on every val metric (mAP@0.5 0.983 vs 0.914, mAP@0.5:0.95 0.679 vs 0.474). |
 
-#### 3.2.1 INT8 ONNX export — `models/serving/best_int8.onnx`
+#### 3.2.1a Held-out test eval (same split/harness as §3.1.2, measured 2026-06-10)
 
-| Field | Value |
-| --- | --- |
-| **Path** | `models/serving/best_int8.onnx` |
-| **Source model** | the **previous** `yolo26n-sequence-1280` (NOT the current serving model) |
-| **Status** | **experimental + stale** — quantised from the retired yolo26n model |
-| **Failure** | CPU ONNX Runtime raises `ConvInteger(10) not implemented`; runnable only on GPU-accelerated ORT. |
-| **Follow-up** | Re-export INT8 from `yolo26s-fulldata-1280` once an edge target is confirmed; kept in place for now because the edge-benchmark records (`docs/edge-benchmark.md`, `docs/qa-artifacts/`) reference this exact file. |
+| Metric | Day rwy 24 Wide (1000 m) | Night rwy 06 Wide (500 m) | Aggregate |
+| --- | ---: | ---: | ---: |
+| Detection F1 | 0.984 | 0.751 | 0.877 |
+| Per-state F1 — red | 0.990 | 0.700 | 0.855 |
+| Per-state F1 — white | 0.977 | 0.788 | 0.893 |
+| mAP@0.5 | 0.993 | 0.786 | 0.949 |
+
+Artifact: `docs/qa-artifacts/test-split-eval.json`. Both models are near-ceiling on
+the day-wide flight; the night regime separates them (yolo26s mAP@0.5 0.886 vs
+0.786) — the test-split evidence behind the §3.1 promotion.
+
+#### 3.2.1 ONNX exports
+
+**fp32 — `models/runs/detect/yolo26s-fulldata-1280/weights/best.onnx`** (new, 2026-06-10):
+exported from the SERVING yolo26s checkpoint (`yolo export format=onnx imgsz=1280
+simplify=True`, onnx 1.21 / opset 19) and parity-checked against torch on 10
+held-out test frames: identical box/class outputs (40/40 boxes), max confidence
+drift 0.03. This is the supported non-PyTorch serving path (loadable by the
+backend's registry — `.onnx` is on the weight-type allowlist).
+
+**INT8 — retired.** The old `models/serving/best_int8.onnx` was quantised from the
+RETIRED yolo26n model and fails on CPU ORT (`ConvInteger(10)` not implemented). A
+re-quantisation attempt from the new yolo26s fp32 export (onnxruntime 1.20
+`quantize_dynamic`) crashed the quantiser outright (2026-06-10, segfault), so there
+is NO working INT8 artifact and no INT8 numbers anywhere in the docs. Revisit with
+a static-QDQ pipeline once an edge target (WL051) is confirmed; until then the
+fp32 ONNX export above is the deployment alternative to PyTorch.
 
 ### 3.3 Comparison / experiment runs
 
@@ -185,23 +229,89 @@ When promoting a new run to serving:
    ```powershell
    Copy-Item models\runs\detect\<new_run>\weights\best.pt models\serving\best.pt -Force
    ```
-6. Regenerate the model card so `/api/model` reports the new run:
+6. Regenerate the model card so `/api/model` reports the new run. From the
+   repo root:
    ```powershell
-   ..\..\.venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
+   .venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
      models\runs\detect\<new_run> --write-model-card models\serving\model_card.json
    ```
 7. Restart the backend (`docker compose restart backend`, or the uvicorn
    process). The model is pre-warmed at startup, so a load error surfaces
    immediately.
-8. Run the backend + papi pytest suites and a smoke inference. Roll back if
+8. Confirm `models/serving/models.json` still points at the intended serving
+   slot and update any selector labels/metrics if the promoted run changes.
+9. Run the backend + papi pytest suites and a smoke inference. Roll back if
    anything fails.
-9. **Rollback**: the previous serving model is preserved in its run folder.
+10. **Rollback**: the previous serving model is preserved in its run folder.
    Restore with:
    ```powershell
    Copy-Item models\runs\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force
    ```
    then regenerate the card (step 6, pointing at `models\runs\yolo26n-sequence-1280`)
    and restart the backend.
+
+## 5b. Reproducibility record
+
+What was ACTUALLY used (read from each run's committed `args.yaml` — no
+retro-claims):
+
+| Run | seed | deterministic | imgsz | batch | epochs (trained) | wall time |
+| --- | ---: | --- | ---: | ---: | --- | ---: |
+| `yolo26s-fulldata-1280` | 0 | true | 1280 | 4 | 100 cfg, stopped at 54 | ≈5.2 h |
+| `yolo26n-sequence-1280` | 42 | true | 1280 | 2 | 100 cfg, stopped at 50 | ≈8.9 h |
+
+Both trained on the project laptop (RTX 4070 Laptop GPU, 8 GB). Note the seeds
+differ between runs — they were independent training sessions, recorded as-is.
+
+To reproduce the held-out test evaluation (from the repo root):
+
+```powershell
+.venv\Scripts\python.exe workflows/scripts/build_redwhite_test_view.py
+.venv\Scripts\python.exe workflows/scripts/run_redwhite_test_eval.py
+# transition model (3-class twin):
+.venv\Scripts\python.exe workflows/scripts/evaluate_transition_model.py --no-examples
+```
+
+Raw flights are not git-versioned (size); dataset identity is pinned by the
+twin's `manifest.json` / `tracking_manifest.json` plus the per-box label-gate
+audit trail (`verification_log.csv`). Delete `**/labels.cache` after ANY
+relabeling — Ultralytics does not invalidate it (this silently fed a stale
+label set to an earlier eval).
+
+## 5c. Enabling the optional transition classifier
+
+The 3-class `transition` registry entry ships disabled-by-default: its weights are
+an experimental local artifact (`data/runs/detect/transition3class-yolo26s-1280/`),
+not committed. The selector button in the Live Demo stays greyed out until the
+backend can see the file. Two working recipes:
+
+**Bare-metal / local uvicorn** — nothing to do if the training run is present:
+the registry path `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt`
+resolves against the repo root. (Optionally override with
+`PAPI_TRANSITION_MODEL_PATH=<path>`.)
+
+**Docker Compose** — the container only mounts `./models`, so a `data/...` path
+can NEVER resolve inside it (it lands at the unmounted `/app/data/...`). Place
+the weights inside the mount and reference the in-container path:
+
+```powershell
+New-Item -ItemType Directory -Force models\transition | Out-Null
+Copy-Item data\runs\detect\transition3class-yolo26s-1280\weights\best.pt models\transition\best.pt
+# .env (models/transition/ is gitignored, so the copy is never committed):
+#   PAPI_TRANSITION_MODEL_PATH=/models/transition/best.pt
+docker compose up -d backend   # env change only — no rebuild needed
+```
+
+Verify: the startup log prints `Registry models loaded at startup: ... transition`
+and `/api/models` reports the entry `available: true`. Selecting it in the UI
+auto-uses the learned `model` transition method (`transition_method: "model"` on
+the payload); `PAPI_TRANSITION_METHOD=model` does the same for the default model
+when the entry is available.
+
+**Honesty note**: enabling it makes the classifier *selectable*, not *good* —
+held-out transition-class F1 is 0.10 (recall 2/6, support 6; §3.1.2 / the
+registry's inline `val_metrics`). `tracking` stays the default method until the
+CVAT relabel grows the transition class (§6).
 
 ## 6. Open items
 

@@ -60,6 +60,10 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface-muted);
+  /* The panel grid stretches row cells to the tallest sibling; pack our own
+     content to the top so the stretch never opens gaps between heading and
+     list (the list itself is capped below). */
+  align-content: start;
 }
 
 .transition-readout > span {
@@ -81,14 +85,39 @@
   font-weight: 600;
 }
 
+/* Neutral count pill next to the method pill: a two-minute sweep yields dozens
+   of flips, and the list scrolls — the evidence volume must read at a glance. */
+.transition-readout__count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Capped + scrollable: the list grows with the analysed footage (31 entries on
+   the bundled two-minute sample), and uncapped it stretched the whole panel
+   row — the sibling model/angle cards ballooned with it. */
 .transition-readout ul {
   margin: 6px 0 0;
   padding-left: 18px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .transition-readout li {
   color: var(--text-strong);
   font-size: 13px;
+  line-height: 1.6;
+}
+
+.transition-readout__angle {
+  color: var(--text-muted);
 }
 
 /* Site footer (ported from New_frontend; uses the merged palette tokens). */
@@ -298,10 +327,9 @@
   cursor: pointer;
 }
 
-/* Transition-method toggle — a segmented control (Tracking | Model) matching the runway
-   selector's bordered surface; the active option is filled with the theme accent. Lets the
-   user pick how transitions are detected before/after an analysis. */
-.transition-method {
+/* Inference model selector — a segmented control matching the runway selector's
+   bordered surface; unavailable registry entries are visible but disabled. */
+.model-selector {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -314,19 +342,19 @@
   font-size: 13px;
 }
 
-.transition-method__label {
+.model-selector__label {
   white-space: nowrap;
   font-weight: 600;
 }
 
-.transition-method__options {
+.model-selector__options {
   display: inline-flex;
   border: 1px solid var(--border);
   border-radius: 3px;
   overflow: hidden;
 }
 
-.transition-method__option {
+.model-selector__option {
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -335,19 +363,40 @@
   cursor: pointer;
 }
 
-.transition-method__option + .transition-method__option {
+.model-selector__option + .model-selector__option {
   border-left: 1px solid var(--border);
 }
 
-.transition-method__option.is-active {
+.model-selector__option.is-active {
   background: var(--accent);
   color: var(--surface);
   font-weight: 600;
 }
 
-.transition-method__option:focus-visible {
-  outline: 2px solid var(--accent);
+/* aria-disabled (not the disabled attribute) keeps blocked options focusable so
+   keyboard focus survives mid-analysis and the title reason stays reachable. */
+.model-selector__option:disabled,
+.model-selector__option[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.model-selector__option:focus-visible {
+  /* --focus, not --accent: the active option's background IS var(--accent), so an
+     accent outline would be invisible on it (WCAG 2.4.7). */
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
+}
+
+.model-selector small {
+  max-width: 18ch;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.model-selector__error {
+  color: var(--danger);
 }
 
 .upload-button,

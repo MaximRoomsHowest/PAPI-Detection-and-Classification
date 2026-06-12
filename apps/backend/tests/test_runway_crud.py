@@ -77,6 +77,24 @@ def test_create_runway_is_listed_usable_and_deletable(client, isolated_runways):
     assert runway_id not in {r["id"] for r in client.get("/api/runways").json()}
 
 
+def test_create_runway_long_label_id_fits_analysis_log_column(client, isolated_runways):
+    """The id derived from a max-length label (120 chars, no explicit id) must
+    fit analysis_logs.runway_id VARCHAR(96). Pre-cap, "custom_" + the uncapped
+    slug reached 127 chars and 503'd every analysis on that runway at the log
+    commit on Postgres (audit 2026-06-12)."""
+    label = "Extremely Long Runway Label " * 5  # > 120 trimmed below
+    created = client.post(
+        "/api/runways",
+        json={"label": label.strip()[:120], "lights": _valid_lights()},
+    )
+    assert created.status_code == 201, created.text
+    runway_id = created.json()["id"]
+    assert runway_id.startswith("custom_")
+    assert len(runway_id) <= 96
+    # The cap must not leave a dangling separator.
+    assert not runway_id.endswith("_")
+
+
 def test_create_runway_rejects_wrong_lamp_count(client, isolated_runways):
     resp = client.post("/api/runways", json={"label": "Bad", "lights": _valid_lights()[:3]})
     assert resp.status_code == 422

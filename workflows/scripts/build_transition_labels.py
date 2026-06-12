@@ -130,7 +130,7 @@ def process_video(video_dir: Path, airport_config: dict, *, half_window: int, wa
                     previous_state=flip.from_state, candidate_state="transition",
                     next_state=flip.to_state, transition_type=flip.transition_type,
                     flip_frame=flip.from_frame, frame_offset=offset,
-                    approach_elevation_deg=elev(fr) if math.isfinite(elev(fr)) else 0.0,
+                    approach_elevation_deg=elev(fr),  # NaN when missing; as_row emits "" (LS-9)
                     empirical_set_angle_deg=f"{sa:.3f}" if sa is not None else "",
                     runway=approach_elevation_deg(meta, airport_config)[0] if meta else "",
                     camera=meta.get("camera", ""),

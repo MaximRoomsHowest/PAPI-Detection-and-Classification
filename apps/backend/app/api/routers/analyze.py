@@ -71,6 +71,9 @@ class AnalyzeParams:
     # detector). None lets the service apply its configured default. Validated server-side; an
     # unknown value falls back to "tracking".
     transition_method: str | None
+    # Optional selectable inference model from /api/models. Omitted keeps the
+    # backend default; unknown ids are rejected by the inference service.
+    model_id: str | None
 
 
 def analyze_params(
@@ -84,9 +87,10 @@ def analyze_params(
     drone_longitude: Annotated[float | None, Form()] = None,
     drone_altitude_m: Annotated[float | None, Form()] = None,
     transition_method: Annotated[str | None, Form()] = None,
+    model_id: Annotated[str | None, Form()] = None,
 ) -> AnalyzeParams:
     return AnalyzeParams(
-        runway_id, drone_id, drone_latitude, drone_longitude, drone_altitude_m, transition_method
+        runway_id, drone_id, drone_latitude, drone_longitude, drone_altitude_m, transition_method, model_id
     )
 
 
@@ -360,6 +364,7 @@ def analyze_sequence(
                 drone_metadata=manual_metadata,
                 drone_samples=drone_samples,
                 transition_method=params.transition_method,
+                model_id=params.model_id,
             )
             log = AnalysisLogRepository(db).create_from_payload(payload)
             payload.log_id = log.id
@@ -413,6 +418,7 @@ def _analyze_upload(
                 drone_metadata=manual_metadata,
                 drone_samples=drone_samples,
                 transition_method=params.transition_method,
+                model_id=params.model_id,
             )
             log = AnalysisLogRepository(db).create_from_payload(payload)
             payload.log_id = log.id

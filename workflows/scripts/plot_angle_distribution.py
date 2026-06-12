@@ -9,11 +9,15 @@ validated to ~0.02 deg against the client's tool.
 
 Usage:
     python workflows/scripts/plot_angle_distribution.py [DATASET_DIR] [OUT_PNG]
+
+DATASET_DIR may be omitted when PAPI_ARTIFACTS_ROOT points at the artifacts
+checkout (the snapshot-relative dataset path is appended).
 """
 
 from __future__ import annotations
 
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -30,9 +34,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 from app.services.runways import get_runway  # noqa: E402
 from papi import geodetic_to_enu  # noqa: E402
 
-DEFAULT_DATASET = Path(
-    "C:/Users/rodri/source/howest/25-26/industryproject/PAPI-artifacts/"
-    "2026-05-26-cleanup/data/datasets/papi_lamp_sequences"
+# The populated dataset lives in the machine-specific artifacts checkout; no
+# portable hardcoded default exists. Resolved from PAPI_ARTIFACTS_ROOT when set.
+_ARTIFACTS_ROOT = os.environ.get("PAPI_ARTIFACTS_ROOT")
+DEFAULT_DATASET = (
+    Path(_ARTIFACTS_ROOT) / "2026-05-26-cleanup" / "data" / "datasets" / "papi_lamp_sequences"
+    if _ARTIFACTS_ROOT
+    else None
 )
 
 
@@ -101,5 +109,11 @@ def main(dataset_dir: Path, out_png: Path) -> None:
 
 if __name__ == "__main__":
     dataset = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_DATASET
+    if dataset is None:
+        print(
+            "Usage: python workflows/scripts/plot_angle_distribution.py [DATASET_DIR] [OUT_PNG]\n"
+            "Set PAPI_ARTIFACTS_ROOT or pass DATASET_DIR explicitly."
+        )
+        sys.exit(2)
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else (ROOT / "angle_distribution.png")
     main(dataset, out)

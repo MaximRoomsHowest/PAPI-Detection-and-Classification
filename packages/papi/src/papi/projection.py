@@ -118,7 +118,10 @@ def world_to_image(
     image = convention.body_to_image @ body
 
     z = image[2]
-    if z <= 1e-6:
+    # `not (z > eps)` instead of `z <= eps`: NaN compares False to everything, so a
+    # non-finite depth (bad upstream lat/lon) must hit the behind-camera contract
+    # (None, None, True, False) rather than flowing into the division (audit LS-4).
+    if not (z > 1e-6):
         return None, None, True, False
 
     u = fx_px * (image[0] / z) + cx_px

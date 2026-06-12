@@ -28,14 +28,14 @@ import {
   deleteRunway,
   fetchLogs,
   fetchModelInfo,
-  fetchReady,
+  fetchModels,
   fetchRunways,
   fetchStats,
-  fetchSystem,
   logsCsvUrl,
   mediaUrl,
   resolveMediaUrl,
 } from './api.js'
+import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages.js'
 
 /** Helper: build a Response-like object the way fetch resolves to one. */
 function jsonResponse(body, { ok = true, status = ok ? 200 : 500 } = {}) {
@@ -119,6 +119,12 @@ describe('GET endpoints — URL + header pinning', () => {
     expect(url).toMatch(/\/api\/model$/)
   })
 
+  it('fetchModels targets /api/models', async () => {
+    await fetchModels()
+    const [url] = fetch.mock.calls[0]
+    expect(url).toMatch(/\/api\/models$/)
+  })
+
   it('fetchStats targets /api/stats', async () => {
     await fetchStats()
     const [url] = fetch.mock.calls[0]
@@ -177,7 +183,7 @@ describe('runway mutations — payloads and backend details', () => {
     )
 
     await expect(createRunway({})).rejects.toThrow(
-      'A runway must have exactly 4 PAPI lamps.; Lamp coordinates must be distinct.',
+      'A runway must have exactly 4 PAPI lamps. · Lamp coordinates must be distinct.',
     )
   })
 
@@ -205,6 +211,7 @@ describe('analyze* — multipart payload + auth', () => {
     droneLatitude: '47.668810',
     droneLongitude: '9.504007',
     droneAltitudeM: '466.5',
+    modelId: 'nano',
   }
 
   it('analyzeFrame POSTs to /api/analyze-frame with file + metadata', async () => {
@@ -217,6 +224,7 @@ describe('analyze* — multipart payload + auth', () => {
     expect(init.body).toBeInstanceOf(FormData)
     expect(init.body.get('file')).toBe(file)
     expect(init.body.get('runway_id')).toBe('24')
+    expect(init.body.get('model_id')).toBe('nano')
     expect(init.body.get('drone_id')).toBe('M4E-01')
     expect(init.body.get('drone_latitude')).toBe('47.668810')
   })
@@ -281,6 +289,18 @@ describe('analyze* — multipart payload + auth', () => {
     expect(init.body.get('drone_id')).toBeNull()
     expect(init.body.get('drone_latitude')).toBeNull()
   })
+
+  it('omits model_id when no model is selected yet, so the backend default applies', async () => {
+    // Before /api/models resolves (or after it fails / on a legacy backend) the UI
+    // holds modelId=null — sending a guessed id would 400 with "Unknown model_id".
+    const file = makeFile('frame.jpg', 1_000)
+    await analyzeFrame(file, { runwayId: '24', modelId: null })
+
+    const [, init] = fetch.mock.calls[0]
+    expect(init.body.get('model_id')).toBeNull()
+    // transition_method is backend-owned now; the client never sends it.
+    expect(init.body.get('transition_method')).toBeNull()
+  })
 })
 
 describe('analyze* — optional telemetry file', () => {
@@ -332,6 +352,29 @@ describe('analyze* — error surfacing', () => {
     })
     await expect(analyzeFrame(tinyFile(), metadata)).rejects.toThrow(/500/)
   })
+
+  it('flattens a FastAPI 422 array detail into a readable message', async () => {
+    // Non-numeric drone telemetry produces this shape; rendering it raw used to
+    // surface "[object Object]" in the error banner (user test 2026-06-11).
+    fetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          detail: [
+            {
+              type: 'float_parsing',
+              loc: ['body', 'drone_latitude'],
+              msg: 'Input should be a valid number, unable to parse string as a number',
+              input: 'abc',
+            },
+          ],
+        },
+        { ok: false, status: 422 },
+      ),
+    )
+    await expect(analyzeFrame(tinyFile(), metadata)).rejects.toThrow(
+      'drone_latitude: Input should be a valid number, unable to parse string as a number',
+    )
+  })
 })
 
 describe('upload size guard', () => {
@@ -366,7 +409,14 @@ describe('upload size guard', () => {
 
 describe('fetchLogs — filters + total count', () => {
   it('builds a querystring from camelCase options', async () => {
-    await fetchLogs({ limit: 10, offset: 20, runwayId: 'papi_24', globalState: 'too_low', minConfidence: 0.5 })
+    await fetchLogs({
+      limit: 10,
+      offset: 20,
+      runwayId: 'papi_24',
+      globalState: 'too_low',
+      minConfidence: 0.5,
+      modelId: 'nano',
+    })
     const [url] = fetch.mock.calls[0]
     expect(url).toContain('/api/logs?')
     expect(url).toContain('limit=10')
@@ -374,6 +424,13 @@ describe('fetchLogs — filters + total count', () => {
     expect(url).toContain('runway_id=papi_24')
     expect(url).toContain('global_state=too_low')
     expect(url).toContain('min_confidence=0.5')
+    expect(url).toContain('model_id=nano')
+  })
+
+  it('omits model_id from the query when no model filter is active', async () => {
+    await fetchLogs({ limit: 10, modelId: '' })
+    const [url] = fetch.mock.calls[0]
+    expect(url).not.toContain('model_id')
   })
 
   it('returns items + total from the X-Total-Count header', async () => {
@@ -392,37 +449,11 @@ describe('fetchLogs — filters + total count', () => {
   })
 })
 
-describe('logsCsvUrl + fetchSystem + fetchReady', () => {
-  it('logsCsvUrl points at export.csv and carries filters', () => {
+describe('logsCsvUrl', () => {
+  it('points at export.csv and carries filters', () => {
     const url = logsCsvUrl({ runwayId: 'papi_06' })
     expect(url).toMatch(/\/api\/logs\/export\.csv\?/)
     expect(url).toContain('runway_id=papi_06')
-  })
-
-  it('fetchSystem targets /api/system', async () => {
-    await fetchSystem()
-    const [url] = fetch.mock.calls[0]
-    expect(url).toMatch(/\/api\/system$/)
-  })
-
-  it('fetchReady targets /health/ready and reflects ok', async () => {
-    fetch.mockResolvedValueOnce(jsonResponseWithHeaders({ status: 'ready' }, { ok: true }))
-    const result = await fetchReady()
-    const [url] = fetch.mock.calls[0]
-    expect(url).toMatch(/\/health\/ready$/)
-    expect(result.ok).toBe(true)
-    expect(result.status).toBe('ready')
-  })
-
-  it('fetchReady returns ok:false when the backend is unreachable (no throw)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new Error('connection refused')
-      }),
-    )
-    const result = await fetchReady()
-    expect(result.ok).toBe(false)
   })
 })
 
@@ -441,5 +472,22 @@ describe('fetchWithTimeout — abort propagation', () => {
     )
 
     await expect(fetchRunways()).rejects.toThrow(/did not respond/i)
+  })
+
+  it('tags the timeout error with the code + seconds the UI localizes from', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        const err = new Error('aborted')
+        err.name = 'AbortError'
+        throw err
+      }),
+    )
+
+    const error = await fetchRunways().catch((caught) => caught)
+    expect(error.code).toBe(REQUEST_TIMEOUT_ERROR_CODE)
+    // Default GET budget is 60 s; display sites interpolate this into the
+    // localized errors.requestTimeout string.
+    expect(error.timeoutSeconds).toBe(60)
   })
 })

@@ -31,6 +31,7 @@ it can be unit-tested in isolation and reused by the offline pipeline if needed.
 from __future__ import annotations
 
 import bisect
+import logging
 import re
 
 from app.services.telemetry.csv_parser import _parse_csv
@@ -41,6 +42,8 @@ from app.services.telemetry.sample import (
     TelemetryError,
 )
 from app.services.telemetry.srt import _parse_srt
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "DroneSample",
@@ -96,6 +99,12 @@ def parse_telemetry(filename: str, raw: bytes) -> list[DroneSample]:
         # Pathologically long track: uniformly downsample to the cap so the per-frame
         # resample stays bounded (audit: sample-count / O(n*m) resample DoS). Uniform
         # striding preserves the track's span rather than truncating the descent.
+        # Logged so a silently thinned angle track is diagnosable from the run log.
+        logger.warning(
+            "Telemetry track downsampled from %d to %d samples (cap).",
+            len(samples),
+            MAX_TELEMETRY_SAMPLES,
+        )
         stride = len(samples) / MAX_TELEMETRY_SAMPLES
         samples = [samples[int(i * stride)] for i in range(MAX_TELEMETRY_SAMPLES)]
 
@@ -127,6 +136,17 @@ def resample_to_frames(samples: list[DroneSample], frame_count: int) -> list[Dro
     if have_indices:
         indexed = sorted(samples, key=lambda s: s.frame_index)
         keys = [s.frame_index for s in indexed]
+        if keys[-1] >= frame_count:
+            # A track whose counters out-run the video pins every trailing frame to
+            # the last in-range fix — usually an SRT from a LONGER recording than the
+            # uploaded clip. Correct nearest-match behaviour, but worth a log line:
+            # the trailing angles all come from one fix and look suspiciously flat.
+            logger.warning(
+                "Telemetry frame indices reach %d but the video has %d frames; "
+                "trailing frames reuse the nearest in-range fix.",
+                keys[-1],
+                frame_count,
+            )
         out: list[DroneSample] = []
         for frame in range(frame_count):
             # Nearest frame_index via binary search on the sorted keys — O((F+N)logN)

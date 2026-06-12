@@ -123,4 +123,12 @@ describe('formatTimestamp', () => {
     expect(typeof out).toBe('string')
     expect(out).not.toBe('—')
   })
+
+  it('formats the date in the requested app locale', () => {
+    const iso = '2026-06-02T12:34:00Z'
+    // German abbreviates June as "Juni"; English (GB) as "Jun" — the month
+    // token is the locale-sensitive part that does not depend on timezone.
+    expect(formatTimestamp(iso, 'de-DE')).toContain('Juni')
+    expect(formatTimestamp(iso, 'en-GB')).toContain('Jun')
+  })
 })

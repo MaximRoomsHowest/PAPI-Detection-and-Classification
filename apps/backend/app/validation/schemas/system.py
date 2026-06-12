@@ -15,10 +15,22 @@ class ValMetrics(BaseModel):
     recall: float | None = None
     map50: float | None = None
     map50_95: float | None = None
+    # Per-class breakdown (e.g. {"transition": {"precision": 0.0, ...}}). The registry
+    # carries these for the 3-class transition model and pydantic's extra="ignore" was
+    # silently dropping them — hiding exactly the number a safety reviewer comparing
+    # models needs (audit PC-1).
+    per_class: dict[str, dict[str, float]] | None = None
     note: str | None = None
 
 
 class ModelInfo(BaseModel):
+    model_id: str | None = None
+    model_label: str | None = None
+    model_role: str | None = None
+    is_default: bool = False
+    available: bool = True
+    disabled_reason: str | None = None
+    description: str | None = None
     model_path: str
     model_filename: str
     model_format: str
@@ -33,8 +45,11 @@ class ModelInfo(BaseModel):
     # /api/model can answer "which run is serving and how accurate is it?". All
     # optional — a bare-weights dev checkout (no model_card.json) returns None.
     sha256: str | None = None
+    # True when the on-disk file no longer matches the loaded weights (checkpoint
+    # swapped under a running service; restart pending). None when not loaded.
+    weights_changed_on_disk: bool | None = None
     classes: dict[int, str] | None = None
-    model_id: str | None = None
+    model_card_id: str | None = None
     training_run: str | None = None
     base_weights: str | None = None
     dataset_split_evaluated: str | None = None

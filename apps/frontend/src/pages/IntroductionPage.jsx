@@ -109,10 +109,14 @@ export function IntroductionPage({ copy }) {
             </div>
 
             <div className="airport-map">
+              {/* The OSM embed needs scripts but nothing else — verified to render
+                  fully under an opaque-origin sandbox (no storage, no popups,
+                  no navigation, no access to this page). */}
               <iframe
                 title="Bodensee-Airport Friedrichshafen map"
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
+                sandbox="allow-scripts"
                 src="https://www.openstreetmap.org/export/embed.html?bbox=9.4896%2C47.6572%2C9.5332%2C47.6856&layer=mapnik&marker=47.67139%2C9.51139"
               />
               <span className="map-caption tnum">47.67139 N, 9.51139 E</span>

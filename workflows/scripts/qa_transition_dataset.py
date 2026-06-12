@@ -84,7 +84,15 @@ def qa(twin: Path) -> dict:
             for label_path in sorted((video_dir / "labels").glob("*.txt")):
                 total_frames += 1
                 file = label_path.stem + ".JPG"
-                split = split_of_file.get(file, "train")
+                if file not in split_of_file:
+                    # Hard-error instead of silently bucketing into "train": a future
+                    # flight with .jpg/.png filenames would otherwise make this report
+                    # diverge from the real training split with no signal (audit WS-6a).
+                    raise SystemExit(
+                        f"QA: label {label_path} has no metadata row for '{file}' — "
+                        "filename/extension mismatch between labels/ and metadata.csv."
+                    )
+                split = split_of_file[file]
                 split_frames[split] += 1
                 try:
                     classes, errs = _validate_label(label_path)
@@ -105,16 +113,19 @@ def qa(twin: Path) -> dict:
     transition_total = totals.get(2, 0)
     red_total, white_total = totals.get(0, 0), totals.get(1, 0)
 
-    # per-lamp transition + ambiguous from the verification log
+    # per-lamp transition (accepted) + exclusions from the verification log. Decisions other than
+    # accepted_* are reverts to red/white (fallback_identity, telemetry_gap, stable_colour).
     per_lamp = Counter()
-    ambiguous = 0
+    excluded = 0
+    excluded_by_reason: Counter = Counter()
     vlog = twin / "verification_log.csv"
     if vlog.exists():
         for r in _read_csv(vlog):
-            if r["decision"] == "accepted_transition":
+            if r["decision"].startswith("accepted"):
                 per_lamp[r.get("track_id", "")] += 1
-            elif r["decision"] == "ambiguous_review":
-                ambiguous += 1
+            else:
+                excluded += 1
+                excluded_by_reason[r["decision"]] += 1
 
     transition_in_train = split_classes.get("train", Counter()).get(2, 0)
     transition_in_val = split_classes.get("val", Counter()).get(2, 0)
@@ -135,7 +146,8 @@ def qa(twin: Path) -> dict:
         "transition_by_video": dict(transition_by_video),
         "most_loaded_clip_share": round(overrep, 3),
         "per_lamp_transition": dict(per_lamp),
-        "ambiguous_excluded": ambiguous,
+        "excluded_from_transition": excluded,
+        "excluded_by_reason": dict(excluded_by_reason),
         "format_errors": len(errors),
         "corrupt_files": len(corrupt),
         "split_leakage_flights": leaking,
@@ -160,7 +172,8 @@ def _write_report(s: dict, sample_errors: list[str]) -> None:
         f"- Boxes — red: **{b['red']}**, white: **{b['white']}**, transition: **{b['transition']}**",
         f"- Transition share of boxes: **{s['transition_pct_of_boxes']}%** "
         f"(imbalance red+white : transition ≈ **{s['imbalance_red_white_to_transition']} : 1**)",
-        f"- Ambiguous candidates excluded (reverted to red/white): **{s['ambiguous_excluded']}**",
+        f"- Candidates excluded from transition (reverted to red/white): **{s['excluded_from_transition']}** "
+        f"{json.dumps(s['excluded_by_reason'])}",
         "",
         "## Split distribution (flight-level)",
         "",
@@ -197,8 +210,9 @@ def _write_report(s: dict, sample_errors: list[str]) -> None:
         "",
         "## Known limitations",
         "",
-        "- Transition is a small minority class (~4% of boxes); Phase 7 handles imbalance via "
-        "transition-frame oversampling + colour-safe augmentation (no hue/sat jitter).",
+        f"- Transition is a small minority class ({s['transition_pct_of_boxes']}% of boxes); "
+        "Phase 7 handles imbalance via transition-frame oversampling + colour-safe "
+        "augmentation (no hue/sat jitter).",
         "- rwy-06 transition angles use FAA defaults (commissioned set-angles pending); affects "
         "angle-binding, not the visual transition label.",
         "- Verification was an AI spot-check of 36/~150 flips + a dataset-wide rule; a fuller human "
@@ -213,7 +227,10 @@ def main() -> int:
     args = parser.parse_args()
     summary = qa(args.twin)
     print(json.dumps(summary, indent=2))
-    return 1 if summary["hard_fail"] else 0
+    # Gate on the full verdict: a dataset with label-format errors (or no transition
+    # boxes in train/val) printed "Ready: NO" but still exited 0, so a scripted
+    # pipeline would train on it anyway (audit WS-8).
+    return 0 if summary["ready_for_training"] else 1
 
 
 if __name__ == "__main__":

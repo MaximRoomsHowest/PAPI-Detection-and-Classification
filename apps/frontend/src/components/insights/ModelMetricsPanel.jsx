@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { Cpu, Target } from 'lucide-react'
 import { LazyPlot } from './LazyPlot'
 import { AngleEmptyState } from './AngleEmptyState'
 import { InlineMetric } from '../InlineMetric'
 import { useFetch } from '../../hooks/useFetch'
-import { fetchModelInfo, fetchStats } from '../../lib/api'
+import { fetchModelInfo, fetchModels, fetchStats } from '../../lib/api'
 import {
   axisTitle,
   basePlotLayout,
@@ -15,14 +16,16 @@ import {
 } from '../../catalog/plotly'
 import { backendStateId, stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
+import { lampStateLabel } from '../../lib/stateLabels'
 import { percent } from '../../lib/format'
 
 // Aggregate model/dataset panel. All values come from the backend:
 //   /api/stats  -> logged global-state distribution + throughput
-//   /api/model  -> validation-split detection metrics (box, NOT per-class)
-// Per-class precision/recall/F1 and a confusion matrix are intentionally NOT
-// shown: the backend exposes only box-detection metrics, so building them would
-// be fabrication (documented blocker).
+//   /api/model  -> the selected registry entry's card (val_metrics + provenance)
+// Per-class rows render ONLY when the card itself carries `per_class` (the
+// 3-class transition entry ships real measured ones); deriving them for cards
+// that lack them would be fabrication (documented blocker), so absent stays
+// absent.
 
 function stateLabel(rawState, copy) {
   const id = backendStateId[rawState] ?? 'unknown'
@@ -88,6 +91,8 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
   )
 }
 
+const fmt = (value) => (Number.isFinite(value) ? value.toFixed(3) : '—')
+
 function ModelMetrics({ model, copy }) {
   const metrics = model?.val_metrics
   if (!metrics) {
@@ -98,7 +103,7 @@ function ModelMetrics({ model, copy }) {
       />
     )
   }
-  const fmt = (value) => (Number.isFinite(value) ? value.toFixed(3) : '—')
+  const perClass = metrics.per_class && Object.entries(metrics.per_class)
   return (
     <>
       <div className="metric-grid">
@@ -114,16 +119,67 @@ function ModelMetrics({ model, copy }) {
           suffix={Number.isFinite(model.confidence_threshold) ? '%' : ''}
         />
       </div>
-      {/* The card subtitle already carries the "box detection, not per-class"
-          disclaimer; here we surface only the backend's own val_metrics note. */}
-      {metrics.note ? <p className="viz-footnote">{metrics.note}</p> : null}
+      {/* MEASURED per-class rows from the card itself (e.g. the 3-class
+          transition entry) — localized class names, raw values verbatim. */}
+      {perClass?.length > 0 && (
+        <table className="model-per-class">
+          <caption>{copy.insights.metricPerClass}</caption>
+          <thead>
+            <tr>
+              <th scope="col" />
+              <th scope="col">{copy.insights.metricPrecision}</th>
+              <th scope="col">{copy.insights.metricRecall}</th>
+              <th scope="col">F1</th>
+              <th scope="col">{copy.insights.metricMap50}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {perClass.map(([className, row]) => (
+              <tr key={className}>
+                <th scope="row">{lampStateLabel(className, copy)}</th>
+                <td className="tnum">{fmt(row?.precision)}</td>
+                <td className="tnum">{fmt(row?.recall)}</td>
+                <td className="tnum">{fmt(row?.f1)}</td>
+                <td className="tnum">{fmt(row?.map50)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {perClass?.length > 0 && metrics.note ? <p className="viz-footnote">{metrics.note}</p> : null}
+      {!perClass?.length ? <p className="viz-footnote">{copy.insights.metricNoPerClass}</p> : null}
     </>
+  )
+}
+
+function ModelCredentials({ model, copy }) {
+  if (!model) return null
+  const role = model.model_role ? (copy.live.modelRole?.[model.model_role] ?? model.model_role) : '—'
+  const split = model.dataset_split_evaluated ? `${model.dataset_split_evaluated} split` : '—'
+  const threshold = Number.isFinite(model.confidence_threshold)
+    ? `${Math.round(model.confidence_threshold * 100)}%`
+    : '—'
+  return (
+    <div className="model-credentials" aria-label={copy.insights.modelCredentials}>
+      <InlineMetric label={copy.insights.modelRole} value={role} />
+      <InlineMetric label={copy.history.trainingRun} value={model.training_run || '—'} />
+      <InlineMetric label={copy.insights.modelSplit} value={split} />
+      <InlineMetric label={copy.insights.metricThreshold} value={threshold} />
+    </div>
   )
 }
 
 export function ModelMetricsPanel({ plotTheme, copy }) {
   const stats = useFetch(fetchStats, [])
-  const model = useFetch(fetchModelInfo, [])
+  // Every registry model's card is inspectable, not only the backend default —
+  // /api/model?model_id always supported this; the UI never sent an id
+  // (integration audit 2026-06-11). null = the backend default's card.
+  const [selectedId, setSelectedId] = useState(null)
+  const models = useFetch(fetchModels, [])
+  const model = useFetch(() => fetchModelInfo(selectedId ?? undefined), [selectedId], {
+    keepPreviousData: true,
+  })
+  const pickerOptions = Array.isArray(models.data) ? models.data : []
 
   return (
     <>
@@ -167,12 +223,43 @@ export function ModelMetricsPanel({ plotTheme, copy }) {
             <p>{copy.insights.modelMetricsText}</p>
           </div>
         </div>
-        {model.loading ? (
+        {pickerOptions.length > 1 && (
+          <div className="model-selector" role="group" aria-label={copy.insights.modelPicker}>
+            <span className="model-selector__label">{copy.insights.modelPicker}</span>
+            <div className="model-selector__options">
+              {pickerOptions.map((option) => {
+                const active =
+                  selectedId === option.model_id || (selectedId === null && option.is_default)
+                return (
+                  <button
+                    key={option.model_id}
+                    type="button"
+                    className={`model-selector__option${active ? ' is-active' : ''}`}
+                    aria-pressed={active}
+                    // Unavailable entries stay selectable ON PURPOSE: their card
+                    // (provenance + val_metrics) comes from the registry, not the
+                    // weights file — exactly what a reviewer wants to inspect.
+                    title={option.description || option.model_role || undefined}
+                    onClick={() => setSelectedId(option.model_id)}
+                  >
+                    {option.model_label || option.model_id}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {model.loading && !model.data ? (
           <ChartSkeleton copy={copy} />
         ) : model.error ? (
           <AngleEmptyState icon={<Cpu size={26} aria-hidden="true" />} message={copy.insights.loadError} />
         ) : (
-          <ModelMetrics model={model.data} copy={copy} />
+          <>
+            {model.data && (
+              <ModelCredentials model={model.data} copy={copy} />
+            )}
+            <ModelMetrics model={model.data} copy={copy} />
+          </>
         )}
       </article>
     </>

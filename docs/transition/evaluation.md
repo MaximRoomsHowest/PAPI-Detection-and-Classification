@@ -1,5 +1,11 @@
 # Phase 8 — Transition Evaluation (yolo26s)
 
+> **Superseded (2026-06-09):** the metrics below predate the 2026-06-09 colour-gate label cleanup
+> (487 → 250 transition boxes) and the subsequent retrain. Current numbers live in
+> `evaluation_metrics.json` (retrained `transition3class-yolo26s-1280-clean`: red mAP50 0.87,
+> white 0.94; false transitions 53 → 1; transition recall starved — 0 of the 6 test-split boxes
+> detected). This file is kept as the evaluation record of the pre-cleanup model.
+
 Model: **`yolo26s`** @ 1280 (the production backbone), 19 epochs (`best.pt`), trained on
 flip-anchored + AI-spot-checked labels, colour-safe augmentation, transition oversampling, under
 **ultralytics 8.4.61** (8.3.x cannot train yolo26). Raw metrics: `evaluation_metrics.json`,

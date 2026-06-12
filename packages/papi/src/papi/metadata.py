@@ -10,6 +10,7 @@ Field names and value formats verified against:
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -71,12 +72,16 @@ def _dms_to_dd(dms: tuple, ref: str) -> float | None:
     if dms is None:
         return None
     try:
+        # ZeroDivisionError: PIL's IFDRational(x, 0) raises on float() — a corrupt
+        # zero-denominator EXIF rational must yield None, not crash extraction (LS-1).
         deg = float(dms[0])
         minutes = float(dms[1])
         seconds = float(dms[2])
-    except (TypeError, ValueError, IndexError):
+    except (TypeError, ValueError, IndexError, ZeroDivisionError):
         return None
     dd = deg + minutes / 60.0 + seconds / 3600.0
+    if not math.isfinite(dd):
+        return None
     if ref in ("S", "W"):
         dd = -dd
     return dd

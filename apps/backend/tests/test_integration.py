@@ -19,6 +19,7 @@ Two substitutions in the fixture:
 
 from __future__ import annotations
 
+import re
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -85,12 +86,16 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         drone_metadata=None,
         drone_samples=None,
         transition_method=None,
+        model_id=None,
     ):
         return AnalysisPayload(
             media_type=media_type,
             original_filename=original_filename,
             runway_id=runway_id,
             drone_id=drone_id,
+            model_id=model_id or "small",
+            model_label="Small detector",
+            model_role="detector",
             global_state="correct_glidepath",
             lamps=[
                 LampResult(index=1, state="white", confidence=0.95),
@@ -108,13 +113,16 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     def _fake_analyze_sequence(
         image_paths, runway_id, original_filename, drone_id=None, drone_metadata=None,
-        drone_samples=None, transition_method=None,
+        drone_samples=None, transition_method=None, model_id=None,
     ):
         return AnalysisPayload(
             media_type="video",
             original_filename=original_filename,
             runway_id=runway_id,
             drone_id=drone_id,
+            model_id=model_id or "small",
+            model_label="Small detector",
+            model_role="detector",
             global_state="correct_glidepath",
             lamps=[
                 LampResult(index=1, state="white", confidence=0.95),
@@ -136,7 +144,12 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Readiness gates on the model being loaded; the stub reports loaded by default
     # (test_health_ready_returns_503_when_model_not_loaded flips this).
     fake_service.is_loaded = True
+    fake_service.default_weights_present = True
     fake_service.model_info.return_value = ModelInfo(
+        model_id="small",
+        model_label="Small detector",
+        model_role="detector",
+        is_default=True,
         model_path=str(tmp_path / "models" / "best.pt"),
         model_filename="best.pt",
         model_format="pt",
@@ -147,6 +160,24 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         device="cpu",
         loaded=False,
     )
+    fake_service.model_options.return_value = [
+        fake_service.model_info.return_value,
+        ModelInfo(
+            model_id="transition",
+            model_label="Transition classifier",
+            model_role="transition",
+            model_path=str(tmp_path / "data" / "runs" / "transition.pt"),
+            model_filename="best.pt",
+            model_format="pt",
+            backend_type="ultralytics-pytorch",
+            exists=False,
+            available=False,
+            disabled_reason="missing",
+            confidence_threshold=0.4,
+            device="cpu",
+            loaded=False,
+        ),
+    ]
 
     # Override get_session via FastAPI's mechanism (it's a real Depends).
     app.dependency_overrides[get_session] = override_get_session
@@ -221,6 +252,23 @@ def test_request_id_header_is_preserved_when_client_supplies_one(client):
     """When the caller passes X-Request-ID, the server should propagate it."""
     response = client.get("/health", headers={"X-Request-ID": "test-trace-id-abc"})
     assert response.headers.get("X-Request-ID") == "test-trace-id-abc"
+
+
+def test_oversized_request_id_is_replaced_with_minted_uuid(client):
+    """An overlong inbound id must not be reflected (audit B11) — mint instead."""
+    hostile = "a" * 300
+    response = client.get("/health", headers={"X-Request-ID": hostile})
+    echoed = response.headers.get("X-Request-ID")
+    assert echoed != hostile
+    assert re.fullmatch(r"[0-9a-f]{32}", echoed)
+
+
+def test_hostile_request_id_is_replaced(client):
+    """Ids outside the [A-Za-z0-9._-] charset are minted fresh (audit B11)."""
+    response = client.get("/health", headers={"X-Request-ID": "trace;evil"})
+    echoed = response.headers.get("X-Request-ID")
+    assert echoed != "trace;evil"
+    assert re.fullmatch(r"[0-9a-f]{32}", echoed)
 
 
 def test_analyze_frame_rejects_video_file(client):
@@ -426,9 +474,98 @@ def test_model_endpoint_returns_active_model_metadata(client):
     assert response.status_code == 200
     body = response.json()
     assert body["model_filename"] == "best.pt"
+    assert body["model_id"] == "small"
+    assert body["model_label"] == "Small detector"
     assert body["backend_type"] == "ultralytics-pytorch"
     assert body["confidence_threshold"] == 0.4
     assert body["device"] == "cpu"
+
+
+def test_models_endpoint_returns_selectable_models(client):
+    response = client.get("/api/models")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [model["model_id"] for model in body] == ["small", "transition"]
+    assert body[1]["available"] is False
+
+
+def test_analyze_frame_passes_model_id_to_inference_and_persists_it(client):
+    response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={"runway_id": "papi_24", "model_id": "nano"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_id"] == "nano"
+    log_id = body["log_id"]
+
+    list_body = client.get("/api/logs").json()
+    assert list_body[0]["id"] == log_id
+    assert list_body[0]["model_id"] == "nano"
+
+    detail = client.get(f"/api/logs/{log_id}").json()
+    assert detail["model_id"] == "nano"
+
+
+def test_logs_model_id_filter_and_csv_export(client):
+    """The persisted model_id column drives a server-side filter on both the
+    list endpoint (with X-Total-Count) and the CSV export (audit COL-1)."""
+    for model_id in ("nano", None):
+        data = {"runway_id": "papi_24"}
+        if model_id:
+            data["model_id"] = model_id
+        response = client.post(
+            "/api/analyze-frame",
+            files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+            data=data,
+        )
+        assert response.status_code == 200
+
+    listed = client.get("/api/logs", params={"model_id": "nano"})
+    assert listed.status_code == 200
+    assert listed.headers["X-Total-Count"] == "1"
+    assert [item["model_id"] for item in listed.json()] == ["nano"]
+
+    csv_text = client.get("/api/logs/export.csv", params={"model_id": "nano"}).text
+    body_rows = [row for row in csv_text.strip().splitlines()[1:] if row]
+    assert len(body_rows) == 1
+    assert ",nano," in body_rows[0]
+
+    # A filter value no analysis ever used returns an empty 200, not an error.
+    empty = client.get("/api/logs", params={"model_id": "never-used"})
+    assert empty.status_code == 200
+    assert empty.json() == []
+
+
+def test_analyze_frame_unknown_model_id_returns_400(client):
+    """The unknown-model_id contract (service raises ValueError -> HTTP 400) was
+    previously unpinned because the mock echoed any id back (audit DT-4)."""
+    import app.api.routes as routes
+
+    routes.get_inference_service().analyze.side_effect = ValueError("Unknown model_id: nope")
+
+    response = client.post(
+        "/api/analyze-frame",
+        files={"file": ("frame.jpg", BytesIO(b"\xff\xd8\xff" + b"\x00" * 256), "image/jpeg")},
+        data={"runway_id": "papi_24", "model_id": "nope"},
+    )
+
+    assert response.status_code == 400
+    assert "Unknown model_id" in response.json()["detail"]
+
+
+def test_model_endpoint_unknown_model_id_returns_400(client):
+    import app.api.routes as routes
+
+    routes.get_inference_service().model_info.side_effect = ValueError("Unknown model_id: nope")
+
+    response = client.get("/api/model", params={"model_id": "nope"})
+
+    assert response.status_code == 400
+    assert "Unknown model_id" in response.json()["detail"]
 
 
 def test_stats_endpoint_summarizes_recent_logs(client):
@@ -689,7 +826,10 @@ def test_health_ready_returns_503_when_model_not_loaded(client, monkeypatch):
     """
     from types import SimpleNamespace
 
-    monkeypatch.setattr("app.main.get_inference_service", lambda: SimpleNamespace(is_loaded=False))
+    monkeypatch.setattr(
+        "app.main.get_inference_service",
+        lambda: SimpleNamespace(is_loaded=False, default_weights_present=True),
+    )
     response = client.get("/health/ready")
     assert response.status_code == 503
     body = response.json()

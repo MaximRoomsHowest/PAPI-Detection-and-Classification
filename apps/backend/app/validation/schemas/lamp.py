@@ -21,7 +21,7 @@ class Detection(BaseModel):
     # Measured "redness" of the lamp crop (red-channel fraction scaled to 0-255):
     # high while the lamp is red, low once it turns white. Real pixel measurement
     # backing the client's "Redness vs angle" graph; None when it can't be computed.
-    redness: float | None = Field(default=None, ge=0.0)
+    redness: float | None = Field(default=None, ge=0.0, le=255.0)
 
 
 class LampResult(BaseModel):
@@ -29,9 +29,14 @@ class LampResult(BaseModel):
     state: LampState
     confidence: float = Field(ge=0.0, le=1.0)
     bbox: BoundingBox | None = None
+    # True when the state was inferred from runway geometry + drone angle rather
+    # than directly detected by YOLO. The state still carries the inferred red/white
+    # value so the global PAPI verdict can use it, while the UI can disclose it.
+    inferred: bool = False
+    inference_note: str | None = None
     # Measured red-channel redness of this lamp (0-255, high=red); None when the
     # crop pixels weren't available. Additive — drives the Redness-vs-angle chart.
-    redness: float | None = Field(default=None, ge=0.0)
+    redness: float | None = Field(default=None, ge=0.0, le=255.0)
 
 
 class FrameLampState(BaseModel):
@@ -46,4 +51,4 @@ class FrameLampState(BaseModel):
     state: LampState
     confidence: float = Field(ge=0.0, le=1.0)
     # Measured red-channel redness (0-255, high=red) at this frame; None if absent.
-    redness: float | None = Field(default=None, ge=0.0)
+    redness: float | None = Field(default=None, ge=0.0, le=255.0)

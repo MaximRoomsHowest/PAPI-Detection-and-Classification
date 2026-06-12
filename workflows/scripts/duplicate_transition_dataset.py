@@ -32,11 +32,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The populated canonical dataset lives in the sibling artifacts snapshot; the in-repo
-# data/datasets/ tree is empty scaffolding. Override with --source if it moves.
-DEFAULT_SOURCE = Path(
-    r"C:\Users\rodri\source\howest\25-26\industryproject\PAPI-artifacts"
-    r"\2026-05-26-cleanup\data\datasets\papi_lamp_sequences"
+# The populated canonical dataset lives in the sibling artifacts snapshot — a
+# machine-specific location, so there is no portable hardcoded default. Set
+# PAPI_ARTIFACTS_ROOT to the artifacts checkout (the snapshot-relative path is
+# appended) or pass --source explicitly.
+_ARTIFACTS_ROOT = os.environ.get("PAPI_ARTIFACTS_ROOT")
+DEFAULT_SOURCE = (
+    Path(_ARTIFACTS_ROOT) / "2026-05-26-cleanup" / "data" / "datasets" / "papi_lamp_sequences"
+    if _ARTIFACTS_ROOT
+    else None
 )
 DEFAULT_TARGET = REPO_ROOT / "data" / "datasets" / "transition-classification-data"
 
@@ -157,6 +161,8 @@ def main() -> int:
     parser.add_argument("--target", type=Path, default=DEFAULT_TARGET)
     parser.add_argument("--overwrite", action="store_true", help="relink/recopy existing files")
     args = parser.parse_args()
+    if args.source is None:
+        parser.error("set PAPI_ARTIFACTS_ROOT or pass --source <papi_lamp_sequences dir>")
 
     src_before = _tree_signature(args.source)
     report = duplicate(args.source, args.target, overwrite=args.overwrite)

@@ -8,15 +8,10 @@ import {
   initialTheme,
   safeLocalStorageSet,
 } from './lib/storage'
-import { stateCatalog } from './catalog/stateCatalog'
-import { scenarios } from './catalog/scenarios'
 import { translations } from './i18n/translations'
-import { translateScenario, translateState } from './i18n/translate'
-import { useAnalysis } from './hooks/useAnalysis'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { CookieConsent } from './components/CookieConsent'
 import { LiveDemoProvider } from './context/LiveDemoProvider'
 import { IntroductionPage } from './pages/IntroductionPage'
 import { LiveDemoPage } from './pages/LiveDemoPage'
@@ -44,43 +39,6 @@ function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [language, setLanguage] = useState(initialLanguage)
   const copy = translations[language]
-
-  // Live-Demo upload + backend-inference state and handlers live in this hook
-  // (extracted from App, which is now just the route shell + theme/language/status).
-  const analysis = useAnalysis(copy)
-
-  const activeScenarioRaw = useMemo(
-    () => {
-      if (analysis.activeId === 'backend' && analysis.backendScenario) {
-        return analysis.backendScenario
-      }
-      return scenarios.find((scenario) => scenario.id === analysis.activeId) ?? scenarios[0]
-    },
-    [analysis.activeId, analysis.backendScenario],
-  )
-
-  const activeScenario = useMemo(
-    () => translateScenario(activeScenarioRaw, copy),
-    [activeScenarioRaw, copy],
-  )
-
-  const activeState = useMemo(
-    () =>
-      translateState(
-        stateCatalog.find((state) => state.id === activeScenario.stateId) ?? stateCatalog[stateCatalog.length - 1],
-        copy,
-      ),
-    [activeScenario, copy],
-  )
-
-  // Bundle the full useAnalysis() value with the two App-derived display objects
-  // into a single context value for the Live Demo subtree. Spreading `analysis`
-  // preserves every field name the page used to receive as a prop, so the page
-  // consumes the exact same data — just via context instead of ~16 drilled props.
-  const liveDemoValue = useMemo(
-    () => ({ ...analysis, activeScenario, activeState }),
-    [analysis, activeScenario, activeState],
-  )
 
   const plotTheme = useMemo(
     () =>
@@ -123,6 +81,10 @@ function App() {
 
   useEffect(() => {
     safeLocalStorageSet(STORAGE_KEYS.language, language)
+    // Keep <html lang> in sync so screen readers switch voices with the UI and
+    // locale-aware CSS/formatting sees the active language (index.html ships
+    // lang="en" statically).
+    document.documentElement.lang = language
   }, [language])
 
   return (
@@ -136,11 +98,7 @@ function App() {
         theme={theme}
         onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
         language={language}
-        onSelectLanguage={(option) => {
-          setLanguage(option)
-          // Drop any stale PDF-export banner so it never lingers in the previous language.
-          analysis.setExportError('')
-        }}
+        onSelectLanguage={setLanguage}
       />
 
       <main id="main-content">
@@ -153,28 +111,16 @@ function App() {
               Demo analysis state are shared app-wide through this one provider, so
               the Runways page and the Live Demo runway selector stay in sync. Only
               the route matched by react-router mounts, so the value still drives a
-              single page at a time. */}
-          <LiveDemoProvider value={liveDemoValue}>
+              single page at a time. The provider owns useAnalysis() itself, so
+              analysis state changes (e.g. per-frame progress ticks) re-render its
+              consumers — not App or this shell. */}
+          <LiveDemoProvider copy={copy}>
             <Routes>
               <Route path="/" element={<IntroductionPage copy={copy} />} />
               <Route path="/live-demo" element={<LiveDemoPage copy={copy} plotTheme={plotTheme} />} />
               <Route path="/runways" element={<RunwaysPage copy={copy} />} />
-              <Route
-                path="/insights"
-                element={
-                  <InsightsPage
-                    backendResults={analysis.backendResults}
-                    plotTheme={plotTheme}
-                    insightsRef={analysis.insightsRef}
-                    isExporting={analysis.isExporting}
-                    exportError={analysis.exportError}
-                    onDownloadCharts={analysis.handleDownloadCharts}
-                    runways={analysis.runways}
-                    copy={copy}
-                  />
-                }
-              />
-              <Route path="/history" element={<HistoryPage copy={copy} runways={analysis.runways} />} />
+              <Route path="/insights" element={<InsightsPage copy={copy} plotTheme={plotTheme} />} />
+              <Route path="/history" element={<HistoryPage copy={copy} />} />
               <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
               <Route path="*" element={<NotFound copy={copy} />} />
             </Routes>
@@ -183,8 +129,6 @@ function App() {
       </main>
 
       <AppFooter copy={copy} />
-
-      <CookieConsent copy={copy} />
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

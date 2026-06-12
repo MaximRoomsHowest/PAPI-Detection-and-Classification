@@ -72,6 +72,37 @@ def test_stats_empty_table_is_zeroed(session):
     assert stats.avg_confidence is None
 
 
+def test_stats_respects_the_shared_filters(session):
+    _add(session, runway_id="papi_24", global_state="correct_glidepath", media_type="image", confidence=0.9, processing_ms=100)
+    _add(session, runway_id="papi_24", global_state="too_low", media_type="video", confidence=0.8, processing_ms=300)
+    _add(session, runway_id="papi_06", global_state="correct_glidepath", media_type="image", confidence=0.7, processing_ms=200)
+    repo = AnalysisLogRepository(session)
+
+    by_runway = repo.stats(runway_id="papi_24")
+    assert by_runway.total_analyses == 2
+    assert by_runway.by_runway == {"papi_24": 2}
+    assert by_runway.image_count == 1
+    assert by_runway.video_count == 1
+    # Averages describe the filtered slice, not the whole table.
+    assert by_runway.avg_confidence == pytest.approx(0.85)
+
+    by_state = repo.stats(global_state="correct_glidepath")
+    assert by_state.total_analyses == 2
+    assert by_state.by_runway == {"papi_24": 1, "papi_06": 1}
+
+    by_confidence = repo.stats(min_confidence=0.85)
+    assert by_confidence.total_analyses == 1
+    assert by_confidence.avg_confidence == pytest.approx(0.9)
+
+
+def test_stats_filtered_to_nothing_is_zeroed(session):
+    _add(session, runway_id="papi_24")
+    stats = AnalysisLogRepository(session).stats(runway_id="papi_06")
+    assert stats.total_analyses == 0
+    assert stats.by_runway == {}
+    assert stats.avg_confidence is None
+
+
 def test_filters_and_count(session):
     _add(session, runway_id="papi_24", global_state="correct_glidepath", confidence=0.9)
     _add(session, runway_id="papi_06", global_state="too_low", confidence=0.5)
@@ -93,6 +124,69 @@ def test_iter_filtered_for_csv_export(session):
 
     assert len(repo.iter_filtered()) == 2
     assert len(repo.iter_filtered(runway_id="papi_24")) == 1
+
+
+def test_create_from_payload_persists_model_id_column(session):
+    """model_id is promoted out of result_json into a real column (audit COL-1)."""
+    payload = AnalysisPayload(
+        media_type="image",
+        original_filename="frame.jpg",
+        runway_id="papi_24",
+        model_id="nano",
+        global_state="unknown",
+        lamps=[],
+        confidence=0.5,
+        frame_count=1,
+        processing_ms=1,
+        angle=AngleResult(angle_available=False, angle_note="no metadata"),
+    )
+    log = AnalysisLogRepository(session).create_from_payload(payload)
+    assert log.model_id == "nano"
+
+
+def test_to_list_item_surfaces_partial_result_flags_from_result_json(session):
+    """truncated_at_frame / decode_shortfall have no dedicated columns; the
+    list view mirrors them from result_json so History can badge partial
+    analyses without per-row detail fetches (audit 2026-06-12)."""
+    _add(session, original_filename="partial.mp4",
+         result_json={"truncated_at_frame": 120, "decode_shortfall": 30})
+    _add(session, original_filename="complete.mp4", result_json={})
+    repo = AnalysisLogRepository(session)
+
+    items = {item.original_filename: item
+             for item in (repo.to_list_item(log) for log in repo.list_recent(2, 0))}
+
+    assert items["complete.mp4"].truncated_at_frame is None
+    assert items["complete.mp4"].decode_shortfall is None
+    assert items["partial.mp4"].truncated_at_frame == 120
+    assert items["partial.mp4"].decode_shortfall == 30
+
+
+def test_to_list_item_falls_back_to_result_json_model_id_for_legacy_rows(session):
+    """Rows written before the model_id column keep NULL there; the list view
+    must still surface the id recorded in result_json (audit COL-1)."""
+    _add(session, model_id=None, result_json={"model_id": "small"})
+    repo = AnalysisLogRepository(session)
+
+    item = repo.to_list_item(repo.list_recent(1, 0)[0])
+
+    assert item.model_id == "small"
+
+
+def test_list_recent_filters_by_model_id(session):
+    _add(session, model_id="nano")
+    _add(session, model_id="small")
+    _add(session, model_id=None, result_json={"model_id": "nano"})  # legacy row
+    repo = AnalysisLogRepository(session)
+
+    rows = repo.list_recent(50, 0, model_id="nano")
+
+    # Column-only match: the legacy row (NULL column) is intentionally not
+    # matched — there is no backfill (see app/migrations.py docstring).
+    assert len(rows) == 1
+    assert rows[0].model_id == "nano"
+    assert repo.count(model_id="nano") == 1
+    assert repo.count() == 3
 
 
 def test_create_from_payload_truncates_overlong_drone_id(session):

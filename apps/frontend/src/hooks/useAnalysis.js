@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   analyzeFrame,
   analyzeMedia,
   analyzeSequence,
+  fetchModels,
+  positiveNumberEnv,
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
+import { localizedErrorMessage } from '../lib/errorMessages'
 import { extractFrameImages } from '../lib/frameExtraction'
 import { isImageFile, isVideoFile, fileDisplayPath } from '../lib/fileType'
-import { scenarioFromBackendResult } from '../lib/papi'
+import { scenarioFromBackendResult, scenarioFromVideoFrameResult } from '../lib/papi'
 import { createFolderVideo } from '../lib/folderVideo'
 import {
   FOLDER_MODE_ANGLE_SWEEP,
@@ -22,7 +25,27 @@ import { useChartExport } from './useChartExport'
 
 // Client-side mirror of the backend PAPI_MAX_BATCH_FRAMES cap so an oversized folder is
 // rejected up front instead of uploading the whole batch only to be 413'd (audit).
-const MAX_BATCH_FRAMES = Number(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES) || 200
+// positiveNumberEnv (api.js) also rejects negative/zero/NaN overrides, which a bare
+// Number(...) || 200 would let through as a nonsensical cap.
+const MAX_BATCH_FRAMES = positiveNumberEnv(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES, 200)
+
+// Video and folder-as-sequence analyses are ONE long backend await with no
+// per-frame callbacks (unlike the angle-sweep loop, which counts frames), so
+// tick the elapsed seconds into the progress line — a message frozen for
+// minutes reads as a hang.
+async function withElapsedProgress(initialMessage, elapsedTemplate, setProgress, task) {
+  setProgress(initialMessage)
+  const startedAt = Date.now()
+  const ticker = window.setInterval(() => {
+    const seconds = Math.round((Date.now() - startedAt) / 1000)
+    setProgress(elapsedTemplate.replace('{seconds}', String(seconds)))
+  }, 1000)
+  try {
+    return await task()
+  } finally {
+    window.clearInterval(ticker)
+  }
+}
 
 // Owns the Live-Demo upload + backend-inference state and the handlers that drive
 // it — extracted from App.jsx so the App component is just the route shell. `copy`
@@ -50,9 +73,12 @@ export function useAnalysis(copy) {
     refetchRunways,
   } = useRunwayManagement()
 
-  // Insights PDF export (independent of the analysis state).
+  // Insights PDF export. The ref hands the CURRENT session data to the export
+  // at download time (results + runway labels for the report's data pages)
+  // without coupling the export hook to analysis re-renders.
+  const exportSessionRef = useRef({ results: [], runways: [], selectedRunwayId: null })
   const { insightsRef, isExporting, exportError, setExportError, handleDownloadCharts } =
-    useChartExport(copy)
+    useChartExport(copy, exportSessionRef)
 
   const [activeId, setActiveId] = useState('clean')
   const [media, setMedia] = useState(null)
@@ -69,6 +95,13 @@ export function useAnalysis(copy) {
   // requires lat + lon + altitude together).
   const [droneTelemetry, setDroneTelemetry] = useState({ latitude: '', longitude: '', altitudeM: '' })
 
+  // Optional drone identifier persisted with every analysis (History/CSV
+  // provenance: which aircraft flew the approach). An INPUT like the manual
+  // telemetry — it survives media changes and travels with each run; empty
+  // means "not provided" and the field is omitted (integration audit
+  // 2026-06-11: the backend column existed but no UI could ever set it).
+  const [droneId, setDroneId] = useState('')
+
   // Optional drone-telemetry FILE (DJI .SRT / CSV / JSON) paired with the upload.
   // Parsed server-side into drone fixes that take priority over the manual fields
   // and the media's embedded EXIF; for a video it powers the per-frame angle track
@@ -77,10 +110,16 @@ export function useAnalysis(copy) {
   // media and clears it explicitly.
   const [metadataFile, setMetadataFile] = useState(null)
 
-  // Transition-detection method the backend applies: "tracking" (temporal red<->white flips on the
-  // serving model) or "model" (learned class-2 events from the 3-class detector). An INPUT like the
-  // runway/telemetry, so it persists across media changes; the backend echoes the method it used.
-  const [transitionMethod, setTransitionMethod] = useState('tracking')
+  // Inference model selected from /api/models. The backend owns model availability and the
+  // transition classifier's auto-"model" transition behavior; the UI sends only model_id so it
+  // cannot drift into a conflicting model/method combination. Starts as null — NOT a guessed
+  // registry id — so analyses fired before /api/models resolves (or after it fails, or against
+  // a legacy backend with different ids) omit model_id and get the backend default instead of
+  // 400ing on "Unknown model_id" (audit FE-1).
+  const [selectedModelId, setSelectedModelIdState] = useState(null)
+  const [modelOptions, setModelOptions] = useState([])
+  const [modelOptionsLoading, setModelOptionsLoading] = useState(true)
+  const [modelOptionsError, setModelOptionsError] = useState('')
 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [backendScenario, setBackendScenario] = useState(null)
@@ -92,6 +131,9 @@ export function useAnalysis(copy) {
   const [backendFrameIndex, setBackendFrameIndex] = useState(0)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisProgress, setAnalysisProgress] = useState('')
+  // True when the numeric analysis succeeded but at least one annotated preview could not
+  // be fetched — surfaced as an inline toolbar badge in addition to the toast (audit F6).
+  const [artifactWarning, setArtifactWarning] = useState(false)
   const autoRunRequestedRef = useRef(false)
   const [folderVideo, setFolderVideo] = useState(null)
   const [isTransformingFolderVideo, setIsTransformingFolderVideo] = useState(false)
@@ -106,6 +148,14 @@ export function useAnalysis(copy) {
   // which prevents it finishing server-side and leaving a stale History row + artifact
   // (audit P2: stale backend requests can still create History rows/artifacts).
   const abortRef = useRef(null)
+  const sampleMetadataRef = useRef(false)
+
+  // Latest-value mirror for the PDF export's data pages (read on download click,
+  // never during render). An effect (not a render-time write) keeps the React
+  // Compiler's purity rules happy.
+  useEffect(() => {
+    exportSessionRef.current = { results: backendResults, runways, selectedRunwayId: effectiveRunwayId }
+  })
 
   useEffect(() => {
     return () => {
@@ -128,6 +178,45 @@ export function useAnalysis(copy) {
       resolvedArtifactUrlsRef.current.forEach(revokeMediaUrl)
       resolvedArtifactUrlsRef.current = []
     }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    fetchModels()
+      .then((options) => {
+        if (!active) return
+        const list = Array.isArray(options) ? options : []
+        setModelOptions(list)
+        // Select the backend's default (or the first available) entry. An entry with
+        // available:false is never auto-selected; when nothing is available the
+        // selection stays null so model_id is omitted and the backend default applies.
+        const fallback =
+          list.find((model) => model.is_default && model.available !== false) ??
+          list.find((model) => model.available !== false)
+        setSelectedModelIdState((current) => {
+          const stillAvailable = list.some(
+            (model) => model.model_id === current && model.available !== false,
+          )
+          return stillAvailable ? current : fallback?.model_id ?? current
+        })
+      })
+      .catch(() => {
+        if (!active) return
+        // api.js throws a typed code (MODEL_OPTIONS_ERROR_CODE) rather than a user-facing
+        // string — every failure shape (HTTP error, timeout, malformed body) maps to the
+        // active locale's message here, since this text renders in a live region (FE-4).
+        setModelOptionsError(copy.live.modelLoadError)
+      })
+      .finally(() => {
+        if (active) setModelOptionsLoading(false)
+      })
+    return () => {
+      active = false
+    }
+    // copy is intentionally omitted: the registry fetch is mount-only and copy is read
+    // solely to localize the failure message — re-fetching /api/models on every locale
+    // switch would be wasted work for an unchanged registry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function clearResolvedArtifactUrls() {
@@ -198,7 +287,7 @@ export function useAnalysis(copy) {
     return { urls, createdUrls, failed }
   }
 
-  function handleMediaFiles(files) {
+  function handleMediaFiles(files, options = {}) {
     const selectedFiles = Array.from(files ?? [])
     if (!selectedFiles.length) {
       return
@@ -217,20 +306,42 @@ export function useAnalysis(copy) {
     // image, and only fail once the backend returned 400 (regression
     // USERTEST-MAJ-1, papi-user-test-2026-05-28).
     if (!isFolderBatch && !isImageFile(file) && !isVideoFile(file)) {
-      // Clear any prior result so a stale result panel doesn't sit under the
-      // "unsupported file" error as if it belonged to the rejected file (audit FB-03).
-      abortInFlight()
-      runIdRef.current += 1
-      clearResolvedArtifactUrls()
-      setIsAnalyzing(false)
-      setBackendScenario(null)
-      setBackendFrames([])
-      setBackendResults([])
-      setBackendFrameIndex(0)
-      clearFolderVideo()
-      setAnalysisProgress('')
+      // Reject WITHOUT touching the current media or its result: the rejected
+      // file never becomes the displayed media, so everything on screen still
+      // belongs together and only the banner (which names the rejected file)
+      // changes. The earlier behaviour (audit FB-03) cleared media + result to
+      // avoid a stale panel "belonging" to the rejected file — but wiping a
+      // finished sweep over one mis-dropped .txt costs the user their whole
+      // analysis (user test 2026-06-11). Keeping media AND result is the
+      // consistent variant of the same honesty rule.
       setAnalysisError(copy.live.unsupportedFile.replace('{name}', () => file.name))
       return
+    }
+
+    if (options.folderMode) {
+      setFolderMode(options.folderMode)
+    }
+    if (options.runwayId) {
+      setSelectedRunwayId(options.runwayId)
+    }
+    if (options.metadataFile !== undefined) {
+      setMetadataFile(options.metadataFile)
+    }
+    if (options.droneTelemetry) {
+      setDroneTelemetry({
+        latitude: options.droneTelemetry.latitude ?? '',
+        longitude: options.droneTelemetry.longitude ?? '',
+        altitudeM: options.droneTelemetry.altitudeM ?? '',
+      })
+    } else if (options.sampleMetadata) {
+      setDroneTelemetry({ latitude: '', longitude: '', altitudeM: '' })
+    }
+    if (options.sampleMetadata) {
+      sampleMetadataRef.current = true
+    } else if (sampleMetadataRef.current) {
+      setMetadataFile(null)
+      setDroneTelemetry({ latitude: '', longitude: '', altitudeM: '' })
+      sampleMetadataRef.current = false
     }
 
     const url = URL.createObjectURL(file)
@@ -262,6 +373,7 @@ export function useAnalysis(copy) {
     setBackendResults([])
     setBackendFrameIndex(0)
     clearFolderVideo()
+    setArtifactWarning(false)
     setAnalysisError('')
     setAnalysisProgress('')
     autoRunRequestedRef.current = true
@@ -293,17 +405,41 @@ export function useAnalysis(copy) {
     event.target.value = ''
   }
 
+  function setSelectedModelId(nextModelId) {
+    // Resolve functional updaters against the CURRENT state inside the updater — the
+    // captured selectedModelId can be render-stale, which would both mis-resolve the
+    // updater and let a duplicate id slip past the no-op guard (audit FE-5). Arming the
+    // auto-run ref in here is idempotent, so a double-invoked updater stays harmless.
+    setSelectedModelIdState((current) => {
+      const next = typeof nextModelId === 'function' ? nextModelId(current) : nextModelId
+      if (!next || next === current) {
+        return current
+      }
+      if (media?.file) {
+        autoRunRequestedRef.current = true
+      }
+      return next
+    })
+  }
+
   useEffect(() => {
     if (!autoRunRequestedRef.current || !media?.file || isAnalyzing) {
       return
     }
 
     // One-shot auto-run after a new upload commits. The request flag is a ref (not
-    // state) so clearing it here is not a setState-in-effect (eslint error) and adds no
+    // state) so consuming it is not a setState-in-effect (eslint error) and adds no
     // render; the effect still fires because media?.file changed in the same handler
-    // that set the flag.
-    autoRunRequestedRef.current = false
+    // that set the flag. The flag is consumed INSIDE the timer callback, not here: an
+    // unrelated re-render runs this effect's cleanup before the 0ms timer fires, and a
+    // flag already cleared in the effect body would make the re-run of the effect see
+    // "not armed" and silently cancel the queued run (audit FE-2). Left armed, the
+    // re-run simply schedules a fresh timer.
     const timeoutId = window.setTimeout(() => {
+      if (!autoRunRequestedRef.current) {
+        return
+      }
+      autoRunRequestedRef.current = false
       runBackendInference()
     }, 0)
 
@@ -312,21 +448,38 @@ export function useAnalysis(copy) {
     // listing it would re-run this effect on every render. The 0ms timer fires on the
     // next tick with an up-to-date closure, so there is no stale-closure risk.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [media?.file, isAnalyzing])
+  }, [media?.file, isAnalyzing, selectedModelId])
 
   function selectBackendFrame(index) {
-    if (!backendFrames.length) {
+    const videoFrameCount =
+      backendResults.length === 1
+        ? (backendResults[0]?.per_frame?.length || backendResults[0]?.angle_track?.length || 0)
+        : 0
+    const frameCount = backendFrames.length || videoFrameCount
+
+    if (!frameCount) {
       return
     }
 
-    const nextIndex = Math.min(Math.max(index, 0), backendFrames.length - 1)
+    const nextIndex = Math.min(Math.max(index, 0), frameCount - 1)
     setBackendFrameIndex(nextIndex)
-    setBackendScenario(backendFrames[nextIndex])
+    if (backendFrames.length) {
+      setBackendScenario(backendFrames[nextIndex])
+    }
     setActiveId('backend')
   }
 
   async function transformFolderToVideo() {
     if (media?.type !== 'folder' || isTransformingFolderVideo) {
+      return
+    }
+
+    // Toggle OFF: a second activation returns to the per-frame view instead of
+    // silently rebuilding the same video (user test 2026-06-11: the preview was
+    // one-way — the frame navigator stayed visible but could not change what
+    // the stage showed).
+    if (folderVideo) {
+      clearFolderVideo()
       return
     }
 
@@ -387,6 +540,7 @@ export function useAnalysis(copy) {
     const signal = controller.signal
     setIsAnalyzing(true)
     setAnalysisError('')
+    setArtifactWarning(false)
 
     try {
       let bestScenario = null
@@ -408,7 +562,10 @@ export function useAnalysis(copy) {
       )
       const metadata = {
         runwayId: effectiveRunwayId,
-        transitionMethod,
+        modelId: selectedModelId,
+        // appendMetadata (api.js) omits empty values, so an untouched field
+        // never reaches the backend.
+        droneId: droneId.trim(),
         ...(hasDroneTelemetry
           ? {
               droneLatitude: droneTelemetry.latitude.trim(),
@@ -424,11 +581,15 @@ export function useAnalysis(copy) {
       const telemetryFile = metadataFileForAnalysis(media.type, currentFolderMode, metadataFile)
 
       if (media.type === 'video') {
-        setAnalysisProgress(copy.live.uploadingVideo)
-        const result = await analyzeMedia(media.file, metadata, telemetryFile, signal)
+        const result = await withElapsedProgress(
+          copy.live.uploadingVideo,
+          copy.live.analyzingVideoElapsed,
+          setAnalysisProgress,
+          () => analyzeMedia(media.file, metadata, telemetryFile, signal),
+        )
         rawResults = [result]
         frameContexts.push({
-          frameLabel: `${result.frame_count ?? 0} labeled frames`,
+          frameLabel: copy.live.frameLabelLabeled.replace('{count}', String(result.frame_count ?? 0)),
           totalFrames: 1,
         })
       } else if (shouldAnalyzeFolderAsSequence(media.type, currentFolderMode)) {
@@ -441,11 +602,15 @@ export function useAnalysis(copy) {
             copy.live.tooManyImages.replace('{count}', files.length).replace('{max}', MAX_BATCH_FRAMES),
           )
         }
-        setAnalysisProgress(copy.live.uploadingSequence.replace('{count}', files.length))
-        const result = await analyzeSequence(files, metadata, telemetryFile, signal)
+        const result = await withElapsedProgress(
+          copy.live.uploadingSequence.replace('{count}', files.length),
+          copy.live.analyzingSequenceElapsed,
+          setAnalysisProgress,
+          () => analyzeSequence(files, metadata, telemetryFile, signal),
+        )
         rawResults = [result]
         frameContexts.push({
-          frameLabel: `${result.frame_count ?? files.length} sequenced frames`,
+          frameLabel: copy.live.frameLabelSequenced.replace('{count}', String(result.frame_count ?? files.length)),
           totalFrames: 1,
         })
       } else {
@@ -516,7 +681,10 @@ export function useAnalysis(copy) {
 
       const scenarios = rawResults.map((result, index) =>
         scenarioFromBackendResult(result, {
-          ...(frameContexts[index] ?? { frameLabel: 'Result', totalFrames: rawResults.length }),
+          ...(frameContexts[index] ?? {
+            frameLabel: copy.live.frameLabelResult,
+            totalFrames: rawResults.length,
+          }),
           artifactUrl: resolvedArtifacts.urls[index],
         }),
       )
@@ -546,7 +714,12 @@ export function useAnalysis(copy) {
       // Remember which folder mode produced this result so the toggle can flag the result
       // stale if the user switches modes without re-running (audit P1).
       setResultFolderMode(currentFolderMode)
-      setBackendFrameIndex(0)
+      // The index must point at the scenario being SHOWN (the best-scoring frame),
+      // or the stage displays frame N while the navigator reads "1/x" and the
+      // history panel highlights frame 0 — three views of one selection
+      // disagreeing until the first manual navigation (user test 2026-06-11).
+      // bestIndex indexes rawResults == scenarios == backendFrames (sweep mode).
+      setBackendFrameIndex(keepsFrameScenarios ? bestIndex : 0)
       setBackendScenario(bestScenario)
       setActiveId('backend')
       setMedia((current) =>
@@ -573,6 +746,7 @@ export function useAnalysis(copy) {
         )
       }
       if (resolvedArtifacts.failed > 0) {
+        setArtifactWarning(true)
         toast.warning(copy.live.artifactWarning)
       }
       // Non-blocking confirmation — the inline result panel is the primary
@@ -584,9 +758,10 @@ export function useAnalysis(copy) {
       if (runIdRef.current !== runId) {
         return
       }
-      setAnalysisError(error.message)
+      const message = localizedErrorMessage(error, copy)
+      setAnalysisError(message)
       setAnalysisProgress('')
-      toast.error(error.message)
+      toast.error(message)
     } finally {
       if (runIdRef.current === runId) {
         setIsAnalyzing(false)
@@ -602,6 +777,24 @@ export function useAnalysis(copy) {
     backendResults.length > 0 &&
     resultFolderMode != null &&
     resultFolderMode !== folderMode
+
+  const displayBackendScenario = useMemo(() => {
+    const result = backendResults.length === 1 ? backendResults[0] : null
+    const hasVideoFrameData = result?.media_type === 'video' && (
+      result.per_frame?.length > 0 || result.angle_track?.length > 0
+    )
+
+    if (!backendScenario || !hasVideoFrameData) {
+      return backendScenario
+    }
+
+    // copy is a dependency so the derived frame labels re-localize on a
+    // locale switch without requiring a frame change.
+    return scenarioFromVideoFrameResult(result, backendScenario, backendFrameIndex, {
+      angleUnavailable: copy.live.angleUnavailable,
+      framesLabel: copy.live.frameLabelLabeled,
+    })
+  }, [backendScenario, backendFrameIndex, backendResults, copy])
 
   return {
     activeId,
@@ -622,15 +815,20 @@ export function useAnalysis(copy) {
     refetchRunways,
     droneTelemetry,
     setDroneTelemetry,
+    droneId,
+    setDroneId,
     metadataFile,
     setMetadataFile,
-    transitionMethod,
-    setTransitionMethod,
+    selectedModelId,
+    setSelectedModelId,
+    modelOptions,
+    modelOptionsLoading,
+    modelOptionsError,
     isAnalyzing,
     isExporting,
     exportError,
     setExportError,
-    backendScenario,
+    backendScenario: displayBackendScenario,
     backendFrames,
     backendResults,
     backendFrameIndex,
@@ -638,6 +836,7 @@ export function useAnalysis(copy) {
     isTransformingFolderVideo,
     analysisError,
     analysisProgress,
+    artifactWarning,
     insightsRef,
     handleMediaFiles,
     handleMediaChange,

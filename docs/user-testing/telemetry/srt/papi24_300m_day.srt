@@ -1,0 +1,59 @@
+1
+00:00:00,000 --> 00:00:00,200
+<font size="28">SrtCnt : 1, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473482] [longitude: 9.52174278] [rel_alt: 0.000 abs_alt: 471.367]</font>
+
+2
+00:00:00,200 --> 00:00:00,400
+<font size="28">SrtCnt : 2, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473500] [longitude: 9.52174297] [rel_alt: 0.000 abs_alt: 472.517]</font>
+
+3
+00:00:00,400 --> 00:00:00,600
+<font size="28">SrtCnt : 3, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473515] [longitude: 9.52174277] [rel_alt: 0.000 abs_alt: 473.666]</font>
+
+4
+00:00:00,600 --> 00:00:00,800
+<font size="28">SrtCnt : 4, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473516] [longitude: 9.52174177] [rel_alt: 0.000 abs_alt: 474.798]</font>
+
+5
+00:00:00,800 --> 00:00:01,000
+<font size="28">SrtCnt : 5, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473485] [longitude: 9.52174195] [rel_alt: 0.000 abs_alt: 475.985]</font>
+
+6
+00:00:01,000 --> 00:00:01,200
+<font size="28">SrtCnt : 6, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473476] [longitude: 9.52174305] [rel_alt: 0.000 abs_alt: 477.219]</font>
+
+7
+00:00:01,200 --> 00:00:01,400
+<font size="28">SrtCnt : 7, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473500] [longitude: 9.52174321] [rel_alt: 0.000 abs_alt: 478.244]</font>
+
+8
+00:00:01,400 --> 00:00:01,600
+<font size="28">SrtCnt : 8, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473534] [longitude: 9.52174268] [rel_alt: 0.000 abs_alt: 479.305]</font>
+
+9
+00:00:01,600 --> 00:00:01,800
+<font size="28">SrtCnt : 9, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473545] [longitude: 9.52174269] [rel_alt: 0.000 abs_alt: 480.428]</font>
+
+10
+00:00:01,800 --> 00:00:02,000
+<font size="28">SrtCnt : 10, DiffTime : 200ms
+2026-04-29 17:38:00.000
+[latitude: 47.67473543] [longitude: 9.52174223] [rel_alt: 0.000 abs_alt: 481.509]</font>

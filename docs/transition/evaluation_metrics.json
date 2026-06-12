@@ -2,30 +2,30 @@
   "weights": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-yolo26s-1280\\weights\\best.pt",
   "per_class": {
     "red": {
-      "precision": 0.8528,
-      "recall": 0.7524,
-      "f1": 0.7995,
-      "mAP50": 0.809
+      "precision": 0.8435,
+      "recall": 0.7686,
+      "f1": 0.8043,
+      "mAP50": 0.8981,
+      "support": 765
     },
     "white": {
-      "precision": 0.9732,
-      "recall": 0.5944,
-      "f1": 0.738,
-      "mAP50": 0.604
+      "precision": 0.9701,
+      "recall": 0.584,
+      "f1": 0.7291,
+      "mAP50": 0.8633,
+      "support": 625
     },
     "transition": {
-      "precision": 0.385,
-      "recall": 0.3243,
-      "f1": 0.3521,
-      "mAP50": 0.256
+      "precision": 0.061,
+      "recall": 0.3333,
+      "f1": 0.1032,
+      "mAP50": 0.0647,
+      "support": 6
     }
   },
-  "mAP50": 0.5563,
-  "mAP50_95": 0.3083,
-  "val_dir": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-test",
-  "example_counts": {
-    "false_transition_examples": 12,
-    "correct_transition_examples": 12,
-    "missed_transition_examples": 12
-  }
+  "mAP50": 0.6087,
+  "mAP50_95": 0.3411,
+  "val_conf": 0.001,
+  "val_iou": 0.5,
+  "val_dir": "C:\\Users\\rodri\\source\\howest\\25-26\\industryproject\\PAPI-Detection-and-Classification\\data\\runs\\detect\\transition3class-test"
 }

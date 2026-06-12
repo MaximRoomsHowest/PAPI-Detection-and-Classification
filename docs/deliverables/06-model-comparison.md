@@ -37,22 +37,23 @@ The decision criteria are spelled out in §4.
 
 | Field | Value |
 | --- | --- |
-| Dataset snapshot | EDNY sequence dataset at git SHA <!-- TEAM --> |
+| Dataset snapshot | EDNY sequence dataset (not git-versioned; identity pinned by the transition twin's `manifest.json` / `tracking_manifest.json` — see MODELS.md §5b) |
 | Split | `configs/split.yaml` — flight-level, regime-aware |
-| Augmentation | <!-- TEAM: copy from `workflows/notebooks/06_augmentation.ipynb` summary --> |
+| Augmentation | Ultralytics defaults minus colour jitter (colour IS the label: hue/sat jitter disabled — see each run's `args.yaml`) |
 | Loss | YOLO default (CIoU + BCE classification) |
-| Optimizer | SGD, initial LR <!-- TEAM -->, momentum 0.937 |
-| Epochs | <!-- TEAM --> |
-| Batch size | <!-- TEAM --> |
-| Image size | 640 × 640 (default) |
-| Hardware | <!-- TEAM: e.g. "Howest GPU node — RTX 3090, 24 GB" --> |
-| Training time | <!-- TEAM: hours per variant --> |
+| Optimizer | auto (SGD), initial LR 0.01, momentum 0.937 |
+| Epochs | 100 configured; early-stopped — 26s at 54, 26n at 50 (patience 15) |
+| Batch size | 26s: 4 · 26n: 2 |
+| Image size | 1280 × 1280 |
+| Hardware | Project laptop — RTX 4070 Laptop GPU, 8 GB |
+| Training time | 26s ≈ 5.2 h · 26n ≈ 8.9 h (cumulative, from each run's `results.csv`) |
 
 ## 3. Results
 
-> **Real numbers available today (validation split, box metrics).** The §3.1-3.3
-> tables below are the *controlled, test-split* comparison and still need the eval
-> notebook (§6) run per variant — they stay `<!-- TEAM -->` until then. Meanwhile the
+> **Test-split numbers measured 2026-06-10** via
+> `workflows/scripts/run_redwhite_test_eval.py` (artifact
+> `docs/qa-artifacts/test-split-eval.json`) — the §3.1/3.2 tables below are that
+> like-for-like comparison. For context, the
 > committed runs already give validation-split box metrics for three points: the **serving
 > yolo26s at 1280px** (`yolo26s-fulldata-1280`: mAP@0.5 **0.983**, mAP@0.5:0.95 **0.679** —
 > `models/runs/detect/yolo26s-fulldata-1280/results.csv`, see MODELS.md §3.1.1), the
@@ -65,11 +66,16 @@ The decision criteria are spelled out in §4.
 
 ### 3.1 Accuracy on the held-out test split
 
+Measured 2026-06-10 (`workflows/scripts/run_redwhite_test_eval.py`, full PR curve,
+IoU 0.5; artifact `docs/qa-artifacts/test-split-eval.json`). The test split covers the
+day-wide and night-wide flights; the day-zoom flight is absent from the evaluated
+dataset (focal calibration pending) — see §3.2.
+
 | Model | Detection F1 | mAP@0.5 | mAP@0.5:0.95 | Per-state F1 red | Per-state F1 white | Per-state F1 transition* |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| yolo26n | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| yolo26s | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| yolo26m | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
+| yolo26n | 0.877 | 0.949 | 0.584 | 0.855 | 0.893 | n/a — 2-class detector |
+| yolo26s | 0.915 | 0.971 | 0.651 | 0.901 | 0.928 | n/a — 2-class detector |
+| yolo26m | not trained — see §5 | — | — | — | — | — |
 
 \* "Transition" is computed geometrically post-hoc (see design
 doc §6 / §11). Per-state F1 for transition measures how often the
@@ -78,27 +84,38 @@ labelled transition state.
 
 ### 3.2 Per-regime accuracy
 
-| Model | Day rwy 24 Wide | Night rwy 06 Wide | Day rwy 24 Zoom |
+| Model | Day rwy 24 Wide (1000 m) | Night rwy 06 Wide (500 m) | Day rwy 24 Zoom |
 | --- | ---: | ---: | ---: |
-| yolo26n — detection F1 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| yolo26s — detection F1 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| yolo26m — detection F1 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
+| yolo26n — detection F1 | 0.984 | 0.751 | not evaluated (flight absent from dataset) |
+| yolo26s — detection F1 | 0.989 | 0.828 | not evaluated (flight absent from dataset) |
+| yolo26m — detection F1 | not trained | not trained | — |
 
 Notes on per-regime patterns:
 
-- **<!-- TEAM: e.g. "Day Zoom is the weakest regime for every variant — see configs/papi_edny.yaml ZoomCamera focal_px = null." --></sub>**
-- **<!-- TEAM: e.g. "Night rwy 06 benefits most from the larger variants because daylight saturation isn't the bottleneck." --></sub>**
+- **Night rwy 06 is the separating regime**: both variants are near-ceiling on the
+  day-wide flight (F1 0.98+), but yolo26s holds +7.7 pp detection F1 and +10 mAP@0.5
+  points over yolo26n at night — the capacity gain shows exactly where lamps are
+  small, dim and low-contrast.
+- **Day Zoom cannot be compared yet**: the zoom test flight is not part of the
+  evaluated dataset (ZoomCamera `calibrated_focal_px` is still `null` in
+  `configs/papi_edny.yaml`), so no zoom numbers exist for any variant — absent,
+  not zero.
 
 ### 3.3 Latency × resource
 
 Cross-references `docs/edge-benchmark.md §5`. Numbers below are
 the same fps@p50 / RSS measurements consolidated for comparison.
 
-| Model | Params (M) | p50 latency laptop CPU (ms) | fps@p50 Jetson Orin INT8 | RSS MB (steady) |
-| --- | ---: | ---: | ---: | ---: |
-| yolo26n | 2.6 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| yolo26s | 9.1 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
-| yolo26m | 24.0 | <!-- TEAM --> | <!-- TEAM --> | <!-- TEAM --> |
+Measured 2026-06-10 on the project laptop (30 frames × 3 runs, bare `model.predict`;
+artifacts `docs/qa-artifacts/benchmarks/`). No Jetson hardware is available — that
+column is honestly empty pending the client's WL051 specs. For GPU reference the
+laptop RTX 4070 runs yolo26s at p50 29.1 ms (34.4 fps).
+
+| Model | Params (M) | p50 latency laptop CPU (ms) | fps@p50 laptop CPU | fps@p50 Jetson Orin INT8 | RSS MB (steady) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| yolo26n | 2.6 | 142.3 | 7.0 | no hardware | 2426 |
+| yolo26s | 9.1 | 316.1 | 3.2 | no hardware | 2549 |
+| yolo26m | 24.0 | not trained | — | — | — |
 
 ## 4. Decision criteria
 
@@ -112,8 +129,8 @@ A larger variant earns its place if it satisfies **all** of:
    test regimes individually is ≥ yolo26n by at least 1 pp (we
    don't want to trade day-zoom accuracy for night accuracy).
 4. **TCO penalty acceptable**: the edge-tier upgrade (e.g. Pi → NUC)
-   doesn't push three-year TCO per airport past <!-- TEAM: a
-   client-agreed threshold, default 12 000 EUR -->.
+   doesn't push three-year TCO per airport past the working threshold of
+   12 000 EUR (no client-agreed figure yet — flagged for the handover meeting).
 
 Failing any of (1)–(4), the smaller model wins by default.
 
@@ -123,19 +140,22 @@ Failing any of (1)–(4), the smaller model wins by default.
 `models/serving/best.pt` since 2026-05-31, superseding the yolo26n
 sequence model.
 
-**Reasoning**: **<!-- TEAM: 2-3 sentences justifying the yolo26n→yolo26s
-upgrade against the §4 criteria. Cite the §3 rows — e.g. "yolo26s lifts
-validation mAP@0.5:0.95 from 0.474 (yolo26n) to 0.679, a large
-detection-quality gain. The cost is throughput: yolo26s is ~3.5× the
-params, so CPU fps drops and the real-time target (criterion 1) now leans
-on the GPU / INT8-ONNX path. We judged the accuracy gain to justify the
-upgrade for v1.0; edge-tier latency is tracked in docs/edge-benchmark.md."
---></sub>**
+**Reasoning**: On the held-out test split (§3.1) yolo26s lifts aggregate
+detection F1 by **+3.8 pp** (0.915 vs 0.877) — clearing criterion 2 — and the
+gain concentrates where it matters: the hard night regime improves **+7.7 pp
+detection F1 / +10 mAP@0.5 points** while day-wide stays at ceiling, so
+criterion 3 holds on every evaluable regime. The cost is throughput (§3.3):
+3.2 fps vs 7.0 fps bare-inference on laptop CPU, so the 10 fps real-time
+target (criterion 1) leans on GPU-class hardware — the laptop RTX 4070
+already delivers 34 fps, and the edge tier awaits WL051 specs. Criterion 4
+is unaffected at the reference tier. Accuracy gain where the model was
+weakest justified the promotion for v1.0.**
 
-**What we would change if we had another sprint**: **<!-- TEAM:
-e.g. "Train a distilled student of yolo26m on the EDNY split —
-distillation could close the accuracy gap to 26m while keeping
-26n-class latency." --></sub>**
+**What we would change if we had another sprint**: Train yolo26m on the same
+split to complete the size sweep (it was skipped for v1.0: the 8 GB laptop GPU
+makes 24 M-param training at 1280 px slow and the night-regime gap was already
+closed by 26s), and obtain the zoom-flight calibration so the third regime can
+be evaluated at all.**
 
 ## 6. Reproducibility
 
@@ -146,15 +166,17 @@ To reproduce the comparison from a clean checkout:
 .venv\Scripts\Activate.ps1
 
 # Train each variant (one run each)
-python workflows\scripts\pipeline.py train --base yolo26n --epochs <!-- TEAM -->
-python workflows\scripts\pipeline.py train --base yolo26s --epochs <!-- TEAM -->
-python workflows\scripts\pipeline.py train --base yolov26m --epochs <!-- TEAM -->
+python workflows\scripts\pipeline.py train --base yolo26n --epochs 100   # early-stops ~50
+python workflows\scripts\pipeline.py train --base yolo26s --epochs 100   # early-stops ~54
+# yolo26m: not trained for v1.0 (see §5)
 
 # Evaluate each on the held-out test split
-jupyter nbconvert --to notebook --execute `
-  workflows\notebooks\04_yolov26n_sequence_model_evaluation.ipynb
+# (writes docs/qa-artifacts/test-split-eval.json; latency rows come from
+#  workflows/scripts/edge_benchmark.py -> docs/qa-artifacts/benchmarks/)
+python workflows\scripts\build_redwhite_test_view.py
+python workflows\scripts\run_redwhite_test_eval.py
 
-# Update the §3 tables in this document from the eval output
+# Update the §3 tables in this document from those artifacts
 ```
 
 Each completed run writes its `args.yaml`, `results.csv`, and

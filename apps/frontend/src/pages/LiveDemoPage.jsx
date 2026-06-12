@@ -31,6 +31,7 @@ export function LiveDemoPage({ copy, plotTheme }) {
     isTransformingFolderVideo,
     analysisError,
     analysisProgress,
+    artifactWarning,
     handleMediaFiles,
     runBackendInference,
     transformFolderToVideo,
@@ -56,7 +57,7 @@ export function LiveDemoPage({ copy, plotTheme }) {
       <ActiveMetadataNotice copy={copy} />
 
       {media?.type === 'folder' && (
-        <div className="folder-mode" aria-live="polite">
+        <div className="folder-mode">
           <span className="folder-mode__label">{copy.live.folderMode}</span>
           <div className="folder-mode__options" role="group" aria-label={copy.live.folderMode}>
             <button
@@ -80,9 +81,17 @@ export function LiveDemoPage({ copy, plotTheme }) {
           {/* The shown result was produced in a different mode than the toggle now selects —
               prompt a re-run instead of letting the result drift silently (audit P1). */}
           {folderResultStale && (
-            <p className="folder-mode__stale" role="status">
-              {copy.live.folderModeStale}
-            </p>
+            <div className="folder-mode__stale" role="status">
+              <span>{copy.live.folderModeStale}</span>
+              <button
+                type="button"
+                className="folder-mode__rerun"
+                onClick={runBackendInference}
+                disabled={isAnalyzing}
+              >
+                {copy.live.folderModeRerun}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -116,6 +125,7 @@ export function LiveDemoPage({ copy, plotTheme }) {
             onRestart={runBackendInference}
             canRestart={Boolean(media)}
             restarting={isAnalyzing}
+            artifactWarning={artifactWarning}
             copy={copy}
           />
         </div>

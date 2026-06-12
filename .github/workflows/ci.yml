@@ -23,10 +23,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -72,10 +72,10 @@ jobs:
         working-directory: apps/frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -101,7 +101,7 @@ jobs:
         run: npm run build
 
       - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: frontend-dist
           path: apps/frontend/dist
@@ -115,13 +115,21 @@ jobs:
     needs: [python, frontend]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Compose config sanity
+        # Catches a syntactically-broken compose.yaml before the slow image builds
+        # (audit CI3). Dummy credentials satisfy the ${VAR:?} fail-fast guards.
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        run: docker compose -f compose.yaml config -q
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Build backend image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
         with:
           context: apps/backend
           push: false
@@ -133,8 +141,24 @@ jobs:
       - name: Smoke backend image
         run: docker run --rm papi-backend:ci python -c "import app.main; print('backend import ok')"
 
+      - name: Smoke model registry against the real mount layout
+        # Exercises the Docker path-resolution branch of the registry against the
+        # committed models.json + ./models mount — unit tests only cover tmp
+        # layouts, so a broken registry/mount pairing previously surfaced only at
+        # runtime (audit IS-4).
+        run: |
+          docker run --rm -v "$PWD/models:/models:ro" papi-backend:ci python -c "
+          import torch
+          from app.config import get_settings
+          from app.services.inference import InferenceService
+          service = InferenceService(get_settings())
+          assert service.default_weights_present, 'default weights missing'
+          model = service.model  # real ultralytics load of the committed checkpoint
+          print('registry + YOLO load ok on torch', torch.__version__, '| classes:', getattr(model, 'names', None))
+          "
+
       - name: Build frontend image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
         with:
           context: apps/frontend
           push: false
@@ -149,22 +173,35 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.12"
 
       # Audit the pinned backend requirements without installing the heavy
       # torch/ultralytics tree. This is a hard gate after the June 2026 triage.
+      # CVE-2025-3000 (torch.jit.script memory corruption, local AV, NVD
+      # CVSS 5.3 MEDIUM): re-checked 2026-06-12 — still no fixed torch release
+      # in any version. The resolver pulls latest torch transitively here, so
+      # the ignore is needed on this step too. Drop it when a fix ships.
       - name: pip-audit (backend requirements)
         run: |
           python -m pip install --upgrade pip pip-audit
-          pip-audit -r apps/backend/requirements.txt
+          pip-audit -r apps/backend/requirements.txt --ignore-vuln CVE-2025-3000
+
+      - name: pip-audit (Docker torch pins)
+        # torch is installed in the image from torch-requirements.txt, outside
+        # requirements.txt — without this it was invisible to the scan (audit IS-1).
+        # CVE-2025-3000: no fixed torch release exists as of 2026-06-12 (see the
+        # backend-requirements step above; torch-requirements.txt documents why
+        # 2.11.0 is the audit-clean floor for everything else). The previous
+        # PYSEC-2026-139 ignore is gone: that advisory caps at torch <=2.10.x.
+        run: pip-audit -r apps/backend/torch-requirements.txt --ignore-vuln CVE-2025-3000
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
           cache: "npm"
@@ -184,12 +221,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       # Surfaces blank <!-- TEAM -->, [TODO] and TBD markers (audit IMP-DOC-12).
       # continue-on-error while the team is mid-fill; drop it before final submission
       # to make a blank deliverable fail the build.
-      - name: Scan deliverables for unfilled markers
+      - name: Scan deliverables for unfilled markers (non-gating until final submission)
         continue-on-error: true
         shell: pwsh
         run: ./scripts/build-deliverables.ps1 -CheckOnly -Strict

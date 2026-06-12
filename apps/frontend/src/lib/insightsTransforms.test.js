@@ -5,7 +5,10 @@ import {
   elevationOverFrameSeries,
   perLightStateSeries,
   resolveAngle,
-  transitionCountSeries,
+  stateBandSeries,
+  transitionAngleSummary,
+  transitionCsv,
+  transitionFlickerStatus,
 } from './insightsTransforms'
 
 const result = ({ available = true, perLight = [], global = 3.0, lamps = [] }) => ({
@@ -160,24 +163,131 @@ describe('elevationOverFrameSeries', () => {
   })
 })
 
-describe('transitionCountSeries', () => {
-  const event = (lampIndex) => ({
-    lamp_index: lampIndex,
-    from_state: 'white',
-    to_state: 'red',
-    frame_index: 10,
+describe('transitionAngleSummary', () => {
+  const sweepResult = {
+    original_filename: 'clip.mp4',
+    angle_track: [
+      { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+      { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.82 }] },
+      { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.85 }] },
+      { frame_index: 3, elevation_angle_deg: 3.5, lamps: [{ index: 1, state: 'white', confidence: 0.86 }] },
+    ],
+    transitions: [
+      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 2, elevation_angle_deg: 2.7 },
+      { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 2, elevation_angle_deg: 2.9 },
+      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 3, elevation_angle_deg: 3.1 },
+      // Out-of-range lamp index never lands in a bucket.
+      { lamp_index: 7, from_state: 'red', to_state: 'white', frame_index: 3, elevation_angle_deg: 3.1 },
+      // A flip without a resolved angle still counts but never shapes the band.
+      { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 4, elevation_angle_deg: null },
+    ],
+  }
+
+  it('combines the settled crossing angle with the raw flip band per light', () => {
+    const summary = transitionAngleSummary([sweepResult])
+    expect(summary).toHaveLength(4)
+    // settledAngle is the SAME midpoint the redness charts mark (2.5 -> 3.0 step).
+    expect(summary[0].settledAngle).toBeCloseTo(2.75, 5)
+    expect(summary[0].bandMin).toBeCloseTo(2.7, 5)
+    expect(summary[0].bandMax).toBeCloseTo(3.1, 5)
+    expect(summary[0].flips).toBe(4)
   })
 
-  it('returns zeros for no transitions', () => {
-    expect(transitionCountSeries([])).toEqual({ lamps: [1, 2, 3, 4], counts: [0, 0, 0, 0] })
-    expect(transitionCountSeries(undefined).counts).toEqual([0, 0, 0, 0])
+  it('reports null settled angle and empty band for a light that never crossed', () => {
+    const summary = transitionAngleSummary([sweepResult])
+    expect(summary[1]).toEqual({ lampIndex: 2, settledAngle: null, bandMin: null, bandMax: null, flips: 0 })
   })
 
-  it('counts per light index and ignores out-of-range indices', () => {
-    expect(transitionCountSeries([event(1), event(1), event(3), event(4), event(4), event(4)]).counts).toEqual([
-      2, 0, 1, 3,
+  it('handles no input', () => {
+    const summary = transitionAngleSummary([])
+    expect(summary.every((entry) => entry.settledAngle === null && entry.flips === 0)).toBe(true)
+  })
+})
+
+describe('transitionFlickerStatus', () => {
+  it('classifies no crossing, clean crossing, and repeated-flip review cases', () => {
+    expect(transitionFlickerStatus(0)).toBe('no_crossing')
+    expect(transitionFlickerStatus(1)).toBe('clean_crossing')
+    expect(transitionFlickerStatus(2)).toBe('review_flicker')
+  })
+})
+
+describe('transitionCsv', () => {
+  it('exports only real transition events and flags repeated flips by lamp', () => {
+    const csv = transitionCsv(
+      [
+        {
+          log_id: 'log-1',
+          runway_id: 'papi_24',
+          original_filename: 'clip, one.mp4',
+          transition_method: 'tracking',
+          transitions: [
+            { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 2, elevation_angle_deg: 2.7, method: 'tracking' },
+            { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 3, elevation_angle_deg: 2.9, method: 'tracking' },
+            { lamp_index: 5, from_state: 'red', to_state: 'white', frame_index: 4, elevation_angle_deg: 3.1 },
+          ],
+        },
+      ],
+      { mode: 'history' },
+    )
+
+    const rows = csv.split('\r\n')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toContain('flicker_status')
+    expect(rows[1]).toContain('"clip, one.mp4"')
+    expect(rows[1]).toContain('review_flicker')
+    expect(rows[2]).toContain('review_flicker')
+    expect(csv).not.toContain(',5,')
+  })
+})
+
+describe('stateBandSeries', () => {
+  it('returns no blocks when no result carries a track', () => {
+    expect(stateBandSeries([])).toEqual([])
+    expect(stateBandSeries([{ lamps: [{ index: 1, state: 'red' }] }])).toEqual([])
+  })
+
+  it('codes per-frame lamp states per light, absent slots as unknown (0)', () => {
+    const blocks = stateBandSeries([
+      {
+        original_filename: 'clip.mp4',
+        angle_track: [
+          {
+            frame_index: 0,
+            elevation_angle_deg: 2.0,
+            lamps: [
+              { index: 1, state: 'red', confidence: 0.8 },
+              { index: 2, state: 'white', confidence: 0.7 },
+            ],
+          },
+          {
+            frame_index: 1,
+            elevation_angle_deg: null, // angle missing -> kept as null, frame still coded
+            lamps: [{ index: 1, state: 'transition', confidence: 0.6 }],
+          },
+        ],
+      },
     ])
-    expect(transitionCountSeries([event(0), event(5), event(2)]).counts).toEqual([0, 1, 0, 0])
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].label).toBe('clip.mp4')
+    expect(blocks[0].frames).toEqual([0, 1])
+    expect(blocks[0].angles).toEqual([2.0, null])
+    // Row order = Light 1..4; codes: unknown 0, obscured 1, red 2, transition 3, white 4.
+    expect(blocks[0].z[0]).toEqual([2, 3]) // light 1: red then transition
+    expect(blocks[0].z[1]).toEqual([4, 0]) // light 2: white then absent -> unknown
+    expect(blocks[0].z[2]).toEqual([0, 0]) // light 3 never seen
+  })
+
+  it('skips samples without a finite frame index', () => {
+    const blocks = stateBandSeries([
+      {
+        angle_track: [
+          { frame_index: null, elevation_angle_deg: 2.0, lamps: [] },
+          { frame_index: 1, elevation_angle_deg: 2.1, lamps: [] },
+        ],
+      },
+    ])
+    expect(blocks[0].frames).toEqual([1])
   })
 })
 
@@ -209,6 +319,32 @@ describe('perLightStateSeries', () => {
   it('ignores lamp indices outside 1..4', () => {
     const series = perLightStateSeries([resultWith([{ index: 9, state: 'white', confidence: 0.5 }])])
     expect(series.every((bucket) => bucket.white === 0)).toBe(true)
+  })
+
+  it('counts PER FRAME when a result carries an angle_track (absent slot = unknown)', () => {
+    const series = perLightStateSeries([
+      {
+        // The aggregate says "red" — but the frames tell the real story and must win.
+        lamps: [{ index: 1, state: 'red', confidence: 0.8 }],
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+          { frame_index: 3, elevation_angle_deg: 3.5, lamps: [] },
+        ],
+      },
+    ])
+    expect(series[0]).toEqual({ white: 1, red: 2, transition: 0, obscured: 0, unknown: 1 })
+    // Lights never present in any frame are all-unknown, not silently zero.
+    expect(series[1].unknown).toBe(4)
+  })
+
+  it('keeps aggregate counting for results without a track', () => {
+    const series = perLightStateSeries([
+      { lamps: [{ index: 1, state: 'red', confidence: 0.8 }], angle_track: [] },
+    ])
+    expect(series[0].red).toBe(1)
+    expect(series[0].unknown).toBe(0)
   })
 })
 

@@ -67,6 +67,7 @@ def _crafted_log():
         elevation_angle_deg=None,
         frame_count=1,
         processing_ms=42,
+        result_json={"model_id": "small", "model_label": "Small detector", "model_role": "detector"},
         original_filename="@evil.jpg",
     )
 
@@ -76,8 +77,43 @@ def test_stream_log_rows_header_matches_column_constant():
     reader = list(csv.reader(io.StringIO(body)))
     assert reader[0] == CSV_COLUMNS
     # Sanity-pin the documented order so a reorder is a visible diff.
-    assert CSV_COLUMNS[:5] == ["id", "created_at", "media_type", "runway_id", "global_state"]
+    assert CSV_COLUMNS[:6] == ["id", "created_at", "media_type", "runway_id", "drone_id", "global_state"]
+    assert "truncated_at_frame" in CSV_COLUMNS
+    assert "decode_shortfall" in CSV_COLUMNS
+    assert CSV_COLUMNS[-4:-1] == ["model_id", "model_label", "model_role"]
     assert CSV_COLUMNS[-1] == "original_filename"
+
+
+def test_stream_log_rows_exports_model_metadata_from_result_json():
+    body = "".join(stream_log_rows([_crafted_log()]))
+    rows = list(csv.reader(io.StringIO(body)))
+    data = rows[1]
+    assert data[CSV_COLUMNS.index("model_id")] == "small"
+    assert data[CSV_COLUMNS.index("model_label")] == "Small detector"
+    assert data[CSV_COLUMNS.index("model_role")] == "detector"
+
+
+def test_stream_log_rows_exports_partial_result_flags_and_drone_id():
+    """truncated_at_frame / decode_shortfall live only in result_json and
+    drone_id was documented as a CSV provenance column but never exported —
+    a partial analysis was indistinguishable from a complete one in the CSV
+    (audit 2026-06-12)."""
+    log = _crafted_log()
+    log.drone_id = "=DRONE-7"  # client-supplied free text -> must be escaped
+    log.result_json = {**log.result_json, "truncated_at_frame": 120, "decode_shortfall": 30}
+
+    body = "".join(stream_log_rows([log]))
+    data = list(csv.reader(io.StringIO(body)))[1]
+
+    assert data[CSV_COLUMNS.index("drone_id")] == "'=DRONE-7"
+    assert data[CSV_COLUMNS.index("truncated_at_frame")] == "120"
+    assert data[CSV_COLUMNS.index("decode_shortfall")] == "30"
+    # A complete analysis leaves both flag cells empty, not "None".
+    complete = "".join(stream_log_rows([_crafted_log()]))
+    complete_row = list(csv.reader(io.StringIO(complete)))[1]
+    assert complete_row[CSV_COLUMNS.index("truncated_at_frame")] == ""
+    assert complete_row[CSV_COLUMNS.index("decode_shortfall")] == ""
+    assert complete_row[CSV_COLUMNS.index("drone_id")] == ""
 
 
 def test_stream_log_rows_escapes_both_freetext_columns():
