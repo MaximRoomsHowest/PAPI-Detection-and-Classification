@@ -171,6 +171,10 @@ services:
       # Uploaded originals + annotated exports persist across container
       # restarts in a named volume.
       - papi_backend_storage:/storage
+    # uvicorn waits for in-flight requests after SIGTERM, but compose SIGKILLs
+    # after 10s by default — mid-flight 150s video analyses died on every
+    # `compose restart`. Give them time to finish instead.
+    stop_grace_period: 3m
     healthcheck:
       # Readiness via the stdlib (no curl in the slim image). This keeps the
       # frontend from starting until DB + model readiness pass.

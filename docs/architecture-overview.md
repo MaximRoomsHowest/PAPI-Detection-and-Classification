@@ -27,7 +27,7 @@ pieces fit together and why specific design choices were made.
 ┌──────────────────────────────────────────────────────────────────┐
 │  ONLINE  (Docker compose: postgres + backend + frontend)         │
 │                                                                  │
-│   Browser  ── HTTPS ──►  Nginx (apps/frontend, port 8080)        │
+│   Browser  ── HTTP* ──►  Nginx (apps/frontend, port 8080)        │
 │      │                         │                                 │
 │      │                         ▼                                 │
 │      │              Static React/Vite bundle                     │
@@ -41,6 +41,9 @@ pieces fit together and why specific design choices were made.
 │                                  analysis_logs (one row/request) │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+\* Plain HTTP on localhost in the compose setup; TLS terminates at the Azure
+Container Apps ingress in the cloud deployment.
 
 ## 2. Repository layout
 
