@@ -627,6 +627,11 @@
 .model-readout {
   display: grid;
   gap: 5px;
+  /* Pack to the top: the panel grid stretches this cell to its tallest row
+     sibling (the transitions list), and without this the grid distributed the
+     surplus BETWEEN the three lines — label, name and role floated apart with
+     huge voids. */
+  align-content: start;
   margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -888,6 +893,9 @@
 .angle-readout {
   display: grid;
   gap: 5px;
+  /* Same top-packing as .model-readout: stretched by the panel grid, the
+     surplus height must collect below the content, not between the lines. */
+  align-content: start;
   margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 8px;

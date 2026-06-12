@@ -195,11 +195,26 @@ export function ResultPanel({ copy }) {
                   )}
                 </small>
               )}
+              {/* Total count up front: the list itself scrolls inside a capped
+                  box (a long sweep produces dozens of flips), so the size of
+                  the evidence must be readable without scrolling. */}
+              <small className="transition-readout__count tnum">
+                {activeScenario.transitions.length}
+              </small>
               <ul>
                 {activeScenario.transitions.map((event, index) => (
                   <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
                     {`${copy.live.light} ${event.lamp_index}: `}
                     {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
+                    {/* The flip's viewing angle is the actual evidence (which set
+                        angle the lamp crossed) — show it whenever the backend
+                        resolved one. The frame alone would be cryptic; angles are
+                        what the PAPI verification workflow reasons in. */}
+                    {event.elevation_angle_deg != null && (
+                      <span className="transition-readout__angle tnum">
+                        {` · ${Number(event.elevation_angle_deg).toFixed(2)}°`}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
