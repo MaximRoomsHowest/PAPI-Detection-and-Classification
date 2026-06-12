@@ -51,6 +51,26 @@ to reach the **Live Demo** page.
 The Live Demo page accepts input in three ways. Pick whichever
 matches your data.
 
+### 3.0 No data of your own? Use the built-in samples
+
+The empty stage offers **premade test data** — three cards under the
+upload button, built from a real EDNY runway-24 capture in which the
+drone climbs through every PAPI set angle at a ~300 m stand-off. Each
+sample ships the drone telemetry that was actually recorded with its
+frames, so the displayed viewing angle always matches what the lamps
+show:
+
+- **Sample image** — one on-slope frame (~2.8°, two white + two red).
+- **Sample image set** — a ten-frame angle sweep analysed as a tracked
+  sequence; the verdict walks through all five PAPI states.
+- **Sample video** — a two-minute clip (60 frames at 0.5 fps) covering
+  the whole climb (~1.2° → ~3.9°), including every lamp's red→white
+  transition. Analysis takes roughly half a minute.
+
+Click a card and the analysis starts automatically — runway and
+telemetry are filled in for you. Uploading your own media afterwards
+clears the sample's metadata.
+
 ### 3.1 Single image upload
 
 1. Make sure the **Analysis runway** selector matches the runway the
