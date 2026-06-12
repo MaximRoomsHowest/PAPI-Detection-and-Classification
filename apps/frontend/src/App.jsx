@@ -12,7 +12,6 @@ import { translations } from './i18n/translations'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { CookieConsent } from './components/CookieConsent'
 import { LiveDemoProvider } from './context/LiveDemoProvider'
 import { IntroductionPage } from './pages/IntroductionPage'
 import { LiveDemoPage } from './pages/LiveDemoPage'
@@ -130,8 +129,6 @@ function App() {
       </main>
 
       <AppFooter copy={copy} />
-
-      <CookieConsent copy={copy} />
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

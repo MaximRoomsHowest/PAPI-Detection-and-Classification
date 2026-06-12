@@ -91,6 +91,8 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
   )
 }
 
+const fmt = (value) => (Number.isFinite(value) ? value.toFixed(3) : '—')
+
 function ModelMetrics({ model, copy }) {
   const metrics = model?.val_metrics
   if (!metrics) {
@@ -101,7 +103,6 @@ function ModelMetrics({ model, copy }) {
       />
     )
   }
-  const fmt = (value) => (Number.isFinite(value) ? value.toFixed(3) : '—')
   const perClass = metrics.per_class && Object.entries(metrics.per_class)
   return (
     <>
@@ -145,8 +146,26 @@ function ModelMetrics({ model, copy }) {
           </tbody>
         </table>
       )}
-      {metrics.note ? <p className="viz-footnote">{metrics.note}</p> : null}
+      {perClass?.length > 0 && metrics.note ? <p className="viz-footnote">{metrics.note}</p> : null}
+      {!perClass?.length ? <p className="viz-footnote">{copy.insights.metricNoPerClass}</p> : null}
     </>
+  )
+}
+
+function ModelCredentials({ model, copy }) {
+  if (!model) return null
+  const role = model.model_role ? (copy.live.modelRole?.[model.model_role] ?? model.model_role) : '—'
+  const split = model.dataset_split_evaluated ? `${model.dataset_split_evaluated} split` : '—'
+  const threshold = Number.isFinite(model.confidence_threshold)
+    ? `${Math.round(model.confidence_threshold * 100)}%`
+    : '—'
+  return (
+    <div className="model-credentials" aria-label={copy.insights.modelCredentials}>
+      <InlineMetric label={copy.insights.modelRole} value={role} />
+      <InlineMetric label={copy.history.trainingRun} value={model.training_run || '—'} />
+      <InlineMetric label={copy.insights.modelSplit} value={split} />
+      <InlineMetric label={copy.insights.metricThreshold} value={threshold} />
+    </div>
   )
 }
 
@@ -237,11 +256,7 @@ export function ModelMetricsPanel({ plotTheme, copy }) {
         ) : (
           <>
             {model.data && (
-              <p className="viz-footnote">
-                {`${model.data.model_label || model.data.model_id || ''}`}
-                {model.data.training_run ? ` · ${copy.history.trainingRun}: ${model.data.training_run}` : ''}
-                {model.data.dataset_split_evaluated ? ` · ${model.data.dataset_split_evaluated} split` : ''}
-              </p>
+              <ModelCredentials model={model.data} copy={copy} />
             )}
             <ModelMetrics model={model.data} copy={copy} />
           </>

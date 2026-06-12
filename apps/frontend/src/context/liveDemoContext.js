@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, use } from 'react'
 
 // Live-Demo shared-state context internals (the Context object + the consumer
 // hook). Kept in a hook-only module — separate from the JSX provider component —
@@ -14,7 +14,7 @@ export const LiveDemoContext = createContext(null)
 // clear error in development instead of a confusing "cannot read property of
 // null" deep in the render.
 export function useLiveDemo() {
-  const value = useContext(LiveDemoContext)
+  const value = use(LiveDemoContext)
   if (value === null) {
     throw new Error('useLiveDemo must be used within a <LiveDemoProvider>')
   }

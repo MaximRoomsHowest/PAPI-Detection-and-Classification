@@ -18,14 +18,16 @@ const TEXT = [22, 34, 48]
 const MUTED = [92, 107, 125]
 const BORDER = [218, 225, 232]
 
+const TIMESTAMP_FORMAT = new Intl.DateTimeFormat(undefined, {
+  year: 'numeric',
+  month: 'short',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
 function todayLabel() {
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date())
+  return TIMESTAMP_FORMAT.format(new Date())
 }
 
 function pageSize(pdf) {
@@ -267,6 +269,9 @@ function addSessionSummaryPage(pdf, logoDataUrl, session) {
       ? `${summary.elevationMin.toFixed(2)}° – ${summary.elevationMax.toFixed(2)}°`
       : '—'
   const facts = [
+    ['Source', session.sourceLabel ?? 'Live session'],
+    ...(session.logId ? [['Log ID', session.logId]] : []),
+    ...(session.createdAt ? [['Captured', session.createdAt]] : []),
     ['Runway', session.runwayLabel ?? summary.runwayId ?? '—'],
     ['Model', session.modelLabel ?? '—'],
     ['Transition method', session.transitionMethod ?? '—'],
@@ -374,7 +379,7 @@ function addTransitionEventsPages(pdf, logoDataUrl, transitions) {
     ...(hasModelEvents ? [{ label: 'Duration (frames)', width: 36, align: 'right' }] : []),
     { label: 'Reading', width: 46 },
   ]
-  const sorted = [...transitions].sort(
+  const sorted = transitions.toSorted(
     (a, b) => a.lamp_index - b.lamp_index || a.frame_index - b.frame_index,
   )
   const rows = sorted.map((event) => ({
@@ -551,6 +556,9 @@ export function useChartExport(copy, sessionRef) {
           results,
           summary: summarizeSession(results),
           angleSummary: transitionAngleSummary(results),
+          sourceLabel: session.sourceLabel,
+          logId: session.logId,
+          createdAt: session.createdAt,
           runwayLabel: runways.find((runway) => runway.id === runwayId)?.label ?? runwayId,
           modelLabel: first?.model_label ?? first?.model_id ?? null,
           transitionMethod: first?.transition_method ?? null,

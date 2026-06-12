@@ -390,31 +390,31 @@ export function FrameStage({
   )
 }
 
+async function fileFromSampleAsset(sampleFile) {
+  const response = await fetch(sampleFile.url)
+  if (!response.ok) {
+    throw new Error(`Could not load ${sampleFile.name}`)
+  }
+
+  const blob = await response.blob()
+  // No explicit lastModified: the File constructor defaults it to "now", and
+  // an inline Date.now() trips the react-hooks/purity compiler lint.
+  const file = new File([blob], sampleFile.name, {
+    type: sampleFile.type || blob.type,
+  })
+
+  if (sampleFile.path) {
+    Object.defineProperty(file, 'webkitRelativePath', {
+      configurable: true,
+      value: sampleFile.path,
+    })
+  }
+
+  return file
+}
+
 function DropzonePlaceholder({ isDragActive, onFilesSelected, copy }) {
   const [loadingSampleId, setLoadingSampleId] = useState(null)
-
-  async function fileFromSampleAsset(sampleFile) {
-    const response = await fetch(sampleFile.url)
-    if (!response.ok) {
-      throw new Error(`Could not load ${sampleFile.name}`)
-    }
-
-    const blob = await response.blob()
-    // No explicit lastModified: the File constructor defaults it to "now", and
-    // an inline Date.now() trips the react-hooks/purity compiler lint.
-    const file = new File([blob], sampleFile.name, {
-      type: sampleFile.type || blob.type,
-    })
-
-    if (sampleFile.path) {
-      Object.defineProperty(file, 'webkitRelativePath', {
-        configurable: true,
-        value: sampleFile.path,
-      })
-    }
-
-    return file
-  }
 
   async function loadSample(sample) {
     if (loadingSampleId) {

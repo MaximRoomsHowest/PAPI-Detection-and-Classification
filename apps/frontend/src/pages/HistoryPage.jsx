@@ -20,6 +20,21 @@ import { HistoryDetailModal } from '../components/history/HistoryDetailModal'
 
 const HISTORY_PAGE_SIZE = 25
 
+// The six list filters travel together: every change shares one transition
+// (close the modal, mark the refetch, jump back to page 1), so they live in a
+// single state object with one change handler instead of six parallel useStates.
+const EMPTY_FILTERS = {
+  runway: '',
+  state: '',
+  model: '',
+  media: '',
+  // YYYY-MM-DD from the date input; sent as created_after (date-only ISO is
+  // read as UTC midnight by the backend, matching the stored-UTC convention).
+  date: '',
+  // One of '' | '0.5' | '0.75' | '0.9' (the select buckets in HistoryFilters).
+  confidence: '',
+}
+
 // The date input yields a bare YYYY-MM-DD, which the backend reads as UTC
 // midnight. A user east of UTC picking "today" would silently lose their
 // early-morning rows (local 00:00–02:00 is still "yesterday" in UTC), so the
@@ -59,16 +74,10 @@ export function HistoryPage({ copy }) {
   const [isFetching, setIsFetching] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState('')
-  const [runwayFilter, setRunwayFilter] = useState('')
-  const [stateFilter, setStateFilter] = useState('')
-  const [modelFilter, setModelFilter] = useState('')
-  const [mediaFilter, setMediaFilter] = useState('')
-  // YYYY-MM-DD from the date input; sent as created_after (date-only ISO is
-  // read as UTC midnight by the backend, matching the stored-UTC convention).
-  const [dateFilter, setDateFilter] = useState('')
-  // One of '' | '0.5' | '0.75' | '0.9' (the select buckets in HistoryFilters).
-  const [confidenceFilter, setConfidenceFilter] = useState('')
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [page, setPage] = useState(0)
+  // Read in the fetch effects' dependency arrays: bumping it forces a refetch
+  // even when no filter or page changed (the manual Refresh button).
   const [refreshKey, setRefreshKey] = useState(0)
 
   // Stable universe of filter options (audit F18/F20). The /api/stats counts are
@@ -113,12 +122,12 @@ export function HistoryPage({ copy }) {
     const options = {
       limit: HISTORY_PAGE_SIZE,
       offset: page * HISTORY_PAGE_SIZE,
-      runwayId: runwayFilter || undefined,
-      globalState: stateFilter || undefined,
-      modelId: modelFilter || undefined,
-      mediaType: mediaFilter || undefined,
-      createdAfter: createdAfterInstant(dateFilter),
-      minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
+      runwayId: filters.runway || undefined,
+      globalState: filters.state || undefined,
+      modelId: filters.model || undefined,
+      mediaType: filters.media || undefined,
+      createdAfter: createdAfterInstant(filters.date),
+      minConfidence: filters.confidence ? Number(filters.confidence) : undefined,
     }
     fetchLogs(options)
       .then((logsResult) => {
@@ -132,7 +141,7 @@ export function HistoryPage({ copy }) {
           mergeOptions(
             prev,
             logsResult.items.map((item) => item?.model_id).filter(Boolean),
-            modelFilter,
+            filters.model,
           ),
         )
       })
@@ -152,7 +161,7 @@ export function HistoryPage({ copy }) {
     // locale switch must NOT refetch the logs, so it is intentionally omitted
     // (the banner simply renders in the locale active at failure time).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, runwayFilter, stateFilter, modelFilter, mediaFilter, dateFilter, confidenceFilter, refreshKey])
+  }, [page, filters, refreshKey])
 
   // Stats describe the filtered slice, so they refetch on filter/refresh
   // changes only — paging through results cannot change the aggregate, so it
@@ -160,12 +169,12 @@ export function HistoryPage({ copy }) {
   useEffect(() => {
     let ignore = false
     fetchStats({
-      runwayId: runwayFilter || undefined,
-      globalState: stateFilter || undefined,
-      modelId: modelFilter || undefined,
-      mediaType: mediaFilter || undefined,
-      createdAfter: createdAfterInstant(dateFilter),
-      minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
+      runwayId: filters.runway || undefined,
+      globalState: filters.state || undefined,
+      modelId: filters.model || undefined,
+      mediaType: filters.media || undefined,
+      createdAfter: createdAfterInstant(filters.date),
+      minConfidence: filters.confidence ? Number(filters.confidence) : undefined,
     })
       .then((nextStats) => {
         if (ignore) return
@@ -176,10 +185,10 @@ export function HistoryPage({ copy }) {
         // backend has stopped reporting them. Returning the previous array
         // unchanged when nothing is new avoids a needless re-render.
         setRunwayOptions((prev) =>
-          mergeOptions(prev, Object.keys(nextStats?.by_runway ?? {}), runwayFilter),
+          mergeOptions(prev, Object.keys(nextStats?.by_runway ?? {}), filters.runway),
         )
         setStateOptions((prev) =>
-          mergeOptions(prev, Object.keys(nextStats?.by_global_state ?? {}), stateFilter),
+          mergeOptions(prev, Object.keys(nextStats?.by_global_state ?? {}), filters.state),
         )
       })
       .catch((loadError) => {
@@ -193,7 +202,7 @@ export function HistoryPage({ copy }) {
     }
     // `copy` intentionally omitted — same rationale as the logs effect above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runwayFilter, stateFilter, modelFilter, mediaFilter, dateFilter, confidenceFilter, refreshKey])
+  }, [filters, refreshKey])
 
   // Refresh jumps back to page 1 so freshly-logged analyses (newest first) are
   // visible, and forces a refetch via refreshKey even when already on page 1.
@@ -213,16 +222,15 @@ export function HistoryPage({ copy }) {
   // modal: the fixed backdrop normally makes them unreachable while it is open,
   // but if focus ever escapes the trap (browser chrome re-entry) the modal must
   // not sit over a list it no longer belongs to. No-op when already closed.
-  const handleFilterChange = (setter) => (event) => {
+  const handleFilterChange = (field) => (event) => {
     closeModal()
     setIsFetching(true)
     setPage(0)
-    setter(event.target.value)
+    const value = event.target.value
+    setFilters((current) => ({ ...current, [field]: value }))
   }
 
-  const hasActiveFilters = Boolean(
-    runwayFilter || stateFilter || modelFilter || mediaFilter || dateFilter || confidenceFilter,
-  )
+  const hasActiveFilters = Object.values(filters).some(Boolean)
 
   // Clear filters (audit F18) — reset the selects and return to page 1. A
   // refetch follows automatically because the filter state changed.
@@ -230,12 +238,7 @@ export function HistoryPage({ copy }) {
     closeModal()
     setIsFetching(true)
     setPage(0)
-    setRunwayFilter('')
-    setStateFilter('')
-    setModelFilter('')
-    setMediaFilter('')
-    setDateFilter('')
-    setConfidenceFilter('')
+    setFilters(EMPTY_FILTERS)
   }
 
   const handleExportCsv = async () => {
@@ -246,21 +249,21 @@ export function HistoryPage({ copy }) {
       // full export once downloaded (audit FB-08).
       const nameParts = [
         'papi_analysis_logs',
-        runwayFilter,
-        stateFilter,
-        modelFilter,
-        mediaFilter,
-        dateFilter && `from_${dateFilter}`,
-        confidenceFilter && `conf_${Math.round(Number(confidenceFilter) * 100)}`,
+        filters.runway,
+        filters.state,
+        filters.model,
+        filters.media,
+        filters.date && `from_${filters.date}`,
+        filters.confidence && `conf_${Math.round(Number(filters.confidence) * 100)}`,
       ].filter(Boolean)
       await downloadLogsCsv(
         {
-          runwayId: runwayFilter || undefined,
-          globalState: stateFilter || undefined,
-          modelId: modelFilter || undefined,
-          mediaType: mediaFilter || undefined,
-          createdAfter: createdAfterInstant(dateFilter),
-          minConfidence: confidenceFilter ? Number(confidenceFilter) : undefined,
+          runwayId: filters.runway || undefined,
+          globalState: filters.state || undefined,
+          modelId: filters.model || undefined,
+          mediaType: filters.media || undefined,
+          createdAfter: createdAfterInstant(filters.date),
+          minConfidence: filters.confidence ? Number(filters.confidence) : undefined,
         },
         `${nameParts.join('_')}.csv`,
       )
@@ -356,22 +359,22 @@ export function HistoryPage({ copy }) {
       <HistoryStats modelInfo={modelInfo} stats={stats} isFiltered={hasActiveFilters} copy={copy} />
 
       <HistoryFilters
-        runwayFilter={runwayFilter}
-        stateFilter={stateFilter}
-        modelFilter={modelFilter}
-        mediaFilter={mediaFilter}
-        dateFilter={dateFilter}
-        confidenceFilter={confidenceFilter}
+        runwayFilter={filters.runway}
+        stateFilter={filters.state}
+        modelFilter={filters.model}
+        mediaFilter={filters.media}
+        dateFilter={filters.date}
+        confidenceFilter={filters.confidence}
         runwayOptions={runwayOptions}
         stateOptions={stateOptions}
         modelOptions={modelOptions}
         hasActiveFilters={hasActiveFilters}
-        onRunwayChange={handleFilterChange(setRunwayFilter)}
-        onStateChange={handleFilterChange(setStateFilter)}
-        onModelChange={handleFilterChange(setModelFilter)}
-        onMediaChange={handleFilterChange(setMediaFilter)}
-        onDateChange={handleFilterChange(setDateFilter)}
-        onConfidenceChange={handleFilterChange(setConfidenceFilter)}
+        onRunwayChange={handleFilterChange('runway')}
+        onStateChange={handleFilterChange('state')}
+        onModelChange={handleFilterChange('model')}
+        onMediaChange={handleFilterChange('media')}
+        onDateChange={handleFilterChange('date')}
+        onConfidenceChange={handleFilterChange('confidence')}
         onClearFilters={handleClearFilters}
         onExportCsv={handleExportCsv}
         isExporting={isExporting}

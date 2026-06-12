@@ -5,6 +5,8 @@ import clsx from 'clsx'
 import { computeCropRect } from '../lib/cropRect'
 import { statusCopy } from '../catalog/statusCatalog'
 
+const toneFor = (status) => statusCopy[status] ?? statusCopy.occluded
+
 // Close-up verification of the detected PAPI lights. High-resolution frames
 // render the lamps far too small to verify by eye, so this reframes the image
 // to the union of the detected bounding boxes (original-image pixels) using
@@ -23,7 +25,6 @@ export function LampCropZoom({ imageUrl, naturalWidth, naturalHeight, lamps, cop
   const hasLamps = (lamps?.length ?? 0) > 0
   const canRender = crop && imageUrl && !imageFailed
 
-  const toneFor = (status) => statusCopy[status] ?? statusCopy.occluded
   // Text alternative for the (otherwise SVG-opaque) zoomed image region; the
   // visible legend below carries the same information for sighted users.
   const cropSummary = crop

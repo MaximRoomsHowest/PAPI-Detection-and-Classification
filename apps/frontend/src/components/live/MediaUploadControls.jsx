@@ -49,7 +49,6 @@ export function MediaUploadControls({ copy }) {
           type="file"
           multiple
           webkitdirectory="true"
-          directory=""
           onChange={handleMediaChange}
         />
       </label>

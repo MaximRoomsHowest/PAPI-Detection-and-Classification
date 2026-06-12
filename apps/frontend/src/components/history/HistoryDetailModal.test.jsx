@@ -127,6 +127,20 @@ describe('HistoryDetailModal', () => {
     expect(container.textContent).not.toContain(copy.history.drone)
   })
 
+  it('shows the decode-shortfall banner for a persisted partial decode', () => {
+    const shortLog = {
+      ...baseLog,
+      media_type: 'video',
+      frame_count: 120,
+      decode_shortfall: 80,
+    }
+    const { container } = render(<HistoryDetailModal {...makeProps({ selectedLog: shortLog })} />)
+
+    expect(container.querySelector('.result-truncation')?.textContent).toBe(
+      copy.live.decodeShortfall.replace('{decoded}', '120').replace('{expected}', '200'),
+    )
+  })
+
   it('keeps the raw detections behind the disclosure toggle', () => {
     const onToggleRaw = vi.fn()
     const { container, root } = render(<HistoryDetailModal {...makeProps({ onToggleRaw })} />)

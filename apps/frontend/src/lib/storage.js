@@ -6,7 +6,6 @@ export const STORAGE_KEYS = {
   theme: 'papi.theme.v2',
   language: 'papi.language',
   runway: 'papi.runway',
-  cookie: 'papi.cookie',
 }
 
 // Write a localStorage key, swallowing failures. Some browsers (Safari

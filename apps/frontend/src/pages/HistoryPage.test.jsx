@@ -1,5 +1,6 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../i18n/translations.js'
 import { HistoryPage } from './HistoryPage.jsx'
@@ -67,7 +68,13 @@ async function flush() {
 }
 
 async function mountPage() {
-  const rendered = render(<HistoryPage copy={copy} />)
+  // MemoryRouter: the table's Insights column renders a router <Link> (an SPA
+  // navigation must not remount the app and wipe the live-demo session).
+  const rendered = render(
+    <MemoryRouter>
+      <HistoryPage copy={copy} />
+    </MemoryRouter>,
+  )
   await flush()
   await flush()
   return rendered
@@ -115,6 +122,24 @@ describe('HistoryPage', () => {
     expect(mocks.fetchLogs).toHaveBeenLastCalledWith(
       expect.objectContaining({ offset: 0, runwayId: 'papi_24' }),
     )
+  })
+
+  it('renders the Insights column as an SPA link and badges partial analyses', async () => {
+    mocks.fetchLogs.mockResolvedValue({
+      items: [{ ...logItem, decode_shortfall: 30, frame_count: 120 }],
+      total: 1,
+    })
+    const { container } = await mountPage()
+
+    // Router <Link> (renders an <a> with the right href) — a raw hard-navigation
+    // anchor would remount the SPA and wipe the live session.
+    const insightsLink = container.querySelector('a.history-link')
+    expect(insightsLink).not.toBeNull()
+    expect(insightsLink.getAttribute('href')).toBe('/insights?log=7')
+
+    const badge = container.querySelector('.history-partial-badge')
+    expect(badge).not.toBeNull()
+    expect(badge.textContent).toBe(copy.history.partialBadge)
   })
 
   it('closes the detail modal and revokes its artifact when a filter changes', async () => {

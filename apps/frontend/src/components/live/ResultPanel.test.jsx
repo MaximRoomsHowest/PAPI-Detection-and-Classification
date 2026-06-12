@@ -126,4 +126,29 @@ describe('ResultPanel provenance', () => {
     expect(alert).not.toBeNull()
     expect(alert.textContent).toBe(copy.live.truncatedAnalysis.replace('{frames}', '600'))
   })
+
+  it('shows the decode-shortfall alert with decoded/expected counts', () => {
+    // Backend stamped decode_shortfall: 120 decoded of 200 promised (80 missing).
+    mocks.contextValue = makeContext({
+      rawResult: { runway_id: 'papi_24', frame_count: 120, decode_shortfall: 80 },
+    })
+
+    const { container } = render(<ResultPanel copy={copy} />)
+
+    const alert = container.querySelector('.result-truncation')
+    expect(alert).not.toBeNull()
+    expect(alert.textContent).toBe(
+      copy.live.decodeShortfall.replace('{decoded}', '120').replace('{expected}', '200'),
+    )
+  })
+
+  it('hides the decode-shortfall alert on complete results', () => {
+    mocks.contextValue = makeContext({
+      rawResult: { runway_id: 'papi_24', frame_count: 120 },
+    })
+
+    const { container } = render(<ResultPanel copy={copy} />)
+
+    expect(container.querySelector('.result-truncation')).toBeNull()
+  })
 })

@@ -6,7 +6,7 @@ import { InlineMetric } from '../InlineMetric'
 // what the session found and whether to trust it — deliberately NO pass/fail verdict,
 // which needs the commissioned set-angles (not on the frontend yet); the honest headline
 // is "transitions on N/4 lamps, commissioned comparison pending".
-export function InsightsSummaryStrip({ summary, copy }) {
+export function InsightsSummaryStrip({ summary, sourceMeta, copy }) {
   if (!summary || summary.analysisCount === 0) {
     return null
   }
@@ -41,6 +41,8 @@ export function InsightsSummaryStrip({ summary, copy }) {
   return (
     <div className="insights-summary" role="group" aria-label={copy.insights.summaryLabel}>
       <div className="insights-summary__tiles">
+        {sourceMeta?.label ? <InlineMetric label={copy.insights.summarySource} value={sourceMeta.label} /> : null}
+        {sourceMeta?.timestamp ? <InlineMetric label={copy.insights.summaryCaptured} value={sourceMeta.timestamp} /> : null}
         <InlineMetric label={copy.insights.summaryLampsCrossed} value={`${lampsCrossed} / ${totalLamps}`} />
         <InlineMetric label={copy.insights.summaryElevation} value={elevationText} />
         <InlineMetric label={copy.insights.summaryFrames} value={frameCount} />

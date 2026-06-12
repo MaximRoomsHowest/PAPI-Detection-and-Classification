@@ -7,6 +7,8 @@ import {
   resolveAngle,
   stateBandSeries,
   transitionAngleSummary,
+  transitionCsv,
+  transitionFlickerStatus,
 } from './insightsTransforms'
 
 const result = ({ available = true, perLight = [], global = 3.0, lamps = [] }) => ({
@@ -199,6 +201,43 @@ describe('transitionAngleSummary', () => {
   it('handles no input', () => {
     const summary = transitionAngleSummary([])
     expect(summary.every((entry) => entry.settledAngle === null && entry.flips === 0)).toBe(true)
+  })
+})
+
+describe('transitionFlickerStatus', () => {
+  it('classifies no crossing, clean crossing, and repeated-flip review cases', () => {
+    expect(transitionFlickerStatus(0)).toBe('no_crossing')
+    expect(transitionFlickerStatus(1)).toBe('clean_crossing')
+    expect(transitionFlickerStatus(2)).toBe('review_flicker')
+  })
+})
+
+describe('transitionCsv', () => {
+  it('exports only real transition events and flags repeated flips by lamp', () => {
+    const csv = transitionCsv(
+      [
+        {
+          log_id: 'log-1',
+          runway_id: 'papi_24',
+          original_filename: 'clip, one.mp4',
+          transition_method: 'tracking',
+          transitions: [
+            { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 2, elevation_angle_deg: 2.7, method: 'tracking' },
+            { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 3, elevation_angle_deg: 2.9, method: 'tracking' },
+            { lamp_index: 5, from_state: 'red', to_state: 'white', frame_index: 4, elevation_angle_deg: 3.1 },
+          ],
+        },
+      ],
+      { mode: 'history' },
+    )
+
+    const rows = csv.split('\r\n')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toContain('flicker_status')
+    expect(rows[1]).toContain('"clip, one.mp4"')
+    expect(rows[1]).toContain('review_flicker')
+    expect(rows[2]).toContain('review_flicker')
+    expect(csv).not.toContain(',5,')
   })
 })
 

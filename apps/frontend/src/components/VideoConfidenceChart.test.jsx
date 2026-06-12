@@ -97,6 +97,15 @@ describe('VideoConfidenceChart', () => {
     expect(mocks.renderCount).toBe(2)
   })
 
+  it('forwards copy and an accessible name to LazyPlot', () => {
+    // Without these the Live Demo chart was the only LazyPlot call site with
+    // no screen-reader name and English-only loading/error fallbacks.
+    render(<Harness frames={perFrame} />)
+
+    expect(mocks.lastProps.ariaLabel).toBe(copy.live.frameConfidenceTitle)
+    expect(mocks.lastProps.copy).toBe(copy)
+  })
+
   it('maps per-frame states to localized hover labels with a raw-value fallback', () => {
     render(<Harness frames={perFrame} />)
 

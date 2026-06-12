@@ -96,18 +96,34 @@
   .topnav {
     grid-column: 1 / -1;
     grid-row: 2;
-    justify-content: center;
+    /* NOT justify-content: center — a centered flex row that overflows clips
+       BOTH edges and the left half sits before scroll position 0, so the first
+       nav items become unreachable on narrow phones (audit 2026-06-12, 380px).
+       Auto margins on the end links center the group while it fits and resolve
+       to 0 once it overflows, leaving a normally scrollable start-aligned row. */
+    justify-content: flex-start;
     overflow-x: auto;
     border-top: 1px solid var(--border);
   }
 
+  .topnav .nav-link:first-child {
+    margin-left: auto;
+  }
+
+  .topnav .nav-link:last-child {
+    margin-right: auto;
+  }
+
   .topnav .nav-link {
-    /* Tighten padding + font + letter spacing so the four nav links fit a
+    /* Tighten padding + font + letter spacing so the five nav links fit a
        390 px (iPhone) viewport without horizontal clipping (regression
        USERTEST-MAJ-3, papi-user-test-2026-05-28). */
     padding: 10px 12px;
     font-size: 12px;
     letter-spacing: 0.2px;
+    /* A flex child may shrink below content size and ellipse mid-word; in a
+       scrollable row each link must keep its intrinsic width instead. */
+    flex-shrink: 0;
   }
 
   .intro-band {
@@ -177,8 +193,24 @@
     flex-wrap: wrap;
   }
 
+  /* Full row is not enough: the selector's own inline contents (label +
+     segmented options + status note) also have to wrap, or they clip past the
+     viewport at ~380px (audit 2026-06-12). Stack them as rows and give the
+     note a full line of its own instead of an 18ch sliver. */
   .demo-actions .model-selector {
     width: 100%;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .demo-actions .model-selector__options {
+    flex-wrap: wrap;
+  }
+
+  .demo-actions .model-selector small {
+    flex: 1 1 100%;
+    max-width: none;
   }
 
   /* The telemetry-prompt controls grid's minmax floors sum past a phone's width —

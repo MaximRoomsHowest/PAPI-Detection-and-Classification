@@ -2,6 +2,18 @@ import { MapPin, Upload, X } from 'lucide-react'
 import { useLiveDemo } from '../../context/liveDemoContext'
 import { FOLDER_MODE_ANGLE_SWEEP } from '../../lib/analysisMode'
 
+// Client-side range check (bounds mirror the backend's): a non-numeric or
+// out-of-range value otherwise travels to the backend and comes back as a
+// 422 — slower and scarier than a hint under the field. A field is invalid
+// only when it is FILLED and bad; empty fields just keep Apply gated by the
+// all-three rule below.
+const fieldInvalid = (value, min, max) => {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  const numeric = Number(trimmed)
+  return !Number.isFinite(numeric) || numeric < min || numeric > max
+}
+
 // The "angle metadata missing" panel: runway select + telemetry-file upload + manual
 // lat/lon/alt fields + the re-run button. Shown only after a result whose angle came
 // back unavailable, so the user can supply a fix and re-analyse. Pulls its state and
@@ -43,21 +55,13 @@ export function MetadataPrompt({ copy }) {
       droneTelemetry.longitude.trim() &&
       droneTelemetry.altitudeM.trim(),
   )
-  // Client-side range check (bounds mirror the backend's): a non-numeric or
-  // out-of-range value otherwise travels to the backend and comes back as a
-  // 422 — slower and scarier than a hint under the field. A field is invalid
-  // only when it is FILLED and bad; empty fields just keep Apply gated by the
-  // all-three rule above.
-  const fieldInvalid = (value, min, max) => {
-    const trimmed = value.trim()
-    if (!trimmed) return false
-    const numeric = Number(trimmed)
-    return !Number.isFinite(numeric) || numeric < min || numeric > max
-  }
   const invalidTelemetryFields = {
     latitude: fieldInvalid(droneTelemetry.latitude, -90, 90),
     longitude: fieldInvalid(droneTelemetry.longitude, -180, 180),
-    altitudeM: fieldInvalid(droneTelemetry.altitudeM, -500, 15000),
+    // Bounds mirror the backend's ALTITUDE_MIN_M/ALTITUDE_MAX_M
+    // (app/validation/analyze.py) — a stale 15000 here blocked values the
+    // backend (and the field's own hint) accept.
+    altitudeM: fieldInvalid(droneTelemetry.altitudeM, -500, 20000),
   }
   const telemetryInvalid = Object.values(invalidTelemetryFields).some(Boolean)
   // In folder ANGLE-SWEEP mode each image is scored against its OWN EXIF GPS, so an uploaded

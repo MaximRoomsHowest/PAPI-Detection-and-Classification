@@ -38,26 +38,14 @@ export function HistoryDetailModal({
     <div className="history-modal-backdrop">
       {/* Click-the-backdrop-to-dismiss as a real, keyboard-focusable control
           instead of an onClick on a non-interactive <div> (which had no
-          keyboard path). It sits behind the dialog as a full-bleed layer;
-          Escape also closes via useModalA11y, and the focus trap keeps Tab
-          inside the dialog. Inline-positioned because CSS for this overlay
-          lives elsewhere and this component owns no stylesheet. */}
+          keyboard path). It sits behind the dialog as a full-bleed layer
+          (.history-modal-dismiss); Escape also closes via useModalA11y, and
+          the focus trap keeps Tab inside the dialog. */}
       <button
         type="button"
         className="history-modal-dismiss"
         aria-label={copy.history.close}
         onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          border: 0,
-          padding: 0,
-          margin: 0,
-          background: 'transparent',
-          cursor: 'default',
-        }}
       />
       <section
         className="history-modal"
@@ -66,11 +54,6 @@ export function HistoryDetailModal({
         aria-labelledby="history-detail-title"
         ref={modalRef}
         tabIndex={-1}
-        // position:relative so the dialog paints above the absolutely-
-        // positioned backdrop-dismiss button (which would otherwise stack on
-        // top and swallow clicks). The .history-modal CSS sets no position,
-        // so this is purely additive.
-        style={{ position: 'relative' }}
       >
         <div className="history-modal-heading">
           <div>
@@ -151,10 +134,20 @@ export function HistoryDetailModal({
           </p>
         )}
 
+        {/* Decode shortfall: the source ended early (damaged file / unreadable
+            sequence images) — fewer frames decoded than the source promised. */}
+        {selectedLog.decode_shortfall != null && (
+          <p className="result-truncation" role="alert">
+            {copy.live.decodeShortfall
+              .replace('{decoded}', selectedLog.frame_count)
+              .replace('{expected}', selectedLog.frame_count + selectedLog.decode_shortfall)}
+          </p>
+        )}
+
         {artifact.key === selectedLog.artifact_url && artifact.url && (
           <div className="history-artifact">
             {selectedLog.media_type === 'video' ? (
-              <video src={artifact.url} controls>
+              <video src={artifact.url} controls aria-label={selectedLog.original_filename}>
                 <track kind="captions" />
               </video>
             ) : (

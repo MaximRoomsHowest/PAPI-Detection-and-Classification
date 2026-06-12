@@ -194,6 +194,64 @@ export function transitionAngleSummary(results) {
   }))
 }
 
+export function transitionFlickerStatus(flipCount) {
+  if (!Number.isFinite(flipCount) || flipCount <= 0) return 'no_crossing'
+  if (flipCount === 1) return 'clean_crossing'
+  return 'review_flicker'
+}
+
+function csvCell(value) {
+  if (value === null || value === undefined) return ''
+  const text = String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+export function transitionCsv(results, source = {}) {
+  const headers = [
+    'source',
+    'log_id',
+    'runway_id',
+    'original_filename',
+    'transition_method',
+    'lamp_index',
+    'from_state',
+    'to_state',
+    'frame_index',
+    'elevation_angle_deg',
+    'method',
+    'flicker_status',
+  ]
+  const rows = []
+  for (const result of results ?? []) {
+    const counts = new Map()
+    for (const event of result?.transitions ?? []) {
+      if (Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= 4) {
+        counts.set(event.lamp_index, (counts.get(event.lamp_index) ?? 0) + 1)
+      }
+    }
+    for (const event of result?.transitions ?? []) {
+      if (!Number.isInteger(event?.lamp_index) || event.lamp_index < 1 || event.lamp_index > 4) {
+        continue
+      }
+      rows.push([
+        source.mode ?? '',
+        result?.log_id ?? source.logId ?? '',
+        result?.runway_id ?? '',
+        result?.original_filename ?? '',
+        result?.transition_method ?? '',
+        event.lamp_index,
+        event.from_state ?? '',
+        event.to_state ?? '',
+        event.frame_index ?? '',
+        Number.isFinite(event.elevation_angle_deg) ? event.elevation_angle_deg : '',
+        event.method ?? '',
+        transitionFlickerStatus(counts.get(event.lamp_index) ?? 0),
+      ])
+    }
+  }
+  return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+}
+
 // --- Per-frame lamp-state bands ------------------------------------------------
 
 // z-code order for the state-band heatmap. Index IS the code: a lamp slot absent

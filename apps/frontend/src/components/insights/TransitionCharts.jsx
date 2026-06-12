@@ -16,6 +16,7 @@ import {
   STATE_BAND_CODES,
   stateBandSeries,
   transitionAngleSummary,
+  transitionFlickerStatus,
 } from '../../lib/insightsTransforms'
 import { degrees } from '../../lib/format'
 
@@ -346,6 +347,7 @@ function TransitionTable({ transitions, summary, copy }) {
               group.summary.bandMin !== null
                 ? `${degrees(group.summary.bandMin)} – ${degrees(group.summary.bandMax)}`
                 : '—'
+            const flickerLabel = copy.insights.flickerStatus?.[transitionFlickerStatus(group.events.length)]
             return (
               <Fragment key={group.lampIndex}>
                 <tr className="transition-group-row">
@@ -354,6 +356,7 @@ function TransitionTable({ transitions, summary, copy }) {
                     {copy.insights.flipsSummary
                       .replace('{flips}', group.events.length)
                       .replace('{zone}', zone)}
+                    {flickerLabel ? ` · ${flickerLabel}` : ''}
                   </th>
                 </tr>
                 {group.events.map((event, index) => {

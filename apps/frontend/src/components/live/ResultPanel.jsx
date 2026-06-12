@@ -68,6 +68,21 @@ export function ResultPanel({ copy }) {
             </p>
           )}
 
+          {/* The opposite partial-result case: the source ended EARLY (mid-stream
+              decode failure / unreadable sequence images), so the backend stamps
+              decode_shortfall = promised-but-undecoded frame count. */}
+          {activeScenario.rawResult?.decode_shortfall != null && (
+            <p className="result-truncation" role="alert">
+              {copy.live.decodeShortfall
+                .replace('{decoded}', activeScenario.rawResult.frame_count)
+                .replace(
+                  '{expected}',
+                  activeScenario.rawResult.frame_count +
+                    activeScenario.rawResult.decode_shortfall,
+                )}
+            </p>
+          )}
+
           <div className="state-summary">
             <span className="status-dot" style={{ '--dot-color': activeState.color }} />
             <div>

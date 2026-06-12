@@ -94,6 +94,17 @@ describe('MetadataPrompt manual-position validation', () => {
     expect(container.querySelector('.drone-telemetry__invalid')).toBeNull()
   })
 
+  it('accepts altitudes the backend accepts (bounds mirror ALTITUDE_MAX_M = 20000)', () => {
+    // A stale 15000 m client cap used to block 15000–20000 m values that the
+    // backend — and the field's own hint text — accept (audit 2026-06-12).
+    mocks.contextValue = makeContext({ latitude: '47.665', longitude: '9.505', altitudeM: '16000' })
+
+    const { container } = render(<MetadataPrompt copy={copy} />)
+
+    expect(applyButton(container).disabled).toBe(false)
+    expect(container.querySelector('#drone-altitude').getAttribute('aria-invalid')).toBe('false')
+  })
+
   it('offers the optional drone-id input and forwards typing to the hook', () => {
     const setDroneId = vi.fn()
     mocks.contextValue = makeContext(

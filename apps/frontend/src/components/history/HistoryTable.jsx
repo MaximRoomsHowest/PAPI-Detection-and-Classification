@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { Link } from 'react-router-dom'
 import { formatAngle, formatTimestamp, percent } from '../../lib/format'
 import { runwayDisplayName } from '../../lib/runwaySelection'
 import { globalStateLabel } from '../../lib/stateLabels'
@@ -50,6 +51,7 @@ export function HistoryTable({
                   <th scope="col" className="history-col-secondary">{copy.history.processing}</th>
                   <th scope="col">{copy.history.created}</th>
                   <th scope="col">{copy.history.artifact}</th>
+                  <th scope="col">{copy.history.insights}</th>
                 </tr>
               </thead>
               <tbody>
@@ -89,7 +91,17 @@ export function HistoryTable({
                         ? formatAngle(log.elevation_angle_deg)
                         : '—'}
                     </td>
-                    <td data-label={copy.history.frames} className="history-col-secondary tnum">{log.frame_count}</td>
+                    <td data-label={copy.history.frames} className="history-col-secondary tnum">
+                      {log.frame_count}
+                      {/* Partial-result badge: the backend mirrors truncated_at_frame /
+                          decode_shortfall into the list payload so a capped or
+                          half-decoded analysis is visible without opening the row. */}
+                      {(log.truncated_at_frame != null || log.decode_shortfall != null) && (
+                        <span className="history-partial-badge" title={copy.history.partialBadgeHint}>
+                          {copy.history.partialBadge}
+                        </span>
+                      )}
+                    </td>
                     <td data-label={copy.history.processing} className="history-col-secondary tnum">{log.processing_ms} ms</td>
                     <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at, copy.locale)}</td>
                     <td data-label={copy.history.artifact}>
@@ -105,6 +117,13 @@ export function HistoryTable({
                       ) : (
                         copy.history.unavailable
                       )}
+                    </td>
+                    <td data-label={copy.history.insights}>
+                      {/* Router Link, not a raw <a>: a hard navigation remounts the
+                          whole SPA and wipes the in-memory live-demo session. */}
+                      <Link className="history-link" to={`/insights?log=${encodeURIComponent(log.id)}`}>
+                        {copy.history.openInsights}
+                      </Link>
                     </td>
                   </tr>
                 ))}

@@ -68,7 +68,18 @@ function VideoConfidenceChartInner({ perFrame, plotTheme, copy }) {
           <p>{copy.live.frameConfidenceText}</p>
         </div>
       </div>
-      <LazyPlot className="plotly-chart" config={plotlyConfig} data={data} layout={layout} useResizeHandler />
+      {/* copy + ariaLabel: localized loading/error fallbacks and a screen-reader
+          name for the SVG chart — this was the only LazyPlot call site without
+          them (every Insights chart already passes both). */}
+      <LazyPlot
+        className="plotly-chart"
+        copy={copy}
+        ariaLabel={copy.live.frameConfidenceTitle}
+        config={plotlyConfig}
+        data={data}
+        layout={layout}
+        useResizeHandler
+      />
     </article>
   )
 }
