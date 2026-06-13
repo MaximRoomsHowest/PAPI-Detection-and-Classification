@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
 import {
@@ -12,6 +12,7 @@ import { translations } from './i18n/translations'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { CookieConsent } from './components/CookieConsent'
 import { LiveDemoProvider } from './context/LiveDemoProvider'
 import { IntroductionPage } from './pages/IntroductionPage'
 import { LiveDemoPage } from './pages/LiveDemoPage'
@@ -33,6 +34,35 @@ function NotFound({ copy }) {
       </Link>
     </section>
   )
+}
+
+function wasBrowserReload() {
+  const navigation = performance.getEntriesByType?.('navigation')?.[0]
+  if (navigation?.type) {
+    return navigation.type === 'reload'
+  }
+  return performance.navigation?.type === performance.navigation?.TYPE_RELOAD
+}
+
+function RouteEffects() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [shouldResetReloadPath] = useState(wasBrowserReload)
+  const reloadResetHandledRef = useRef(false)
+
+  useEffect(() => {
+    if (shouldResetReloadPath && !reloadResetHandledRef.current) {
+      reloadResetHandledRef.current = true
+      if (location.pathname !== '/') {
+        navigate('/', { replace: true })
+        return
+      }
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname, navigate, shouldResetReloadPath])
+
+  return null
 }
 
 function App() {
@@ -93,6 +123,8 @@ function App() {
         {copy.a11y.skipToContent}
       </a>
 
+      <RouteEffects />
+
       <Topbar
         copy={copy}
         theme={theme}
@@ -129,6 +161,8 @@ function App() {
       </main>
 
       <AppFooter copy={copy} />
+
+      <CookieConsent copy={copy} />
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

@@ -35,6 +35,14 @@ export const translations = {
       message: 'The page you are looking for does not exist.',
       home: 'Back to introduction',
     },
+    cookie: {
+      title: 'Would you like a cookie?',
+      message: 'A small welcome moment before you start exploring PAPI Vision.',
+      accept: 'Yes, please',
+      decline: 'No thanks',
+      accepted: 'Enjoy the cookie',
+      declined: 'Maybe next time',
+    },
     nav: {
       introduction: 'Introduction',
       liveDemo: 'Live Demo',
@@ -553,6 +561,14 @@ export const translations = {
       title: 'Seite nicht gefunden',
       message: 'Die gesuchte Seite existiert nicht.',
       home: 'Zurück zur Einführung',
+    },
+    cookie: {
+      title: 'Möchtest du einen Cookie?',
+      message: 'Ein kleiner Willkommensmoment, bevor du PAPI Vision erkundest.',
+      accept: 'Ja, gerne',
+      decline: 'Nein danke',
+      accepted: 'Genieß den Cookie',
+      declined: 'Vielleicht nächstes Mal',
     },
     nav: {
       introduction: 'Einführung',
@@ -1073,6 +1089,14 @@ export const translations = {
       message: 'De pagina die je zoekt bestaat niet.',
       home: 'Terug naar introductie',
     },
+    cookie: {
+      title: 'Wil je een cookie?',
+      message: 'Een klein welkomstmoment voordat je PAPI Vision verkent.',
+      accept: 'Ja, graag',
+      decline: 'Nee bedankt',
+      accepted: 'Veel plezier met de cookie',
+      declined: 'Misschien volgende keer',
+    },
     nav: {
       introduction: 'Introductie',
       liveDemo: 'Live demo',
@@ -1591,6 +1615,14 @@ export const translations = {
       title: 'Page introuvable',
       message: 'La page que vous recherchez n’existe pas.',
       home: 'Retour à l’introduction',
+    },
+    cookie: {
+      title: 'Voulez-vous un cookie ?',
+      message: 'Un petit moment d’accueil avant d’explorer PAPI Vision.',
+      accept: 'Oui, volontiers',
+      decline: 'Non merci',
+      accepted: 'Profitez du cookie',
+      declined: 'Peut-être plus tard',
     },
     nav: {
       introduction: 'Introduction',
