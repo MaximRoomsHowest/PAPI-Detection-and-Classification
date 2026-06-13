@@ -1,13 +1,16 @@
 from app.services.state import (
     aggregate_transition_state_events,
+    bind_lamps_to_runway_display,
+    bind_transitions_to_runway_display,
     confidence_from_lamps,
     detect_lamp_transitions,
+    frame_ranked_lamp_observations,
     global_state_from_lamps,
     infer_single_missing_lamp_from_angle,
     normalize_detections,
     transition_events_from_state_runs,
 )
-from app.validation.schemas import AngleResult, LampResult
+from app.validation.schemas import AngleResult, LampResult, TransitionEvent
 
 
 def test_normalize_detections_sorts_lamps_left_to_right():
@@ -22,6 +25,43 @@ def test_normalize_detections_sorts_lamps_left_to_right():
 
     assert [lamp.index for lamp in lamps] == [1, 2, 3, 4]
     assert [lamp.state for lamp in lamps] == ["white", "white", "red", "red"]
+
+
+def test_display_binding_keeps_left_to_right_lamp_order_for_rwy24():
+    lamps = [
+        LampResult(index=1, state="red", confidence=0.8),
+        LampResult(index=2, state="white", confidence=0.7),
+        LampResult(index=3, state="red", confidence=0.6),
+        LampResult(index=4, state="white", confidence=0.9),
+    ]
+
+    bound = bind_lamps_to_runway_display(lamps, "papi_24")
+
+    assert [lamp.index for lamp in bound] == [1, 2, 3, 4]
+    assert [lamp.state for lamp in bound] == ["red", "white", "red", "white"]
+    assert [lamp.index for lamp in lamps] == [1, 2, 3, 4]
+
+
+def test_rwy06_display_binding_keeps_lamp_order():
+    lamps = [
+        LampResult(index=1, state="red", confidence=0.8),
+        LampResult(index=4, state="white", confidence=0.9),
+    ]
+
+    bound = bind_lamps_to_runway_display(lamps, "papi_06")
+
+    assert [(lamp.index, lamp.state) for lamp in bound] == [(1, "red"), (4, "white")]
+
+
+def test_display_binding_keeps_left_to_right_transition_lamp_indices_for_rwy24():
+    events = [
+        TransitionEvent(lamp_index=1, from_state="red", to_state="white", frame_index=32),
+        TransitionEvent(lamp_index=4, from_state="white", to_state="red", frame_index=31),
+    ]
+
+    bound = bind_transitions_to_runway_display(events, "papi_24")
+
+    assert [(event.lamp_index, event.frame_index) for event in bound] == [(4, 31), (1, 32)]
 
 
 def test_normalize_detections_keeps_top_four_by_confidence_then_resorts_by_x():
@@ -296,6 +336,41 @@ def test_detect_lamp_transitions_finds_consecutive_red_to_white():
     assert event.elevation_angle_deg == 3.05
 
 
+def test_frame_ranked_lamp_observations_follow_left_to_right_each_frame():
+    observations = {
+        10: [(0, "red", 100.0, 0.9), (1, "white", 400.0, 0.9)],
+        20: [(0, "white", 400.0, 0.9), (1, "red", 100.0, 0.9)],
+    }
+
+    ranked = frame_ranked_lamp_observations(observations)
+
+    assert [obs[1] for obs in ranked[1]] == ["red", "red"]
+    assert [obs[1] for obs in ranked[2]] == ["white", "white"]
+
+
+def test_frame_ranked_lamp_observations_preserve_missing_slot_gaps():
+    """A dropped left lamp must not make the remaining lamps shift into lower slots."""
+
+    def obs(frame: int, state: str, x: float) -> tuple:
+        return (frame, state, x, 0.9)
+
+    observations = {
+        101: [obs(0, "red", 10.0), obs(3, "red", 10.0)],
+        102: [obs(0, "red", 20.0), obs(1, "white", 20.0), obs(2, "white", 20.0), obs(3, "white", 20.0)],
+        103: [obs(0, "red", 30.0), obs(1, "red", 30.0), obs(2, "red", 30.0), obs(3, "red", 30.0)],
+        104: [obs(0, "red", 40.0), obs(1, "red", 40.0), obs(2, "red", 40.0), obs(3, "red", 40.0)],
+    }
+
+    ranked = frame_ranked_lamp_observations(observations)
+    events = detect_lamp_transitions(ranked)
+
+    assert [entry[0] for entry in ranked[1]] == [0, 3]
+    assert [entry[1] for entry in ranked[1]] == ["red", "red"]
+    assert [(event.lamp_index, event.from_state, event.to_state, event.frame_index) for event in events] == [
+        (2, "red", "white", 1)
+    ]
+
+
 def test_detect_lamp_transitions_ignores_large_frame_gap():
     """A switch across a gap larger than TRANSITION_MAX_FRAME_GAP is not counted."""
     track_observations = {3: [(0, "red", 50.0), (5, "white", 50.0)]}  # gap 5 > 2
@@ -321,6 +396,33 @@ def test_detect_lamp_transitions_empty_without_a_switch():
     assert detect_lamp_transitions({1: [(0, "red", 10.0)]}) == []  # single observation
 
 
+def test_detect_lamp_transitions_suppresses_single_frame_colour_blips():
+    """A stable lamp can briefly misclassify for one frame; that should not emit
+    two false transition events around the real sustained crossing."""
+    observations = {
+        1: [
+            (26, "red", 10.0),
+            (27, "red", 10.0),
+            (28, "white", 10.0),  # isolated white blip
+            (29, "red", 10.0),
+            (30, "red", 10.0),
+            (31, "red", 10.0),
+            (32, "white", 10.0),  # sustained red -> white crossing
+            (33, "white", 10.0),
+            (47, "white", 10.0),
+            (48, "red", 10.0),  # isolated red blip
+            (49, "white", 10.0),
+            (50, "white", 10.0),
+        ]
+    }
+
+    events = detect_lamp_transitions(observations)
+
+    assert [(event.from_state, event.to_state, event.frame_index) for event in events] == [
+        ("red", "white", 32)
+    ]
+
+
 def test_aggregate_transition_state_events_groups_a_run():
     """A 3-class model reads 'transition' for a run of frames; the run collapses to one event
     with a stable id, frame span, duration, and the bracketing red/white states + angles."""
@@ -341,9 +443,9 @@ def test_aggregate_transition_state_events_empty_for_two_class():
 
 
 def test_aggregate_transition_state_events_min_run_filters_flicker():
-    """A single isolated 'transition' frame is dropped at min_run_frames=2 (flicker), kept at 1."""
+    """A single isolated 'transition' frame is dropped by the model-method default."""
     obs = {5: [(0, "red", 1.0), (1, "transition", 1.0), (2, "red", 1.0)]}
-    assert aggregate_transition_state_events(obs, min_run_frames=2) == []
+    assert aggregate_transition_state_events(obs) == []
     assert len(aggregate_transition_state_events(obs, min_run_frames=1)) == 1
 
 
@@ -370,3 +472,17 @@ def test_transition_events_from_state_runs_skips_incomplete_run():
     """A run with no stable colour after it (track ends mid-transition) is skipped so to_state
     never becomes None."""
     assert transition_events_from_state_runs({5: [(0, "red", 1.0), (1, "transition", 1.0)]}) == []
+
+
+def test_transition_events_from_state_runs_skips_non_colour_change_runs():
+    """A model class-2 run bracketed by the same colour is flicker, not a red/white transition."""
+    obs = {
+        5: [
+            (0, "red", 100.0),
+            (1, "transition", 100.0),
+            (2, "transition", 100.0),
+            (3, "red", 100.0),
+        ]
+    }
+
+    assert transition_events_from_state_runs(obs, frame_angles={1: 3.10}) == []

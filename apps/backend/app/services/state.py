@@ -1,13 +1,12 @@
 """Per-lamp + global state derivation for the backend API.
 
-Detection-class IDs from the YOLO model are 0=red, 1=white, so a lamp's
-per-frame state is only ever red / white / unknown. The third label,
-"transition", is NOT a per-frame verdict: per the project design
-(docs/label_spec.md, "transition handling moved to the temporal tracking
-layer") it is a *temporal* red<->white change observed by tracking a lamp
-across consecutive frames. ``detect_lamp_transitions`` produces those events
-from ByteTrack-tracked detections; the drone-metadata elevation angle is
-associated with each event (it annotates the transition, it does not decide it).
+The canonical detector classes are 0=red and 1=white. The optional experimental
+3-class model can also emit 2=transition during a video run, but a transition
+event is still accepted only when temporal evidence brackets that state with a
+real red<->white change. ``detect_lamp_transitions`` produces tracking-method
+events from red/white observations; ``transition_events_from_state_runs`` does
+the equivalent collapse for class-2 runs. The drone-metadata elevation angle is
+associated with each event; it annotates the transition, it does not decide it.
 """
 
 from collections import Counter
@@ -55,9 +54,8 @@ TRANSITION_HALF_WIDTH_DEG = 0.10
 def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
     """Build per-lamp results (red/white) sorted left-to-right.
 
-    Transition is deliberately NOT decided here: a single frame can only show a
-    lamp as red, white, or unknown. A "transition" is a red<->white switch
-    observed over time -- see ``detect_lamp_transitions``.
+    Transition events are deliberately NOT decided here: a single detection is
+    only a state sample. Red/white switches are emitted later by temporal logic.
     """
     candidates = []
     for detection in raw_detections:
@@ -103,6 +101,75 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
 TRANSITION_MAX_FRAME_GAP = 2
 
 
+def display_lamp_index(runway_id: str, lamp_index: int) -> int:
+    """Map internal tracked index to the user-facing lamp number.
+
+    Rodrigo's UI convention is image left-to-right: Light 1, Light 2, Light 3,
+    Light 4. Runtime tracking already assigns indices by image x-position, so
+    this is currently an identity mapping for all configured runways.
+    """
+    return lamp_index
+
+
+def bind_lamps_to_runway_display(lamps: list[LampResult], runway_id: str) -> list[LampResult]:
+    """Return lamps sorted by user-facing index for the selected runway."""
+    return sorted(
+        (lamp.model_copy(update={"index": display_lamp_index(runway_id, lamp.index)}) for lamp in lamps),
+        key=lambda lamp: lamp.index,
+    )
+
+
+def bind_transitions_to_runway_display(
+    transitions: list[TransitionEvent],
+    runway_id: str,
+) -> list[TransitionEvent]:
+    """Return transition events with lamp_index in user-facing runway order."""
+    return sorted(
+        (
+            event.model_copy(
+                update={"lamp_index": display_lamp_index(runway_id, event.lamp_index)}
+            )
+            for event in transitions
+        ),
+        key=lambda event: (event.frame_index, event.lamp_index),
+    )
+
+
+def denoise_track_observations(
+    track_observations: dict[int, list[tuple]],
+    max_frame_gap: int = TRANSITION_MAX_FRAME_GAP,
+) -> dict[int, list[tuple]]:
+    """Collapse one-frame colour blips inside each tracked lamp.
+
+    Runtime detections occasionally produce an isolated ``red/white/red`` or
+    ``white/red/white`` sample for a stable lamp. Those should not become two
+    transition events, but endpoints and sustained changes are left intact.
+    """
+    stabilized: dict[int, list[tuple]] = {}
+    for track_id, observations in track_observations.items():
+        ordered = sorted(observations, key=lambda item: item[0])
+        if len(ordered) < 3:
+            stabilized[track_id] = ordered
+            continue
+        cleaned = list(ordered)
+        for index in range(1, len(ordered) - 1):
+            prev = ordered[index - 1]
+            current = ordered[index]
+            next_obs = ordered[index + 1]
+            prev_frame, prev_state = prev[0], prev[1]
+            frame, state = current[0], current[1]
+            next_frame, next_state = next_obs[0], next_obs[1]
+            if (
+                state != prev_state
+                and prev_state == next_state
+                and 0 < frame - prev_frame <= max_frame_gap
+                and 0 < next_frame - frame <= max_frame_gap
+            ):
+                cleaned[index] = (frame, prev_state, *current[2:])
+        stabilized[track_id] = cleaned
+    return stabilized
+
+
 def lamp_index_by_track(track_observations: dict[int, list[tuple]]) -> dict[int, int]:
     """Map ByteTrack ids to lamp index 1..4 (left-to-right).
 
@@ -117,6 +184,78 @@ def lamp_index_by_track(track_observations: dict[int, list[tuple]]) -> dict[int,
     persistent = sorted(tracks, key=lambda kv: len(kv[1]), reverse=True)[:4]
     ordered = sorted(persistent, key=lambda kv: sum(o[2] for o in kv[1]) / len(kv[1]))
     return {tid: rank for rank, (tid, _) in enumerate(ordered, start=1)}
+
+
+def _reference_slot_centers(observations_by_frame: dict[int, list[tuple]]) -> list[float] | None:
+    complete_frames: list[list[tuple]] = []
+    for observations in observations_by_frame.values():
+        top_four = sorted(observations, key=lambda item: item[3], reverse=True)[:4]
+        if len(top_four) == 4:
+            complete_frames.append(sorted(top_four, key=lambda item: item[2]))
+    if not complete_frames:
+        return None
+    return [
+        sum(frame[slot][2] for frame in complete_frames) / len(complete_frames)
+        for slot in range(4)
+    ]
+
+
+def _assign_observations_to_slots(
+    observations: list[tuple],
+    reference_centers: list[float] | None,
+) -> list[tuple[int, tuple]]:
+    """Assign frame detections to Light 1..4 without compacting across missing slots."""
+    top_four = sorted(observations, key=lambda item: item[3], reverse=True)[:4]
+    ordered = sorted(top_four, key=lambda item: item[2])
+    if reference_centers is None or len(ordered) == 4:
+        return list(enumerate(ordered, start=1))
+
+    # Pick the monotonic subset of reference slots that best matches this frame's
+    # observed x-centers. This preserves an obscured gap: if L1 is missing, the
+    # remaining three detections map to slots 2,3,4 instead of shifting to 1,2,3.
+    from itertools import combinations
+
+    best_slots: tuple[int, ...] | None = None
+    best_cost: float | None = None
+    for slots in combinations(range(4), len(ordered)):
+        cost = sum(abs(observation[2] - reference_centers[slot]) for observation, slot in zip(ordered, slots, strict=False))
+        if best_cost is None or cost < best_cost:
+            best_cost = cost
+            best_slots = slots
+    if best_slots is None:
+        return []
+    return [(slot + 1, observation) for slot, observation in zip(best_slots, ordered, strict=False)]
+
+
+def frame_ranked_lamp_observations(
+    track_observations: dict[int, list[tuple]],
+) -> dict[int, list[tuple]]:
+    """Convert tracked observations into per-frame left-to-right lamp slots.
+
+    ByteTrack identities are useful for smoothing a single detection path, but
+    tiny distant PAPI lamps can swap track ids. User-facing frame analysis is
+    inspected visually, so each frame must use the same convention as the overlay:
+    Light 1..4 from image left-to-right. Missing lamps are kept as gaps whenever a
+    four-lamp reference can be learned from the clip, so a dropped L1 does not make
+    L2 temporarily become Light 1.
+    """
+    observations_by_frame: dict[int, list[tuple]] = {}
+    for observations in track_observations.values():
+        for observation in observations:
+            if len(observation) < 4:
+                continue
+            observations_by_frame.setdefault(observation[0], []).append(observation)
+
+    reference_centers = _reference_slot_centers(observations_by_frame)
+    ranked: dict[int, list[tuple]] = {}
+    for frame_index, observations in observations_by_frame.items():
+        for lamp_index, observation in _assign_observations_to_slots(observations, reference_centers):
+            _frame, state, center_x, confidence, *rest = observation
+            ranked.setdefault(lamp_index, []).append(
+                (frame_index, state, center_x, confidence, *rest)
+            )
+
+    return {lamp_index: sorted(obs, key=lambda item: item[0]) for lamp_index, obs in ranked.items()}
 
 
 def detect_lamp_transitions(
@@ -138,7 +277,11 @@ def detect_lamp_transitions(
     gets the drone's angle AT frame 120 — the real set angle); otherwise it falls
     back to ``elevation_angle_deg`` (the single per-video value).
     """
-    index_by_track = lamp_index_by_track(track_observations)
+    stabilized_observations = denoise_track_observations(track_observations)
+    if set(stabilized_observations).issubset({1, 2, 3, 4}):
+        index_by_track = {track_id: track_id for track_id in stabilized_observations}
+    else:
+        index_by_track = lamp_index_by_track(stabilized_observations)
 
     def angle_at(frame_index: int) -> float | None:
         if frame_angles is not None and frame_index in frame_angles:
@@ -146,7 +289,7 @@ def detect_lamp_transitions(
         return elevation_angle_deg
 
     events: list[TransitionEvent] = []
-    for tid, obs in track_observations.items():
+    for tid, obs in stabilized_observations.items():
         lamp_index = index_by_track.get(tid)
         if lamp_index is None:
             continue
@@ -170,11 +313,10 @@ def detect_lamp_transitions(
     return events
 
 
-# A transition-state run is reported once it persists at least this many observed frames.
-# At the current value (1) even a single isolated "transition" frame becomes an event; raise
-# to 2 to drop one-frame detector flicker (temporal smoothing). Only affects the opt-in
-# "model" transition method — bump it deliberately and add a run-of-1 test if you do.
-MIN_TRANSITION_RUN_FRAMES = 1
+# A transition-state run is reported only after it persists for multiple observed
+# frames. The optional 3-class transition model is noisy around blend zones; a
+# single isolated class-2 frame should not become a visible transition event.
+MIN_TRANSITION_RUN_FRAMES = 2
 
 
 def _transition_event(eid: int, lamp_index: int, run: list[int], before: str | None,
@@ -208,7 +350,10 @@ def aggregate_transition_state_events(
     2-class model (no "transition" states ever appear). Lamp identity uses the same
     ``lamp_index_by_track`` as the temporal method so both reference one physical-lamp numbering.
     """
-    index_by_track = lamp_index_by_track(track_observations)
+    if set(track_observations).issubset({1, 2, 3, 4}):
+        index_by_track = {track_id: track_id for track_id in track_observations}
+    else:
+        index_by_track = lamp_index_by_track(track_observations)
     events: list[dict] = []
     eid = 0
     for tid, obs in track_observations.items():
@@ -252,6 +397,8 @@ def transition_events_from_state_runs(
     for run in aggregate_transition_state_events(track_observations, frame_angles):
         from_state, to_state = run["from_state"], run["to_state"]
         if from_state not in ("red", "white") or to_state not in ("red", "white"):
+            continue
+        if from_state == to_state:
             continue
         start = run["start_frame"]
         angle = run["start_angle_deg"]

@@ -68,8 +68,8 @@ class AnalyzeParams:
     drone_longitude: float | None
     drone_altitude_m: float | None
     # "tracking" (temporal red<->white flips) or "model" (learned class-2 events from the 3-class
-    # detector). None lets the service apply its configured default. Validated server-side; an
-    # unknown value falls back to "tracking".
+    # detector). None lets the service apply its configured default. Validated server-side;
+    # an unknown explicit value is rejected.
     transition_method: str | None
     # Optional selectable inference model from /api/models. Omitted keeps the
     # backend default; unknown ids are rejected by the inference service.

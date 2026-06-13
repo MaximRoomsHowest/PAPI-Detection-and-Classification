@@ -40,7 +40,7 @@ class LampResult(BaseModel):
 
 
 class FrameLampState(BaseModel):
-    """One lamp's classified colour at a single frame, by STABLE ByteTrack identity.
+    """One lamp's classified colour at a single frame, by display Light 1..4 slot.
 
     Lighter than ``LampResult`` (no bbox): the per-frame angle track only needs the
     lamp index, its colour, the detection confidence, and the measured redness for

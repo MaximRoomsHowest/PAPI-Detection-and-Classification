@@ -37,6 +37,7 @@ from app.services.model_registry import (
     load_model_registry,
 )
 from app.services.state import (
+    bind_lamps_to_runway_display,
     confidence_from_lamps,
     global_state_from_lamps,
     infer_single_missing_lamp_from_angle,
@@ -266,7 +267,7 @@ class InferenceService:
             model = self._load_model(entry)
             method = (transition_method or "").strip().lower() if explicit_method else None
             if method not in ("tracking", "model", None):
-                method = "tracking"
+                raise ValueError("transition_method must be 'tracking' or 'model'")
             if method is None:
                 method = "model" if entry.role == "transition" or entry.class_count >= 3 else "tracking"
             if method == "model" and not self._is_three_class(model):
@@ -282,6 +283,8 @@ class InferenceService:
             if explicit_method
             else (self.settings.default_transition_method or "tracking").strip().lower()
         )
+        if explicit_method and requested_method not in ("tracking", "model"):
+            raise ValueError("transition_method must be 'tracking' or 'model'")
         if requested_method == "model":
             transition_entry = self._registry.transition_entry()
             if transition_entry is not None and transition_entry.available:
@@ -444,15 +447,22 @@ class InferenceService:
             raise ValueError("Could not read uploaded image.")
         self._check_pixel_budget(frame.shape[1], frame.shape[0], "image")
 
-        # With the "model" method a 3-class detector can classify a lamp as "transition" in a
-        # single frame; "tracking" uses the 2-class serving model (red/white only).
+        # Images have no temporal context, so even when a 3-class model is selected
+        # class-2 detections are normalized below instead of surfaced as transition events.
         model, selected_model, effective_method = self._resolve_selected_model(model_id, transition_method)
         detections = self._detect_frame(frame, use_tracking=False, model=model)
         # A single image yields red/white per lamp; a "transition" requires a
         # red<->white switch across frames, so there are none here. The angle is
         # still computed for display / transition association.
         angle = self._angle_for_media(media_path, runway_id, drone_metadata, drone_samples)
-        lamps = infer_single_missing_lamp_from_angle(normalize_detections(detections), angle)
+        if effective_method == "model":
+            detections = [
+                {**detection, "class_id": -1}
+                if int(detection.get("class_id", -1)) == 2 else detection
+                for detection in detections
+            ]
+        raw_lamps = infer_single_missing_lamp_from_angle(normalize_detections(detections), angle)
+        lamps = bind_lamps_to_runway_display(raw_lamps, runway_id)
         global_state = global_state_from_lamps(lamps)
         confidence = confidence_from_lamps(lamps)
 
@@ -668,8 +678,8 @@ class InferenceService:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
         ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
 
-        Runs ByteTrack detection per frame, writes the annotated artifact, and aggregates
-        the final per-lamp verdict + transitions by STABLE track identity. ``frames`` yields
+        Runs ByteTrack detection per frame, writes the annotated artifact, and derives
+        the final per-lamp verdict + transitions in display Light 1..4 slots. ``frames`` yields
         BGR frames already sized to ``width`` x ``height``. ``model`` selects the detector
         (serving 2-class or the 3-class transition model); ``transition_method`` selects how
         transitions are derived from the tracked observations.
@@ -732,7 +742,7 @@ class InferenceService:
     def _aggregate_video_lamps(
         track_observations: dict[int, list[tuple]],
     ) -> list[LampResult]:
-        """Final per-lamp video verdict, aggregated by STABLE ByteTrack identity.
+        """Legacy stable-track aggregation helper kept for direct unit tests.
 
         Delegates to ``aggregation.aggregate_video_lamps`` (kept as a static method
         so unit tests can call ``InferenceService._aggregate_video_lamps`` directly).

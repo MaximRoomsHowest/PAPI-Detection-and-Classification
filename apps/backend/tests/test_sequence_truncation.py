@@ -51,6 +51,10 @@ def _run(frame_iter, *, max_frames, tmp_path, cv2=None, expected=None, tolerance
     )
 
 
+def _box(x1, x2):
+    return {"x1": x1, "y1": 1.0, "x2": x2, "y2": 3.0}
+
+
 def test_sequence_truncates_at_max_frames_and_signals_it(tmp_path):
     frames = (np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(10))
     fake_cv2 = MagicMock()
@@ -75,6 +79,205 @@ def test_sequence_within_limit_is_not_marked_truncated(tmp_path):
 
     assert payload.frame_count == 3
     assert payload.truncated_at_frame is None
+
+
+def test_video_summary_lamps_use_last_visible_frame_not_majority_vote(tmp_path):
+    frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(3)]
+    states = [0, 0, 1]
+
+    def detect(_frame, *, use_tracking, reset_tracker=False):
+        frame_index = detect.calls
+        detect.calls += 1
+        return [
+            {
+                "class_id": states[frame_index],
+                "track_id": 1,
+                "confidence": 0.9,
+                "bbox": _box(1.0, 3.0),
+            }
+        ]
+
+    detect.calls = 0
+
+    payload = run_tracked_sequence(
+        iter(frames),
+        detect=detect,
+        cv2=MagicMock(),
+        fps=15.0,
+        width=8,
+        height=8,
+        runway_id="papi_24",
+        original_filename="clip.mp4",
+        drone_id=None,
+        angle=AngleResult(angle_available=False, angle_note="test: no metadata"),
+        start=0.0,
+        max_frames=10,
+        empty_message="empty",
+        exports_dir=tmp_path,
+    )
+
+    assert payload.lamps[0].state == "white"
+
+
+def test_video_per_frame_and_final_lamps_preserve_missing_slot_gaps(tmp_path):
+    frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(3)]
+    detections_by_frame = [
+        [
+            {"class_id": 0, "track_id": 101, "confidence": 0.9, "bbox": _box(1, 2)},
+            {"class_id": 0, "track_id": 102, "confidence": 0.9, "bbox": _box(3, 4)},
+            {"class_id": 0, "track_id": 103, "confidence": 0.9, "bbox": _box(5, 6)},
+            {"class_id": 0, "track_id": 104, "confidence": 0.9, "bbox": _box(7, 8)},
+        ],
+        [
+            # True Light 1 is missed. These must stay in slots 2/3/4, not compact
+            # into slots 1/2/3 in the scrubber/state-band payload.
+            {"class_id": 1, "track_id": 102, "confidence": 0.9, "bbox": _box(3, 4)},
+            {"class_id": 0, "track_id": 103, "confidence": 0.9, "bbox": _box(5, 6)},
+            {"class_id": 0, "track_id": 104, "confidence": 0.9, "bbox": _box(7, 8)},
+        ],
+        [
+            {"class_id": 1, "track_id": 102, "confidence": 0.9, "bbox": _box(3, 4)},
+            {"class_id": 0, "track_id": 103, "confidence": 0.9, "bbox": _box(5, 6)},
+            {"class_id": 0, "track_id": 104, "confidence": 0.9, "bbox": _box(7, 8)},
+        ],
+    ]
+
+    def detect(_frame, *, use_tracking, reset_tracker=False):
+        frame_index = detect.calls
+        detect.calls += 1
+        return detections_by_frame[frame_index]
+
+    detect.calls = 0
+
+    payload = run_tracked_sequence(
+        iter(frames),
+        detect=detect,
+        cv2=MagicMock(),
+        fps=15.0,
+        width=8,
+        height=8,
+        runway_id="papi_24",
+        original_filename="clip.mp4",
+        drone_id=None,
+        angle=AngleResult(angle_available=False, angle_note="test: no metadata"),
+        start=0.0,
+        max_frames=10,
+        empty_message="empty",
+        exports_dir=tmp_path,
+    )
+
+    assert [lamp.state for lamp in payload.per_frame[1].lamps] == [
+        "obscured",
+        "white",
+        "red",
+        "red",
+    ]
+    assert [lamp.state for lamp in payload.lamps] == ["obscured", "white", "red", "red"]
+
+
+def test_video_overlay_uses_gap_preserving_lamp_slots(tmp_path, monkeypatch):
+    frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(2)]
+    detections_by_frame = [
+        [
+            {"class_id": 0, "track_id": 101, "confidence": 0.9, "bbox": _box(1, 2)},
+            {"class_id": 0, "track_id": 102, "confidence": 0.9, "bbox": _box(3, 4)},
+            {"class_id": 0, "track_id": 103, "confidence": 0.9, "bbox": _box(5, 6)},
+            {"class_id": 0, "track_id": 104, "confidence": 0.9, "bbox": _box(7, 8)},
+        ],
+        [
+            {"class_id": 1, "track_id": 102, "confidence": 0.9, "bbox": _box(3, 4)},
+            {"class_id": 0, "track_id": 103, "confidence": 0.9, "bbox": _box(5, 6)},
+            {"class_id": 0, "track_id": 104, "confidence": 0.9, "bbox": _box(7, 8)},
+        ],
+    ]
+    overlay_lamps = []
+
+    def detect(_frame, *, use_tracking, reset_tracker=False):
+        frame_index = detect.calls
+        detect.calls += 1
+        return detections_by_frame[frame_index]
+
+    def capture_overlay(_cv2, frame, lamps, _state, _confidence, _angle):
+        overlay_lamps.append([(lamp.index, lamp.state) for lamp in lamps])
+        return frame
+
+    detect.calls = 0
+    monkeypatch.setattr("app.services.inference.sequence_runner.draw_overlay", capture_overlay)
+
+    run_tracked_sequence(
+        iter(frames),
+        detect=detect,
+        cv2=MagicMock(),
+        fps=15.0,
+        width=8,
+        height=8,
+        runway_id="papi_24",
+        original_filename="clip.mp4",
+        drone_id=None,
+        angle=AngleResult(angle_available=False, angle_note="test: no metadata"),
+        start=0.0,
+        max_frames=10,
+        empty_message="empty",
+        exports_dir=tmp_path,
+    )
+
+    assert overlay_lamps[1] == [
+        (1, "obscured"),
+        (2, "white"),
+        (3, "red"),
+        (4, "red"),
+    ]
+
+
+def test_model_transitions_use_frame_ranked_lamp_slots_when_track_ids_swap(tmp_path):
+    frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(4)]
+    detections_by_frame = [
+        [
+            {"class_id": 0, "track_id": 10, "confidence": 0.9, "bbox": _box(1.0, 3.0)},
+            {"class_id": 0, "track_id": 20, "confidence": 0.9, "bbox": _box(5.0, 7.0)},
+        ],
+        [
+            {"class_id": 2, "track_id": 20, "confidence": 0.9, "bbox": _box(1.0, 3.0)},
+            {"class_id": 0, "track_id": 10, "confidence": 0.9, "bbox": _box(5.0, 7.0)},
+        ],
+        [
+            {"class_id": 2, "track_id": 20, "confidence": 0.9, "bbox": _box(1.0, 3.0)},
+            {"class_id": 0, "track_id": 10, "confidence": 0.9, "bbox": _box(5.0, 7.0)},
+        ],
+        [
+            {"class_id": 1, "track_id": 20, "confidence": 0.9, "bbox": _box(1.0, 3.0)},
+            {"class_id": 0, "track_id": 10, "confidence": 0.9, "bbox": _box(5.0, 7.0)},
+        ],
+    ]
+
+    def detect(_frame, *, use_tracking, reset_tracker=False):
+        frame_index = detect.calls
+        detect.calls += 1
+        return detections_by_frame[frame_index]
+
+    detect.calls = 0
+
+    payload = run_tracked_sequence(
+        iter(frames),
+        detect=detect,
+        cv2=MagicMock(),
+        fps=15.0,
+        width=8,
+        height=8,
+        runway_id="papi_24",
+        original_filename="clip.mp4",
+        drone_id=None,
+        angle=AngleResult(angle_available=False, angle_note="test: no metadata"),
+        start=0.0,
+        max_frames=10,
+        empty_message="empty",
+        exports_dir=tmp_path,
+        transition_method="model",
+    )
+
+    assert len(payload.transitions) == 1
+    assert payload.transitions[0].lamp_index == 1
+    assert (payload.transitions[0].from_state, payload.transitions[0].to_state) == ("red", "white")
 
 
 def test_empty_stream_still_raises(tmp_path):

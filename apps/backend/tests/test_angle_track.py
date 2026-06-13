@@ -3,7 +3,7 @@
 Covers the pieces the metadata-file feature added on top of the parser:
   * ``InferenceService._build_angle_track`` — aligns a telemetry track to frames,
     computes a per-frame midpoint angle, and tags each frame with the lamps seen
-    there (stable identity) so the chart can draw the red->white sweep,
+    there in left-to-right image order so the chart matches the video scrubber,
   * ``detect_lamp_transitions(frame_angles=...)`` — each transition gets the angle
     AT its own frame (its commissioned set angle),
   * ``_angle_from_samples`` / ``_resolve_drone_samples`` — representative angle +
@@ -85,6 +85,30 @@ def test_build_angle_track_sweeps_angle_and_carries_lamp_states(service: Inferen
     # The sweep: lamp 3 reads red early and white late.
     assert state_of(track[0], 3) == "red"
     assert state_of(track[9], 3) == "white"
+
+
+def test_build_angle_track_ranks_lamps_left_to_right_per_frame(service: InferenceService) -> None:
+    """If tracker ids swap sides, the visible frame track still follows the image."""
+    samples = _descent_samples(2)
+    observations = {
+        10: [(0, "red", 100.0, 0.9), (1, "white", 400.0, 0.9)],
+        20: [(0, "white", 400.0, 0.9), (1, "red", 100.0, 0.9)],
+    }
+
+    track, _frame_angles = service._build_angle_track(
+        samples,
+        RUNWAY,
+        frame_count=2,
+        track_observations=observations,
+    )
+
+    def state_of(sample, lamp_index: int) -> str:
+        return next(lamp.state for lamp in sample.lamps if lamp.index == lamp_index)
+
+    assert state_of(track[0], 1) == "red"
+    assert state_of(track[0], 2) == "white"
+    assert state_of(track[1], 1) == "red"
+    assert state_of(track[1], 2) == "white"
 
 
 def test_build_angle_track_empty_for_single_fix(service: InferenceService) -> None:

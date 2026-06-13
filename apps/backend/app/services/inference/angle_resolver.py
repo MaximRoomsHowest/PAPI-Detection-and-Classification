@@ -14,7 +14,7 @@ from app.services.angle import (
     extract_gps_pose,
     unavailable_angle,
 )
-from app.services.state import lamp_index_by_track
+from app.services.state import frame_ranked_lamp_observations
 from app.services.telemetry import DroneSample, resample_to_frames
 from app.validation.schemas import AngleResult, AngleSample, FrameLampState
 
@@ -103,7 +103,7 @@ def build_angle_track(
 
     Aligns the telemetry track to the processed frames (``resample_to_frames``),
     computes the PAPI-midpoint elevation angle per frame, and tags each frame with
-    the lamps observed there (stable ByteTrack identity). With fewer than two
+    the lamps observed there in image left-to-right order. With fewer than two
     fixes there is nothing to sweep, so an empty track + map is returned and the
     single representative angle on the payload covers it. The surfaced track is
     evenly downsampled to ``MAX_ANGLE_TRACK_POINTS``; the full-resolution
@@ -127,14 +127,11 @@ def build_angle_track(
         if angle_deg is not None:
             frame_angles[frame_index] = round(angle_deg, 6)
 
-    # Per-frame per-lamp colour by stable identity, so each angle sample lists the
-    # lamps actually seen at that frame.
-    index_by_track = lamp_index_by_track(track_observations)
+    # Per-frame per-lamp colour by current image x-rank, so each angle sample
+    # matches the visual convention: Light 1..4 from left to right.
+    ranked_observations = frame_ranked_lamp_observations(track_observations)
     frame_lamps: dict[int, dict[int, tuple[str, float, float | None]]] = {}
-    for track_id, observations in track_observations.items():
-        lamp_index = index_by_track.get(track_id)
-        if lamp_index is None:
-            continue
+    for lamp_index, observations in ranked_observations.items():
         # Tuples are (frame, color, center_x, conf[, redness]); tolerate the older
         # 4-tuple shape so nothing breaks if an upstream path doesn't carry redness.
         for frame_idx, color, _center_x, conf, *rest in observations:

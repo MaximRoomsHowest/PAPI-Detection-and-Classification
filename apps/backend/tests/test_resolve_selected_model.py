@@ -116,3 +116,11 @@ def test_explicit_model_method_without_model_id_uses_transition_entry(tmp_path, 
     service = _service(tmp_path, monkeypatch)
     model, entry, method = service._resolve_selected_model(None, "model")
     assert (entry.id, method, model) == ("transition", "model", THREE_CLASS)
+
+
+def test_invalid_explicit_transition_method_is_rejected(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    with pytest.raises(ValueError, match="transition_method must be 'tracking' or 'model'"):
+        service._resolve_selected_model(None, "banana")
+    with pytest.raises(ValueError, match="transition_method must be 'tracking' or 'model'"):
+        service._resolve_selected_model("small", "banana")

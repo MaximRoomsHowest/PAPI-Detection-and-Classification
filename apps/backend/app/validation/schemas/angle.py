@@ -82,6 +82,10 @@ class FramePoint(BaseModel):
     frame_index: int = Field(ge=0)
     confidence: float = Field(ge=0.0, le=1.0)
     state: GlobalState
+    # Full-resolution per-frame lamp states. This lets the video scrubber and
+    # state charts use the selected decoded frame instead of borrowing the nearest
+    # downsampled angle_track sample.
+    lamps: list[FrameLampState] = Field(default_factory=list)
 
 
 class AngleSample(BaseModel):
