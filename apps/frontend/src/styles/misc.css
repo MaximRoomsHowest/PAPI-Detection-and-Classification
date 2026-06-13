@@ -98,7 +98,7 @@
   bottom: 22px;
   z-index: 70;
   border: 1px solid color-mix(in srgb, var(--accent-cyan) 28%, var(--border));
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--accent-fill) 16%, transparent), transparent 55%),
     var(--surface);
@@ -147,28 +147,42 @@
 
 .cookie-card__actions button {
   min-height: 38px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--text-strong);
-  font-weight: 800;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
   transition:
     background 160ms ease,
     border-color 160ms ease,
+    box-shadow 160ms ease,
     transform 160ms ease;
 }
 
 .cookie-card__actions button:first-child {
-  border-color: var(--accent-fill);
-  background: var(--accent-fill);
+  border-color: var(--accent-fill-strong);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent-fill) 88%, #fff),
+    var(--accent-fill) 52%,
+    var(--accent-fill-strong)
+  );
   color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .cookie-card__actions button:hover {
   transform: translateY(-1px);
   border-color: var(--accent);
+}
+
+.cookie-card__actions button:active {
+  transform: translateY(0);
+  filter: brightness(0.97);
 }
 
 .cookie-card__actions button:focus-visible {
