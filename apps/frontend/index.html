@@ -8,7 +8,15 @@
       name="description"
       content="Real-time PAPI (Precision Approach Path Indicator) detection and glidepath classification prototype for Intersoft Electronics Services BV."
     />
-    <meta name="theme-color" content="#00426e" />
+    <!-- Matches the night-ops default surface so the browser chrome and the
+         first paint don't flash the old navy before the app theme applies. -->
+    <meta name="theme-color" content="#0b1016" />
+    <!-- Pre-paint background: the app defaults to the dark theme (storage.js),
+         so seed <html> dark to avoid a white flash before React mounts. A
+         persisted light choice is re-applied by App's theme effect on load. -->
+    <style>
+      html { background: #0b1016; }
+    </style>
     <!-- Share previews (og:image / og:url intentionally omitted: no canonical
          public origin is configured for this prototype). -->
     <meta property="og:title" content="PAPI Vision — Intersoft Electronics" />

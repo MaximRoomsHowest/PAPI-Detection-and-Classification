@@ -6,6 +6,8 @@ import {
   perLightStateSeries,
   resolveAngle,
   stateBandSeries,
+  stableTransitionEvents,
+  summarizeSession,
   transitionAngleSummary,
   transitionCsv,
   transitionFlickerStatus,
@@ -173,24 +175,22 @@ describe('transitionAngleSummary', () => {
       { frame_index: 3, elevation_angle_deg: 3.5, lamps: [{ index: 1, state: 'white', confidence: 0.86 }] },
     ],
     transitions: [
-      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 2, elevation_angle_deg: 2.7 },
-      { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 2, elevation_angle_deg: 2.9 },
-      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 3, elevation_angle_deg: 3.1 },
+      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 1, elevation_angle_deg: 2.5 },
+      { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 2, elevation_angle_deg: 2.75 },
+      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 3, elevation_angle_deg: 3.0 },
       // Out-of-range lamp index never lands in a bucket.
       { lamp_index: 7, from_state: 'red', to_state: 'white', frame_index: 3, elevation_angle_deg: 3.1 },
-      // A flip without a resolved angle still counts but never shapes the band.
-      { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 4, elevation_angle_deg: null },
     ],
   }
 
-  it('combines the settled crossing angle with the raw flip band per light', () => {
+  it('combines the settled crossing angle with the stabilized flip band per light', () => {
     const summary = transitionAngleSummary([sweepResult])
     expect(summary).toHaveLength(4)
-    // settledAngle is the SAME midpoint the redness charts mark (2.5 -> 3.0 step).
-    expect(summary[0].settledAngle).toBeCloseTo(2.75, 5)
-    expect(summary[0].bandMin).toBeCloseTo(2.7, 5)
-    expect(summary[0].bandMax).toBeCloseTo(3.1, 5)
-    expect(summary[0].flips).toBe(4)
+    // settledAngle follows the same stabilized event the table/CSV show.
+    expect(summary[0].settledAngle).toBeCloseTo(3.0, 5)
+    expect(summary[0].bandMin).toBeCloseTo(3.0, 5)
+    expect(summary[0].bandMax).toBeCloseTo(3.0, 5)
+    expect(summary[0].flips).toBe(1)
   })
 
   it('reports null settled angle and empty band for a light that never crossed', () => {
@@ -201,6 +201,121 @@ describe('transitionAngleSummary', () => {
   it('handles no input', () => {
     const summary = transitionAngleSummary([])
     expect(summary.every((entry) => entry.settledAngle === null && entry.flips === 0)).toBe(true)
+  })
+
+  it('does not fabricate a settled angle from angle_track when backend transitions are authoritative and empty', () => {
+    const summary = transitionAngleSummary([
+      {
+        transition_method: 'tracking',
+        transitions: [],
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+          { frame_index: 3, elevation_angle_deg: 3.5, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+        ],
+      },
+    ])
+
+    expect(summary[0]).toEqual({ lampIndex: 1, settledAngle: null, bandMin: null, bandMax: null, flips: 0 })
+  })
+})
+
+describe('stableTransitionEvents', () => {
+  it('suppresses one-frame tracking blips while keeping the sustained crossing', () => {
+    const noisyTrackingResult = {
+      original_filename: 'sample.mp4',
+      transition_method: 'tracking',
+      angle_track: [
+        { frame_index: 26, elevation_angle_deg: 2.32, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 27, elevation_angle_deg: 2.37, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 28, elevation_angle_deg: 2.41, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 29, elevation_angle_deg: 2.46, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 30, elevation_angle_deg: 2.52, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 31, elevation_angle_deg: 2.57, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 32, elevation_angle_deg: 2.61, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 33, elevation_angle_deg: 2.66, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 47, elevation_angle_deg: 3.34, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 48, elevation_angle_deg: 3.39, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 49, elevation_angle_deg: 3.45, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 50, elevation_angle_deg: 3.48, lamps: [{ index: 1, state: 'white' }] },
+      ],
+      transitions: [
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 28, elevation_angle_deg: 2.41 },
+        { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 29, elevation_angle_deg: 2.46 },
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 32, elevation_angle_deg: 2.61 },
+        { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 48, elevation_angle_deg: 3.39 },
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 49, elevation_angle_deg: 3.45 },
+      ],
+    }
+    const events = stableTransitionEvents([noisyTrackingResult])
+
+    expect(events).toEqual([
+      {
+        lamp_index: 1,
+        from_state: 'red',
+        to_state: 'white',
+        frame_index: 32,
+        elevation_angle_deg: 2.61,
+        method: 'tracking',
+      },
+    ])
+    expect(transitionAngleSummary([noisyTrackingResult])[0].settledAngle).toBeCloseTo(2.61, 5)
+  })
+
+  it('keeps valid model transition runs from the backend', () => {
+    const raw = [{ lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 12, method: 'model' }]
+
+    expect(stableTransitionEvents([{ transition_method: 'model', angle_track: [], transitions: raw }])).toEqual(raw)
+  })
+
+  it('drops model transition runs that do not change colour', () => {
+    const raw = [
+      { lamp_index: 1, from_state: 'red', to_state: 'red', frame_index: 12, method: 'model' },
+      { lamp_index: 2, from_state: 'white', to_state: 'red', frame_index: 20, method: 'model' },
+    ]
+
+    expect(stableTransitionEvents([{ transition_method: 'model', angle_track: [], transitions: raw }])).toEqual([
+      raw[1],
+    ])
+  })
+
+  it('uses full-resolution backend tracking transitions when angle_track is downsampled', () => {
+    const result = {
+      transition_method: 'tracking',
+      frame_count: 600,
+      angle_track: [
+        { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 599, elevation_angle_deg: 4.0, lamps: [{ index: 1, state: 'white' }] },
+      ],
+      transitions: [
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 251, elevation_angle_deg: 2.76 },
+      ],
+    }
+
+    expect(stableTransitionEvents([result])).toEqual([
+      {
+        lamp_index: 1,
+        from_state: 'red',
+        to_state: 'white',
+        frame_index: 251,
+        elevation_angle_deg: 2.76,
+        method: 'tracking',
+      },
+    ])
+  })
+
+  it('treats an empty backend transitions array as authoritative', () => {
+    const result = {
+      transition_method: 'tracking',
+      transitions: [],
+      angle_track: [
+        { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 1, elevation_angle_deg: 2.1, lamps: [{ index: 1, state: 'white' }] },
+      ],
+    }
+
+    expect(stableTransitionEvents([result])).toEqual([])
   })
 })
 
@@ -223,7 +338,7 @@ describe('transitionCsv', () => {
           transition_method: 'tracking',
           transitions: [
             { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 2, elevation_angle_deg: 2.7, method: 'tracking' },
-            { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 3, elevation_angle_deg: 2.9, method: 'tracking' },
+            { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 6, elevation_angle_deg: 2.9, method: 'tracking' },
             { lamp_index: 5, from_state: 'red', to_state: 'white', frame_index: 4, elevation_angle_deg: 3.1 },
           ],
         },
@@ -238,6 +353,43 @@ describe('transitionCsv', () => {
     expect(rows[1]).toContain('review_flicker')
     expect(rows[2]).toContain('review_flicker')
     expect(csv).not.toContain(',5,')
+  })
+})
+
+describe('summarizeSession', () => {
+  it('counts crossed lamps from stabilized backend transitions, not discarded angle_track flips', () => {
+    const summary = summarizeSession([
+      {
+        transition_method: 'tracking',
+        transitions: [],
+        frame_count: 4,
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+          { frame_index: 3, elevation_angle_deg: 3.5, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+        ],
+      },
+    ])
+
+    expect(summary.lampsDetected).toBe(1)
+    expect(summary.lampsCrossed).toBe(0)
+  })
+
+  it('keeps the legacy angle_track fallback for results without backend transition authority', () => {
+    const summary = summarizeSession([
+      {
+        frame_count: 4,
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 1, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'red', confidence: 0.8 }] },
+          { frame_index: 2, elevation_angle_deg: 3.0, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+          { frame_index: 3, elevation_angle_deg: 3.5, lamps: [{ index: 1, state: 'white', confidence: 0.8 }] },
+        ],
+      },
+    ])
+
+    expect(summary.lampsCrossed).toBe(1)
   })
 })
 
@@ -289,6 +441,26 @@ describe('stateBandSeries', () => {
     ])
     expect(blocks[0].frames).toEqual([1])
   })
+
+  it('uses full-resolution per_frame lamp states for state bands when present', () => {
+    const blocks = stateBandSeries([
+      {
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red' }] },
+          { frame_index: 2, elevation_angle_deg: 2.2, lamps: [{ index: 1, state: 'white' }] },
+        ],
+        per_frame: [
+          { frame_index: 0, state: 'unknown', confidence: 0.5, lamps: [{ index: 1, state: 'red' }] },
+          { frame_index: 1, state: 'unknown', confidence: 0.5, lamps: [{ index: 1, state: 'red' }] },
+          { frame_index: 2, state: 'unknown', confidence: 0.5, lamps: [{ index: 1, state: 'white' }] },
+        ],
+      },
+    ])
+
+    expect(blocks[0].frames).toEqual([0, 1, 2])
+    expect(blocks[0].angles).toEqual([2.0, null, 2.2])
+    expect(blocks[0].z[0]).toEqual([2, 2, 4])
+  })
 })
 
 describe('perLightStateSeries', () => {
@@ -337,6 +509,25 @@ describe('perLightStateSeries', () => {
     expect(series[0]).toEqual({ white: 1, red: 2, transition: 0, obscured: 0, unknown: 1 })
     // Lights never present in any frame are all-unknown, not silently zero.
     expect(series[1].unknown).toBe(4)
+  })
+
+  it('prefers full-resolution per_frame lamp states over downsampled angle_track states', () => {
+    const series = perLightStateSeries([
+      {
+        frame_count: 3,
+        per_frame: [
+          { frame_index: 0, state: 'unknown', confidence: 0.5, lamps: [{ index: 1, state: 'red' }] },
+          { frame_index: 1, state: 'unknown', confidence: 0.5, lamps: [{ index: 1, state: 'red' }] },
+          { frame_index: 2, state: 'unknown', confidence: 0.5, lamps: [{ index: 1, state: 'white' }] },
+        ],
+        angle_track: [
+          { frame_index: 0, elevation_angle_deg: 2.0, lamps: [{ index: 1, state: 'red' }] },
+          { frame_index: 2, elevation_angle_deg: 2.2, lamps: [{ index: 1, state: 'white' }] },
+        ],
+      },
+    ])
+
+    expect(series[0]).toEqual({ white: 1, red: 2, transition: 0, obscured: 0, unknown: 0 })
   })
 
   it('keeps aggregate counting for results without a track', () => {

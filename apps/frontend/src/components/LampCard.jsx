@@ -28,7 +28,16 @@ export function LampCard({ lamp, copy }) {
       <div>
         <p>{label}</p>
         <small>
-          {isLowConfidence && !lamp.inferred && <span aria-hidden="true">⚠ </span>}
+          {/* Low-confidence flag carried by real localized text (not colour or the
+              decorative ⚠ alone) so screen-reader users hear "Low confidence" too,
+              not just the percentage — WCAG 1.4.1 / information parity. */}
+          {isLowConfidence && !lamp.inferred && (
+            <span className="lamp-card__warn">
+              <span aria-hidden="true">⚠ </span>
+              {copy.live.lowConfidence}
+              {' · '}
+            </span>
+          )}
           {lamp.inferred ? copy.live.inferredFromAngle : `${lamp.confidence}% ${copy.live.confidenceLabel}`}
         </small>
       </div>

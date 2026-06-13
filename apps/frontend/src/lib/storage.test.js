@@ -121,14 +121,14 @@ describe('initialTheme', () => {
     expect(initialTheme()).toBe('dark')
   })
 
-  it('falls back to light when nothing valid is stored, even if the system prefers dark', () => {
+  it('falls back to dark when nothing valid is stored, even if the system prefers dark', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true })
-    expect(initialTheme()).toBe('light')
+    expect(initialTheme()).toBe('dark')
   })
 
-  it('falls back to light when nothing is stored and the system prefers light', () => {
+  it('falls back to dark when nothing is stored and the system prefers light', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false })
-    expect(initialTheme()).toBe('light')
+    expect(initialTheme()).toBe('dark')
   })
 })
 

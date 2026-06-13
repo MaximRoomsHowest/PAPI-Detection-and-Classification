@@ -4,7 +4,7 @@
 export function AngleEmptyState({ icon, title, message }) {
   return (
     <div className="chart-empty" role="status">
-      {icon}
+      {icon ? <span className="empty-state__icon">{icon}</span> : null}
       {title ? <strong>{title}</strong> : null}
       <p>{message}</p>
     </div>

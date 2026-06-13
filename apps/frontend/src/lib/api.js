@@ -198,6 +198,26 @@ export function revokeMediaUrl(url) {
   }
 }
 
+/**
+ * Readiness probe for the topbar status cell. Deliberately cheap: short
+ * timeout (a hung backend should read as offline within seconds, not after
+ * the full 60s request budget) and a boolean result — callers only need
+ * online / offline, never the body.
+ */
+export async function fetchHealth(signal) {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/health`,
+      { headers: buildHeaders() },
+      5_000,
+      signal,
+    )
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
 export async function fetchRunways() {
   const response = await fetchWithTimeout(`${API_BASE_URL}/api/runways`, {
     headers: buildHeaders(),

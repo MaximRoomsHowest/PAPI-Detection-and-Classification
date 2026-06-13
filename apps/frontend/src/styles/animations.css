@@ -1,8 +1,8 @@
-/* Global @keyframes used across the app: `pulse` (live status dot), `spin`
-   (loading spinner), and `cue-bounce` (the table scroll-cue). Split out of the
-   former history-and-responsive.css. @keyframes are resolved by name, so import
-   order is immaterial; the prefers-reduced-motion resets that neutralise these
-   live with the other @media blocks in responsive.css. */
+/* Global @keyframes used across the app: `pulse` (live backend-status dot) and
+   `spin` (loading spinner). Split out of the former history-and-responsive.css.
+   @keyframes are resolved by name, so import order is immaterial; the
+   prefers-reduced-motion resets that neutralise these live with the other
+   @media blocks in responsive.css. */
 
 @keyframes pulse {
   0%,
@@ -17,15 +17,5 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes cue-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(3px);
   }
 }

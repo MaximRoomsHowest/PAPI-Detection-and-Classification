@@ -31,15 +31,15 @@ export function readStoredChoice(key, allowed, fallback) {
   }
 }
 
-// Initial theme: persisted value -> light. Computed once via lazy initializer so
+// Initial theme: persisted value -> dark. Computed once via lazy initializer so
 // the App doesn't re-read localStorage on every render. We intentionally do not
-// follow the OS dark preference for first-time visitors: the default presentation
-// mode for the project is the light theme, while an explicit user toggle still
-// persists.
+// follow the OS preference for first-time visitors: the night-ops dark theme is
+// the product's primary presentation — detection overlays and the red/white lamp
+// language read best on graphite — while an explicit user toggle still persists.
 export function initialTheme() {
   const stored = readStoredChoice(STORAGE_KEYS.theme, ['light', 'dark'], null)
   if (stored) return stored
-  return 'light'
+  return 'dark'
 }
 
 // Initial language: persisted -> navigator.language two-letter prefix

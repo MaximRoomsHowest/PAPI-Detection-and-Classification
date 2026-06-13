@@ -1,109 +1,179 @@
-/* Stage 3 hero: no photo wash, no parallax/ken-burns. A calm drafted
-   glidepath cross-section (inline SVG) sits beside the copy over a faint
-   blueprint panel; the app-shell already carries the page grid. */
-.intro-hero {
-  position: relative;
+/* Introduction: copy beside the interactive glide-slope simulator. No photo
+   wash, no parallax — the instrument is the hero. The app-shell already
+   carries the faint blueprint grid. */
+.intro-page {
   padding-bottom: 24px;
 }
 
-.intro-hero-inner {
-  position: relative;
-}
-
-.intro-band {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  gap: 32px;
-  width: 100%;
+/* The glide-slope explainer section — the interactive instrument that used to be
+   the hero, now its own centered section below the footage hero. */
+.glide-explainer {
+  width: min(1120px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 120px 24px 112px;
-  min-height: calc(100vh - 92px);
+  padding: clamp(40px, 6vh, 76px) 0 0;
 }
 
-/* Restored hero background video (compressed 720p loop). Sits behind the copy +
-   diagram as a faint wash; a left-weighted scrim keeps the headline readable in
-   both themes. The video is absolutely positioned (out of grid flow), so the
-   2-column copy|diagram layout is untouched. */
-.intro-band__bg {
+/* ============================================================
+   Approach hero — cinematic footage + computer-vision HUD overlay.
+   The hero is a dark "media" surface in BOTH themes (footage + scrim), so its
+   text/overlay colours are fixed light values rather than theme tokens.
+   ============================================================ */
+.approach-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: clamp(540px, 82vh, 820px);
+  overflow: hidden;
+  background: #06121a;
+}
+
+.approach-hero__media {
   position: absolute;
   inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  border-radius: 0;
-  pointer-events: none;
+  z-index: -2;
 }
 
-.intro-band__video {
+.approach-hero__video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.68;
   display: block;
 }
 
-.intro-band__scrim {
+/* Directional scrim: heaviest behind the left-side copy, clearing toward the
+   right where the footage breathes; plus a floor gradient for the scroll cue. */
+.approach-hero__scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--accent-fill) 54%, transparent) 0%,
-    color-mix(in srgb, var(--accent-cyan) 34%, var(--surface)) 52%,
-    color-mix(in srgb, var(--surface) 70%, transparent) 100%
-  );
-  opacity: 0.68;
+  background:
+    linear-gradient(
+      100deg,
+      rgba(4, 10, 16, 0.96) 0%,
+      rgba(4, 10, 16, 0.88) 30%,
+      rgba(4, 10, 16, 0.46) 60%,
+      rgba(4, 10, 16, 0.3) 78%,
+      rgba(4, 10, 16, 0.58) 100%
+    ),
+    linear-gradient(0deg, rgba(4, 10, 16, 0.85), transparent 38%);
 }
 
-/* Keep the hero content above the video wash. */
-.intro-copy {
-  position: relative;
-  z-index: 1;
-}
-
-.intro-band__toggle {
+.approach-hero__vignette {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 2;
+  inset: 0;
+  background: radial-gradient(125% 95% at 50% 28%, transparent 48%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* ---- Media control (WCAG 2.2.2) ---- */
+.approach-hero__toggle {
+  position: absolute;
+  top: clamp(16px, 3vh, 28px);
+  right: clamp(16px, 4vw, 40px);
+  z-index: 3;
+  width: 40px;
+  height: 40px;
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  color: var(--text-strong);
+  border: 1px solid rgba(124, 213, 236, 0.35);
+  background: rgba(8, 16, 24, 0.6);
+  color: #cfe8f2;
   cursor: pointer;
   transition:
     background 160ms ease,
     border-color 160ms ease,
-    color 160ms ease;
+    transform 160ms ease;
 }
 
-.intro-band__toggle:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.approach-hero__toggle:hover {
+  border-color: #7cd5ec;
+  background: rgba(12, 24, 34, 0.82);
 }
 
-.intro-band__toggle:focus-visible {
+.approach-hero__toggle:active {
+  transform: scale(0.95);
+}
+
+.approach-hero__toggle:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 
-.intro-copy {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  max-width: 940px;
+/* ---- Copy (light over the dark media, both themes) ---- */
+.approach-hero__copy {
+  position: relative;
+  z-index: 2;
+  width: min(1480px, calc(100% - 48px));
   margin: 0 auto;
 }
 
+.approach-hero .eyebrow {
+  color: #8fdcf0;
+}
+
+/* Two-class selector so the light hero colour beats `.intro-copy h1`
+   (which sets var(--text-strong) later in this file). */
+.approach-hero .intro-copy h1 {
+  color: #f6fafe;
+  max-width: 17ch;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    0 2px 30px rgba(0, 0, 0, 0.55);
+}
+
+.approach-hero .intro-description {
+  max-width: 46ch;
+  color: rgba(228, 238, 247, 0.85);
+}
+
+/* ---- Scroll cue ---- */
+.scroll-cue {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: rgba(220, 230, 240, 0.68);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+
+.scroll-cue svg {
+  animation: scroll-bob 1.8s ease-in-out infinite;
+}
+
+@keyframes scroll-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+.scroll-cue:hover {
+  color: #9fe3f4;
+}
+
+.scroll-cue:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+/* Microlabel used across every page header: mono caps, wide tracking — the
+   flight-strip annotation voice. */
 .eyebrow {
+  margin: 0 0 12px;
   color: var(--accent);
-  font-size: 13px;
-  font-weight: 700;
-  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 2.2px;
   text-transform: uppercase;
 }
 
@@ -114,51 +184,67 @@
 }
 
 .intro-copy h1 {
-  font-size: clamp(44px, 5vw, 74px);
-  line-height: 1.05;
+  font-size: clamp(38px, 4vw, 58px);
+  line-height: 1.06;
   font-weight: 600;
-  max-width: 980px;
+  max-width: 14ch;
 }
 
 .intro-description {
-  max-width: 720px;
-  margin-top: 18px;
+  max-width: 52ch;
+  margin: 20px 0 0;
   color: var(--text-muted);
-  font-size: 18px;
-  margin-bottom: 0;
+  font-size: 16.5px;
+  line-height: 1.65;
 }
 
 .intro-actions {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-top: 24px;
-  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 28px;
 }
 
-/* Flat navy fill + 1px border, no big shadow (Stage 3). */
 .cta-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: 46px;
   padding: 0 24px;
-  border-radius: 3px;
-  border: 1px solid var(--accent-fill);
-  background: var(--accent-fill);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-fill-strong);
+  /* Lit-from-above fill: a soft vertical gradient + top catch-light + key shadow
+     so the call-to-action reads as a raised, illuminated control. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent-fill) 88%, #fff) 0%,
+    var(--accent-fill) 52%,
+    var(--accent-fill-strong) 100%
+  );
   color: #ffffff;
   font-weight: 600;
+  font-size: 13.5px;
   text-decoration: none;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.7px;
   text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 22px -12px color-mix(in oklab, var(--accent-fill) 80%, transparent);
   transition:
     background 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    box-shadow 200ms ease,
+    transform 160ms ease;
 }
 
 .cta-button:hover {
-  background: var(--accent-fill-strong);
   border-color: var(--accent-fill-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 14px 30px -12px color-mix(in oklab, var(--accent-fill) 85%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--accent-cyan) 32%, transparent);
+  transform: translateY(-1px);
 }
 
 .cta-button:focus-visible {
@@ -166,67 +252,453 @@
   outline-offset: 3px;
 }
 
-.scroll-cue {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  width: min(1180px, calc(100% - 32px));
-  margin: -92px auto 0;
-  position: relative;
-  z-index: 2;
-  color: var(--accent);
+.hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(
+    180deg,
+    var(--surface),
+    color-mix(in oklab, var(--surface) 90%, var(--bg))
+  );
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 13.5px;
   text-decoration: none;
+  letter-spacing: 0.5px;
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    var(--shadow-soft);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
-.scroll-cue span {
-  width: 42px;
-  height: 42px;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
+.hero-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--accent) 10%, var(--surface)),
+    color-mix(in oklab, var(--accent) 5%, var(--surface))
+  );
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    var(--shadow-elev);
+  transform: translateY(-1px);
+}
+
+.hero-secondary:active {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px var(--edge-shade);
+  filter: brightness(0.98);
+}
+
+.hero-secondary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ---- Glide-slope simulator panel ---- */
+.glide-sim {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--surface);
-  animation: cue-bounce 2s ease-in-out infinite;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
-.scroll-cue span::before {
-  content: '';
-  width: 11px;
-  height: 11px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: translateY(-2px) rotate(45deg);
+.glide-sim__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--paper);
 }
 
-.scroll-cue small {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 800;
+.glide-sim__eyebrow {
+  margin: 0 0 3px;
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 2px;
   text-transform: uppercase;
 }
 
-.scroll-cue:focus-visible {
+.glide-sim__head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.glide-sim__sweep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.glide-sim__sweep:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.glide-sim__sweep[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.glide-sim__sweep:focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: 5px;
+  outline-offset: 2px;
 }
 
-.inline-metric span {
+.glide-sim__svg {
   display: block;
-  color: var(--text-muted);
-  font-size: 12px;
-  margin-top: 14px;
+  width: 100%;
+  height: auto;
+  background:
+    linear-gradient(180deg, transparent 0 78%, var(--surface-muted) 100%),
+    var(--bg-soft);
 }
 
-.inline-metric small {
-  color: var(--text-muted);
-  font-size: 12px;
+.glide-sim__svg text {
+  font-family: var(--font-mono);
+}
+
+/* Optical sectors: red wedges under the path, the accent corridor on it,
+   pale beam tints above. Opacities are quiet — the rays do the drawing. */
+.gs-zone--red-deep {
+  fill: var(--lamp-red);
+  opacity: 0.13;
+}
+
+.gs-zone--red {
+  fill: var(--lamp-red);
+  opacity: 0.07;
+}
+
+.gs-zone--corridor {
+  fill: var(--accent);
+  opacity: 0.1;
+}
+
+.gs-zone--white {
+  fill: var(--lamp-white);
+  opacity: 0.08;
+}
+
+.gs-zone--white-deep {
+  fill: var(--lamp-white);
+  opacity: 0.14;
+}
+
+.gs-ray {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.gs-ray-label {
+  fill: var(--faint);
+  font-size: 10.5px;
+}
+
+.gs-ground {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.gs-runway {
+  fill: color-mix(in srgb, var(--text) 38%, transparent);
+}
+
+.gs-threshold {
+  fill: var(--bg);
+}
+
+.gs-papi-box {
+  fill: var(--surface-raised);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.gs-papi-dot {
+  transition: fill 180ms ease;
+}
+
+.gs-papi-dot--white {
+  fill: var(--lamp-white);
+}
+
+.gs-papi-dot--red {
+  fill: var(--lamp-red);
+}
+
+.gs-papi-dot--transition {
+  fill: var(--lamp-transition);
+}
+
+.gs-aircraft {
+  fill: var(--text-strong);
+}
+
+.gs-angle-readout {
+  fill: var(--text-strong);
+  font-size: 15px;
   font-weight: 700;
 }
 
+/* Pilot's view + verdict deck. */
+.glide-sim__deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.glide-sim__pilot {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.glide-sim__pilot-label {
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+
+.glide-sim__short {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.glide-sim__verdict {
+  display: grid;
+  gap: 2px;
+  padding-left: 13px;
+  border-left: 3px solid var(--border-strong);
+  min-width: 200px;
+}
+
+.glide-sim__verdict strong {
+  color: var(--text-strong);
+  font-size: 14.5px;
+}
+
+.glide-sim__verdict span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.glide-sim__verdict[data-state='correct'] {
+  border-left-color: var(--accent);
+}
+
+.glide-sim__verdict[data-state='too-low'],
+.glide-sim__verdict[data-state='far-low'] {
+  border-left-color: var(--lamp-red);
+}
+
+.glide-sim__verdict[data-state='too-high'],
+.glide-sim__verdict[data-state='far-high'] {
+  border-left-color: var(--lamp-white-border);
+}
+
+.glide-sim__verdict[data-state='transition'] {
+  border-left-color: var(--lamp-transition);
+}
+
+.glide-sim__controls {
+  display: grid;
+  gap: 8px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--paper);
+}
+
+.glide-sim__slider {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+}
+
+.glide-sim__slider > span {
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+
+.glide-sim__slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.glide-sim__slider input[type='range']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.glide-sim__slider output {
+  min-width: 5.5ch;
+  text-align: right;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.glide-sim__note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+/* ---- Capability band: one panel, four bays divided by hairlines. ---- */
+.capability-section {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 26px 0 10px;
+}
+
+.capability-band {
+  counter-reset: capability;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    var(--shadow-soft);
+  overflow: hidden;
+}
+
+.capability-band li {
+  position: relative;
+  display: grid;
+  gap: 11px;
+  align-content: start;
+  padding: 22px 20px;
+  transition: background 200ms ease;
+}
+
+/* Editorial index — 01–04 in the mono face, top-right of each cell. */
+.capability-band li::before {
+  counter-increment: capability;
+  content: counter(capability, decimal-leading-zero);
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--faint);
+}
+
+.capability-band li:hover {
+  background: var(--surface-muted);
+}
+
+.capability-band li + li {
+  border-left: 1px solid var(--border);
+}
+
+/* Bezelled icon housing — the same indicator language as card headers and the
+   empty-state icons, so the capability band reads as a row of instruments. */
+.capability-band svg {
+  box-sizing: border-box;
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--border));
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-muted));
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  color: var(--accent);
+}
+
+.capability-band h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.capability-band p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1040px) {
+  .capability-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .capability-band li + li {
+    border-left: 0;
+  }
+
+  .capability-band li:nth-child(even) {
+    border-left: 1px solid var(--border);
+  }
+
+  .capability-band li:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 560px) {
+  .capability-band {
+    grid-template-columns: 1fr;
+  }
+
+  .capability-band li:nth-child(even) {
+    border-left: 0;
+  }
+
+  .capability-band li:nth-child(n + 2) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* ---- Airport context ---- */
 .airport-section {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 42px 0 28px;
+  padding: 36px 0 28px;
   scroll-margin-top: 92px;
 }
 
@@ -240,27 +712,29 @@
 .airport-card,
 .airport-map {
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
 }
 
 .airport-card {
-  padding: 18px;
+  padding: 20px;
   display: grid;
   gap: 14px;
+  align-content: start;
 }
 
 .airport-card h3 {
   margin: 0;
   color: var(--text-strong);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .airport-card p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 14.5px;
+  line-height: 1.6;
 }
 
 .airport-meta {
@@ -270,17 +744,18 @@
 }
 
 .airport-meta span {
-  color: var(--text-muted);
-  font-size: 12px;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.6px;
 }
 
 .airport-meta strong {
   display: block;
   color: var(--text-strong);
-  font-size: 14px;
-  margin-top: 4px;
+  font-size: 13px;
+  margin-top: 5px;
 }
 
 .airport-map {
@@ -296,9 +771,15 @@
   border: 0;
 }
 
+/* The OSM embed cannot be themed, so approximate a night chart: invert +
+   re-rotate hues. Imperfect but far less glaring than a white tile field. */
+html[data-theme='dark'] .airport-map iframe {
+  filter: invert(0.88) hue-rotate(180deg) saturate(0.55) brightness(0.92);
+}
+
 .map-caption {
   padding: 10px 12px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   border-top: 1px solid var(--border);
 }
@@ -312,4 +793,23 @@
 
 .text-link:hover {
   text-decoration: underline;
+}
+
+.text-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.inline-metric span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 14px;
+}
+
+.inline-metric small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
 }

@@ -22,10 +22,11 @@
   min-height: 38px;
   padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-strong);
   font: inherit;
+  font-size: 13px;
 }
 
 /* Match the rest of the app's keyboard-focus affordance (audit F11). */
@@ -91,19 +92,22 @@
 .history-summary {
   min-width: 0;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow-soft);
   padding: 14px;
 }
 
 .history-summary span,
 .history-detail-grid span,
 .history-angle-note span {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 800;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
 }
 
@@ -112,7 +116,9 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--text-strong);
+  font-family: var(--font-mono);
   font-size: 21px;
+  font-weight: 700;
   line-height: 1.1;
 }
 
@@ -168,10 +174,18 @@
 }
 
 .history-table-wrap {
-  overflow-x: auto;
+  /* Bounded scroll region (both axes) so the sticky thead actually pins while a
+     long page of analyses scrolls: without a max-height the wrap grows to fit
+     every row and the "sticky" header has nothing to scroll against. The <=480px
+     card layout drops this (overflow becomes visible) so stacked cards aren't
+     clipped. */
+  max-height: min(74vh, 760px);
+  overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .history-table {
@@ -183,21 +197,51 @@
 .history-table th,
 .history-table td {
   border-bottom: 1px solid var(--border);
-  padding: 12px 13px;
+  padding: 11px 14px;
   text-align: left;
   vertical-align: middle;
   font-size: 13px;
 }
 
-.history-table th {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 900;
+/* Sticky mono header so the column keys stay legible while scanning a long
+   run of analyses — the table reads like a log readout. */
+.history-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper);
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* Numeric columns (confidence, angle, frames, processing, created) ride the
+   cockpit mono via .tnum in the markup; lock the family so they align. */
+.history-table td.tnum {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.history-table tbody tr {
+  transition: background 120ms ease;
+}
+
+.history-table tbody tr:hover {
+  background: var(--surface-muted);
 }
 
 .history-table tr:last-child td {
   border-bottom: 0;
+}
+
+/* State column: lamp glyph + verdict pill, read together. */
+.history-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .history-link {
@@ -211,13 +255,27 @@
   color: var(--accent);
   cursor: pointer;
   font: inherit;
-  font-weight: 800;
+  font-weight: 600;
   text-align: left;
 }
 
 .history-link:hover,
 .history-table a:hover {
   text-decoration: underline;
+}
+
+/* While a row's detail is loading the trigger carries aria-disabled (not the
+   disabled attribute, to keep focus for the modal a11y flow). Give it matching
+   visual busy state so the announced state and the look agree (mirrors the
+   .model-selector__option[aria-disabled] treatment). */
+.history-link[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.history-link[aria-disabled='true']:hover {
+  text-decoration: none;
 }
 
 /* Partial-result marker next to the frame count: a capped or half-decoded
@@ -227,8 +285,8 @@
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--warning, #b45309) 18%, transparent);
-  color: var(--warning, #b45309);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -259,6 +317,13 @@
 
 /* The shared `.state-pill` base now lives once in insights.css (it owns the
    values that rendered here anyway); only the History-specific tints remain. */
+
+/* The History pill is preceded by a real lamp glyph (.history-state), so it
+   suppresses insights.css's leading swatch — the glyph already carries the
+   lamp picture and a second square would just be noise. */
+.history-state .state-pill::before {
+  display: none;
+}
 
 /* Per-global-state History pill tints. HistoryPage applies
    `state-pill-<global_state>`; these were previously undefined, so every pill
@@ -291,6 +356,14 @@
      text, and this also stops the warning being conveyed by colour alone. */
   color: var(--text-strong);
   font-weight: 700;
+}
+
+/* The "Low confidence" lead-in: visible amber word so the flag is real text, not
+   colour alone (paired with the ⚠). Amber is legible here as a short emphasised
+   label on the card surface, while the confidence figure beside it stays full
+   contrast per the rule above. */
+.lamp-card__warn {
+  color: var(--warn);
 }
 
 .history-empty {
@@ -369,9 +442,9 @@
 .history-artifact {
   margin-bottom: 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   overflow: hidden;
-  background: #0b1521;
+  background: #0a0f15;
 }
 
 .history-artifact img,
@@ -413,9 +486,9 @@
   font-weight: 800;
 }
 
-.history-lamp-white { border-left-color: #f8fbff; }
-.history-lamp-red { border-left-color: #ff4545; }
-.history-lamp-transition { border-left-color: #ffb11f; }
+.history-lamp-white { border-left-color: var(--lamp-white-border); }
+.history-lamp-red { border-left-color: var(--lamp-red); }
+.history-lamp-transition { border-left-color: var(--lamp-transition); }
 
 /* Compact detections summary table (audit F19): the common-case view shown
    before the raw JSON is expanded. */

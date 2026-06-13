@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { axisTitle, basePlotLayout, baseAxisStyle, PLOT_FONT_FAMILY } from './plotly'
+import { axisTitle, basePlotLayout, baseAxisStyle, PLOT_FONT_FAMILY, PLOT_MONO_FAMILY } from './plotly'
 
 // A representative plotTheme (the real one is computed from CSS vars at runtime).
 const plotTheme = {
@@ -29,10 +29,10 @@ describe('basePlotLayout', () => {
 })
 
 describe('baseAxisStyle', () => {
-  it('defaults to fixedrange + muted ticks only', () => {
+  it('defaults to fixedrange + muted mono ticks only', () => {
     expect(baseAxisStyle(plotTheme)).toEqual({
       fixedrange: true,
-      tickfont: { color: '#8a97a8' },
+      tickfont: { color: '#8a97a8', family: PLOT_MONO_FAMILY },
     })
   })
 

@@ -2,16 +2,14 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../../i18n/translations.js'
-import { ModelMetricsPanel } from './ModelMetricsPanel.jsx'
+import { ModelPerformance } from './ModelPerformance.jsx'
 
 const mocks = vi.hoisted(() => ({
-  fetchStats: vi.fn(),
   fetchModels: vi.fn(),
   fetchModelInfo: vi.fn(),
 }))
 
 vi.mock('../../lib/api', () => ({
-  fetchStats: mocks.fetchStats,
   fetchModels: mocks.fetchModels,
   fetchModelInfo: mocks.fetchModelInfo,
 }))
@@ -54,7 +52,6 @@ async function flush() {
 }
 
 beforeEach(() => {
-  mocks.fetchStats.mockResolvedValue({ by_global_state: {}, total_analyses: 0 })
   mocks.fetchModels.mockResolvedValue([
     { model_id: 'small', model_label: 'Small detector', is_default: true, available: true },
     { model_id: 'transition', model_label: 'Transition classifier', available: false },
@@ -72,9 +69,9 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('ModelMetricsPanel model picker', () => {
+describe('ModelPerformance', () => {
   it('loads the backend default card first and marks it active', async () => {
-    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+    const { container } = render(<ModelPerformance plotTheme={plotTheme} copy={copy} />)
     await flush()
     await flush()
 
@@ -85,7 +82,7 @@ describe('ModelMetricsPanel model picker', () => {
   })
 
   it('fetches and shows another registry model on picker click — including unavailable ones', async () => {
-    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+    const { container } = render(<ModelPerformance plotTheme={plotTheme} copy={copy} />)
     await flush()
     await flush()
 
@@ -103,7 +100,7 @@ describe('ModelMetricsPanel model picker', () => {
     expect(transitionButton.getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('renders the measured per-class table when the card carries one', async () => {
+  it('renders the measured per-class table + chart when the card carries one', async () => {
     mocks.fetchModelInfo.mockImplementation(async (modelId) =>
       card(modelId ?? 'small', {
         val_metrics: {
@@ -119,12 +116,14 @@ describe('ModelMetricsPanel model picker', () => {
         },
       }),
     )
-    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+    const { container } = render(<ModelPerformance plotTheme={plotTheme} copy={copy} />)
     await flush()
     await flush()
 
     const table = container.querySelector('.model-per-class')
     expect(table).not.toBeNull()
+    // The per-class bar chart renders alongside the table (LazyPlot stubbed).
+    expect(container.querySelector('.per-class-chart')).not.toBeNull()
     // Localized class names, raw measured values verbatim — incl. the honest
     // transition F1 0.103.
     expect(table.textContent).toContain(copy.status.red)
@@ -133,18 +132,19 @@ describe('ModelMetricsPanel model picker', () => {
     expect(container.textContent).toContain('Held-out 3-class test eval.')
   })
 
-  it('renders no per-class table for a card without one', async () => {
-    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+  it('renders no per-class table or chart for a card without one', async () => {
+    const { container } = render(<ModelPerformance plotTheme={plotTheme} copy={copy} />)
     await flush()
     await flush()
     expect(container.querySelector('.model-per-class')).toBeNull()
+    expect(container.querySelector('.per-class-chart')).toBeNull()
   })
 
   it('renders no picker when the registry has a single entry', async () => {
     mocks.fetchModels.mockResolvedValueOnce([
       { model_id: 'small', model_label: 'Small detector', is_default: true, available: true },
     ])
-    const { container } = render(<ModelMetricsPanel plotTheme={plotTheme} copy={copy} />)
+    const { container } = render(<ModelPerformance plotTheme={plotTheme} copy={copy} />)
     await flush()
     await flush()
 

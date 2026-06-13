@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { scenarios } from '../catalog/scenarios'
 import { stateCatalog } from '../catalog/stateCatalog'
 import { translateScenario, translateState } from '../i18n/translate'
@@ -16,6 +16,22 @@ import { LiveDemoContext } from './liveDemoContext'
 // liveDemoContext.js).
 export function LiveDemoProvider({ copy, children }) {
   const analysis = useAnalysis(copy)
+
+  // Video seek channel: the transition list (ResultPanel) and the stage's
+  // <video> live in sibling components, so "click a transition, jump the
+  // video there" flows through context. The nonce makes re-clicking the same
+  // transition seek again; videoDurationS doubles as the honest "a video is
+  // actually mounted" gate for showing the jump buttons at all.
+  const [videoSeek, setVideoSeek] = useState(null)
+  const [videoDurationS, setVideoDurationS] = useState(null)
+  const seekNonce = useRef(0)
+  const requestFrameSeek = useCallback((frame) => {
+    seekNonce.current += 1
+    setVideoSeek({ frame, nonce: seekNonce.current })
+  }, [])
+  const reportVideoDuration = useCallback((duration) => {
+    setVideoDurationS(Number.isFinite(duration) && duration > 0 ? duration : null)
+  }, [])
 
   const activeScenarioRaw = useMemo(
     () => {
@@ -42,8 +58,24 @@ export function LiveDemoProvider({ copy, children }) {
   )
 
   const value = useMemo(
-    () => ({ ...analysis, activeScenario, activeState }),
-    [analysis, activeScenario, activeState],
+    () => ({
+      ...analysis,
+      activeScenario,
+      activeState,
+      videoSeek,
+      videoDurationS,
+      requestFrameSeek,
+      reportVideoDuration,
+    }),
+    [
+      analysis,
+      activeScenario,
+      activeState,
+      videoSeek,
+      videoDurationS,
+      requestFrameSeek,
+      reportVideoDuration,
+    ],
   )
 
   return <LiveDemoContext.Provider value={value}>{children}</LiveDemoContext.Provider>

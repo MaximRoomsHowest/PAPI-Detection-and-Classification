@@ -4,13 +4,63 @@ import { Globe, Moon, Sun } from 'lucide-react'
 import clsx from 'clsx'
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../i18n/translations'
 import { useClickOutside } from '../hooks/useClickOutside'
+import { fetchHealth } from '../lib/api'
+import { PapiGlyph } from './PapiGlyph'
 
-// The sticky application header: brand, primary nav, language menu and theme
-// toggle. Extracted from App.jsx so the App component stays as the route shell.
+// Aviation operations run on UTC, and every History timestamp ultimately keys
+// against backend (UTC) time — the clock cell makes that frame of reference
+// visible. en-GB locale only fixes the 24h digit layout; digits are digits in
+// all four UI languages.
+const UTC_CLOCK = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  hour12: false,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+})
+
+// Readiness poll cadence. Slow on purpose: the cell is a passive indicator,
+// not a monitor — analysis calls surface their own errors.
+const HEALTH_POLL_MS = 45_000
+
+function useUtcClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  return UTC_CLOCK.format(now)
+}
+
+function useBackendStatus() {
+  const [status, setStatus] = useState('checking')
+  useEffect(() => {
+    const controller = new AbortController()
+    let timer = null
+    const probe = async () => {
+      const ok = await fetchHealth(controller.signal)
+      if (controller.signal.aborted) return
+      setStatus(ok ? 'online' : 'offline')
+      timer = setTimeout(probe, HEALTH_POLL_MS)
+    }
+    probe()
+    return () => {
+      controller.abort()
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
+  return status
+}
+
+// The sticky application header: brand, primary nav, live util cells (UTC
+// clock + backend readiness) and the language / theme controls. Extracted from
+// App.jsx so the App component stays as the route shell.
 export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage }) {
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
   const languageMenuRef = useRef(null)
   const languageTriggerRef = useRef(null)
+  const utcTime = useUtcClock()
+  const backendStatus = useBackendStatus()
   // Stable ref store keyed by the language code (not a render-time array index),
   // so the ref callback never mutates an array during render. Each option's
   // callback sets its own entry on mount and clears it on unmount. Initialised
@@ -85,34 +135,36 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
   return (
     <header className="topbar">
       <Link className="brand" to="/" aria-label={copy.a11y.brandLabel}>
-        <span className="brand-logo" aria-hidden="true">
-          <img className="logo-light" src="/intersoft-electronics-logo.svg" alt="" />
-          <img className="logo-dark" src="/intersoft-electronics-logo-white-inverse.svg" alt="" />
-        </span>
+        <PapiGlyph size="brand" />
         <span className="brand-text">
           <strong>PAPI Vision</strong>
           <small>{copy.brand.subtitle}</small>
-          <small className="brand-company">{copy.brand.company}</small>
         </span>
       </Link>
 
       <nav className="topnav" aria-label={copy.a11y.primaryNav}>
-        {navItems.map((item, index) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             className={({ isActive }) => clsx('nav-link', isActive && 'active')}
             to={item.to}
             end={item.end}
           >
-            <span className="nav-link__idx mono" aria-hidden="true">
-              {String(index + 1).padStart(2, '0')}
-            </span>
             <span className="nav-link__label">{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
       <div className="topbar-actions">
+        <div className="util-cell clock-cell" aria-hidden="true">
+          <span className="util-cell__label">UTC</span>
+          <span className="util-cell__value mono">{utcTime}</span>
+        </div>
+        <div className="util-cell status-cell">
+          <span className={`status-dot status-dot--${backendStatus}`} aria-hidden="true" />
+          <span className="util-cell__label">{copy.topbar.backend}</span>
+          <span className="util-cell__value">{copy.status[backendStatus]}</span>
+        </div>
         <div className="language-switch topbar-control" ref={languageMenuRef}>
           <button
             className="language-trigger"
@@ -131,7 +183,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
             aria-haspopup="menu"
             aria-label={copy.a11y.chooseLanguage}
           >
-            <Globe size={18} />
+            <Globe size={16} />
             <span>{language.toUpperCase()}</span>
           </button>
           {languageMenuOpen && (
@@ -178,7 +230,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
             onClick={onToggleTheme}
             aria-label={theme === 'dark' ? copy.a11y.switchToLight : copy.a11y.switchToDark}
           >
-            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
         </div>
       </div>

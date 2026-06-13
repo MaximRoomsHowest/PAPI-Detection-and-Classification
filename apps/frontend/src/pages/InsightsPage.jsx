@@ -6,10 +6,16 @@ import clsx from 'clsx'
 import { AngleVsStateCharts } from '../components/insights/AngleVsStateCharts'
 import { TransitionCharts } from '../components/insights/TransitionCharts'
 import { SessionSummaryCharts } from '../components/insights/SessionSummaryCharts'
-import { ModelMetricsPanel } from '../components/insights/ModelMetricsPanel'
+import { ModelPerformance } from '../components/insights/ModelPerformance'
+import { InferencePerformance } from '../components/insights/InferencePerformance'
 import { InsightsSummaryStrip } from '../components/insights/InsightsSummaryStrip'
 import { sessionRunwaySummary } from '../lib/runwaySelection'
-import { summarizeSession, transitionCsv } from '../lib/insightsTransforms'
+import {
+  confidenceValues,
+  stableTransitionEvents,
+  summarizeSession,
+  transitionCsv,
+} from '../lib/insightsTransforms'
 import { fetchLogDetail } from '../lib/api'
 import { localizedErrorMessage } from '../lib/errorMessages'
 import { formatTimestamp } from '../lib/format'
@@ -17,12 +23,17 @@ import { useChartExport } from '../hooks/useChartExport'
 import { useFetch } from '../hooks/useFetch'
 import { useLiveDemo } from '../context/liveDemoContext'
 
-// Insights is split into two tabs: "Current analysis" (charts built from the
-// session's real results — angle-vs-state, transitions, per-light/confidence
-// distributions) and "Model & dataset" (aggregate /api/stats + /api/model).
-// Both tab panels are force-mounted (CSS parks the inactive one off-screen at
-// full size) so PDF export captures every chart and Plotly never re-initialises
-// on tab switch.
+// Insights is an overview-first analytical console: an always-visible KPI strip
+// (the verdict layer) above five focused, question-led section tabs —
+//   • Transition analysis   (commissioning: measured crossing angles + flips)
+//   • Angle analysis         (redness vs angle small multiples + descent profile)
+//   • Lamp analysis          (per-light state mix + detection confidence)
+//   • Model performance      (the detector's evaluation card + per-class P/R/F1)
+//   • Inference performance  (filterable fleet distribution + latency percentiles)
+// Progressive disclosure: the user sees one focused section at a time and the most
+// relevant one is selected by default. All panels are force-mounted (CSS parks the
+// inactive ones off-screen at full size) so PDF export captures every chart and
+// Plotly never re-initialises on a tab switch.
 export function InsightsPage({ plotTheme, copy }) {
   const { backendResults, runways = [] } = useLiveDemo()
   const [searchParams] = useSearchParams()
@@ -39,19 +50,40 @@ export function InsightsPage({ plotTheme, copy }) {
     handleDownloadCharts: onDownloadCharts,
   } = useChartExport(copy, exportSessionRef)
 
-  // Controlled so the off-screen, force-mounted panel can be marked `inert`
-  // (removed from the tab order and the a11y tree) while staying in the DOM at
-  // full size for PDF export. Plotly.toImage still reads inert nodes.
-  const [tab, setTab] = useState('current')
+  // `tab === null` means "not chosen yet" — the active tab then tracks the most
+  // relevant section for the loaded data (which can arrive async in history mode);
+  // the first manual pick pins it. Derived, so no set-state-in-effect.
+  const [tab, setTab] = useState(null)
   const sourceMode = logId ? 'history' : 'live'
   const sourceResults = useMemo(
     () => (sourceMode === 'history' ? (historyLog.data ? [historyLog.data] : []) : (backendResults ?? [])),
     [sourceMode, historyLog.data, backendResults],
   )
   const hasSession = (sourceResults?.length ?? 0) > 0
-  const hasTransitions = sourceResults?.some((result) => (result?.transitions?.length ?? 0) > 0)
-  // At-a-glance roll-up for the verdict strip (lamps crossed / elevation / trust).
+  const transitionEvents = useMemo(
+    () => stableTransitionEvents(sourceResults).filter(
+      (event) => Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= 4,
+    ),
+    [sourceResults],
+  )
+  const hasTransitions = transitionEvents.length > 0
+
+  // At-a-glance roll-up for the overview strip (lamps crossed / elevation / trust)
+  // plus the extra KPIs the strip surfaces (transitions, detection confidence, detector).
   const summary = useMemo(() => summarizeSession(sourceResults), [sourceResults])
+  const summaryExtra = useMemo(() => {
+    const confidences = confidenceValues(sourceResults)
+    const avgConfidence = confidences.length
+      ? Math.round(confidences.reduce((total, value) => total + value, 0) / confidences.length)
+      : null
+    const first = sourceResults?.[0]
+    return {
+      transitionsCount: transitionEvents.length,
+      avgConfidence,
+      detectorLabel: first?.model_label || first?.model_id || null,
+    }
+  }, [sourceResults, transitionEvents])
+
   const runwaySummary = sessionRunwaySummary(sourceResults, runways)
   const runwayContextText =
     runwaySummary.kind === 'mixed'
@@ -68,6 +100,21 @@ export function InsightsPage({ plotTheme, copy }) {
     sourceMode === 'history' && historyLog.data?.created_at
       ? formatTimestamp(historyLog.data.created_at, copy.locale)
       : null
+
+  // Section tabs in priority order. The fleet/model sections always have data
+  // (their own backend fetches); the session sections show honest empty states
+  // until an analysis is run.
+  const tabDefs = [
+    { value: 'transition', label: copy.insights.tabTransition, question: copy.insights.qTransition },
+    { value: 'angle', label: copy.insights.tabAngle, question: copy.insights.qAngle },
+    { value: 'lamp', label: copy.insights.tabLamp, question: copy.insights.qLamp },
+    { value: 'model', label: copy.insights.tabModel, question: copy.insights.qModel },
+    { value: 'inference', label: copy.insights.tabInference, question: copy.insights.qInference },
+  ]
+  // Most relevant section first: a swept video leads with transitions, any other
+  // analysis with lamp states, and a no-session visit with the model card.
+  const preferredTab = hasTransitions ? 'transition' : hasSession ? 'lamp' : 'model'
+  const activeTab = tab ?? preferredTab
 
   useEffect(() => {
     const first = sourceResults?.[0]
@@ -93,6 +140,23 @@ export function InsightsPage({ plotTheme, copy }) {
     link.remove()
     URL.revokeObjectURL(url)
   }
+
+  // Each tab panel is force-mounted (inactive ones parked off-screen by CSS) so the
+  // PDF export still captures every chart node. The question subhead states what the
+  // section answers; the grid hosts the section's existing chart components.
+  const renderPanel = (def, children) => (
+    <Tabs.Content
+      key={def.value}
+      className="insights-tab-content"
+      value={def.value}
+      forceMount
+      inert={activeTab !== def.value}
+      aria-hidden={activeTab !== def.value}
+    >
+      <p className="section-question">{def.question}</p>
+      <div className="insights-grid">{children}</div>
+    </Tabs.Content>
+  )
 
   return (
     <section className="insights-section">
@@ -168,7 +232,7 @@ export function InsightsPage({ plotTheme, copy }) {
       )}
 
       {/* No analysis this session: point the user at Live Demo instead of leaving
-          them with several empty cards and a working-but-lonely model chart (audit D5). */}
+          them with empty session cards (the model/inference tabs still have data). */}
       {!hasSession && !(sourceMode === 'history' && historyLog.loading) && !historyLog.error && (
         <div className="insights-cta" role="note">
           <Info size={18} aria-hidden="true" />
@@ -179,52 +243,39 @@ export function InsightsPage({ plotTheme, copy }) {
         </div>
       )}
 
-      {/* Verdict layer: stated before the charts and OUTSIDE the tabs (so it isn't
-          parked off-screen with an inactive force-mounted panel). Self-hides when empty. */}
+      {/* Overview layer: stated before the tabs and OUTSIDE them (so it isn't parked
+          off-screen with an inactive force-mounted panel). Self-hides when empty. */}
       <InsightsSummaryStrip
         summary={summary}
         sourceMeta={{ label: sourceLabel, timestamp: sourceTimestamp }}
+        extra={summaryExtra}
         copy={copy}
       />
 
-      <Tabs.Root value={tab} onValueChange={setTab} className="insights-tabs">
+      <Tabs.Root value={activeTab} onValueChange={setTab} className="insights-tabs">
         <Tabs.List className="insights-tab-list" aria-label={copy.insights.eyebrow}>
-          <Tabs.Trigger className="insights-tab-trigger" value="current">
-            {copy.insights.tabCurrent}
-          </Tabs.Trigger>
-          <Tabs.Trigger className="insights-tab-trigger" value="model">
-            {copy.insights.tabModel}
-          </Tabs.Trigger>
+          {tabDefs.map((def) => (
+            <Tabs.Trigger key={def.value} className="insights-tab-trigger" value={def.value}>
+              {def.label}
+            </Tabs.Trigger>
+          ))}
         </Tabs.List>
 
         <div className="insights-tab-viewport" ref={insightsRef}>
-          <Tabs.Content
-            className="insights-tab-content"
-            value="current"
-            forceMount
-            inert={tab !== 'current'}
-            aria-hidden={tab !== 'current'}
-          >
-            <div className="insights-grid">
-              {/* The measured transition angles lead — they are the commissioning
-                  deliverable; the per-lamp evidence (state bands, redness sweeps)
-                  and session distributions follow. */}
-              <TransitionCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />
-              <AngleVsStateCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />
-              <SessionSummaryCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />
-            </div>
-          </Tabs.Content>
-          <Tabs.Content
-            className="insights-tab-content"
-            value="model"
-            forceMount
-            inert={tab !== 'model'}
-            aria-hidden={tab !== 'model'}
-          >
-            <div className="insights-grid">
-              <ModelMetricsPanel plotTheme={plotTheme} copy={copy} />
-            </div>
-          </Tabs.Content>
+          {renderPanel(
+            tabDefs[0],
+            <TransitionCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />,
+          )}
+          {renderPanel(
+            tabDefs[1],
+            <AngleVsStateCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />,
+          )}
+          {renderPanel(
+            tabDefs[2],
+            <SessionSummaryCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />,
+          )}
+          {renderPanel(tabDefs[3], <ModelPerformance plotTheme={plotTheme} copy={copy} />)}
+          {renderPanel(tabDefs[4], <InferencePerformance plotTheme={plotTheme} copy={copy} />)}
         </div>
       </Tabs.Root>
     </section>

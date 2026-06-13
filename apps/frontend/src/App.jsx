@@ -40,33 +40,33 @@ function App() {
   const [language, setLanguage] = useState(initialLanguage)
   const copy = translations[language]
 
+  // Mirrors the index.css token sheet for the canvas/SVG world Plotly draws
+  // into (CSS custom properties can't reach chart internals). Values must stay
+  // in step with the approach-console palette.
   const plotTheme = useMemo(
     () =>
       theme === 'dark'
         ? {
             paper: 'rgba(0,0,0,0)',
-            plot: 'rgba(255,255,255,0.04)',
-            text: '#dbe6f2',
-            strong: '#ffffff',
-            muted: '#9cb0c4',
-            grid: 'rgba(219, 230, 242, 0.16)',
-            border: 'rgba(219, 230, 242, 0.18)',
-            // Navy/grey bar palette for the decision plot + ribbon chrome.
-            accent: '#6fb4e6',
-            accentSoft: 'rgba(111, 180, 230, 0.22)',
-            track: 'rgba(219, 230, 242, 0.16)',
+            text: '#dce5ee',
+            strong: '#f4f8fc',
+            muted: '#94a3b4',
+            grid: 'rgba(148, 178, 205, 0.14)',
+            border: 'rgba(148, 178, 205, 0.2)',
+            accent: '#53c1dc',
+            accentSoft: 'rgba(83, 193, 220, 0.22)',
+            track: 'rgba(148, 178, 205, 0.14)',
           }
         : {
             paper: 'rgba(0,0,0,0)',
-            plot: 'rgba(25,42,61,0.035)',
-            text: '#192a3d',
-            strong: '#0c1d2d',
-            muted: '#5a6b7d',
-            grid: 'rgba(25, 42, 61, 0.16)',
-            border: 'rgba(25, 42, 61, 0.18)',
-            accent: '#00426e',
-            accentSoft: 'rgba(0, 66, 110, 0.18)',
-            track: 'rgba(25, 42, 61, 0.12)',
+            text: '#1a2733',
+            strong: '#0d1822',
+            muted: '#52677a',
+            grid: 'rgba(13, 50, 75, 0.15)',
+            border: 'rgba(13, 50, 75, 0.2)',
+            accent: '#0a6e89',
+            accentSoft: 'rgba(10, 110, 137, 0.16)',
+            track: 'rgba(13, 50, 75, 0.12)',
           },
     [theme],
   )

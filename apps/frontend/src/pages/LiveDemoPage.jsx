@@ -36,6 +36,8 @@ export function LiveDemoPage({ copy, plotTheme }) {
     runBackendInference,
     transformFolderToVideo,
     selectBackendFrame,
+    videoSeek,
+    reportVideoDuration,
   } = useLiveDemo()
 
   // The Live Demo shows real backend output only. Until an analysis has run the
@@ -126,6 +128,8 @@ export function LiveDemoPage({ copy, plotTheme }) {
             canRestart={Boolean(media)}
             restarting={isAnalyzing}
             artifactWarning={artifactWarning}
+            videoSeek={videoSeek}
+            onVideoDuration={reportVideoDuration}
             copy={copy}
           />
         </div>

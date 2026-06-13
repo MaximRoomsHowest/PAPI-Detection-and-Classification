@@ -1,6 +1,8 @@
-/* Numeric/label utilities — pair with var(--font-mono) (JetBrains Mono).
-   .mono switches the family and enables tabular figures + slashed zero;
-   .tnum just locks tabular numerals on text that stays in the body font. */
+/* Numeric/label utilities — pair with var(--font-mono) (Geist Mono, a crisp
+   technical monospace; every value of record wears it).
+   .mono switches the family; .tnum locks tabular numerals on text that
+   stays in the body font. Geist Mono is fixed-pitch so tabular alignment
+   is inherent; the feature settings are kept for the fallback stack. */
 .mono {
   font-family: var(--font-mono);
   font-feature-settings: 'tnum', 'zero';
@@ -55,55 +57,104 @@ h1 {
   padding-bottom: 48px;
 }
 
-/* Flight-strip topbar (Stage 2): full-bleed, single bottom rule, no float /
-   blur / drop shadow. Brand | nav | util cluster divided by hairline rules. */
+/* Flight-strip topbar: full-bleed, single bottom rule, no float / blur /
+   drop shadow. Brand | nav | util cluster divided by hairline rules. */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: minmax(330px, auto) 1fr auto;
+  grid-template-columns: auto 1fr auto;
   align-items: stretch;
   width: 100%;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--paper) 96%, transparent);
+  background: var(--paper);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 22px;
+  gap: 13px;
+  padding: 10px 20px;
   border-right: 1px solid var(--border);
   color: var(--text-strong);
   text-decoration: none;
   min-width: 0;
 }
 
-.brand-logo {
-  width: 156px;
-  height: 44px;
-  display: grid;
-  place-items: center;
+/* The four-box PAPI unit as the product mark. Cell colours come from the
+   same --lamp-* tokens the result cards use, so the mark can encode real
+   per-lamp states wherever it appears (brand, History rows, verdicts). */
+.papi-glyph {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 3px;
 }
 
-.brand-logo img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.papi-glyph__cell {
+  width: 9px;
+  height: 9px;
+  border-radius: 1.5px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  /* Lamp flips ease briefly — a real beam changeover is not instant either.
+     Neutralised by the global prefers-reduced-motion reset. */
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
 }
 
-html[data-theme='light'] .brand-logo .logo-dark {
-  display: none;
+.papi-glyph__cell--red {
+  background: var(--lamp-red);
+  border-color: var(--lamp-red-border);
 }
 
-html[data-theme='dark'] .brand-logo .logo-light {
-  display: none;
+.papi-glyph__cell--white {
+  background: var(--lamp-white);
+  border-color: var(--lamp-white-border);
+}
+
+.papi-glyph__cell--transition {
+  background: var(--lamp-transition);
+  border-color: color-mix(in srgb, var(--lamp-transition) 60%, var(--text));
+}
+
+.papi-glyph__cell--occluded {
+  background: color-mix(in srgb, var(--lamp-occluded) 35%, transparent);
+  border-color: var(--lamp-occluded);
+}
+
+.papi-glyph--sm .papi-glyph__cell {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+}
+
+.papi-glyph--sm {
+  gap: 2px;
+}
+
+.papi-glyph--brand .papi-glyph__cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+}
+
+/* Large variant: the simulator's pilot's-view bar. Lamp flips ease briefly —
+   a real beam changeover is not instant either. */
+.papi-glyph--lg {
+  gap: 6px;
+}
+
+.papi-glyph--lg .papi-glyph__cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
 }
 
 .brand-text {
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 
 .brand strong,
@@ -114,19 +165,16 @@ html[data-theme='dark'] .brand-logo .logo-light {
 .brand strong {
   color: var(--text-strong);
   font-size: 16px;
+  font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0.2px;
 }
 
 .brand small {
-  color: var(--text-muted);
-  font-size: 12px;
-  margin-top: 2px;
-}
-
-.brand-company {
-  font-size: 11px;
-  letter-spacing: 0.3px;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
 }
 
@@ -135,6 +183,22 @@ html[data-theme='dark'] .brand-logo .logo-light {
   display: inline-grid;
   place-items: center;
   color: var(--accent);
+}
+
+/* Card-header icons sit in a small bezelled housing — the same indicator
+   language as the empty-state icons, so every panel header reads as a labeled
+   instrument readout rather than a bare glyph beside a title. (All viz-heading
+   icons render at size 18, so a 34px padded housing frames them consistently.) */
+.viz-heading svg {
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--border));
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface-muted));
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  flex: none;
 }
 
 .topnav {
@@ -176,8 +240,10 @@ html[data-theme='dark'] .brand-logo .logo-light {
   letter-spacing: 0.4px;
 }
 
+/* Geist Mono is fixed-pitch, so the ticking clock never jitters horizontally;
+   the min-width just reserves the cell before the first paint. */
 .clock-cell {
-  min-width: 116px;
+  min-width: 118px;
   justify-content: center;
 }
 
@@ -373,10 +439,6 @@ html[data-theme='dark'] .brand-logo .logo-light {
   border-right: 1px solid var(--border);
 }
 
-.nav-link__idx {
-  display: none;
-}
-
 .topnav .nav-link:hover {
   color: var(--accent);
   background: color-mix(in oklab, var(--accent-cyan) 7%, transparent);
@@ -393,8 +455,7 @@ html[data-theme='dark'] .brand-logo .logo-light {
   right: 12px;
   bottom: -1px;
   height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-cyan));
+  background: var(--accent);
 }
 
 .topnav .nav-link:focus-visible {
@@ -447,6 +508,78 @@ html[data-theme='dark'] .brand-logo .logo-light {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--focus) 22%, transparent);
+}
+
+/* ---------- Empty-state instrument framing ---------- */
+/* Shared by the Live Demo result panel (.analysis-empty) and every chart empty
+   state (.chart-empty): a bezelled indicator icon + a registration-reticle frame
+   + a faint scope backdrop, so an empty panel reads as a powered-but-idle
+   instrument rather than a blank placeholder. */
+.analysis-empty,
+.chart-empty {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Soft radial bloom behind the icon. */
+.analysis-empty::before,
+.chart-empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    120px 120px at 50% 38%,
+    color-mix(in oklab, var(--accent) 9%, transparent),
+    transparent 70%
+  );
+}
+
+/* Registration ticks at the four corners — the CV-overlay motif from the live
+   stage, reused so empty panels share the product's visual language. */
+.analysis-empty::after,
+.chart-empty::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  pointer-events: none;
+  opacity: 0.4;
+  background:
+    linear-gradient(var(--accent) 0 0) top left / 14px 1.5px,
+    linear-gradient(var(--accent) 0 0) top left / 1.5px 14px,
+    linear-gradient(var(--accent) 0 0) top right / 14px 1.5px,
+    linear-gradient(var(--accent) 0 0) top right / 1.5px 14px,
+    linear-gradient(var(--accent) 0 0) bottom left / 14px 1.5px,
+    linear-gradient(var(--accent) 0 0) bottom left / 1.5px 14px,
+    linear-gradient(var(--accent) 0 0) bottom right / 14px 1.5px,
+    linear-gradient(var(--accent) 0 0) bottom right / 1.5px 14px;
+  background-repeat: no-repeat;
+}
+
+/* Bezelled indicator housing for the empty-state icon. */
+.empty-state__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  color: var(--accent);
+  border: 1px solid color-mix(in oklab, var(--accent) 38%, var(--border));
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in oklab, var(--accent) 16%, transparent),
+      transparent 72%
+    ),
+    var(--surface-muted);
+  box-shadow:
+    inset 0 1px 0 var(--edge-highlight),
+    0 0 0 6px color-mix(in oklab, var(--accent) 6%, transparent);
+}
+
+.empty-state__icon svg {
+  opacity: 1;
 }
 
 /* Refined scrollbars — slim, brand-tinted, rounded. `scrollbar-color` covers

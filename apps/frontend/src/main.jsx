@@ -3,24 +3,14 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { LazyMotion, domAnimation } from 'motion/react'
 
-// Self-hosted Poppins — replaces the Google Fonts @import that was in
-// index.css. GDPR concern for the German client: loading fonts from
-// Google's CDN transmits the visitor's IP to a third party without
-// consent (audit F-MAJ-14). These imports inline the WOFF2 files into
-// Vite's bundle output so the browser fetches them from our own origin.
-import '@fontsource/poppins/300.css'
-import '@fontsource/poppins/400.css'
-import '@fontsource/poppins/500.css'
-import '@fontsource/poppins/600.css'
-import '@fontsource/poppins/700.css'
-
-// Self-hosted JetBrains Mono for numerals / labels (the .mono / .tnum utility
-// classes via var(--font-mono)). Same GDPR rationale as Poppins above — these
-// imports inline the WOFF2 files into our own bundle, no Google Fonts CDN.
-import '@fontsource/jetbrains-mono/400.css'
-import '@fontsource/jetbrains-mono/500.css'
-import '@fontsource/jetbrains-mono/600.css'
-import '@fontsource/jetbrains-mono/700.css'
+// Self-hosted fonts (GDPR: Google Fonts CDN would transmit the visitor's IP
+// to a third party without consent — audit F-MAJ-14; @fontsource inlines the
+// WOFF2 files into our own bundle). Geist (Sans) is the UI face; Geist Mono
+// carries every numeric readout (angles, confidences, timestamps) via
+// var(--font-mono). Both are variable fonts — one file per family covers the
+// whole 100–900 weight axis, so no per-weight imports are needed.
+import '@fontsource-variable/geist'
+import '@fontsource-variable/geist-mono'
 
 import './index.css'
 import App from './App.jsx'

@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { loadPlotlyBundle } from '../lib/plotlyBundle'
 import {
   FAA_DEFAULT_SET_ANGLES_DEG,
+  stableTransitionEvents,
   summarizeSession,
   transitionAngleSummary,
 } from '../lib/insightsTransforms'
@@ -206,8 +207,8 @@ const VERDICT_LABELS = {
 
 const FAA_NOTE =
   `FAA default set angles (${FAA_DEFAULT_SET_ANGLES_DEG.map((a) => `${a.toFixed(2)}°`).join(' / ')}) ` +
-  'are shown for reference only — EDNY\'s commissioned per-lamp values are pending, and the image ' +
-  'lamp order depends on the approach direction, so compare sorted values, never slot-by-slot.'
+  'are shown for reference only — EDNY\'s commissioned per-lamp values are pending, so compare ' +
+  'sorted values, never slot-by-slot.'
 
 // Minimal paginating table: fixed column widths, header redrawn on every page
 // break. Hand-rolled on purpose — no extra dependency for four columns.
@@ -551,7 +552,7 @@ export function useChartExport(copy, sessionRef) {
         const { results, runways = [], selectedRunwayId } = session
         const first = results[0]
         const runwayId = first?.runway_id ?? selectedRunwayId
-        const transitions = results.flatMap((result) => result?.transitions ?? [])
+        const transitions = stableTransitionEvents(results)
         addSessionSummaryPage(pdf, logoDataUrl, {
           results,
           summary: summarizeSession(results),

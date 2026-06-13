@@ -1,6 +1,7 @@
 import { backendStateId, stateCatalog } from '../catalog/stateCatalog'
 import { percent } from './format'
 import { mediaUrl } from './api'
+import { transitionEventsForResult } from './insightsTransforms'
 
 export function lampPattern(lamps) {
   const labels = lamps.map((lamp) => {
@@ -90,7 +91,7 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
     artifactType: result.media_type,
     logId: result.log_id,
     angle: result.angle,
-    transitions: result.transitions ?? [],
+    transitions: transitionEventsForResult(result),
     // Raw per-frame confidence + verdict series for video / folder analyses
     // (empty for single images). Drives the Live Demo frame-by-frame chart.
     perFrame: result.per_frame ?? [],
@@ -149,9 +150,11 @@ export function scenarioFromVideoFrameResult(result, baseScenario, frameIndex, l
   const globalState = framePoint?.state ?? result.global_state
   const stateId = backendStateId[globalState] ?? 'unknown'
   const activeState = stateCatalog.find((state) => state.id === stateId) ?? stateCatalog[stateCatalog.length - 1]
-  const frameLamps = angleSample?.lamps?.length
-    ? completeFrameLamps(angleSample.lamps)
-    : result.lamps
+  const frameLamps = framePoint?.lamps?.length
+    ? completeFrameLamps(framePoint.lamps)
+    : angleSample?.lamps?.length
+      ? completeFrameLamps(angleSample.lamps)
+      : result.lamps
   const frameResult = {
     ...result,
     global_state: globalState,

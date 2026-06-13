@@ -15,6 +15,7 @@ import {
   FAA_DEFAULT_SET_ANGLES_DEG,
   STATE_BAND_CODES,
   stateBandSeries,
+  stableTransitionEvents,
   transitionAngleSummary,
   transitionFlickerStatus,
 } from '../../lib/insightsTransforms'
@@ -25,10 +26,10 @@ import { degrees } from '../../lib/format'
 //    lamp actually crossed red<->white, with its blend zone, against the FAA
 //    default set angles (labelled as defaults; commissioned values pending).
 // 2. Lamp state bands — what every lamp showed at every frame (flicker reads as
-//    thin stripes in the blend zone), with the raw flip markers on top.
+//    thin stripes in the blend zone), with stabilized flip markers on top.
 // 3. The per-event table, grouped per light.
-// Every value comes from the backend's transitions[] / angle_track[] — nothing
-// is fabricated: a field a given method doesn't produce shows "—".
+  // Every value comes from backend transitions[] plus per_frame/angle_track state
+  // samples — nothing is fabricated: a field a given method doesn't produce shows "—".
 const LANE_COUNT = 4
 
 const clampLamp = (lampIndex) => Math.min(Math.max(lampIndex, 1), LANE_COUNT)
@@ -125,8 +126,8 @@ const TransitionAngleChart = memo(function TransitionAngleChart({ summary, plotT
             color: measured.map((entry) => LAMP_COLORS[(entry.lampIndex - 1) % LAMP_COLORS.length]),
             line: { color: plotTheme.paper, width: 1.5 },
           },
-          // Whiskers span the blend zone: the lowest..highest angle at which the
-          // tracker logged ANY flip for this light.
+          // Whiskers span the event zone: the lowest..highest angle at which the
+          // tracker logged a sustained flip for this light.
           error_x: {
             type: 'data',
             symmetric: false,
@@ -154,8 +155,8 @@ const TransitionAngleChart = memo(function TransitionAngleChart({ summary, plotT
           gridcolor: plotTheme.grid,
         }),
         // FAA defaults as labelled reference lines — sorted values against sorted
-        // measurements, never slot-by-slot (the image lamp order flips with the
-        // approach direction and EDNY's commissioned values are unconfirmed).
+        // measurements, never slot-by-slot while EDNY's commissioned per-lamp
+        // values are unconfirmed.
         shapes: FAA_DEFAULT_SET_ANGLES_DEG.map((angle) => ({
           type: 'line',
           xref: 'x',
@@ -414,17 +415,11 @@ function TransitionTable({ transitions, summary, copy }) {
 
 export function TransitionCharts({ backendResults, plotTheme, copy }) {
   const transitions = useMemo(() => {
-    const all = []
-    for (const result of backendResults ?? []) {
-      for (const event of result?.transitions ?? []) {
-        // Single source of truth for lamp identity: drop events outside 1..4 here so the
-        // angle chart, state bands, and table all operate on the same validated set.
-        if (Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= LANE_COUNT) {
-          all.push(event)
-        }
-      }
-    }
-    return all
+    // Single source of truth for lamp identity: drop events outside 1..4 here so the
+    // angle chart, state bands, and table all operate on the same validated set.
+    return stableTransitionEvents(backendResults).filter(
+      (event) => Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= LANE_COUNT,
+    )
   }, [backendResults])
 
   const summary = useMemo(() => transitionAngleSummary(backendResults ?? []), [backendResults])

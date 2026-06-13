@@ -1,129 +1,95 @@
-import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Pause, Play } from 'lucide-react'
+import { ArrowLeftRight, Crosshair, Film, Image as ImageIcon } from 'lucide-react'
+import { ApproachHero } from '../components/intro/ApproachHero'
+import { GlideSlopeSimulator } from '../components/intro/GlideSlopeSimulator'
 
-// Respect the OS "reduce motion" setting: don't auto-play the looping hero video
-// for users who asked for less motion (WCAG 2.3.3). Computed once at module load;
-// this is a client-only SPA so window is always present.
-const PREFERS_REDUCED_MOTION =
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
+// Landing page: a cinematic approach-footage hero with a live computer-vision
+// HUD overlay (ApproachHero), the four-capability band, the interactive
+// glide-slope explainer kept as its own section, and the real-airport context.
 export function IntroductionPage({ copy }) {
-  const videoRef = useRef(null)
-  const [isPlaying, setIsPlaying] = useState(!PREFERS_REDUCED_MOTION)
-
-  // Pause/play control satisfies WCAG 2.2.2 for the auto-playing looping video.
-  const toggleHeroVideo = () => {
-    const video = videoRef.current
-    if (!video) return
-    if (video.paused) {
-      video.play().then(() => setIsPlaying(true)).catch(() => {})
-    } else {
-      video.pause()
-      setIsPlaying(false)
-    }
-  }
+  const capabilities = [
+    { icon: ImageIcon, title: copy.intro.capImage, body: copy.intro.capImageBody },
+    { icon: Film, title: copy.intro.capVideo, body: copy.intro.capVideoBody },
+    { icon: Crosshair, title: copy.intro.capState, body: copy.intro.capStateBody },
+    { icon: ArrowLeftRight, title: copy.intro.capTransition, body: copy.intro.capTransitionBody },
+  ]
 
   return (
-    <section className="intro-hero">
-      <div className="intro-hero-inner">
-        <section className="intro-band">
-          {/* Bodensee approach footage as a faint hero wash (compressed 720p loop).
-              Muted + looping; the toggle is a pause control and reduced-motion users
-              get the poster instead of autoplay. Absolutely positioned, so the
-              single-column copy layout sits cleanly on top of it. */}
-          <div className="intro-band__bg" aria-hidden="true">
-            <video
-              ref={videoRef}
-              className="intro-band__video"
-              src="/intro-hero.mp4"
-              poster="/intro-hero-poster.jpg"
-              muted
-              loop
-              playsInline
-              autoPlay={!PREFERS_REDUCED_MOTION}
-              preload="metadata"
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-            />
-            <span className="intro-band__scrim" />
-          </div>
-          <button
-            type="button"
-            className="intro-band__toggle"
-            onClick={toggleHeroVideo}
-            aria-label={isPlaying ? copy.intro.pauseMedia : copy.intro.playMedia}
-          >
-            {isPlaying ? <Pause size={15} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
-          </button>
-          <div className="intro-copy">
-            <p className="eyebrow">{copy.intro.eyebrow}</p>
-            <h1>{copy.intro.title}</h1>
-            <p className="intro-description">{copy.intro.description}</p>
-            <div className="intro-actions">
-              <Link className="cta-button" to="/live-demo">
-                {copy.intro.cta}
-              </Link>
-            </div>
-          </div>
-        </section>
+    <div className="intro-page">
+      <ApproachHero copy={copy} />
 
-        <a className="scroll-cue" href="#airport-context" aria-label={copy.intro.scroll}>
-          <span />
-          <small>{copy.intro.scroll}</small>
-        </a>
-
-        <section className="airport-section" id="airport-context">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">{copy.intro.airportEyebrow}</p>
-              <h2>{copy.intro.airportTitle}</h2>
-            </div>
-            <span className="source-note">{copy.intro.runwayNote}</span>
+      <section className="capability-section" aria-label={copy.intro.capabilitiesTitle}>
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{copy.intro.capabilitiesEyebrow}</p>
+            <h2>{copy.intro.capabilitiesTitle}</h2>
           </div>
+        </div>
+        <ul className="capability-band">
+          {capabilities.map(({ icon: Icon, title, body }) => (
+            <li key={title}>
+              <Icon size={19} aria-hidden="true" />
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-          <div className="airport-grid">
-            <div className="airport-card">
-              <h3>{copy.intro.runwayDetails}</h3>
-              <p>{copy.intro.runwayDescription}</p>
-              <div className="airport-meta">
-                <div>
-                  <span>{copy.intro.coordinates}</span>
-                  <strong className="tnum">47.67139 N, 9.51139 E</strong>
-                </div>
-                <div>
-                  <span>{copy.intro.elevation}</span>
-                  <strong className="tnum">414 m AMSL</strong>
-                </div>
+      {/* The interactive instrument that used to be the hero now lives as its own
+          explainer section — it keeps the educational value without competing
+          with the footage hero above. */}
+      <section className="glide-explainer" aria-label={copy.intro.sim.title}>
+        <GlideSlopeSimulator copy={copy} />
+      </section>
+
+      <section className="airport-section" id="airport-context">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{copy.intro.airportEyebrow}</p>
+            <h2>{copy.intro.airportTitle}</h2>
+          </div>
+          <span className="source-note">{copy.intro.runwayNote}</span>
+        </div>
+
+        <div className="airport-grid">
+          <div className="airport-card">
+            <h3>{copy.intro.runwayDetails}</h3>
+            <p>{copy.intro.runwayDescription}</p>
+            <div className="airport-meta">
+              <div>
+                <span>{copy.intro.coordinates}</span>
+                <strong className="mono">47.67139 N, 9.51139 E</strong>
               </div>
-              <a
-                className="text-link"
-                href="https://www.bodensee-airport.eu/en/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Bodensee-Airport Friedrichshafen
-              </a>
+              <div>
+                <span>{copy.intro.elevation}</span>
+                <strong className="mono">414 m AMSL</strong>
+              </div>
             </div>
-
-            <div className="airport-map">
-              {/* The OSM embed needs scripts but nothing else — verified to render
-                  fully under an opaque-origin sandbox (no storage, no popups,
-                  no navigation, no access to this page). */}
-              <iframe
-                title="Bodensee-Airport Friedrichshafen map"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                sandbox="allow-scripts"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=9.4896%2C47.6572%2C9.5332%2C47.6856&layer=mapnik&marker=47.67139%2C9.51139"
-              />
-              <span className="map-caption tnum">47.67139 N, 9.51139 E</span>
-            </div>
+            <a
+              className="text-link"
+              href="https://www.bodensee-airport.eu/en/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Bodensee-Airport Friedrichshafen
+            </a>
           </div>
-        </section>
-      </div>
-    </section>
+
+          <div className="airport-map">
+            {/* The OSM embed needs scripts but nothing else — verified to render
+                fully under an opaque-origin sandbox (no storage, no popups,
+                no navigation, no access to this page). */}
+            <iframe
+              title="Bodensee-Airport Friedrichshafen map"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              sandbox="allow-scripts"
+              src="https://www.openstreetmap.org/export/embed.html?bbox=9.4896%2C47.6572%2C9.5332%2C47.6856&layer=mapnik&marker=47.67139%2C9.51139"
+            />
+            <span className="map-caption mono">47.67139 N, 9.51139 E</span>
+          </div>
+        </div>
+      </section>
+    </div>
   )
 }

@@ -7,19 +7,22 @@ import {
   basePlotLayout,
   baseAxisStyle,
   plotlyConfig,
+  plotlyPalette,
   CHART_HEIGHT,
   LAMP_COLORS,
   SEQUENCE_COLORS,
 } from '../../catalog/plotly'
-import { angleVsStateSeries, elevationOverFrameSeries } from '../../lib/insightsTransforms'
+import { angleVsStateSeries, elevationOverFrameSeries, transitionAngleSummary } from '../../lib/insightsTransforms'
 
 // THE client-critical chart, matching the Intersoft "AGL Altitude" tool's "Redness vs
 // angle" view: ONE graph per lamp, Y = measured red-channel REDNESS (high while the lamp
 // is red, dropping sharply to a low plateau once it turns white), X = real elevation
 // angle, with a dashed vertical line at the lamp's detected red->white transition angle.
 // Redness is a real pixel measurement from the backend (lamp.redness), not the
-// classified state. Lamp identity uses the CVD-safe LAMP_COLORS.
-const TRANSITION_COLOR = '#b04cc8'
+// classified state. Lamp identity uses the CVD-safe LAMP_COLORS; the detected
+// crossing marker uses the canonical amber transition token (plotlyPalette.transition)
+// so it agrees with the state pills, cards, and the transition zone tint below —
+// never a competing off-palette hue (design audit 2026-06-13).
 const REDNESS_CHART_HEIGHT = 260
 
 function lampName(lampIndex, copy) {
@@ -120,7 +123,7 @@ const RednessChart = memo(function RednessChart({ lampIndex, points, transitionA
       name: transitionName,
       x: [transitionAngle, transitionAngle],
       y: [rMin, rMax],
-      line: { color: TRANSITION_COLOR, dash: 'dash', width: 1.6 },
+      line: { color: plotlyPalette.transition, dash: 'dash', width: 1.6 },
       hovertemplate: `${transitionName}: %{x:.2f}°<extra></extra>`,
     })
   }
@@ -160,7 +163,7 @@ const RednessChart = memo(function RednessChart({ lampIndex, points, transitionA
             y: 1.02,
             text: `${transitionAngle.toFixed(2)}°`,
             showarrow: false,
-            font: { color: TRANSITION_COLOR, size: 11 },
+            font: { color: plotlyPalette.transition, size: 11 },
             xanchor: 'left',
           },
         ]
@@ -229,6 +232,7 @@ const ElevationOverFrameChart = memo(function ElevationOverFrameChart({ series, 
 
 export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
   const series = useMemo(() => angleVsStateSeries(backendResults), [backendResults])
+  const transitionSummary = useMemo(() => transitionAngleSummary(backendResults), [backendResults])
   const elevationSeries = useMemo(() => elevationOverFrameSeries(backendResults), [backendResults])
   const hasRedness = series.some((lamp) => lamp.points.some((point) => Number.isFinite(point.redness)))
 
@@ -251,7 +255,7 @@ export function AngleVsStateCharts({ backendResults, plotTheme, copy }) {
                 key={lamp.lampIndex}
                 lampIndex={lamp.lampIndex}
                 points={lamp.points}
-                transitionAngle={lamp.transitionAngle}
+                transitionAngle={transitionSummary[lamp.lampIndex - 1]?.settledAngle ?? lamp.transitionAngle}
                 plotTheme={plotTheme}
                 copy={copy}
               />

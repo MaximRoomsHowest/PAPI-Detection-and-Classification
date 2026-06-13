@@ -4,8 +4,9 @@
    they override and before runways.css, so the cascade is preserved exactly. */
 
 /* Respect the OS "reduce motion" preference (audit IMP-FE-9, WCAG 2.3.3):
-   neutralise the infinite spin / pulse / scroll-cue animations and long
-   transitions for users who opt out. */
+   neutralise the infinite spin / pulse animations and long transitions for
+   users who opt out. The glide-slope simulator's autoplay sweep is rAF-driven,
+   so it checks the same media query in JS (GlideSlopeSimulator). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -17,9 +18,12 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .scroll-cue span {
-    animation: none;
+
+/* The UTC clock is the first util cell to go — it's ambience, the backend
+   readiness cell is information. */
+@media (max-width: 1280px) {
+  .clock-cell {
+    display: none;
   }
 }
 
@@ -61,23 +65,8 @@
     grid-template-columns: 1fr;
   }
 
-  /* Stack the hero: copy centered above the glidepath diagram. */
-  .intro-band {
-    grid-template-columns: 1fr;
-    gap: 32px;
-    justify-items: center;
-    padding: 96px 24px 104px;
-    min-height: calc(100vh - 128px);
-  }
-
-  .intro-copy {
-    justify-items: center;
-    text-align: center;
-    max-width: 720px;
-  }
-
-  .intro-actions {
-    justify-content: center;
+  .intro-copy h1 {
+    max-width: 22ch;
   }
 
   .history-summary-grid,
@@ -126,17 +115,33 @@
     flex-shrink: 0;
   }
 
-  .intro-band {
-    padding: 72px 20px 92px;
+  .approach-hero {
+    min-height: clamp(460px, 76vh, 640px);
   }
 
-  .brand-logo {
-    width: 120px;
-    height: 38px;
+  .approach-hero__copy {
+    width: calc(100% - 32px);
   }
 
-  .brand-text {
+  /* Compact brand on phones: the glyph + wordmark stay, the mono version
+     line goes — it's repeated in the footer. */
+  .brand {
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .brand small {
     display: none;
+  }
+
+  /* The readiness LED keeps its meaning without the text cell. */
+  .status-cell .util-cell__label,
+  .status-cell .util-cell__value {
+    display: none;
+  }
+
+  .status-cell {
+    padding: 0 10px;
   }
 
   .topbar-actions {
@@ -150,11 +155,11 @@
   }
 
   .intro-copy h1 {
-    font-size: 40px;
+    font-size: 34px;
   }
 
   .intro-description {
-    font-size: 16px;
+    font-size: 15.5px;
   }
 
   .intro-actions {
@@ -162,8 +167,15 @@
     align-items: stretch;
   }
 
-  .cta-button {
+  .cta-button,
+  .hero-secondary {
     width: 100%;
+  }
+
+  /* The simulator deck stacks; the verdict rule keeps its colour cue. */
+  .glide-sim__deck {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .metric-grid {
@@ -293,7 +305,10 @@
    without a detail-modal round-trip and without horizontal scrolling. */
 @media (max-width: 480px) {
   .history-table-wrap {
-    overflow-x: visible;
+    /* Card layout: no sideways scroll and no bounded-height scroller, so stacked
+       rows are never clipped (the desktop sticky-header scroller is dropped). */
+    overflow: visible;
+    max-height: none;
   }
 
   /* display:block (table AND row group): with display:table, `width: 100%` is

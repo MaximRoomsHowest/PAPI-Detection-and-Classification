@@ -1,10 +1,24 @@
+import { PapiGlyph } from './PapiGlyph'
+
+// Graphite ops panel in both themes (the partner logo artwork is white, and a
+// constant dark band anchors the page bottom regardless of theme). The
+// certification notice is a contractual honesty requirement — it must stay
+// visible in every redesign.
 export function AppFooter({ copy }) {
   return (
     <footer className="site-footer">
       <div className="footer-main">
         <div className="footer-brand">
-          <img src="/intersoft-electronics-logo-white-inverse.svg" alt="Intersoft Electronics" />
+          <span className="footer-mark">
+            <PapiGlyph />
+            <strong>PAPI Vision</strong>
+          </span>
           <p>{copy.footer.description}</p>
+          <img
+            className="footer-partner-logo"
+            src="/intersoft-electronics-logo-white-inverse.svg"
+            alt={copy.brand.company}
+          />
         </div>
         <div className="footer-column">
           <h2>{copy.footer.project}</h2>

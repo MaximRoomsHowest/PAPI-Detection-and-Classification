@@ -35,7 +35,11 @@ export const SEQUENCE_COLORS = ['#5b6b7b', '#2f6fed', '#8a5cf6', '#0e8a6e', '#b8
 // paper/plot/font wrapper and the same fixedrange + muted-tick axis defaults; these
 // centralise that. They are behaviour-preserving: callers spread the result and add
 // their chart-specific fields (height, margin, ranges, titles, ...) as overrides.
-export const PLOT_FONT_FAMILY = 'Poppins, Segoe UI, sans-serif'
+export const PLOT_FONT_FAMILY = '"Geist Variable", "Geist", Segoe UI, sans-serif'
+
+// Axis ticks are almost always numbers (angles, frames, percentages), so they
+// render in the cockpit mono to match every other value of record in the UI.
+export const PLOT_MONO_FAMILY = '"Geist Mono Variable", "Geist Mono", ui-monospace, monospace'
 
 export function basePlotLayout(plotTheme, overrides = {}) {
   return {
@@ -54,7 +58,7 @@ export function basePlotLayout(plotTheme, overrides = {}) {
 export function baseAxisStyle(plotTheme, overrides = {}) {
   return {
     fixedrange: true,
-    tickfont: { color: plotTheme.muted },
+    tickfont: { color: plotTheme.muted, family: PLOT_MONO_FAMILY },
     ...overrides,
   }
 }

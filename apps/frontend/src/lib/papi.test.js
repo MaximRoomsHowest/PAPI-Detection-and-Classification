@@ -176,6 +176,36 @@ describe('scenarioFromBackendResult', () => {
     expect(s.artifactType).toBe('image')
   })
 
+  it('uses authoritative backend tracking transitions and suppresses raw flicker flips', () => {
+    const rawTransitions = [
+      { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 2, method: 'tracking' },
+      { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 3, method: 'tracking' },
+    ]
+    const result = makeResult({
+      media_type: 'video',
+      transition_method: 'tracking',
+      transitions: rawTransitions,
+      angle_track: [
+        { frame_index: 1, elevation_angle_deg: 2.1, lamps: [{ index: 1, state: 'red', confidence: 0.9 }] },
+        { frame_index: 2, elevation_angle_deg: 2.2, lamps: [{ index: 1, state: 'white', confidence: 0.9 }] },
+        { frame_index: 3, elevation_angle_deg: 2.3, lamps: [{ index: 1, state: 'red', confidence: 0.9 }] },
+        { frame_index: 4, elevation_angle_deg: 2.4, lamps: [{ index: 1, state: 'red', confidence: 0.9 }] },
+        { frame_index: 5, elevation_angle_deg: 2.5, lamps: [{ index: 1, state: 'white', confidence: 0.9 }] },
+      ],
+    })
+
+    expect(scenarioFromBackendResult(result, context).transitions).toEqual([])
+  })
+
+  it('keeps valid backend-authored model transitions', () => {
+    const transitions = [
+      { lamp_index: 2, from_state: 'red', to_state: 'white', frame_index: 7, method: 'model' },
+    ]
+    const result = makeResult({ transition_method: 'model', transitions, angle_track: [] })
+
+    expect(scenarioFromBackendResult(result, context).transitions).toEqual(transitions)
+  })
+
   it('preserves per-frame backend series for video and folder-sequence charts', () => {
     const perFrame = [
       { frame_index: 0, global_state: 'transition', confidence: 0.8 },
@@ -198,7 +228,17 @@ describe('scenarioFromVideoFrameResult', () => {
       confidence: 0.5,
       per_frame: [
         { frame_index: 0, state: 'far_too_low', confidence: 0.4 },
-        { frame_index: 1, state: 'correct_glidepath', confidence: 0.8 },
+        {
+          frame_index: 1,
+          state: 'correct_glidepath',
+          confidence: 0.8,
+          lamps: [
+            { index: 1, state: 'red', confidence: 0.91 },
+            { index: 2, state: 'red', confidence: 0.81 },
+            { index: 3, state: 'white', confidence: 0.71 },
+            { index: 4, state: 'white', confidence: 0.61 },
+          ],
+        },
         { frame_index: 2, state: 'far_too_high', confidence: 0.7 },
       ],
       angle_track: [
@@ -206,10 +246,10 @@ describe('scenarioFromVideoFrameResult', () => {
           frame_index: 1,
           elevation_angle_deg: 3.125,
           lamps: [
-            { index: 1, state: 'red', confidence: 0.9 },
-            { index: 2, state: 'red', confidence: 0.8 },
-            { index: 3, state: 'white', confidence: 0.7 },
-            { index: 4, state: 'white', confidence: 0.6 },
+            { index: 1, state: 'white', confidence: 0.9 },
+            { index: 2, state: 'white', confidence: 0.8 },
+            { index: 3, state: 'red', confidence: 0.7 },
+            { index: 4, state: 'red', confidence: 0.6 },
           ],
         },
       ],

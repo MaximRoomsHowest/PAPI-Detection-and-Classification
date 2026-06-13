@@ -1,17 +1,40 @@
-import { Radar } from 'lucide-react'
+import { Play, Radar } from 'lucide-react'
 import clsx from 'clsx'
 import { LampCard } from '../LampCard'
 import { InlineMetric } from '../InlineMetric'
 import { formatDistanceM, formatDurationMs } from '../../lib/format'
 import { useLiveDemo } from '../../context/liveDemoContext'
 
+function formatVideoTime(seconds) {
+  const whole = Math.max(0, Math.floor(seconds))
+  const minutes = String(Math.floor(whole / 60)).padStart(2, '0')
+  return `${minutes}:${String(whole % 60).padStart(2, '0')}`
+}
+
 // The analysis result aside: state summary, per-lamp cards, the detection/latency
 // metrics, the PAPI elevation-angle readout (with provenance + plausibility), and
 // any red<->white transitions. Falls back to the empty prompt until a backend
 // analysis has produced a result. Reads the active scenario/state from context.
 export function ResultPanel({ copy }) {
-  const { activeScenario, activeState, runways, selectedRunwayId, backendScenario, isAnalyzing } =
-    useLiveDemo()
+  const {
+    activeScenario,
+    activeState,
+    runways,
+    selectedRunwayId,
+    backendScenario,
+    isAnalyzing,
+    requestFrameSeek,
+    videoDurationS,
+  } = useLiveDemo()
+
+  // Transition timestamps are clickable only while a measurable <video> is on
+  // the stage; the frame->seconds mapping mirrors the stage's own seek math
+  // (sampled frame index over total sampled frames, scaled to duration).
+  const seekFrameCount =
+    activeScenario?.perFrame?.length || activeScenario?.rawResult?.angle_track?.length || 0
+  const canSeekVideo = Boolean(videoDurationS) && seekFrameCount > 1
+  const frameToSeconds = (frame) =>
+    (Math.min(Math.max(frame, 0), seekFrameCount - 1) / seekFrameCount) * videoDurationS
 
   // The Live Demo shows real backend output only. Until an analysis has run the
   // result panel stays empty rather than displaying a canned "demo" preset.
@@ -217,28 +240,49 @@ export function ResultPanel({ copy }) {
                 {activeScenario.transitions.length}
               </small>
               <ul>
-                {activeScenario.transitions.map((event, index) => (
-                  <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
-                    {`${copy.live.light} ${event.lamp_index}: `}
-                    {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
-                    {/* The flip's viewing angle is the actual evidence (which set
-                        angle the lamp crossed) — show it whenever the backend
-                        resolved one. The frame alone would be cryptic; angles are
-                        what the PAPI verification workflow reasons in. */}
-                    {event.elevation_angle_deg != null && (
-                      <span className="transition-readout__angle tnum">
-                        {` · ${Number(event.elevation_angle_deg).toFixed(2)}°`}
+                {activeScenario.transitions.map((event, index) => {
+                  const seconds = canSeekVideo ? frameToSeconds(event.frame_index) : null
+                  const timeLabel = seconds != null ? formatVideoTime(seconds) : null
+                  return (
+                    <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
+                      <span className="transition-readout__event">
+                        {`${copy.live.light} ${event.lamp_index}: `}
+                        {`${copy.status?.[event.from_state] ?? event.from_state} → ${copy.status?.[event.to_state] ?? event.to_state}`}
+                        {/* The flip's viewing angle is the actual evidence (which set
+                            angle the lamp crossed) — show it whenever the backend
+                            resolved one. The frame alone would be cryptic; angles are
+                            what the PAPI verification workflow reasons in. */}
+                        {event.elevation_angle_deg != null && (
+                          <span className="transition-readout__angle tnum">
+                            {` · ${Number(event.elevation_angle_deg).toFixed(2)}°`}
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </li>
-                ))}
+                      {/* Clickable timestamp: seeks (and pauses) the stage video at
+                          this flip so the evidence can be eyeballed immediately. */}
+                      {timeLabel && (
+                        <button
+                          type="button"
+                          className="transition-readout__jump mono"
+                          onClick={() => requestFrameSeek(event.frame_index)}
+                          aria-label={copy.live.seekTransition.replace('{time}', timeLabel)}
+                        >
+                          <Play size={10} aria-hidden="true" />
+                          {timeLabel}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}
         </>
       ) : (
         <div className="analysis-empty">
-          <Radar size={28} />
+          <span className="empty-state__icon">
+            <Radar size={26} aria-hidden="true" />
+          </span>
           <p>{copy.live.emptyState}</p>
         </div>
       )}

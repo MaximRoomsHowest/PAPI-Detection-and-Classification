@@ -13,14 +13,16 @@
    into animations.css + responsive.css below, kept in their original cascade
    order so nothing moved relative to the rules it affects.) */
 @import './styles/history.css';
-/* Global @keyframes (pulse/spin/cue-bounce), referenced from base/live-demo/intro.
+/* Global @keyframes (pulse/spin), referenced from base/live-demo/intro.
    @keyframes resolve by name, so this slice's position in the cascade is immaterial. */
 @import './styles/animations.css';
 /* Every @media block: the reduce-motion resets + all max-width breakpoints.
    Imported after the base/page partials it overrides and BEFORE runways.css, so the
-   responsive overrides and the .runway-delete > .ghost-button precedence both hold. */
+   responsive overrides hold and the same-element .runway-delete modifier (equal in
+   specificity to the shared .ghost-button base) wins by being imported later. */
 @import './styles/responsive.css';
 /* Runways page styles — imported after the responsive partial so the page's own
-   button modifier (.runway-delete) wins over the shared .ghost-button base. */
+   button modifier (.runway-delete, on the same element as .ghost-button) wins over
+   the shared base by source order. */
 @import './styles/runways.css';
 @import './styles/misc.css';

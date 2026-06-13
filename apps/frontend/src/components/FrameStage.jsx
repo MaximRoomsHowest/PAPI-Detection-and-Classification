@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ChevronLeft,
@@ -105,6 +105,8 @@ export function FrameStage({
   canRestart,
   restarting,
   artifactWarning,
+  videoSeek,
+  onVideoDuration,
   copy,
 }) {
   const [isDragActive, setIsDragActive] = useState(false)
@@ -176,6 +178,38 @@ export function FrameStage({
     const clamped = Math.min(Math.max(index, 0), timelineFrameCount - 1)
     video.currentTime = (clamped / timelineFrameCount) * video.duration
   }
+
+  // Seek requests arriving from outside the stage (the transition list in the
+  // result panel). Pause first — a click on a transition means "show me that
+  // moment", not "resume playback from there" — then let onSeeked's
+  // syncVideoFrame pull the frame index (and so the whole result panel) along.
+  useEffect(() => {
+    if (!videoSeek) return
+    const video = videoRef.current
+    if (!video || !timelineFrameCount || !Number.isFinite(video.duration) || video.duration <= 0) {
+      return
+    }
+    video.pause()
+    const clamped = Math.min(Math.max(videoSeek.frame, 0), timelineFrameCount - 1)
+    video.currentTime = (clamped / timelineFrameCount) * video.duration
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    video.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' })
+    // timelineFrameCount is derived state that is stable for a given analysis;
+    // the request nonce is the real trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoSeek])
+
+  // The jump buttons must only render while an actual <video> is mounted and
+  // measurable — report its duration up, and retract the offer when the stage
+  // shows anything else.
+  useEffect(() => {
+    if (!canControlVideo) {
+      onVideoDuration?.(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canControlVideo])
 
   const selectFrame = (index) => {
     seekVideoToFrame(index)
@@ -365,7 +399,10 @@ export function FrameStage({
             onPause={() => setIsPaused(true)}
             onTimeUpdate={syncVideoFrame}
             onSeeked={syncVideoFrame}
-            onLoadedMetadata={syncVideoFrame}
+            onLoadedMetadata={(event) => {
+              onVideoDuration?.(event.currentTarget.duration)
+              syncVideoFrame()
+            }}
           />
         ) : displayMedia?.type === 'image' ? (
           <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />

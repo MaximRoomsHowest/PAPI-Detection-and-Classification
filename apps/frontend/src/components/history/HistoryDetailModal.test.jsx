@@ -120,6 +120,45 @@ describe('HistoryDetailModal', () => {
     )
   })
 
+  it('stabilizes noisy tracking transitions for persisted video logs', () => {
+    const videoLog = {
+      ...baseLog,
+      media_type: 'video',
+      frame_count: 60,
+      transition_method: 'tracking',
+      angle_track: [
+        { frame_index: 26, elevation_angle_deg: 2.32, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 27, elevation_angle_deg: 2.37, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 28, elevation_angle_deg: 2.41, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 29, elevation_angle_deg: 2.46, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 30, elevation_angle_deg: 2.52, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 31, elevation_angle_deg: 2.57, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 32, elevation_angle_deg: 2.61, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 33, elevation_angle_deg: 2.66, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 47, elevation_angle_deg: 3.34, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 48, elevation_angle_deg: 3.39, lamps: [{ index: 1, state: 'red' }] },
+        { frame_index: 49, elevation_angle_deg: 3.45, lamps: [{ index: 1, state: 'white' }] },
+        { frame_index: 50, elevation_angle_deg: 3.48, lamps: [{ index: 1, state: 'white' }] },
+      ],
+      transitions: [
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 28 },
+        { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 29 },
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 32 },
+        { lamp_index: 1, from_state: 'white', to_state: 'red', frame_index: 48 },
+        { lamp_index: 1, from_state: 'red', to_state: 'white', frame_index: 49 },
+      ],
+    }
+
+    const { container } = render(<HistoryDetailModal {...makeProps({ selectedLog: videoLog })} />)
+    const transitions = container.querySelector('.history-transitions').textContent
+
+    expect(transitions).toContain(`${copy.history.frames.toLowerCase()} 32`)
+    expect(transitions).not.toContain(`${copy.history.frames.toLowerCase()} 28`)
+    expect(transitions).not.toContain(`${copy.history.frames.toLowerCase()} 29`)
+    expect(transitions).not.toContain(`${copy.history.frames.toLowerCase()} 48`)
+    expect(transitions).not.toContain(`${copy.history.frames.toLowerCase()} 49`)
+  })
+
   it('hides the optional sections when the log has no such data', () => {
     const { container } = render(<HistoryDetailModal {...makeProps()} />)
     expect(container.querySelector('.history-transitions')).toBeNull()

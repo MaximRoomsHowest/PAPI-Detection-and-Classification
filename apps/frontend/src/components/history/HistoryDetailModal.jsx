@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { History as HistoryIcon, X } from 'lucide-react'
 import { formatAngle, percent } from '../../lib/format'
+import { transitionEventsForResult } from '../../lib/insightsTransforms'
 import { runwayDisplayName } from '../../lib/runwaySelection'
 import { globalStateLabel, lampStateLabel } from '../../lib/stateLabels'
 
@@ -33,6 +34,7 @@ export function HistoryDetailModal({
   copy,
 }) {
   const detections = selectedLog?.detections ?? []
+  const transitions = transitionEventsForResult(selectedLog)
 
   return (
     <div className="history-modal-backdrop">
@@ -238,7 +240,7 @@ export function HistoryDetailModal({
             analysis, persisted in the payload but previously invisible here
             (integration audit 2026-06-11). Mirrors the Live Demo readout:
             localized lamp colours + which method produced the events. */}
-        {selectedLog.transitions?.length > 0 && (
+        {transitions.length > 0 && (
           <div className="history-transitions">
             <span>{copy.live.transitionsHeading}</span>
             {selectedLog.transition_method && (
@@ -252,7 +254,7 @@ export function HistoryDetailModal({
               </small>
             )}
             <ul>
-              {selectedLog.transitions.map((event, index) => (
+              {transitions.map((event, index) => (
                 <li key={`${event.lamp_index}-${event.frame_index}-${index}`}>
                   {`${copy.live.light} ${event.lamp_index}: `}
                   {`${lampStateLabel(event.from_state, copy)} → ${lampStateLabel(event.to_state, copy)}`}

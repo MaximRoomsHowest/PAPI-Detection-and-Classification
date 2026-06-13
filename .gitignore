@@ -158,3 +158,6 @@ graphify-out/
 AGENTS.md
 CLAUDE.md
 .graphifyignore
+
+# Playwright / browser-automation run artifacts (generated, transient).
+output/

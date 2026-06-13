@@ -10,10 +10,9 @@ const STATE_NUM = { obscured: -1, red: 0, transition: 1, white: 2 }
 
 // FAA-standard set angles for a 3.0 deg glideslope — DISPLAY REFERENCE ONLY.
 // EDNY's commissioned per-lamp values are still unconfirmed (the comparison the
-// summary strip calls "pending"), and the image lamp order is known to flip with
-// the approach direction, so charts must compare these SORTED-to-SORTED, never
-// slot-by-slot. Mirrors faa_default_set_angles_deg in the backend's state.py /
-// configs/papi_edny.yaml.
+// summary strip calls "pending"), so charts compare these SORTED-to-SORTED,
+// never slot-by-slot. Mirrors faa_default_set_angles_deg in the backend's
+// state.py / configs/papi_edny.yaml.
 export const FAA_DEFAULT_SET_ANGLES_DEG = [2.5, 2.83, 3.17, 3.5]
 
 // --- Angle vs. light state ---------------------------------------------------
@@ -157,21 +156,169 @@ export function angleVsStateSeries(results) {
 
 // --- Transitions -------------------------------------------------------------
 
+const TRANSITION_MAX_FRAME_GAP = 2
+
+function denoiseFrameStates(points) {
+  if (points.length < 3) {
+    return points
+  }
+  return points.map((point, i) => {
+    if (i === 0 || i === points.length - 1) {
+      return point
+    }
+    const prev = points[i - 1]
+    const next = points[i + 1]
+    const isOneFrameBlip =
+      point.state !== prev.state &&
+      prev.state === next.state &&
+      point.frame_index - prev.frame_index > 0 &&
+      point.frame_index - prev.frame_index <= TRANSITION_MAX_FRAME_GAP &&
+      next.frame_index - point.frame_index > 0 &&
+      next.frame_index - point.frame_index <= TRANSITION_MAX_FRAME_GAP
+    return isOneFrameBlip ? { ...point, state: prev.state } : point
+  })
+}
+
+function isColourTransition(event) {
+  return (
+    event &&
+    (event.from_state === 'red' || event.from_state === 'white') &&
+    (event.to_state === 'red' || event.to_state === 'white') &&
+    event.from_state !== event.to_state &&
+    Number.isInteger(event.lamp_index) &&
+    Number.isFinite(event.frame_index)
+  )
+}
+
+function suppressReversalBlips(events) {
+  const grouped = new Map()
+  for (const event of events) {
+    if (!grouped.has(event.lamp_index)) {
+      grouped.set(event.lamp_index, [])
+    }
+    grouped.get(event.lamp_index).push(event)
+  }
+
+  const stable = []
+  for (const group of grouped.values()) {
+    const kept = []
+    for (const event of group.toSorted((a, b) => a.frame_index - b.frame_index)) {
+      const previous = kept[kept.length - 1]
+      const isImmediateReversal =
+        previous &&
+        event.frame_index - previous.frame_index > 0 &&
+        event.frame_index - previous.frame_index <= TRANSITION_MAX_FRAME_GAP &&
+        previous.from_state === event.to_state &&
+        previous.to_state === event.from_state
+      if (isImmediateReversal) {
+        kept.pop()
+      } else {
+        kept.push(event)
+      }
+    }
+    stable.push(...kept)
+  }
+  return stable.toSorted((a, b) => a.frame_index - b.frame_index || a.lamp_index - b.lamp_index)
+}
+
+function stableBackendTrackingEvents(result) {
+  if (!Array.isArray(result?.transitions) || result.transition_method === 'model') {
+    return null
+  }
+  const events = result.transitions
+    .filter(isColourTransition)
+    .map((event) => ({ ...event, method: event.method ?? 'tracking' }))
+  return suppressReversalBlips(events)
+}
+
+function stableTrackingEventsFromAngleTrack(result) {
+  const track = result?.angle_track
+  if (!Array.isArray(track) || track.length === 0 || result?.transition_method === 'model') {
+    return null
+  }
+
+  const events = []
+  for (let lampIndex = 1; lampIndex <= 4; lampIndex += 1) {
+    const points = denoiseFrameStates(
+      track
+        .map((sample) => {
+          const lamp = (sample?.lamps ?? []).find((entry) => entry.index === lampIndex)
+          if (!lamp || (lamp.state !== 'red' && lamp.state !== 'white')) {
+            return null
+          }
+          return {
+            frame_index: sample.frame_index,
+            elevation_angle_deg: sample.elevation_angle_deg,
+            state: lamp.state,
+          }
+        })
+        .filter((point) => point && Number.isFinite(point.frame_index))
+        .sort((a, b) => a.frame_index - b.frame_index),
+    )
+
+    const first = points[0]
+    const last = points[points.length - 1]
+    if (!first || !last || first.state === last.state) {
+      continue
+    }
+
+    const lastOppositeIndex = points.findLastIndex((point) => point.state !== last.state)
+    const current = points[lastOppositeIndex + 1]
+    const previous = points[lastOppositeIndex]
+    if (!previous || !current) {
+      continue
+    }
+    const gap = current.frame_index - previous.frame_index
+    if (gap > 0 && gap <= TRANSITION_MAX_FRAME_GAP && previous.state !== current.state) {
+      events.push({
+        lamp_index: lampIndex,
+        from_state: previous.state,
+        to_state: current.state,
+        frame_index: current.frame_index,
+        elevation_angle_deg: Number.isFinite(current.elevation_angle_deg) ? current.elevation_angle_deg : null,
+        method: 'tracking',
+      })
+    }
+  }
+  events.sort((a, b) => a.frame_index - b.frame_index || a.lamp_index - b.lamp_index)
+  return events
+}
+
+export function transitionEventsForResult(result) {
+  if (result?.transition_method === 'model') {
+    return (result?.transitions ?? []).filter(isColourTransition)
+  }
+  const backendEvents = stableBackendTrackingEvents(result)
+  if (backendEvents !== null) {
+    return backendEvents
+  }
+  return stableTrackingEventsFromAngleTrack(result) ?? []
+}
+
+export function stableTransitionEvents(results) {
+  return (results ?? []).flatMap((result) => transitionEventsForResult(result))
+}
+
+function hasBackendTransitionAuthority(result) {
+  return result?.transition_method === 'model' || Array.isArray(result?.transitions)
+}
+
 // The headline PAPI-verification numbers, one entry per light:
-//   settledAngle — the lamp's detected red<->white crossing angle (the SAME value
-//                  the redness charts draw as a dashed line; single source of truth
-//                  via angleVsStateSeries/detectTransitionAngle), null if the lamp
-//                  never crossed in this session;
-//   bandMin/bandMax — the blend zone: lowest/highest angle at which the tracker
-//                  logged ANY flip for this lamp (real lamps flicker through a
-//                  small angular band rather than switching at one exact angle);
-//   flips        — how many raw red<->white switches the tracker logged (the old
-//                  "transitions per light" count, now a detail, not a chart).
+//   settledAngle — the lamp's stabilized red<->white crossing angle when a
+//                  transition event provides one; otherwise the angle-vs-state
+//                  midpoint fallback. This keeps the chart marker aligned with
+//                  the visible event table for tracked videos.
+//   bandMin/bandMax — the stabilized event zone: lowest/highest angle at which
+//                  the tracker logged a sustained flip for this lamp;
+//   flips        — how many stabilized red<->white switches the tracker logged
+//                  after one-frame blip suppression.
 export function transitionAngleSummary(results) {
+  const list = results ?? []
   const states = angleVsStateSeries(results)
-  const bands = [1, 2, 3, 4].map(() => ({ flips: 0, bandMin: null, bandMax: null }))
-  for (const result of results ?? []) {
-    for (const event of result?.transitions ?? []) {
+  const fallbackStates = angleVsStateSeries(list.filter((result) => !hasBackendTransitionAuthority(result)))
+  const bands = [1, 2, 3, 4].map(() => ({ flips: 0, bandMin: null, bandMax: null, eventAngles: [] }))
+  for (const result of list) {
+    for (const event of transitionEventsForResult(result)) {
       const index = event.lamp_index
       if (!(index >= 1 && index <= 4)) {
         continue
@@ -180,18 +327,26 @@ export function transitionAngleSummary(results) {
       entry.flips += 1
       const angle = event.elevation_angle_deg
       if (Number.isFinite(angle)) {
+        entry.eventAngles.push(angle)
         entry.bandMin = entry.bandMin === null ? angle : Math.min(entry.bandMin, angle)
         entry.bandMax = entry.bandMax === null ? angle : Math.max(entry.bandMax, angle)
       }
     }
   }
-  return states.map((lamp, i) => ({
-    lampIndex: lamp.lampIndex,
-    settledAngle: Number.isFinite(lamp.transitionAngle) ? lamp.transitionAngle : null,
-    bandMin: bands[i].bandMin,
-    bandMax: bands[i].bandMax,
-    flips: bands[i].flips,
-  }))
+  return states.map((lamp, i) => {
+    const eventAngles = bands[i].eventAngles
+    const eventAngle = eventAngles.length === 1 ? eventAngles[0] : null
+    const fallbackAngle = fallbackStates[i]?.transitionAngle
+    return {
+      lampIndex: lamp.lampIndex,
+      settledAngle: Number.isFinite(eventAngle)
+        ? eventAngle
+        : Number.isFinite(fallbackAngle) ? fallbackAngle : null,
+      bandMin: bands[i].bandMin,
+      bandMax: bands[i].bandMax,
+      flips: bands[i].flips,
+    }
+  })
 }
 
 export function transitionFlickerStatus(flipCount) {
@@ -224,12 +379,12 @@ export function transitionCsv(results, source = {}) {
   const rows = []
   for (const result of results ?? []) {
     const counts = new Map()
-    for (const event of result?.transitions ?? []) {
+    for (const event of transitionEventsForResult(result)) {
       if (Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= 4) {
         counts.set(event.lamp_index, (counts.get(event.lamp_index) ?? 0) + 1)
       }
     }
-    for (const event of result?.transitions ?? []) {
+    for (const event of transitionEventsForResult(result)) {
       if (!Number.isInteger(event?.lamp_index) || event.lamp_index < 1 || event.lamp_index > 4) {
         continue
       }
@@ -267,19 +422,27 @@ const STATE_BAND_CODE = Object.fromEntries(STATE_BAND_CODES.map((state, code) =>
 export function stateBandSeries(results) {
   const blocks = []
   for (const result of results ?? []) {
+    const perFrame = Array.isArray(result?.per_frame) ? result.per_frame.filter((sample) => Array.isArray(sample?.lamps)) : []
     const track = result?.angle_track
-    if (!Array.isArray(track) || track.length === 0) {
+    const source = perFrame.length > 0 ? perFrame : track
+    if (!Array.isArray(source) || source.length === 0) {
       continue
     }
+    const angleByFrame = new Map(
+      (Array.isArray(track) ? track : [])
+        .filter((sample) => Number.isFinite(sample?.frame_index))
+        .map((sample) => [sample.frame_index, sample.elevation_angle_deg]),
+    )
     const frames = []
     const angles = []
     const z = [[], [], [], []]
-    for (const sample of track) {
+    for (const sample of source) {
       if (!Number.isFinite(sample?.frame_index)) {
         continue
       }
       frames.push(sample.frame_index)
-      angles.push(Number.isFinite(sample?.elevation_angle_deg) ? sample.elevation_angle_deg : null)
+      const angle = sample.elevation_angle_deg ?? angleByFrame.get(sample.frame_index)
+      angles.push(Number.isFinite(angle) ? angle : null)
       for (let lampIndex = 1; lampIndex <= 4; lampIndex += 1) {
         const lamp = (sample.lamps ?? []).find((entry) => entry.index === lampIndex)
         z[lampIndex - 1].push(STATE_BAND_CODE[lamp?.state] ?? STATE_BAND_CODE.unknown)
@@ -302,14 +465,30 @@ export function stateBandSeries(results) {
 const emptyStateBucket = () => ({ white: 0, red: 0, transition: 0, obscured: 0, unknown: 0 })
 
 // Per-light state counts across the session. A result that carries a per-frame
-// angle_track is counted PER FRAME (the honest mix for a sweep — the old
+  // per_frame is counted PER FRAME when present (the honest mix for a sweep — the old
 // aggregate-only counting showed "100% red" for a video whose lamps spent 40%
 // of frames white, because the aggregate verdict is one majority state per
-// lamp). A lamp slot absent from a frame's detections counts as 'unknown'.
-// Results without a track keep the aggregate lamps[] counting.
+  // lamp). A lamp slot absent from a frame's detections counts as 'unknown'.
+  // Older results without per_frame can still fall back to angle_track; results
+  // without either frame series keep the aggregate lamps[] counting.
 export function perLightStateSeries(results) {
   const counts = [1, 2, 3, 4].map(emptyStateBucket)
   for (const result of results ?? []) {
+    const perFrame = Array.isArray(result?.per_frame) ? result.per_frame.filter((sample) => Array.isArray(sample?.lamps)) : []
+    if (perFrame.length > 0) {
+      for (const sample of perFrame) {
+        for (let lampIndex = 1; lampIndex <= 4; lampIndex += 1) {
+          const lamp = (sample?.lamps ?? []).find((entry) => entry.index === lampIndex)
+          const bucket = counts[lampIndex - 1]
+          if (lamp === undefined) {
+            bucket.unknown += 1
+          } else if (bucket[lamp.state] !== undefined) {
+            bucket[lamp.state] += 1
+          }
+        }
+      }
+      continue
+    }
     const track = result?.angle_track
     if (Array.isArray(track) && track.length > 0) {
       for (const sample of track) {
@@ -395,8 +574,19 @@ export function elevationOverFrameSeries(results) {
 export function summarizeSession(results) {
   const list = results ?? []
   const states = angleVsStateSeries(list)
+  const fallbackStates = angleVsStateSeries(list.filter((result) => !hasBackendTransitionAuthority(result)))
   const lampsDetected = states.filter((lamp) => lamp.points.length > 0).length
-  const lampsCrossed = states.filter((lamp) => Number.isFinite(lamp.transitionAngle)).length
+  const crossedLampIndices = new Set(
+    stableTransitionEvents(list)
+      .filter((event) => Number.isInteger(event?.lamp_index) && event.lamp_index >= 1 && event.lamp_index <= 4)
+      .map((event) => event.lamp_index),
+  )
+  for (const lamp of fallbackStates) {
+    if (Number.isFinite(lamp.transitionAngle)) {
+      crossedLampIndices.add(lamp.lampIndex)
+    }
+  }
+  const lampsCrossed = crossedLampIndices.size
 
   const angles = []
   let frameCount = 0

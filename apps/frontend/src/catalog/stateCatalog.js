@@ -66,3 +66,17 @@ export const backendStateId = {
   transition: 'transition',
   unknown: 'unknown',
 }
+
+// The four-lamp red/white pattern each global state shows, lowest-angle lamp
+// first — what a pilot reads. Used to draw a PapiGlyph from a backend verdict
+// (History rows) so the lamp picture is scannable without re-deriving it. A
+// climbing aircraft turns the low-angle lamps white first, so white fills from
+// the left; transition / unknown have no fixed picture and render as housings.
+export const stateLampPattern = {
+  far_too_low: ['red', 'red', 'red', 'red'],
+  too_low: ['white', 'red', 'red', 'red'],
+  correct_glidepath: ['white', 'white', 'red', 'red'],
+  too_high: ['white', 'white', 'white', 'red'],
+  far_too_high: ['white', 'white', 'white', 'white'],
+  transition: ['white', 'transition', 'red', 'red'],
+}

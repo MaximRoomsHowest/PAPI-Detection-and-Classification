@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { formatAngle, formatTimestamp, percent } from '../../lib/format'
 import { runwayDisplayName } from '../../lib/runwaySelection'
 import { globalStateLabel } from '../../lib/stateLabels'
+import { stateLampPattern } from '../../catalog/stateCatalog'
+import { PapiGlyph } from '../PapiGlyph'
 
 // The analyses table (with its loading/empty states + the horizontal-scroll cue)
 // and the pagination controls. Presentational — the parent owns the logs/paging
@@ -77,8 +79,13 @@ export function HistoryTable({
                       {runwayDisplayName(log.runway_id, runways)}
                     </td>
                     <td data-label={copy.history.state}>
-                      <span className={clsx('state-pill', `state-pill-${log.global_state}`)}>
-                        {globalStateLabel(log.global_state, copy)}
+                      <span className="history-state">
+                        {stateLampPattern[log.global_state] && (
+                          <PapiGlyph size="sm" states={stateLampPattern[log.global_state]} />
+                        )}
+                        <span className={clsx('state-pill', `state-pill-${log.global_state}`)}>
+                          {globalStateLabel(log.global_state, copy)}
+                        </span>
                       </span>
                     </td>
                     <td data-label={copy.history.confidence} className="tnum">{percent(log.confidence)}%</td>
