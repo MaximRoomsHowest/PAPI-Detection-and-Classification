@@ -2,6 +2,7 @@ import { act, createRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../../i18n/translations.js'
+import { globalStateLabel } from '../../lib/stateLabels.js'
 import { HistoryDetailModal } from './HistoryDetailModal.jsx'
 
 const copy = translations.en
@@ -118,6 +119,65 @@ describe('HistoryDetailModal', () => {
     expect(transitions.textContent).toContain(
       `${copy.live.light} 2: ${copy.status.red} → ${copy.status.white}`,
     )
+  })
+
+  it('summarizes video logs from every persisted frame', () => {
+    const videoLog = {
+      ...baseLog,
+      media_type: 'video',
+      frame_count: 3,
+      global_state: 'far_too_high',
+      confidence: 0.5,
+      per_frame: [
+        {
+          frame_index: 0,
+          state: 'far_too_low',
+          confidence: 0.8,
+          lamps: [
+            { index: 1, state: 'red', confidence: 0.8 },
+            { index: 2, state: 'red', confidence: 0.8 },
+          ],
+        },
+        {
+          frame_index: 1,
+          state: 'correct_glidepath',
+          confidence: 0.9,
+          lamps: [
+            { index: 1, state: 'white', confidence: 0.9 },
+            { index: 2, state: 'red', confidence: 0.9 },
+          ],
+        },
+        {
+          frame_index: 2,
+          state: 'correct_glidepath',
+          confidence: 0.7,
+          lamps: [
+            { index: 1, state: 'white', confidence: 0.7 },
+            { index: 2, state: 'red', confidence: 0.7 },
+          ],
+        },
+      ],
+    }
+
+    const { container } = render(<HistoryDetailModal {...makeProps({ selectedLog: videoLog })} />)
+    const summary = container.querySelector('.history-video-summary')
+
+    expect(summary).not.toBeNull()
+    expect(summary.textContent).toContain(copy.insights.perLightStateTitle)
+    expect(summary.textContent).toContain(copy.live.historyTitle)
+    expect(summary.textContent).toContain('80%')
+    expect(summary.textContent).toContain('90%')
+    expect(summary.textContent).toContain('70%')
+    expect(summary.textContent).toContain(`${copy.live.light} 1`)
+    expect(summary.textContent).toContain(`L1 ${copy.status.red}`)
+    expect(summary.textContent).toContain(`L1 ${copy.status.white}`)
+    expect(container.querySelector('.history-detail-grid').textContent).toContain(
+      globalStateLabel('correct_glidepath', copy),
+    )
+    expect(container.querySelector('.history-detail-grid').textContent).toContain('80%')
+    // The raw detections table is still present, but labelled as the last stored
+    // detection frame so it is not mistaken for a whole-video summary.
+    expect(container.textContent).toContain(`${copy.history.detections} (${copy.history.frames.toLowerCase()} 2)`)
   })
 
   it('stabilizes noisy tracking transitions for persisted video logs', () => {

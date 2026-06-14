@@ -89,6 +89,19 @@ services:
       # transition_method: tracking | model.
       PAPI_TRANSITION_METHOD: ${PAPI_TRANSITION_METHOD:-tracking}
       PAPI_STORAGE_DIR: /storage
+      # Model-lifecycle writable stores (upload / datasets / training scratch). These
+      # live on dedicated named volumes (see backend.volumes) because ./models is
+      # mounted READ-ONLY — uploaded/trained weights and datasets must never touch the
+      # git-tracked serving tree.
+      PAPI_USER_MODELS_DIR: /user_models
+      PAPI_DATASETS_DIR: /datasets
+      PAPI_JOBS_DIR: /jobs
+      PAPI_MAX_MODEL_UPLOAD_MB: ${PAPI_MAX_MODEL_UPLOAD_MB:-500}
+      PAPI_MAX_DATASET_UPLOAD_MB: ${PAPI_MAX_DATASET_UPLOAD_MB:-500}
+      PAPI_MAX_DATASET_EXTRACT_MB: ${PAPI_MAX_DATASET_EXTRACT_MB:-4000}
+      # Training is offloaded ("prepare + run externally"): the app emits a dataset
+      # bundle + command the operator runs on their own GPU, then re-imports best.pt.
+      PAPI_TRAINING_ENABLED: ${PAPI_TRAINING_ENABLED:-true}
       PAPI_STORAGE_BACKEND: ${PAPI_STORAGE_BACKEND:-local}
       PAPI_BLOB_CONTAINER: ${PAPI_BLOB_CONTAINER:-papi-media}
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
@@ -171,6 +184,12 @@ services:
       # Uploaded originals + annotated exports persist across container
       # restarts in a named volume.
       - papi_backend_storage:/storage
+      # Model-lifecycle writable stores (NOT :ro). Uploaded/trained weights,
+      # training datasets, and job scratch live here, off the read-only ./models
+      # mount. Named volumes survive `docker compose down` (only `-v` wipes them).
+      - papi_user_models:/user_models
+      - papi_datasets:/datasets
+      - papi_jobs:/jobs
     # uvicorn waits for in-flight requests after SIGTERM, but compose SIGKILLs
     # after 10s by default — mid-flight 150s video analyses died on every
     # `compose restart`. Give them time to finish instead.
@@ -243,3 +262,6 @@ services:
 volumes:
   papi_postgres_data:
   papi_backend_storage:
+  papi_user_models:
+  papi_datasets:
+  papi_jobs:

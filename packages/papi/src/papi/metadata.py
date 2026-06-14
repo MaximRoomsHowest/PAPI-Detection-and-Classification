@@ -93,7 +93,7 @@ def _extract_exif(path: Path) -> dict[str, Any]:
     try:
         with Image.open(path) as img:
             exif = img._getexif() or {}
-    except Exception:
+    except (OSError, ValueError):
         return out
 
     def _exif(name: str) -> Any:

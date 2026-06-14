@@ -77,6 +77,14 @@ class ModelRegistryEntry:
     card_path: Path | None = None
     card: dict[str, Any] | None = None
     disabled_reason: str | None = None
+    # Operator-disabled (DB-backed registry): the entry stays listed (greyed out)
+    # but is never auto-selected or preloaded. Defaults False so every existing
+    # construction site (legacy/JSON loaders) keeps ``available == exists``.
+    disabled: bool = False
+    # Provenance + delete-protection, surfaced to the management UI. Defaults keep
+    # the JSON/legacy loaders (which build "builtin", non-protected entries) intact.
+    source: str = "builtin"
+    protected: bool = False
 
     @property
     def exists(self) -> bool:
@@ -84,7 +92,9 @@ class ModelRegistryEntry:
 
     @property
     def available(self) -> bool:
-        return self.exists
+        # A disabled entry is unavailable for inference even when its weights exist,
+        # so explicit selection is rejected and preload skips it.
+        return self.exists and not self.disabled
 
 
 @dataclass(frozen=True)
@@ -315,3 +325,121 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
             )
         resolved.append(entry)
     return ModelRegistry(default_model_id=default_model_id, entries=tuple(resolved))
+
+
+def registry_from_rows(rows: list[Any], settings: Settings) -> ModelRegistry:
+    """Build the in-memory frozen registry from ``model_registry`` table rows.
+
+    This is the mutable-registry counterpart to ``load_model_registry`` (which reads
+    the read-only JSON). Built-in rows store repo-relative paths resolved via
+    ``_resolve_registry_path``; uploaded/trained rows store absolute paths that the
+    same resolver passes through unchanged. A row's provenance/metrics are packed
+    into the entry ``card`` so ``_model_info_for_entry`` surfaces them unchanged.
+    """
+    entries: list[ModelRegistryEntry] = []
+    default_id = ""
+    for row in rows:
+        path = _resolve_registry_path(str(row.storage_path or ""), settings, settings.model_registry_path)
+        if path is None:
+            path = Path(str(row.storage_path or ""))
+        # The transition slot still honours PAPI_TRANSITION_MODEL_PATH so the compose
+        # mechanism for enabling the optional 3-class model keeps working.
+        if row.role == "transition" and settings.transition_model_path is not None:
+            path = settings.transition_model_path
+        card: dict[str, Any] = {
+            "model_id": row.id,
+            "training_run": row.training_run or row.id,
+            "base_weights": row.base_weights,
+            "split_evaluated": row.split_evaluated,
+        }
+        if isinstance(row.classes_json, dict):
+            card["classes"] = row.classes_json
+        if isinstance(row.val_metrics_json, dict):
+            card["val_metrics"] = row.val_metrics_json
+        card = _sanitize_card(card, str(row.id))
+        entries.append(
+            ModelRegistryEntry(
+                id=str(row.id),
+                label=str(row.label or row.id),
+                role=str(row.role or "detector"),
+                path=path,
+                class_count=int(row.class_count or 2),
+                default=bool(row.is_default),
+                description=row.description,
+                card=card,
+                disabled=bool(row.disabled),
+                disabled_reason=row.disabled_reason,
+                source=str(row.source or "builtin"),
+                protected=bool(row.protected),
+            )
+        )
+        if row.is_default:
+            default_id = str(row.id)
+    if not entries:
+        # No rows yet — fall back to the frozen JSON/legacy loader so the service
+        # still serves while the table is being seeded.
+        return load_model_registry(settings)
+    if not default_id or default_id not in {entry.id for entry in entries}:
+        default_id = entries[0].id
+        entries = [replace(entry, default=(entry.id == default_id)) for entry in entries]
+    return ModelRegistry(default_model_id=default_id, entries=tuple(entries))
+
+
+def resolve_weights_path(settings: Settings, model_id: str) -> Path:
+    """Resolve a registry id to its on-disk weights path (for background jobs).
+
+    Jobs load their OWN ``YOLO`` instance from this path — they never touch the
+    inference service's cache or lock. Raises ``KeyError`` for an unknown id and
+    ``FileNotFoundError`` when the weights are missing.
+    """
+    registry = build_registry_from_db(settings)
+    try:
+        entry = registry.get(model_id)
+    except KeyError as exc:
+        raise KeyError(f"Unknown model_id: {model_id}") from exc
+    if not entry.path.is_file():
+        raise FileNotFoundError(f"Weights for model '{model_id}' not found at {entry.path}.")
+    return entry.path
+
+
+def _can_use_process_registry_db(settings: Settings) -> bool:
+    """Return true when ``settings`` belongs to the process-global app context.
+
+    The database engine/sessionmaker are also process-global and are built from
+    ``get_settings()``. Direct ``Settings(...)`` instances are used heavily by
+    unit tests and tooling to point at temporary model registries; letting those
+    objects query the global database cross-contaminates otherwise isolated
+    registry fixtures with the developer's local model rows.
+    """
+    try:
+        from app.config import get_settings
+    except Exception:  # noqa: BLE001 - keep registry loading resilient at startup
+        return False
+    return settings is get_settings()
+
+
+def build_registry_from_db(settings: Settings) -> ModelRegistry:
+    """Load the registry from the database, falling back to the frozen JSON loader.
+
+    The fallback keeps the no-DB dev path and the very first boot (before seeding)
+    alive: an unreachable DB or an empty table both yield the legacy single-model
+    or JSON registry rather than an empty selector.
+    """
+    if not _can_use_process_registry_db(settings):
+        return load_model_registry(settings)
+    try:
+        from app.database import get_sessionmaker
+        from app.repositories.model_registry import ModelRegistryRepository
+
+        session = get_sessionmaker()()
+    except Exception:  # noqa: BLE001 - any DB wiring failure degrades to the JSON loader
+        return load_model_registry(settings)
+    try:
+        rows = ModelRegistryRepository(session).list_all()
+    except Exception:  # noqa: BLE001 - table missing / query error degrades to JSON
+        return load_model_registry(settings)
+    finally:
+        session.close()
+    if not rows:
+        return load_model_registry(settings)
+    return registry_from_rows(rows, settings)

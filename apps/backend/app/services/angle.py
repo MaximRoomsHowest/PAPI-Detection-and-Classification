@@ -251,7 +251,7 @@ def _ratio_to_float(value: Any) -> float | None:
                 return float(first.num) / float(first.den)
             return float(first)
         return float(value)
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort EXIF rational coercion; absent -> None
         return None
 
 
@@ -263,7 +263,7 @@ def _gps_to_degrees(value: Any) -> float | None:
             + float(minutes.num / minutes.den) / 60
             + float(seconds.num / seconds.den) / 3600
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort GPS DMS parse; malformed -> None
         return None
 
 
@@ -309,7 +309,7 @@ def _read_media_head(media_path: Path) -> bytes:
     try:
         with media_path.open("rb") as file:
             return file.read(262_144)
-    except Exception:
+    except Exception:  # noqa: BLE001 - bounded head read is best-effort; any error -> b""
         return b""
 
 
@@ -340,7 +340,7 @@ def _exif_pose(media_path: Path) -> tuple[float, float, float] | None:
     try:
         with media_path.open("rb") as file:
             tags = exifread.process_file(file, details=False)
-    except Exception:
+    except Exception:  # noqa: BLE001 - exifread parse is best-effort; any error -> None
         return None
 
     lat_ref = tags.get("GPS GPSLatitudeRef")

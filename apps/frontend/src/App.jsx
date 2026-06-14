@@ -19,6 +19,9 @@ import { LiveDemoPage } from './pages/LiveDemoPage'
 import { InsightsPage } from './pages/InsightsPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { RunwaysPage } from './pages/RunwaysPage'
+import { ModelsPage } from './pages/ModelsPage'
+import { DatasetsPage } from './pages/DatasetsPage'
+import { useAdminKey } from './hooks/useAdminKey'
 
 // Real minimal 404 (audit F01): replaces the old catch-all that silently
 // rendered Introduction. Copy comes from i18n; the only literal is the mono
@@ -69,6 +72,8 @@ function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [language, setLanguage] = useState(initialLanguage)
   const copy = translations[language]
+  // Admin mode reveals the model-management surface and carries the API key (if any).
+  const admin = useAdminKey()
 
   // Mirrors the index.css token sheet for the canvas/SVG world Plotly draws
   // into (CSS custom properties can't reach chart internals). Values must stay
@@ -131,6 +136,7 @@ function App() {
         onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
         language={language}
         onSelectLanguage={setLanguage}
+        admin={admin}
       />
 
       <main id="main-content">
@@ -153,6 +159,8 @@ function App() {
               <Route path="/runways" element={<RunwaysPage copy={copy} />} />
               <Route path="/insights" element={<InsightsPage copy={copy} plotTheme={plotTheme} />} />
               <Route path="/history" element={<HistoryPage copy={copy} />} />
+              <Route path="/models" element={<ModelsPage copy={copy} isAdmin={admin.isAdmin} />} />
+              <Route path="/datasets" element={<DatasetsPage copy={copy} isAdmin={admin.isAdmin} />} />
               <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
               <Route path="*" element={<NotFound copy={copy} />} />
             </Routes>

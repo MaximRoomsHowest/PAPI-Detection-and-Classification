@@ -1,7 +1,15 @@
 import clsx from 'clsx'
 import { History as HistoryIcon, X } from 'lucide-react'
 import { formatAngle, percent } from '../../lib/format'
-import { transitionEventsForResult } from '../../lib/insightsTransforms'
+import {
+  VIDEO_STATE_COLUMNS,
+  averageFrameConfidence,
+  dominantFrameState,
+  frameLampPattern,
+  videoFrameSamples,
+  videoResultSummary,
+} from '../../lib/historyVideoSummary'
+import { perLightStateSeries, transitionEventsForResult } from '../../lib/insightsTransforms'
 import { runwayDisplayName } from '../../lib/runwaySelection'
 import { globalStateLabel, lampStateLabel } from '../../lib/stateLabels'
 
@@ -35,6 +43,19 @@ export function HistoryDetailModal({
 }) {
   const detections = selectedLog?.detections ?? []
   const transitions = transitionEventsForResult(selectedLog)
+  const frameSamples = videoFrameSamples(selectedLog)
+  const hasVideoFrames = selectedLog?.media_type === 'video' && frameSamples.length > 0
+  const videoSummary = videoResultSummary(selectedLog)
+  const displayState = videoSummary?.globalState ?? selectedLog.global_state
+  const displayConfidence = videoSummary?.confidence ?? selectedLog.confidence
+  const displayFrameCount = videoSummary?.frameCount ?? selectedLog.frame_count
+  const perLightCounts = hasVideoFrames ? perLightStateSeries([selectedLog]) : []
+  const avgFrameConfidence = averageFrameConfidence(frameSamples)
+  const dominantState = dominantFrameState(frameSamples)
+  const detectionFrameLabel =
+    selectedLog?.media_type === 'video' && Number.isFinite(Number(displayFrameCount))
+      ? `${copy.history.detections} (${copy.history.frames.toLowerCase()} ${Math.max(0, Number(displayFrameCount) - 1)})`
+      : copy.history.detections
 
   return (
     <div className="history-modal-backdrop">
@@ -75,7 +96,7 @@ export function HistoryDetailModal({
         <div className="history-detail-grid">
           <div>
             <span>{copy.history.state}</span>
-            <strong>{globalStateLabel(selectedLog.global_state, copy) || '—'}</strong>
+            <strong>{globalStateLabel(displayState, copy) || '—'}</strong>
           </div>
           <div>
             <span>{copy.history.runway}</span>
@@ -85,7 +106,7 @@ export function HistoryDetailModal({
           </div>
           <div>
             <span>{copy.history.confidence}</span>
-            <strong className="tnum">{percent(selectedLog.confidence)}%</strong>
+            <strong className="tnum">{percent(displayConfidence)}%</strong>
           </div>
           <div>
             <span>{copy.history.angle}</span>
@@ -117,7 +138,7 @@ export function HistoryDetailModal({
               {selectedLog.media_type === 'video'
                 ? copy.history.mediaVideo
                 : copy.history.mediaImage}
-              {selectedLog.frame_count > 1 ? ` · ${selectedLog.frame_count}` : ''}
+              {displayFrameCount > 1 ? ` · ${displayFrameCount}` : ''}
             </strong>
           </div>
           {selectedLog.drone_id && (
@@ -158,6 +179,85 @@ export function HistoryDetailModal({
           </div>
         )}
 
+        {hasVideoFrames && (
+          <section className="history-video-summary">
+            <div className="history-video-summary__cards">
+              <div>
+                <span>{copy.history.frames}</span>
+                <strong className="tnum">{frameSamples.length}</strong>
+              </div>
+              <div>
+                <span>{copy.history.confidenceAvg}</span>
+                <strong className="tnum">
+                  {avgFrameConfidence == null ? '—' : `${percent(avgFrameConfidence)}%`}
+                </strong>
+              </div>
+              <div>
+                <span>{copy.history.state}</span>
+                <strong>{dominantState ? globalStateLabel(dominantState, copy) : '—'}</strong>
+              </div>
+              <div>
+                <span>{copy.live.transitionsHeading}</span>
+                <strong className="tnum">{transitions.length}</strong>
+              </div>
+            </div>
+
+            <div className="history-video-states">
+              <h4>{copy.insights.perLightStateTitle}</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">{copy.live.light}</th>
+                    {VIDEO_STATE_COLUMNS.map((state) => (
+                      <th scope="col" key={state}>
+                        {lampStateLabel(state, copy)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {perLightCounts.map((counts, index) => (
+                    <tr key={index + 1}>
+                      <th scope="row">{`${copy.live.light} ${index + 1}`}</th>
+                      {VIDEO_STATE_COLUMNS.map((state) => (
+                        <td className="tnum" key={state}>
+                          {counts[state] ?? 0}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="history-video-frames">
+              <h4>{copy.live.historyTitle}</h4>
+              <div className="history-video-frames__scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">{copy.history.frames}</th>
+                      <th scope="col">{copy.history.state}</th>
+                      <th scope="col">{copy.history.confidence}</th>
+                      <th scope="col">{copy.history.lamps}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {frameSamples.map((sample) => (
+                      <tr key={sample.frame_index}>
+                        <td className="tnum">{Number(sample.frame_index) + 1}</td>
+                        <td>{globalStateLabel(sample.state, copy)}</td>
+                        <td className="tnum">{percent(sample.confidence)}%</td>
+                        <td>{frameLampPattern(sample, copy)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
         <div className="history-modal-columns">
           <div>
             <h4>{copy.history.lamps}</h4>
@@ -178,7 +278,7 @@ export function HistoryDetailModal({
             </div>
           </div>
           <div>
-            <h4>{copy.history.detections}</h4>
+            <h4>{detectionFrameLabel}</h4>
             {/* Compact summary table for the common case; the full raw JSON
                 sits behind a "Show raw" toggle (audit F19). */}
             {detections.length === 0 ? (

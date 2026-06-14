@@ -6,6 +6,7 @@ import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../i18n/translations'
 import { useClickOutside } from '../hooks/useClickOutside'
 import { fetchHealth } from '../lib/api'
 import { PapiGlyph } from './PapiGlyph'
+import { AdminUnlock } from './AdminUnlock'
 
 // Aviation operations run on UTC, and every History timestamp ultimately keys
 // against backend (UTC) time — the clock cell makes that frame of reference
@@ -55,7 +56,7 @@ function useBackendStatus() {
 // The sticky application header: brand, primary nav, live util cells (UTC
 // clock + backend readiness) and the language / theme controls. Extracted from
 // App.jsx so the App component stays as the route shell.
-export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage }) {
+export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage, admin }) {
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
   const languageMenuRef = useRef(null)
   const languageTriggerRef = useRef(null)
@@ -130,6 +131,13 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
     { to: '/runways', label: copy.nav.runways },
     { to: '/insights', label: copy.nav.insights },
     { to: '/history', label: copy.nav.history },
+    // Management routes appear only in admin mode so the public demo stays clean.
+    ...(admin?.isAdmin
+      ? [
+          { to: '/models', label: copy.nav.models },
+          { to: '/datasets', label: copy.nav.datasets },
+        ]
+      : []),
   ]
 
   return (
@@ -233,6 +241,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage 
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
         </div>
+        {admin ? <AdminUnlock admin={admin} copy={copy} /> : null}
       </div>
     </header>
   )

@@ -57,7 +57,7 @@ def exif_pose(path: Path):
         alt_v = tags["GPS GPSAltitude"].values[0]
         alt = float(alt_v.num / alt_v.den)
         return lat, lon, alt
-    except Exception:
+    except (AttributeError, KeyError, IndexError, OSError, TypeError, ValueError, ZeroDivisionError):
         return None
 
 

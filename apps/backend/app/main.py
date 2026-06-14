@@ -22,7 +22,12 @@ from app.api.routes import require_api_key, router
 from app.config import get_settings
 from app.database import get_session, init_db
 from app.logging_config import RequestIdMiddleware, configure_logging
-from app.middleware import RateLimitMiddleware, RequestSizeLimitMiddleware, request_body_cap_bytes
+from app.middleware import (
+    RateLimitMiddleware,
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+    request_body_cap_bytes,
+)
 from app.services.inference import get_inference_service
 from app.services.storage import get_media_storage
 
@@ -47,15 +52,73 @@ def _allow_cors_credentials(origins: list[str]) -> bool:
     return not any("*" in origin for origin in origins)
 
 
+def _seed_model_registry() -> None:
+    """Copy the frozen models.json registry into the DB table on first boot.
+
+    Idempotent (no-op once the table has rows), so it never clobbers operator edits.
+    The committed serving model is flagged ``protected`` so promote/delete guards
+    work from the first request. Failures are logged, never fatal — the inference
+    service falls back to the frozen JSON registry when the table is empty.
+    """
+    try:
+        from app.database import get_sessionmaker
+        from app.repositories.model_registry import ModelRegistryRepository
+        from app.services.model_registry import load_model_registry
+
+        session = get_sessionmaker()()
+        try:
+            seeded = ModelRegistryRepository(session).seed_from_frozen(load_model_registry(settings))
+            if seeded:
+                logger.info("Seeded %d built-in model(s) into the registry table.", seeded)
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001 - seeding must never abort startup
+        logger.warning("Model registry seeding skipped: %s", exc)
+
+
+def _reconcile_orphaned_jobs() -> None:
+    """Mark jobs left ``running`` by a previous process as failed (no resume).
+
+    Job state is durable in the DB but the executor is in-memory, so a restart
+    orphans any in-flight job. Reconciling here keeps the UI honest instead of
+    showing a job that will never progress.
+    """
+    try:
+        from app.services.jobs import get_job_runner
+
+        reconciled = get_job_runner().reconcile_orphans()
+        if reconciled:
+            logger.info("Reconciled %d orphaned job(s) to failed after restart.", reconciled)
+    except Exception as exc:  # noqa: BLE001 - reconciliation must never abort startup
+        logger.warning("Job reconciliation skipped: %s", exc)
+
+
+def _reap_job_scratch() -> None:
+    """Reap stale background-job scratch (training bundles, stray eval dirs, temp
+    upload zips) so the jobs/storage volumes don't grow without bound. Best-effort."""
+    try:
+        from app.services.jobs.cleanup import reap_job_scratch
+
+        removed = reap_job_scratch(settings)
+        if removed:
+            logger.info("Reaped %d stale job-scratch item(s) at startup.", removed)
+    except Exception as exc:  # noqa: BLE001 - cleanup must never abort startup
+        logger.warning("Job-scratch reaping skipped: %s", exc)
+
+
 def _startup_warmup() -> None:
     """Blocking startup work, run in a thread so it doesn't stall the event loop.
 
-    ``init_db()`` creates the analysis_logs table; touching ``.model`` triggers the lazy
-    YOLO weight load; ``warmup()`` runs one dummy inference so a broken checkpoint fails
-    here, not in front of the jury on the first request. All failures are logged, never
-    fatal — a missing-weights local dev env can still serve /health and /api/runways.
+    ``init_db()`` creates the tables; seeding copies the built-in models into the
+    registry table; touching ``.model`` triggers the lazy YOLO weight load; ``warmup()``
+    runs one dummy inference so a broken checkpoint fails here, not in front of the jury
+    on the first request. All failures are logged, never fatal — a missing-weights local
+    dev env can still serve /health and /api/runways.
     """
     init_db()
+    _seed_model_registry()
+    _reconcile_orphaned_jobs()
+    _reap_job_scratch()
     # Azure Blob readiness is a hard dependency when configured: an unreachable
     # or misconfigured storage account should abort startup loudly instead of
     # failing on the first artifact write mid-demo. Runs here (worker thread)
@@ -117,7 +180,15 @@ async def lifespan(_app: FastAPI):
     # this finishes either way (audit CMT-1; compose HEALTHCHECK start-period covers it).
     await asyncio.get_running_loop().run_in_executor(None, _startup_warmup)
     yield
-    # Nothing to clean up on shutdown for now; placeholder for future use.
+    # Drain the background-job worker within the SIGTERM grace window so an in-flight
+    # evaluation/labeling job finishes and persists its terminal state, rather than
+    # being abandoned and only reconciled to 'failed' on the next startup.
+    try:
+        from app.services.jobs import get_job_runner
+
+        await asyncio.get_running_loop().run_in_executor(None, lambda: get_job_runner().shutdown(wait=True))
+    except Exception:  # noqa: BLE001 - shutdown drain is best-effort
+        logger.warning("JobRunner shutdown drain failed.", exc_info=True)
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -170,6 +241,11 @@ app.add_middleware(
         "Retry-After",
     ],
 )
+
+# Added last = outermost wrap, so baseline security headers land on every response
+# (incl. CORS/error responses) when the backend is reached directly without the
+# nginx proxy that otherwise sets them.
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(router)
 

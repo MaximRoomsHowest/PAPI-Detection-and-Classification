@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../i18n/translations.js'
+import { globalStateLabel } from '../lib/stateLabels.js'
 import { HistoryPage } from './HistoryPage.jsx'
 
 const mocks = vi.hoisted(() => ({
@@ -140,6 +141,34 @@ describe('HistoryPage', () => {
     const badge = container.querySelector('.history-partial-badge')
     expect(badge).not.toBeNull()
     expect(badge.textContent).toBe(copy.history.partialBadge)
+  })
+
+  it('renders video row headlines from every persisted frame when available', async () => {
+    mocks.fetchLogs.mockResolvedValue({
+      items: [
+        {
+          ...logItem,
+          media_type: 'video',
+          global_state: 'far_too_high',
+          confidence: 0.2,
+          frame_count: 1,
+          per_frame: [
+            { frame_index: 0, state: 'far_too_low', confidence: 0.8 },
+            { frame_index: 1, state: 'correct_glidepath', confidence: 0.9 },
+            { frame_index: 2, state: 'correct_glidepath', confidence: 0.7 },
+          ],
+        },
+      ],
+      total: 1,
+    })
+
+    const { container } = await mountPage()
+    const rowText = container.querySelector('tbody tr').textContent
+
+    expect(rowText).toContain(globalStateLabel('correct_glidepath', copy))
+    expect(rowText).toContain('80%')
+    expect(rowText).toContain('3')
+    expect(rowText).not.toContain('20%')
   })
 
   it('closes the detail modal and revokes its artifact when a filter changes', async () => {

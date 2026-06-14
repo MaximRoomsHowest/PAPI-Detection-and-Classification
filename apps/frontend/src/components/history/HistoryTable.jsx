@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
 import { formatAngle, formatTimestamp, percent } from '../../lib/format'
+import { videoResultSummary } from '../../lib/historyVideoSummary'
 import { runwayDisplayName } from '../../lib/runwaySelection'
 import { globalStateLabel } from '../../lib/stateLabels'
 import { stateLampPattern } from '../../catalog/stateCatalog'
@@ -57,83 +58,91 @@ export function HistoryTable({
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td data-label={copy.history.filename}>
-                      {/* aria-disabled, not the disabled attribute, while the detail is
-                          loading: disabling would drop focus to <body> BEFORE the modal
-                          opens, so useModalA11y would capture body as the "previously
-                          focused" element and restore focus there on close (same
-                          keep-focusable rationale as FE-8). The click guard lives in
-                          openLog. */}
-                      <button
-                        className="history-link"
-                        type="button"
-                        onClick={() => openLog(log.id)}
-                        aria-disabled={openingLogId === log.id}
-                      >
-                        {log.original_filename}
-                      </button>
-                    </td>
-                    <td data-label={copy.history.runway} title={log.runway_id}>
-                      {runwayDisplayName(log.runway_id, runways)}
-                    </td>
-                    <td data-label={copy.history.state}>
-                      <span className="history-state">
-                        {stateLampPattern[log.global_state] && (
-                          <PapiGlyph size="sm" states={stateLampPattern[log.global_state]} />
-                        )}
-                        <span className={clsx('state-pill', `state-pill-${log.global_state}`)}>
-                          {globalStateLabel(log.global_state, copy)}
-                        </span>
-                      </span>
-                    </td>
-                    <td data-label={copy.history.confidence} className="tnum">{percent(log.confidence)}%</td>
-                    <td data-label={copy.history.angle} className="history-col-secondary tnum">
-                      {/* Only the angle of a row whose metadata actually yielded a
-                          measurement is shown; "0.000°" for an unmeasured row would
-                          read as a real reading, so we render an em-dash instead —
-                          matching the Live Demo's "Angle unavailable" honesty. */}
-                      {log.angle_available && log.elevation_angle_deg != null
-                        ? formatAngle(log.elevation_angle_deg)
-                        : '—'}
-                    </td>
-                    <td data-label={copy.history.frames} className="history-col-secondary tnum">
-                      {log.frame_count}
-                      {/* Partial-result badge: the backend mirrors truncated_at_frame /
-                          decode_shortfall into the list payload so a capped or
-                          half-decoded analysis is visible without opening the row. */}
-                      {(log.truncated_at_frame != null || log.decode_shortfall != null) && (
-                        <span className="history-partial-badge" title={copy.history.partialBadgeHint}>
-                          {copy.history.partialBadge}
-                        </span>
-                      )}
-                    </td>
-                    <td data-label={copy.history.processing} className="history-col-secondary tnum">{log.processing_ms} ms</td>
-                    <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at, copy.locale)}</td>
-                    <td data-label={copy.history.artifact}>
-                      {log.artifact_url ? (
+                {logs.map((log) => {
+                  const videoSummary = videoResultSummary(log)
+                  const displayState = videoSummary?.globalState ?? log.global_state
+                  const displayConfidence = videoSummary?.confidence ?? log.confidence
+                  const displayFrameCount = videoSummary?.frameCount ?? log.frame_count
+                  return (
+                    <tr key={log.id}>
+                      <td data-label={copy.history.filename}>
+                        {/* aria-disabled, not the disabled attribute, while the detail is
+                            loading: disabling would drop focus to <body> BEFORE the modal
+                            opens, so useModalA11y would capture body as the "previously
+                            focused" element and restore focus there on close (same
+                            keep-focusable rationale as FE-8). The click guard lives in
+                            openLog. */}
                         <button
                           className="history-link"
                           type="button"
                           onClick={() => openLog(log.id)}
                           aria-disabled={openingLogId === log.id}
                         >
-                          {copy.history.view}
+                          {log.original_filename}
                         </button>
-                      ) : (
-                        copy.history.unavailable
-                      )}
-                    </td>
-                    <td data-label={copy.history.insights}>
-                      {/* Router Link, not a raw <a>: a hard navigation remounts the
-                          whole SPA and wipes the in-memory live-demo session. */}
-                      <Link className="history-link" to={`/insights?log=${encodeURIComponent(log.id)}`}>
-                        {copy.history.openInsights}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td data-label={copy.history.runway} title={log.runway_id}>
+                        {runwayDisplayName(log.runway_id, runways)}
+                      </td>
+                      <td data-label={copy.history.state}>
+                        <span className="history-state">
+                          {stateLampPattern[displayState] && (
+                            <PapiGlyph size="sm" states={stateLampPattern[displayState]} />
+                          )}
+                          <span className={clsx('state-pill', `state-pill-${displayState}`)}>
+                            {globalStateLabel(displayState, copy)}
+                          </span>
+                        </span>
+                      </td>
+                      <td data-label={copy.history.confidence} className="tnum">
+                        {percent(displayConfidence)}%
+                      </td>
+                      <td data-label={copy.history.angle} className="history-col-secondary tnum">
+                        {/* Only the angle of a row whose metadata actually yielded a
+                            measurement is shown; "0.000°" for an unmeasured row would
+                            read as a real reading, so we render an em-dash instead —
+                            matching the Live Demo's "Angle unavailable" honesty. */}
+                        {log.angle_available && log.elevation_angle_deg != null
+                          ? formatAngle(log.elevation_angle_deg)
+                          : '—'}
+                      </td>
+                      <td data-label={copy.history.frames} className="history-col-secondary tnum">
+                        {displayFrameCount}
+                        {/* Partial-result badge: the backend mirrors truncated_at_frame /
+                            decode_shortfall into the list payload so a capped or
+                            half-decoded analysis is visible without opening the row. */}
+                        {(log.truncated_at_frame != null || log.decode_shortfall != null) && (
+                          <span className="history-partial-badge" title={copy.history.partialBadgeHint}>
+                            {copy.history.partialBadge}
+                          </span>
+                        )}
+                      </td>
+                      <td data-label={copy.history.processing} className="history-col-secondary tnum">{log.processing_ms} ms</td>
+                      <td data-label={copy.history.created} className="tnum">{formatTimestamp(log.created_at, copy.locale)}</td>
+                      <td data-label={copy.history.artifact}>
+                        {log.artifact_url ? (
+                          <button
+                            className="history-link"
+                            type="button"
+                            onClick={() => openLog(log.id)}
+                            aria-disabled={openingLogId === log.id}
+                          >
+                            {copy.history.view}
+                          </button>
+                        ) : (
+                          copy.history.unavailable
+                        )}
+                      </td>
+                      <td data-label={copy.history.insights}>
+                        {/* Router Link, not a raw <a>: a hard navigation remounts the
+                            whole SPA and wipes the in-memory live-demo session. */}
+                        <Link className="history-link" to={`/insights?log=${encodeURIComponent(log.id)}`}>
+                          {copy.history.openInsights}
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             <p className="history-scroll-cue" aria-hidden="true">

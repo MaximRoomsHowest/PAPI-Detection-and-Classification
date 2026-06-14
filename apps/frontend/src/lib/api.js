@@ -1,7 +1,36 @@
 import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages'
 
 const API_BASE_URL = (import.meta.env.VITE_PAPI_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
-const API_KEY = import.meta.env.VITE_PAPI_API_KEY
+const ENV_API_KEY = import.meta.env.VITE_PAPI_API_KEY
+
+// localStorage slot for a RUNTIME admin key. A deployed read-only demo can keep
+// the management UI hidden until an operator pastes the key here; it is preferred
+// over the build-time VITE_PAPI_API_KEY so an operator can unlock without a rebuild.
+export const ADMIN_KEY_STORAGE = 'papi.adminKey'
+
+export function getApiKey() {
+  try {
+    const stored = window.localStorage.getItem(ADMIN_KEY_STORAGE)
+    if (stored) return stored
+  } catch {
+    /* localStorage unavailable (private mode/SSR) — fall back to the env key. */
+  }
+  return ENV_API_KEY || null
+}
+
+/** Store (or clear, when falsy) the runtime admin key. */
+export function setAdminKey(key) {
+  try {
+    if (key) window.localStorage.setItem(ADMIN_KEY_STORAGE, key)
+    else window.localStorage.removeItem(ADMIN_KEY_STORAGE)
+  } catch {
+    /* accept the loss for this session */
+  }
+}
+
+export function hasApiKeyConfigured() {
+  return Boolean(getApiKey())
+}
 
 // Upload + timeout guards (audit F-MAJ-8). Defaults are intentionally close
 // to the backend's own limits so users see a fast client-side error rather
@@ -37,8 +66,9 @@ const ANALYZE_TIMEOUT_MS = positiveNumberEnv(
 
 function buildHeaders(extra = {}) {
   const headers = { ...extra }
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY
+  const key = getApiKey()
+  if (key) {
+    headers['X-API-Key'] = key
   }
   return headers
 }
@@ -175,7 +205,7 @@ export function mediaUrl(path) {
  */
 export async function resolveMediaUrl(path, signal) {
   const url = mediaUrl(path)
-  if (!url || !API_KEY || url.startsWith('blob:')) {
+  if (!url || !getApiKey() || url.startsWith('blob:')) {
     return url
   }
 
@@ -527,4 +557,230 @@ export async function analyzeMedia(file, metadata, metadataFile, signal) {
   )
 
   return parseAnalysisResponse(response)
+}
+
+// --------------------------------------------------------------------------- //
+// Model lifecycle: upload / promote / disable / delete / evaluate            //
+// --------------------------------------------------------------------------- //
+
+/** Surface a backend error body (string or 422 list) as a readable message. */
+async function errorFrom(response, fallbackLabel) {
+  let detail = `${fallbackLabel} (${response.status})`
+  try {
+    const body = await response.json()
+    detail = detailToMessage(body.detail, detail)
+  } catch {
+    detail = response.statusText || detail
+  }
+  return new Error(detail)
+}
+
+/** Upload a .pt/.onnx model file. Long timeout: checkpoints can be hundreds of MB. */
+export async function uploadModel({ file, label, role = 'detector', description, makeDefault = false }) {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('label', label)
+  formData.append('role', role)
+  if (description) formData.append('description', description)
+  formData.append('make_default', makeDefault ? 'true' : 'false')
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/models`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
+  if (!response.ok) throw await errorFrom(response, 'Could not upload model')
+  return parseJsonBody(response, 'Model')
+}
+
+export async function promoteModel(modelId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/models/${encodeURIComponent(modelId)}/promote`, {
+    method: 'POST',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not promote model')
+  return parseJsonBody(response, 'Model')
+}
+
+export async function setModelDisabled(modelId, disabled) {
+  const action = disabled ? 'disable' : 'enable'
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/models/${encodeURIComponent(modelId)}/${action}`,
+    { method: 'POST', headers: buildHeaders() },
+  )
+  if (!response.ok) throw await errorFrom(response, `Could not ${action} model`)
+  return parseJsonBody(response, 'Model')
+}
+
+export async function deleteModel(modelId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/models/${encodeURIComponent(modelId)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not delete model')
+}
+
+export async function evaluateModel(modelId, { datasetId, split = 'test' }) {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/models/${encodeURIComponent(modelId)}/evaluate`,
+    {
+      method: 'POST',
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ dataset_id: datasetId, split }),
+    },
+  )
+  if (!response.ok) throw await errorFrom(response, 'Could not start evaluation')
+  return parseJsonBody(response, 'Job')
+}
+
+// --------------------------------------------------------------------------- //
+// Datasets + assisted labeling                                                //
+// --------------------------------------------------------------------------- //
+
+export async function fetchDatasets() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/datasets`, { headers: buildHeaders() })
+  if (!response.ok) throw new Error(`Could not load datasets (${response.status})`)
+  return parseJsonBody(response, 'Datasets')
+}
+
+export async function uploadDatasetBundle({ file, name }) {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('name', name)
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/datasets`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
+  if (!response.ok) throw await errorFrom(response, 'Could not upload dataset')
+  return parseJsonBody(response, 'Dataset')
+}
+
+export async function startAssistedLabeling({ files, name, modelId }) {
+  const formData = new FormData()
+  files.forEach((file) => formData.append('files', file, file.name))
+  formData.append('name', name)
+  formData.append('model_id', modelId)
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/datasets/assisted`,
+    { method: 'POST', headers: buildHeaders(), body: formData },
+    ANALYZE_TIMEOUT_MS,
+  )
+  if (!response.ok) throw await errorFrom(response, 'Could not start assisted labeling')
+  return parseJsonBody(response, 'Assisted labeling')
+}
+
+export async function fetchCandidates(datasetId) {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/datasets/${encodeURIComponent(datasetId)}/candidates`,
+    { headers: buildHeaders() },
+  )
+  if (!response.ok) throw new Error(`Could not load candidates (${response.status})`)
+  return parseJsonBody(response, 'Candidates')
+}
+
+export async function commitLabels(datasetId, images) {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/datasets/${encodeURIComponent(datasetId)}/commit`,
+    {
+      method: 'POST',
+      headers: buildHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ images }),
+    },
+  )
+  if (!response.ok) throw await errorFrom(response, 'Could not commit labels')
+  return parseJsonBody(response, 'Commit')
+}
+
+export async function deleteDataset(datasetId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/datasets/${encodeURIComponent(datasetId)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not delete dataset')
+}
+
+/**
+ * Fetch a staged dataset image as an object URL. The endpoint is api-key gated,
+ * so a bare <img src> would 401 when a key is configured — fetch + blob instead.
+ * Caller must revokeMediaUrl() the result.
+ */
+export async function fetchAuthedImageUrl(path, signal) {
+  const url = mediaUrl(path)
+  if (!url) return null
+  const response = await fetchWithTimeout(url, { headers: buildHeaders() }, REQUEST_TIMEOUT_MS, signal)
+  if (!response.ok) throw new Error(`Could not load image (${response.status})`)
+  const blob = await response.blob()
+  return URL.createObjectURL(blob)
+}
+
+// --------------------------------------------------------------------------- //
+// Training launchers                                                          //
+// --------------------------------------------------------------------------- //
+
+export async function prepareTraining({ datasetId, baseModelId, name, hyperparams }) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/training/prepare`, {
+    method: 'POST',
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      dataset_id: datasetId,
+      base_model_id: baseModelId || null,
+      name: name || null,
+      hyperparams,
+    }),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not prepare training')
+  return parseJsonBody(response, 'Training prepare')
+}
+
+/** Download a prepared training bundle (fetch + blob so X-API-Key is sent). */
+export async function downloadTrainingBundle(jobId, filename) {
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/api/training/${encodeURIComponent(jobId)}/bundle`,
+    { headers: buildHeaders() },
+    ANALYZE_TIMEOUT_MS,
+  )
+  if (!response.ok) throw await errorFrom(response, 'Could not download bundle')
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename || `papi-training-${jobId}.zip`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+// --------------------------------------------------------------------------- //
+// Jobs                                                                         //
+// --------------------------------------------------------------------------- //
+
+export async function fetchJobs(options = {}) {
+  const params = new URLSearchParams()
+  if (options.kind) params.set('kind', options.kind)
+  if (options.status) params.set('status', options.status)
+  if (options.limit != null) params.set('limit', String(options.limit))
+  const qs = params.toString()
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/jobs${qs ? `?${qs}` : ''}`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw new Error(`Could not load jobs (${response.status})`)
+  return parseJsonBody(response, 'Jobs')
+}
+
+export async function fetchJob(jobId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/jobs/${encodeURIComponent(jobId)}`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw new Error(`Could not load job (${response.status})`)
+  return parseJsonBody(response, 'Job')
+}
+
+export async function cancelJob(jobId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not cancel job')
+  return parseJsonBody(response, 'Job')
 }

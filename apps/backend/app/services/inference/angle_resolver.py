@@ -93,6 +93,36 @@ def angle_for_media(
     return angle_from_samples(samples, source, runway_id)
 
 
+def frame_angle_map(
+    drone_samples: list[DroneSample] | None,
+    runway_id: str,
+    frame_count: int | None,
+) -> dict[int, float]:
+    """Map each processed frame index to its PAPI-midpoint elevation angle.
+
+    Resamples the telemetry track onto ``frame_count`` frames and computes the
+    midpoint angle per frame, caching by (lat, lon, alt) because nearest-frame
+    resampling reuses the same fix across several frames. This is the single source
+    of truth for both the per-frame overlay banner (``sequence_runner``) and the
+    surfaced angle track (``build_angle_track``); each caller passes its own
+    ``frame_count`` (the overlay's mid-stream estimate vs. the actually-decoded
+    count), so the two maps intentionally key over their own frame range.
+    """
+    if not drone_samples or len(drone_samples) < 2 or not frame_count or frame_count <= 0:
+        return {}
+    cache: dict[tuple[float, float, float], float | None] = {}
+    frame_angles: dict[int, float] = {}
+    for frame_index, sample in enumerate(resample_to_frames(drone_samples, frame_count)):
+        key = (sample.latitude, sample.longitude, sample.altitude_m)
+        if key not in cache:
+            cache[key] = compute_elevation_angles(
+                sample.latitude, sample.longitude, sample.altitude_m, runway_id
+            ).elevation_angle_deg
+        if cache[key] is not None:
+            frame_angles[frame_index] = round(cache[key], 6)
+    return frame_angles
+
+
 def build_angle_track(
     drone_samples: list[DroneSample] | None,
     runway_id: str,
@@ -112,20 +142,7 @@ def build_angle_track(
     if not drone_samples or len(drone_samples) < 2 or frame_count <= 0:
         return [], {}
 
-    resampled = resample_to_frames(drone_samples, frame_count)
-    # Cache midpoint angle by (lat, lon, alt): nearest-frame resampling reuses the
-    # same fix across several frames, so this avoids recomputing identical angles.
-    cache: dict[tuple[float, float, float], float | None] = {}
-    frame_angles: dict[int, float] = {}
-    for frame_index, sample in enumerate(resampled):
-        key = (sample.latitude, sample.longitude, sample.altitude_m)
-        if key not in cache:
-            cache[key] = compute_elevation_angles(
-                sample.latitude, sample.longitude, sample.altitude_m, runway_id
-            ).elevation_angle_deg
-        angle_deg = cache[key]
-        if angle_deg is not None:
-            frame_angles[frame_index] = round(angle_deg, 6)
+    frame_angles = frame_angle_map(drone_samples, runway_id, frame_count)
 
     # Per-frame per-lamp colour by current image x-rank, so each angle sample
     # matches the visual convention: Light 1..4 from left to right.
@@ -155,7 +172,9 @@ def build_angle_track(
 
 def evenly_spaced(items: list[int], cap: int) -> list[int]:
     """Down-sample a sorted list to at most ``cap`` evenly-spaced entries (endpoints kept)."""
-    if cap <= 1 or len(items) <= cap:
+    if cap <= 0:
+        return []
+    if cap == 1 or len(items) <= cap:
         return items[:1] if cap == 1 else items
     step = (len(items) - 1) / (cap - 1)
     return [items[index] for index in sorted({round(i * step) for i in range(cap)})]

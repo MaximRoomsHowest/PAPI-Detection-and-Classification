@@ -48,9 +48,13 @@ def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] 
 # every original path, method, response_model and auth dependency intact.
 from app.api.routers import (  # noqa: E402 - must follow the definitions above
     analyze_router,
+    datasets_router,
+    jobs_router,
     logs_router,
     meta_router,
+    models_admin_router,
     stats_router,
+    training_router,
 )
 
 router = APIRouter()
@@ -58,3 +62,9 @@ router.include_router(analyze_router)
 router.include_router(logs_router)
 router.include_router(stats_router)
 router.include_router(meta_router)
+# Model-lifecycle routers (upload / evaluate / datasets / training / jobs). Every
+# endpoint they carry is api-key gated via Depends(require_api_key).
+router.include_router(models_admin_router)
+router.include_router(datasets_router)
+router.include_router(training_router)
+router.include_router(jobs_router)

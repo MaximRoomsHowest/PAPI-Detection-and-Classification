@@ -39,7 +39,7 @@ def lamp_redness(frame: Any, x1: int, y1: int, x2: int, y2: int) -> float | None
         if total <= 0:
             return None
         return round(255.0 * red / total, 1)
-    except Exception:
+    except Exception:  # noqa: BLE001 - redness is a best-effort display metric; any error -> None
         return None
 
 

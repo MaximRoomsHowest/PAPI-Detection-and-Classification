@@ -71,7 +71,8 @@
 
   .history-summary-grid,
   .history-detail-grid,
-  .history-modal-columns {
+  .history-modal-columns,
+  .history-video-summary__cards {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -107,9 +108,9 @@
     /* Tighten padding + font + letter spacing so the five nav links fit a
        390 px (iPhone) viewport without horizontal clipping (regression
        USERTEST-MAJ-3, papi-user-test-2026-05-28). */
-    padding: 10px 12px;
-    font-size: 12px;
-    letter-spacing: 0.2px;
+    padding: 10px 8px;
+    font-size: 11px;
+    letter-spacing: 0;
     /* A flex child may shrink below content size and ellipse mid-word; in a
        scrollable row each link must keep its intrinsic width instead. */
     flex-shrink: 0;
@@ -233,7 +234,8 @@
 
   .history-summary-grid,
   .history-detail-grid,
-  .history-modal-columns {
+  .history-modal-columns,
+  .history-video-summary__cards {
     grid-template-columns: 1fr;
   }
 

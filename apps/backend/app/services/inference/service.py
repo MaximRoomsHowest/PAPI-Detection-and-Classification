@@ -32,9 +32,9 @@ from app.services.model_registry import (
     REPO_ROOT,
     ModelRegistry,
     ModelRegistryEntry,
+    build_registry_from_db,
     compute_sha256,
     load_model_card,
-    load_model_registry,
 )
 from app.services.state import (
     bind_lamps_to_runway_display,
@@ -67,7 +67,11 @@ _LOCK_WAIT_WARN_S = 5.0
 class InferenceService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._registry: ModelRegistry = load_model_registry(settings)
+        # The registry is now DB-backed (mutable: uploads/promote/delete write rows).
+        # build_registry_from_db falls back to the frozen JSON/legacy loader when the
+        # DB is unreachable or the table is empty (fresh boot, no-DB dev), so startup
+        # never depends on the table already existing.
+        self._registry: ModelRegistry = build_registry_from_db(settings)
         self._models: dict[str, Any] = {}
         self._loaded_at: dict[str, str] = {}
         self._loaded_sha256: dict[str, str | None] = {}
@@ -129,6 +133,34 @@ class InferenceService:
                     drone_samples, transition_method, model_id,
                 )
             raise ValueError(f"Unsupported media type: {media_type}")
+
+    def reload_registry(self) -> None:
+        """Rebuild the registry from the DB and evict stale cached models.
+
+        Called after every registry mutation (upload / promote / delete / disable /
+        evaluation writeback). The new registry is built OUTSIDE the lock — it opens
+        its own short-lived DB session — and only the dict swap + cache eviction run
+        UNDER the lock, so an in-flight ``analyze()`` never observes a half-swapped
+        registry and the critical section costs microseconds (no YOLO load inside it).
+        Live inference simply queues briefly behind the swap on the same RLock.
+        """
+        new_registry = build_registry_from_db(self.settings)
+        with self._lock:
+            old_by_id = {entry.id: entry for entry in self._registry.entries}
+            new_by_id = {entry.id: entry for entry in new_registry.entries}
+            for model_id in list(self._models):
+                new_entry = new_by_id.get(model_id)
+                old_entry = old_by_id.get(model_id)
+                # Evict a cached model if its entry vanished, or if its resolved
+                # weights path changed (an id was re-uploaded with new weights).
+                # A still-valid cached model stays hot across the reload.
+                if new_entry is None or (
+                    old_entry is not None and str(new_entry.path) != str(old_entry.path)
+                ):
+                    self._models.pop(model_id, None)
+                    self._loaded_at.pop(model_id, None)
+                    self._loaded_sha256.pop(model_id, None)
+            self._registry = new_registry
 
     @property
     def is_loaded(self) -> bool:
@@ -338,8 +370,16 @@ class InferenceService:
         # Optional metadata must never take down model discovery: a non-numeric class
         # key or a wrong-typed val_metrics field degrades that one field to None
         # instead of 500ing /api/models and blanking the selector (audit REG-2).
+        # Snapshot the mutable load-state under the lock so the loaded / sha256 /
+        # loaded_at / live-class-names reads below form ONE consistent view, even if a
+        # concurrent reload_registry()/_load_model() mutates these dicts mid-method.
+        with self._lock:
+            loaded_model = self._models.get(entry.id)
+            loaded = entry.id in self._models
+            loaded_sha_at_load = self._loaded_sha256.get(entry.id)
+            loaded_at_value = self._loaded_at.get(entry.id)
+
         classes: dict[int, str] | None = None
-        loaded_model = self._models.get(entry.id)
         if loaded_model is not None:
             names = getattr(loaded_model, "names", None)
             if isinstance(names, dict):
@@ -363,12 +403,18 @@ class InferenceService:
         # When loaded, report the digest recorded AT LOAD TIME so it always describes
         # the in-memory model; a differing on-disk hash means an operator swapped the
         # checkpoint under the running service and a restart is pending (audit SHA-1).
-        loaded = entry.id in self._models
         disk_sha256 = compute_sha256(path)
-        sha256 = self._loaded_sha256.get(entry.id) if loaded else disk_sha256
+        sha256 = loaded_sha_at_load if loaded else disk_sha256
         weights_changed_on_disk = (
             disk_sha256 != sha256 if loaded and sha256 is not None else None
         )
+
+        if entry.available:
+            disabled_reason = None
+        elif entry.disabled:
+            disabled_reason = entry.disabled_reason or "Disabled by operator."
+        else:
+            disabled_reason = entry.disabled_reason or "Model file is missing."
 
         return ModelInfo(
             model_id=entry.id,
@@ -376,8 +422,12 @@ class InferenceService:
             model_role=entry.role,
             is_default=entry.default,
             available=entry.available,
-            disabled_reason=None if entry.available else entry.disabled_reason or "Model file is missing.",
+            disabled_reason=disabled_reason,
             description=entry.description,
+            source=entry.source,
+            protected=entry.protected,
+            disabled=entry.disabled,
+            class_count=entry.class_count,
             model_path=relative_path,
             model_filename=path.name,
             model_format=suffix,
@@ -395,7 +445,7 @@ class InferenceService:
             base_weights=card.get("base_weights"),
             dataset_split_evaluated=card.get("split_evaluated"),
             val_metrics=parsed_val_metrics,
-            loaded_at=self._loaded_at.get(entry.id),
+            loaded_at=loaded_at_value,
         )
 
     def model_info(self, model_id: str | None = None) -> ModelInfo:
@@ -403,6 +453,14 @@ class InferenceService:
             entry = self._registry.get(model_id)
         except KeyError as exc:
             raise ValueError(f"Unknown model_id: {str(model_id)[:120]}") from exc
+        return self._model_info_for_entry(entry)
+
+    def model_info_for_entry(self, entry: ModelRegistryEntry) -> ModelInfo:
+        """Build a ModelInfo for an entry that may not be in the live registry.
+
+        Public seam for the model-upload response fallback so it shares this one
+        ModelInfo construction instead of maintaining a divergent copy.
+        """
         return self._model_info_for_entry(entry)
 
     def model_options(self) -> list[ModelInfo]:

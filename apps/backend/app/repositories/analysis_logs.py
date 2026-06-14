@@ -1,4 +1,5 @@
 from datetime import datetime
+from math import isfinite
 
 from sqlalchemy import ColumnElement, desc, func, select
 from sqlalchemy.orm import Session
@@ -8,6 +9,16 @@ from app.models import AnalysisLog
 from app.services.media import media_url_for_path
 from app.services.storage import get_media_storage
 from app.validation.schemas import AnalysisPayload, InferenceStats, LogListItem
+
+_GLOBAL_STATES = {
+    "far_too_high",
+    "too_high",
+    "correct_glidepath",
+    "too_low",
+    "far_too_low",
+    "transition",
+    "unknown",
+}
 
 
 class AnalysisLogRepository:
@@ -167,6 +178,12 @@ class AnalysisLogRepository:
 
     def to_list_item(self, log: AnalysisLog) -> LogListItem:
         result = log.result_json if isinstance(log.result_json, dict) else {}
+        global_state, confidence, frame_count = _video_display_summary(
+            result,
+            fallback_state=log.global_state,
+            fallback_confidence=log.confidence,
+            fallback_frame_count=log.frame_count,
+        )
         return LogListItem(
             id=log.id,
             media_type=log.media_type,
@@ -178,11 +195,11 @@ class AnalysisLogRepository:
             model_id=log.model_id or result.get("model_id"),
             model_label=result.get("model_label"),
             model_role=result.get("model_role"),
-            global_state=log.global_state,
-            confidence=log.confidence,
+            global_state=global_state,
+            confidence=confidence,
             angle_available=log.angle_available,
             elevation_angle_deg=log.elevation_angle_deg,
-            frame_count=log.frame_count,
+            frame_count=frame_count,
             processing_ms=log.processing_ms,
             # Partial-result flags live only in result_json (no dedicated columns);
             # without them the list/CSV showed a half-decoded or cap-truncated
@@ -218,6 +235,51 @@ def _artifact_reference_from_url(artifact_url: str | None, settings) -> str | No
     except ValueError:
         return None
     return str(candidate)
+
+
+def _video_display_summary(
+    result: dict,
+    *,
+    fallback_state: str,
+    fallback_confidence: float,
+    fallback_frame_count: int,
+) -> tuple[str, float, int]:
+    """Derive list-row video headline fields from every persisted frame.
+
+    Legacy video rows can have column-level state/confidence copied from one
+    representative frame. The full result_json still carries per_frame, so use it
+    for display without fetching every detail payload.
+    """
+
+    if result.get("media_type") != "video":
+        return fallback_state, fallback_confidence, fallback_frame_count
+    raw_samples = result.get("per_frame")
+    if not isinstance(raw_samples, list):
+        return fallback_state, fallback_confidence, fallback_frame_count
+
+    samples = [sample for sample in raw_samples if isinstance(sample, dict)]
+    if not samples:
+        return fallback_state, fallback_confidence, fallback_frame_count
+
+    state_counts: dict[str, int] = {}
+    confidences: list[float] = []
+    for sample in samples:
+        state = sample.get("state")
+        if state in _GLOBAL_STATES:
+            state_counts[state] = state_counts.get(state, 0) + 1
+        confidence = sample.get("confidence")
+        if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+            value = float(confidence)
+            if isfinite(value):
+                confidences.append(value)
+
+    state = (
+        max(state_counts.items(), key=lambda item: item[1])[0]
+        if state_counts
+        else fallback_state
+    )
+    confidence = sum(confidences) / len(confidences) if confidences else fallback_confidence
+    return state, confidence, len(samples)
 
 
 def _percentile_nearest_rank(values: list[int], percentile: float) -> int | None:

@@ -31,6 +31,7 @@ from app.database import get_session
 from app.repositories import AnalysisLogRepository
 from app.services.media import detect_media_type, save_upload, validate_media_signature
 from app.services.telemetry import DroneSample, parse_telemetry
+from app.services.upload_limits import enforce_upload_collection_limits, upload_size_bytes
 from app.validation.analyze import parse_manual_drone_metadata
 from app.validation.schemas import AnalysisPayload, FrameBatchPayload
 
@@ -125,35 +126,8 @@ def read_metadata_samples(metadata_file: UploadFile | None) -> list[DroneSample]
 
 
 def _upload_size_bytes(upload: UploadFile) -> int:
-    """Return the spooled upload size without changing the caller's read position."""
-    try:
-        position = upload.file.tell()
-        upload.file.seek(0, 2)
-        size = upload.file.tell()
-    except (AttributeError, OSError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="Could not inspect uploaded file size.") from exc
-    finally:
-        try:
-            upload.file.seek(position)
-        except (NameError, AttributeError, OSError, ValueError):
-            pass
-    return size
-
-
-def _enforce_batch_upload_budget(files: list[UploadFile], settings) -> None:
-    max_bytes = settings.max_batch_upload_mb * 1024 * 1024
-    total = 0
-    for upload in files:
-        total += _upload_size_bytes(upload)
-        if total > max_bytes:
-            raise HTTPException(
-                status_code=413,
-                detail=(
-                    f"Folder uploads are limited to {settings.max_batch_upload_mb} MB "
-                    f"total per request. Split the folder and retry, or raise "
-                    f"PAPI_MAX_BATCH_UPLOAD_MB on the server."
-                ),
-            )
+    """Backward-compatible test seam for the shared upload-size helper."""
+    return upload_size_bytes(upload)
 
 
 def _validate_batch_upload(files: list[UploadFile], *, what: str):
@@ -164,19 +138,8 @@ def _validate_batch_upload(files: list[UploadFile], *, what: str):
     the byte-budget guard. ``what`` names the upload in the 413 message ("Folder
     uploads" / "Image sequences").
     """
-    if not files:
-        raise HTTPException(status_code=400, detail="Upload at least one image file.")
     settings = routes.get_settings()
-    if len(files) > settings.max_batch_frames:
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                f"{what} are limited to {settings.max_batch_frames} frames per "
-                f"request. Got {len(files)}. Split the folder and retry, or raise "
-                f"PAPI_MAX_BATCH_FRAMES on the server."
-            ),
-        )
-    _enforce_batch_upload_budget(files, settings)
+    enforce_upload_collection_limits(files, settings, what=what, count_unit="frames")
     return settings
 
 

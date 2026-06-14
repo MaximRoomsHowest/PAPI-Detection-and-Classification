@@ -56,7 +56,11 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W", "UP", "B"]
+# BLE (flake8-blind-except) makes the project's many `# noqa: BLE001` directives
+# meaningful and flags any NEW `except Exception` that swallows instead of re-raising,
+# so a future blind catch can't silently hide a bug. Deliberate best-effort guards
+# carry a justified `# noqa: BLE001`.
+select = ["E", "F", "I", "W", "UP", "B", "BLE"]
 ignore = ["E501"]  # line-length handled by formatter; allow exceptions
 
 [tool.ruff.lint.per-file-ignores]

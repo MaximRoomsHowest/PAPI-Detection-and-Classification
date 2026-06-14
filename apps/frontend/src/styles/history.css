@@ -455,6 +455,118 @@
   object-fit: contain;
 }
 
+.history-video-summary {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.history-video-summary__cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-video-summary__cards > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 11px 12px;
+  background: var(--surface-muted);
+}
+
+.history-video-summary__cards span {
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.history-video-summary__cards strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.history-video-states,
+.history-video-frames {
+  display: grid;
+  gap: 8px;
+}
+
+.history-video-states {
+  overflow-x: auto;
+}
+
+.history-video-states h4,
+.history-video-frames h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.history-video-states table,
+.history-video-frames table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.history-video-states table {
+  min-width: 560px;
+}
+
+.history-video-states th,
+.history-video-states td,
+.history-video-frames th,
+.history-video-frames td {
+  border-bottom: 1px solid var(--border);
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.history-video-states thead th,
+.history-video-frames thead th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.history-video-states tbody tr:last-child th,
+.history-video-states tbody tr:last-child td,
+.history-video-frames tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.history-video-states td,
+.history-video-states thead th:not(:first-child),
+.history-video-frames td:nth-child(1),
+.history-video-frames td:nth-child(3) {
+  text-align: right;
+}
+
+.history-video-frames__scroll {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.history-video-frames__scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-muted);
+}
+
 .history-modal-columns {
   display: grid;
   grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1fr);

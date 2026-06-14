@@ -26,3 +26,5 @@
    the shared base by source order. */
 @import './styles/runways.css';
 @import './styles/misc.css';
+/* Model-lifecycle surface (Models + Datasets/Training pages, admin unlock). */
+@import './styles/lifecycle.css';

@@ -162,6 +162,34 @@ def test_to_list_item_surfaces_partial_result_flags_from_result_json(session):
     assert items["partial.mp4"].decode_shortfall == 30
 
 
+def test_to_list_item_summarizes_video_rows_from_every_persisted_frame(session):
+    """Legacy video rows can have stale column-level state/confidence from one
+    representative frame. The list item should display the per-frame video
+    summary stored in result_json."""
+    _add(
+        session,
+        media_type="video",
+        global_state="far_too_high",
+        confidence=0.2,
+        frame_count=1,
+        result_json={
+            "media_type": "video",
+            "per_frame": [
+                {"frame_index": 0, "state": "far_too_low", "confidence": 0.8},
+                {"frame_index": 1, "state": "correct_glidepath", "confidence": 0.9},
+                {"frame_index": 2, "state": "correct_glidepath", "confidence": 0.7},
+            ],
+        },
+    )
+    repo = AnalysisLogRepository(session)
+
+    item = repo.to_list_item(repo.list_recent(1, 0)[0])
+
+    assert item.global_state == "correct_glidepath"
+    assert item.confidence == pytest.approx(0.8)
+    assert item.frame_count == 3
+
+
 def test_to_list_item_falls_back_to_result_json_model_id_for_legacy_rows(session):
     """Rows written before the model_id column keep NULL there; the list view
     must still surface the id recorded in result_json (audit COL-1)."""

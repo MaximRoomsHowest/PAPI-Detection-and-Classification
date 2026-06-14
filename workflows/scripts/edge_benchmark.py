@@ -29,16 +29,18 @@ def git_sha() -> str:
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return "unknown"
 
 
 def rss_mb() -> float | None:
     try:
         import psutil
-
+    except ImportError:
+        return None
+    try:
         return round(psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024), 2)
-    except Exception:
+    except (OSError, psutil.Error):
         return None
 
 
@@ -135,7 +137,7 @@ def benchmark(
             "rss_mb_after_inference": rss_mb(),
         }
         return result
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - benchmark results should report any runtime/model failure as JSON
         return {
             **base,
             "frame_count": 0,

@@ -264,3 +264,38 @@ class RateLimitMiddleware:
             }
         )
         await send({"type": "http.response.body", "body": body, "more_body": False})
+
+
+class SecurityHeadersMiddleware:
+    """Add baseline security response headers for direct (non-nginx) access.
+
+    The compose nginx proxy sets nosniff / X-Frame-Options / CSP on every response,
+    but a direct ``uvicorn app.main:app`` run (README), the loopback :8000 port, or
+    a proxy-less deployment would otherwise ship none. This sets the cheap,
+    broadly-safe ones at the app layer so every topology is covered. CSP is left to
+    nginx (it needs page-specific tuning the API layer can't know). Pure-ASGI, same
+    shape as the other middlewares; ``setdefault``-style so it never clobbers a
+    header a proxy already set.
+    """
+
+    _HEADERS = (
+        (b"x-content-type-options", b"nosniff"),
+        (b"x-frame-options", b"SAMEORIGIN"),
+    )
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = message.setdefault("headers", [])
+                present = {name.lower() for name, _ in headers}
+                headers.extend((name, value) for name, value in self._HEADERS if name not in present)
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)

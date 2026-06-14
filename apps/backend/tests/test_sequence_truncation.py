@@ -81,7 +81,7 @@ def test_sequence_within_limit_is_not_marked_truncated(tmp_path):
     assert payload.truncated_at_frame is None
 
 
-def test_video_summary_lamps_use_last_visible_frame_not_majority_vote(tmp_path):
+def test_video_summary_lamps_use_sequence_majority_not_last_visible_frame(tmp_path):
     frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(3)]
     states = [0, 0, 1]
 
@@ -116,10 +116,10 @@ def test_video_summary_lamps_use_last_visible_frame_not_majority_vote(tmp_path):
         exports_dir=tmp_path,
     )
 
-    assert payload.lamps[0].state == "white"
+    assert payload.lamps[0].state == "red"
 
 
-def test_video_per_frame_and_final_lamps_preserve_missing_slot_gaps(tmp_path):
+def test_video_per_frame_preserves_missing_slot_gaps_while_summary_aggregates(tmp_path):
     frames = [np.zeros((8, 8, 3), dtype=np.uint8) for _ in range(3)]
     detections_by_frame = [
         [
@@ -172,7 +172,7 @@ def test_video_per_frame_and_final_lamps_preserve_missing_slot_gaps(tmp_path):
         "red",
         "red",
     ]
-    assert [lamp.state for lamp in payload.lamps] == ["obscured", "white", "red", "red"]
+    assert [lamp.state for lamp in payload.lamps] == ["red", "white", "red", "red"]
 
 
 def test_video_overlay_uses_gap_preserving_lamp_slots(tmp_path, monkeypatch):

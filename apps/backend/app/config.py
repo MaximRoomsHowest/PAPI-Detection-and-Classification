@@ -125,6 +125,34 @@ class Settings(BaseSettings):
         alias="PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE",
     )
 
+    # --- Model lifecycle: upload / evaluate / train (new feature set) ---
+    # Writable store for operator-uploaded and cloud-trained weights. Kept OUTSIDE
+    # the read-only models/ bind mount (compose mounts ./models:/models:ro) so the
+    # git-tracked serving tree stays pristine; in Docker this is a named volume.
+    user_models_dir: Path = Field(
+        default=BACKEND_ROOT / "storage" / "user_models", alias="PAPI_USER_MODELS_DIR"
+    )
+    # Uploaded / assisted-labelled training datasets (YOLO layout: images/, labels/,
+    # train.txt/val.txt/test.txt, data.yaml).
+    datasets_dir: Path = Field(default=BACKEND_ROOT / "storage" / "datasets", alias="PAPI_DATASETS_DIR")
+    # Scratch for background-job artifacts (training bundles, logs).
+    jobs_dir: Path = Field(default=BACKEND_ROOT / "storage" / "jobs", alias="PAPI_JOBS_DIR")
+    # Model weights are large (.pt checkpoints routinely exceed the 100 MB media cap),
+    # so model upload gets its own, higher ceiling.
+    max_model_upload_mb: int = Field(default=500, ge=1, le=20000, alias="PAPI_MAX_MODEL_UPLOAD_MB")
+    # Dataset bundle (zip) upload gets its OWN compressed-size ceiling (a dataset is a
+    # multi-image archive, not a single checkpoint), plus a cap on TOTAL DECOMPRESSED
+    # bytes so a zip bomb cannot exhaust the datasets volume during extraction (a small
+    # compressed zip can expand ~1000x).
+    max_dataset_upload_mb: int = Field(default=500, ge=1, le=20000, alias="PAPI_MAX_DATASET_UPLOAD_MB")
+    max_dataset_extract_mb: int = Field(default=4000, ge=1, le=200000, alias="PAPI_MAX_DATASET_EXTRACT_MB")
+    # Age after which terminal-job scratch (training bundles + stray eval run dirs)
+    # is reaped at startup so the jobs volume doesn't grow without bound. Operators
+    # download a prepared bundle within this window; raise it if they need longer.
+    job_scratch_ttl_hours: int = Field(default=168, ge=1, le=8760, alias="PAPI_JOB_SCRATCH_TTL_HOURS")
+    # Master switch so a CPU-only / locked-down deployment can hide training entirely.
+    training_enabled: bool = Field(default=True, alias="PAPI_TRAINING_ENABLED")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: Any) -> list[str]:
@@ -138,7 +166,14 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("model_path", "model_registry_path", "storage_dir")
+    @field_validator(
+        "model_path",
+        "model_registry_path",
+        "storage_dir",
+        "user_models_dir",
+        "datasets_dir",
+        "jobs_dir",
+    )
     @classmethod
     def resolve_backend_relative_path(cls, value: Path) -> Path:
         if value.is_absolute():
@@ -195,6 +230,9 @@ class Settings(BaseSettings):
         self.exports_dir.mkdir(parents=True, exist_ok=True)
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
         self.model_path.parent.mkdir(parents=True, exist_ok=True)
+        self.user_models_dir.mkdir(parents=True, exist_ok=True)
+        self.datasets_dir.mkdir(parents=True, exist_ok=True)
+        self.jobs_dir.mkdir(parents=True, exist_ok=True)
 
 
 @lru_cache

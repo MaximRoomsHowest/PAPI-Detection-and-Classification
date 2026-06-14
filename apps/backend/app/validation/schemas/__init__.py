@@ -20,6 +20,17 @@ from app.validation.schemas.common import (
     LampState,
     MediaType,
 )
+from app.validation.schemas.datasets import (
+    CandidateBox,
+    CandidateImage,
+    CandidatesResponse,
+    CommitBox,
+    CommitImage,
+    CommitRequest,
+    CommitResponse,
+    DatasetResponse,
+)
+from app.validation.schemas.jobs import JobResponse
 from app.validation.schemas.lamp import Detection, FrameLampState, LampResult
 from app.validation.schemas.log import LogListItem
 from app.validation.schemas.runway import (
@@ -33,6 +44,12 @@ from app.validation.schemas.system import (
     ModelInfo,
     SystemInfo,
     ValMetrics,
+)
+from app.validation.schemas.training import (
+    EvaluateRequest,
+    PrepareTrainingRequest,
+    PrepareTrainingResponse,
+    TrainHyperparams,
 )
 
 __all__ = [
@@ -66,4 +83,20 @@ __all__ = [
     "RunwayResponse",
     "RunwayLightInput",
     "RunwayCreate",
+    # jobs
+    "JobResponse",
+    # datasets
+    "DatasetResponse",
+    "CandidateBox",
+    "CandidateImage",
+    "CandidatesResponse",
+    "CommitBox",
+    "CommitImage",
+    "CommitRequest",
+    "CommitResponse",
+    # training
+    "TrainHyperparams",
+    "PrepareTrainingRequest",
+    "PrepareTrainingResponse",
+    "EvaluateRequest",
 ]

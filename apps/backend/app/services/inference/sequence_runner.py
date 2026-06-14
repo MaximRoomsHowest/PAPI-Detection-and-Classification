@@ -7,14 +7,14 @@ dependency one-way (leaf -> service). Everything else it needs (writer, overlay,
 angle track, state) is a stateless leaf import.
 """
 
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
-from app.services.angle import compute_elevation_angles
-from app.services.inference.angle_resolver import build_angle_track
+from app.services.inference.angle_resolver import build_angle_track, frame_angle_map
 from app.services.inference.overlay import draw_overlay
 from app.services.inference.video_writer import open_video_writer
 from app.services.state import (
@@ -25,11 +25,10 @@ from app.services.state import (
     detect_lamp_transitions,
     frame_ranked_lamp_observations,
     global_state_from_lamps,
-    infer_single_missing_lamp_from_angle,
     normalize_detections,
     transition_events_from_state_runs,
 )
-from app.services.telemetry import DroneSample, resample_to_frames
+from app.services.telemetry import DroneSample
 from app.validation.schemas import (
     AnalysisPayload,
     AngleResult,
@@ -45,30 +44,10 @@ def _frame_angles_from_samples(
     runway_id: str,
     frame_count: int | None,
 ) -> dict[int, float]:
-    if not drone_samples or len(drone_samples) < 2 or not frame_count or frame_count <= 0:
-        return {}
-
-    angles: dict[int, float] = {}
-    cache: dict[tuple[float, float, float], float | None] = {}
-    for frame_index, sample in enumerate(resample_to_frames(drone_samples, frame_count)):
-        key = (sample.latitude, sample.longitude, sample.altitude_m)
-        if key not in cache:
-            cache[key] = compute_elevation_angles(
-                sample.latitude,
-                sample.longitude,
-                sample.altitude_m,
-                runway_id,
-            ).elevation_angle_deg
-        if cache[key] is not None:
-            angles[frame_index] = round(cache[key], 6)
-    return angles
-
-
-def _angle_for_frame(angle: AngleResult, frame_angles: dict[int, float], frame_index: int) -> AngleResult:
-    frame_angle = frame_angles.get(frame_index)
-    if frame_angle is None:
-        return angle
-    return angle.model_copy(update={"elevation_angle_deg": frame_angle})
+    # Delegates to the shared angle-resolver helper so the per-frame elevation map is
+    # computed by ONE implementation. The overlay banner passes the mid-stream
+    # expected frame count here; build_angle_track passes the actually-decoded count.
+    return frame_angle_map(drone_samples, runway_id, frame_count)
 
 
 def _frame_lamp_states(lamps) -> list[FrameLampState]:
@@ -111,6 +90,45 @@ def _ranked_lamps_for_frame(
                 confidence=round(float(confidence), 4),
                 bbox=BoundingBox(**bbox) if isinstance(bbox, dict) else None,
                 redness=redness,
+            )
+        )
+    return lamps
+
+
+def _aggregate_ranked_lamps(ranked_observations: dict[int, list[tuple]]) -> list[LampResult]:
+    """Summarize a video by all observed frames, not only the final frame."""
+    lamps: list[LampResult] = []
+    for lamp_index in range(1, 5):
+        observations = ranked_observations.get(lamp_index, [])
+        if not observations:
+            lamps.append(LampResult(index=lamp_index, state="obscured", confidence=0.0))
+            continue
+
+        state = Counter(observation[1] for observation in observations).most_common(1)[0][0]
+        matching = [observation for observation in observations if observation[1] == state]
+        confidence = round(sum(float(observation[3]) for observation in matching) / len(matching), 4)
+        redness_values = [
+            float(observation[4])
+            for observation in matching
+            if len(observation) > 4 and observation[4] is not None
+        ]
+        bbox = next(
+            (
+                observation[5]
+                for observation in reversed(matching)
+                if len(observation) > 5 and isinstance(observation[5], dict)
+            ),
+            None,
+        )
+        lamps.append(
+            LampResult(
+                index=lamp_index,
+                state=state,
+                confidence=confidence,
+                bbox=BoundingBox(**bbox) if bbox else None,
+                redness=round(sum(redness_values) / len(redness_values), 4)
+                if redness_values
+                else None,
             )
         )
     return lamps
@@ -298,12 +316,9 @@ def run_tracked_sequence(
     raw_angle_track, frame_angles = build_angle_track(
         drone_samples, runway_id, frame_count, track_observations
     )
-    final_angle = _angle_for_frame(angle, frame_angles, frame_count - 1)
-    last_ranked_lamps = _ranked_lamps_for_frame(ranked_observations, frame_count - 1)
-    raw_final_lamps = infer_single_missing_lamp_from_angle(last_ranked_lamps, final_angle)
-    final_lamps = bind_lamps_to_runway_display(raw_final_lamps, runway_id)
-    global_state = global_state_from_lamps(final_lamps)
-    confidence = confidence_from_lamps(final_lamps)
+    aggregate_lamps = bind_lamps_to_runway_display(_aggregate_ranked_lamps(ranked_observations), runway_id)
+    global_state = global_state_from_lamps(aggregate_lamps)
+    confidence = confidence_from_lamps(aggregate_lamps)
     angle_track = [
         sample.model_copy(
             update={"lamps": bind_lamps_to_runway_display(sample.lamps, runway_id)}
@@ -329,7 +344,7 @@ def run_tracked_sequence(
         runway_id=runway_id,
         drone_id=drone_id,
         global_state=global_state,
-        lamps=final_lamps,
+        lamps=aggregate_lamps,
         confidence=confidence,
         frame_count=frame_count,
         truncated_at_frame=truncated_at_frame,

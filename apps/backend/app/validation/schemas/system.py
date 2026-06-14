@@ -31,6 +31,14 @@ class ModelInfo(BaseModel):
     available: bool = True
     disabled_reason: str | None = None
     description: str | None = None
+    # Lifecycle metadata for the management UI (DB-backed registry):
+    # source = builtin | uploaded | trained; protected = committed serving model
+    # (undeletable); disabled = operator-hidden but still listed; class_count is the
+    # registry-declared class count (frontend fallback when live class names absent).
+    source: str | None = None
+    protected: bool = False
+    disabled: bool = False
+    class_count: int | None = None
     model_path: str
     model_filename: str
     model_format: str
