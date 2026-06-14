@@ -81,6 +81,39 @@ def test_seed_is_idempotent_and_protects_serving_model(db):
     assert repo.get("transition").protected is False
 
 
+def test_reconcile_repairs_stale_builtin_paths_without_clobbering_operator_state(db):
+    from app.models.model_registry import ModelRegistryRow
+    from app.repositories.model_registry import ModelRegistryRepository
+
+    repo = ModelRegistryRepository(db)
+    repo.seed_from_frozen(_frozen_registry())
+    small = repo.get("small")
+    small.storage_path = "best.pt"
+    small.label = "Old small"
+    small.disabled = True
+    small.disabled_reason = "Operator disabled for comparison."
+    db.commit()
+    repo.insert(
+        ModelRegistryRow(
+            id="uploaded",
+            label="Up",
+            role="detector",
+            source="uploaded",
+            storage_path="/abs/up.pt",
+            class_count=2,
+        )
+    )
+    repo.set_default("uploaded")
+
+    assert repo.reconcile_builtins_from_frozen(_frozen_registry()) == 1
+    assert Path(repo.get("small").storage_path) == Path("models/serving/best.pt")
+    assert repo.get("small").label == "Small detector"
+    assert repo.get("small").disabled is True
+    assert repo.get("small").disabled_reason == "Operator disabled for comparison."
+    assert repo.get("uploaded").is_default is True
+    assert repo.get("uploaded").storage_path == "/abs/up.pt"
+
+
 def test_promote_swaps_default(db):
     from app.models.model_registry import ModelRegistryRow
     from app.repositories.model_registry import ModelRegistryRepository

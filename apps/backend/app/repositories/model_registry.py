@@ -26,6 +26,34 @@ class DefaultModelError(RuntimeError):
     first — surfaced as a 409."""
 
 
+def _row_kwargs_from_frozen_entry(entry, default_model_id: str, *, is_default: bool) -> dict[str, Any]:
+    card = entry.card or {}
+    classes = card.get("classes")
+    classes_json = classes if isinstance(classes, dict) else None
+    val_metrics = card.get("val_metrics") if isinstance(card.get("val_metrics"), dict) else None
+    protected = entry.id == default_model_id and entry.role != "transition"
+    return {
+        "id": entry.id,
+        "label": entry.label,
+        "role": entry.role,
+        "source": "builtin",
+        # Store the resolved frozen path. This also repairs old DB rows that were
+        # seeded with a bare "best.pt" and therefore made existing local DBs not-ready.
+        "storage_path": str(entry.path),
+        "class_count": entry.class_count,
+        "is_default": is_default,
+        "disabled": False,
+        "disabled_reason": entry.disabled_reason,
+        "protected": protected,
+        "description": entry.description,
+        "classes_json": classes_json,
+        "val_metrics_json": val_metrics,
+        "training_run": card.get("training_run"),
+        "base_weights": card.get("base_weights"),
+        "split_evaluated": card.get("split_evaluated"),
+    }
+
+
 class ModelRegistryRepository:
     def __init__(self, db: Session):
         self.db = db
@@ -127,35 +155,66 @@ class ModelRegistryRepository:
             return 0
         seeded = 0
         for entry in frozen.entries:
-            card = entry.card or {}
-            classes = card.get("classes")
-            classes_json = classes if isinstance(classes, dict) else None
-            val_metrics = card.get("val_metrics") if isinstance(card.get("val_metrics"), dict) else None
             is_default = entry.id == frozen.default_model_id
-            # The committed serving weights are the protected, undeletable anchor.
-            protected = is_default and entry.role != "transition"
             self.db.add(
                 ModelRegistryRow(
-                    id=entry.id,
-                    label=entry.label,
-                    role=entry.role,
-                    source="builtin",
-                    # Store the path as declared (repo-relative for built-ins); the
-                    # service resolves it through _resolve_registry_path on reload.
-                    storage_path=str(entry.path),
-                    class_count=entry.class_count,
-                    is_default=is_default,
-                    disabled=False,
-                    disabled_reason=entry.disabled_reason,
-                    protected=protected,
-                    description=entry.description,
-                    classes_json=classes_json,
-                    val_metrics_json=val_metrics,
-                    training_run=card.get("training_run"),
-                    base_weights=card.get("base_weights"),
-                    split_evaluated=card.get("split_evaluated"),
+                    **_row_kwargs_from_frozen_entry(
+                        entry,
+                        frozen.default_model_id,
+                        is_default=is_default,
+                    )
                 )
             )
             seeded += 1
         self.db.commit()
         return seeded
+
+    def reconcile_builtins_from_frozen(self, frozen) -> int:
+        """Repair existing built-in rows from the frozen registry without
+        clobbering operator-managed models or the current default selection.
+
+        This covers local/prod databases seeded by older code with incomplete
+        paths such as ``best.pt``. Uploaded/trained rows are ignored, and existing
+        disabled/default choices are preserved.
+        """
+        changed = 0
+        rows = {row.id: row for row in self.list_all()}
+        has_default = any(row.is_default for row in rows.values())
+        for entry in frozen.entries:
+            row = rows.get(entry.id)
+            is_default = not has_default and entry.id == frozen.default_model_id
+            values = _row_kwargs_from_frozen_entry(entry, frozen.default_model_id, is_default=is_default)
+            if row is None:
+                self.db.add(ModelRegistryRow(**values))
+                has_default = has_default or is_default
+                changed += 1
+                continue
+            if row.source not in (None, "", "builtin"):
+                continue
+            row_changed = False
+            for field in (
+                "label",
+                "role",
+                "source",
+                "storage_path",
+                "class_count",
+                "protected",
+                "description",
+                "classes_json",
+                "val_metrics_json",
+                "training_run",
+                "base_weights",
+                "split_evaluated",
+            ):
+                next_value = values[field]
+                if getattr(row, field) != next_value:
+                    setattr(row, field, next_value)
+                    row_changed = True
+            if not row.disabled and row.disabled_reason != values["disabled_reason"]:
+                row.disabled_reason = values["disabled_reason"]
+                row_changed = True
+            if row_changed:
+                changed += 1
+        if changed:
+            self.db.commit()
+        return changed

@@ -67,9 +67,14 @@ def _seed_model_registry() -> None:
 
         session = get_sessionmaker()()
         try:
-            seeded = ModelRegistryRepository(session).seed_from_frozen(load_model_registry(settings))
+            repo = ModelRegistryRepository(session)
+            frozen = load_model_registry(settings)
+            seeded = repo.seed_from_frozen(frozen)
+            reconciled = repo.reconcile_builtins_from_frozen(frozen)
             if seeded:
                 logger.info("Seeded %d built-in model(s) into the registry table.", seeded)
+            if reconciled:
+                logger.info("Reconciled %d built-in model registry row(s).", reconciled)
         finally:
             session.close()
     except Exception as exc:  # noqa: BLE001 - seeding must never abort startup
