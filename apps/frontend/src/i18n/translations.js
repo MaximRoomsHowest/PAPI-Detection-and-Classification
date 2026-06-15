@@ -42,6 +42,7 @@ export const translations = {
       decline: 'No thanks',
       accepted: 'Enjoy the cookie',
       declined: 'Maybe next time',
+      manage: 'Cookie preferences',
     },
     nav: {
       introduction: 'Introduction',
@@ -804,6 +805,7 @@ export const translations = {
       decline: 'Nein danke',
       accepted: 'Viel Spaß mit dem Cookie',
       declined: 'Vielleicht nächstes Mal',
+      manage: 'Cookie-Einstellungen',
     },
     nav: {
       introduction: 'Einführung',
@@ -1566,6 +1568,7 @@ export const translations = {
       decline: 'Nee bedankt',
       accepted: 'Geniet van de cookie',
       declined: 'Misschien volgende keer',
+      manage: 'Cookievoorkeuren',
     },
     nav: {
       introduction: 'Introductie',
@@ -2328,6 +2331,7 @@ export const translations = {
       decline: 'Non merci',
       accepted: 'Profitez du cookie',
       declined: 'Peut-être la prochaine fois',
+      manage: 'Préférences cookies',
     },
     nav: {
       introduction: 'Introduction',
