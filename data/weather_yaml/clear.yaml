@@ -1,0 +1,8 @@
+path: ./PAPI_Weather_Valid/clear
+
+train:
+val: images
+test:
+
+nc: 2
+names: ['PAPI-Red', 'PAPI-White']

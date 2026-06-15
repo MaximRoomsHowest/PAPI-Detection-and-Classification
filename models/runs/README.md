@@ -9,6 +9,8 @@ models/runs/detect/yolo26s-fulldata-640/
 models/runs/detect/yolo26s-augmented/
 models/runs/detect/yolo26s-baseline/
 models/runs/detect/yolo26n-baseline/
+models/runs/detect/yolo26s-extra-aug/        <- extra-augmentation experiment
+models/runs/detect/yolo26s-weather-aug/      <- weather-augmentation experiment
 models/runs/detect/yolov8s-transfer/
 models/runs/yolo26n-sequence-1280/           <- previous serving (rollback)
 ```
@@ -23,3 +25,36 @@ The backend does **not** load from here. It loads the serving slot
 
 Historical runs predating the current label spec live only in the external
 archive `..\PAPI-artifacts\2026-05-26-cleanup\runs\papi\`.
+
+## Weather-augmentation experiments (imported from `data_analysis`)
+
+Two `yolo26s` detectors trained on the 2-class `PAPI_Split` set (100 epochs,
+640 px) extend the augmentation pipeline beyond the baseline. Both were the raw
+ultralytics runs `train-8` / `train-9` on the `data_analysis` branch; they are
+renamed here to follow the `<arch>-<dataset>-<res>` convention.
+
+| Folder                  | Source run | Augmentation focus                                              |
+|-------------------------|------------|-----------------------------------------------------------------|
+| `yolo26s-extra-aug`     | `train-8`  | Extra Albumentations: mixup, copy-paste (flip), erasing, HSV, rotation |
+| `yolo26s-weather-aug`   | `train-9`  | Above **plus** synthetic weather (rain / fog / haze)            |
+
+### Weather-robustness validation (`val-12` … `val-15`)
+
+`yolo26s-weather-aug` (`train-9`) re-validated on synthetic weather variants of
+the `PAPI_Split` valid split. Full notebook + degradation plots:
+[`data/weather_evaluation.ipynb`](../../data/weather_evaluation.ipynb)
+(condition transforms in [`data/weather_aug.py`](../../data/weather_aug.py) and
+[`data/weather_yaml/`](../../data/weather_yaml/)).
+
+| Run      | Condition | mAP50 | mAP50-95 |
+|----------|-----------|-------|----------|
+| `val-12` | clear     | 0.949 | 0.637    |
+| `val-13` | rain      | 0.947 | 0.628    |
+| `val-14` | fog       | 0.663 | 0.271    |
+| `val-15` | haze      | 0.682 | 0.293    |
+
+Takeaway: the detector is robust to rain (≈clear) but degrades sharply under
+fog — the headline result behind the weather-degradation graphs.
+
+`val-5` / `val-6` / `val-7` are additional validation runs imported from the
+same branch (provenance not recorded in their folders — no `args.yaml`).
