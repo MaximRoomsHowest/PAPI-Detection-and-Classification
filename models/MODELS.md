@@ -115,6 +115,10 @@ These are **validation-split box (B) detection** metrics — not the held-out
 test regime and not per-class. Per-regime / per-state **test** numbers come
 from the evaluation notebook (`04_*`), which the team owns.
 
+> ⚠ These val numbers are on the `PAPI_Split` validation split, which is a **random
+> per-frame** partition (not flight-level) — its frames are near-duplicates of
+> training frames, so the metrics are **optimistic**. See the leakage caveat in §3.1.2.
+
 | Selection | Epoch | precision | recall | mAP@0.5 | mAP@0.5:0.95 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | best fitness | 39 | 0.9479 | 0.9367 | 0.9828 | 0.6791 |
@@ -142,6 +146,22 @@ Night-wide is the hard test regime; (n) are GT box counts, so the night numbers
 rest on 616 boxes, not a handful. The previous serving model's numbers on the same
 split are in §3.2.1a — yolo26s wins the night regime by ~10 mAP@0.5 points, which
 is the promotion justification on held-out data.
+
+> ⚠ **Leakage + augmentation caveat (pending retrain).** This checkpoint trained on
+> `PAPI_Split`, built by a **random per-frame shuffle** of all merged frames
+> (`data/data_analysis.ipynb`), **not** a flight-level split. Because the footage is
+> video-like (adjacent near-duplicate frames), frames from the flight-level test
+> flights above were also in this model's *training* set — so these "held-out"
+> numbers **overlap training and are optimistic, not a clean held-out estimate**.
+> Its [`args.yaml`](runs/detect/yolo26s-fulldata-1280/args.yaml) also shows
+> Ultralytics' default colour-jitter augmentation (`hsv_h=0.015`, `hsv_s=0.7`,
+> `mosaic=1.0`), which is risky for a red/white **colour** detector: hue/saturation
+> jitter can push samples across the colour boundary while labels stay fixed. The
+> §3.2.1a comparison is still apples-to-apples (same harness; both models pre-date the
+> flight split), but read the absolute values as an **upper bound**. **Remediation:**
+> retrain on the flight-level split ([`configs/split.yaml`](../configs/split.yaml))
+> with colour-safe augmentation (`hsv_h=0, hsv_s=0, mosaic=0, mixup=0, copy_paste=0`,
+> no horizontal flip); see §6 Open items.
 
 ### 3.2 `yolo26n-sequence-1280` — previous serving (superseded 2026-05-31)
 
@@ -315,6 +335,14 @@ CVAT relabel grows the transition class (§6).
 
 ## 6. Open items
 
+- **Retrain the serving detector without leakage / colour-jitter (highest priority).**
+  `yolo26s-fulldata-1280` trained on the random per-frame `PAPI_Split` with default
+  colour-jitter augmentation (see the §3.1.2 caveat). Retrain on the flight-level split
+  (`configs/split.yaml`) with colour-safe settings (`hsv_h=0, hsv_s=0, mosaic=0,
+  mixup=0, copy_paste=0`, no h-flip) and re-report metrics on the matching held-out
+  partition. The colour-safe recipe already exists in
+  `workflows/scripts/train_transition_model.py` (3-class) — mirror its aug block for
+  the 2-class detector.
 - ZoomCamera `calibrated_focal_px` is `null` in `configs/papi_edny.yaml`;
   zoom-camera frames are degraded for every model here until that lands.
 - Set-angles for both runways are FAA defaults; no commissioned-angle

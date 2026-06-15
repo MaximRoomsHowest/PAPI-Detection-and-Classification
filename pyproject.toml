@@ -21,7 +21,10 @@ dependencies = [
     "tqdm>=4.66",
     # >=8.4: the project's yolo26 models can be loaded for inference by 8.3.x, but TRAINING
     # (re-parsing the architecture) needs 8.4+ (8.3.x raises SPPF arg-count errors on yolo26).
-    "ultralytics>=8.4",
+    # Pinned exactly (matches apps/backend/requirements.txt) so training/eval runs are
+    # reproducible: a floor like >=8.4 lets the default augmentation set drift between
+    # installs, which for a colour detector can silently change label-vs-pixel semantics.
+    "ultralytics==8.4.62",
 ]
 
 [project.optional-dependencies]

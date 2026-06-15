@@ -26,6 +26,7 @@ REPORT = REPO_ROOT / "docs" / "transition" / "dataset_qa_report.md"
 REGIMES = ("daytime", "nighttime")
 CLASS_NAMES = {0: "papi_light_red", 1: "papi_light_white", 2: "papi_light_transition"}
 MIN_TRANSITION_BOXES = 100  # below this, stop and report rather than pretend trainable
+TEST_TRANSITION_FLOOR = 30  # below this, test transition metrics are statistically weak -> WARN
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -68,6 +69,8 @@ def qa(twin: Path) -> dict:
     split_frames: dict[str, int] = Counter()
     video_split: dict[str, set] = defaultdict(set)
     transition_by_video: Counter = Counter()
+    split_regimes: dict[str, set] = defaultdict(set)
+    orphans: Counter = Counter()  # images_without_labels / labels_without_images / metadata_without_labels
     errors: list[str] = []
     corrupt: list[str] = []
     total_frames = 0
@@ -80,7 +83,19 @@ def qa(twin: Path) -> dict:
             meta = _read_csv(video_dir / "metadata.csv")
             split_of_file = {r["file"]: (r.get("split") or "train") for r in meta}
             for r in meta:
-                video_split[video_dir.name].add(r.get("split") or "train")
+                split = r.get("split") or "train"
+                video_split[video_dir.name].add(split)
+                split_regimes[split].add(regime)
+            # Orphan audit (both directions): a label with no image, an image with no
+            # label, or a metadata row with no label file all signal a desynced flight.
+            image_stems = {p.stem for p in (video_dir / "images").glob("*.JPG")} | {
+                p.stem for p in (video_dir / "images").glob("*.jpg")
+            }
+            label_stems = {p.stem for p in (video_dir / "labels").glob("*.txt")}
+            meta_stems = {Path(r["file"]).stem for r in meta}
+            orphans["images_without_labels"] += len(image_stems - label_stems)
+            orphans["labels_without_images"] += len(label_stems - image_stems)
+            orphans["metadata_without_labels"] += len(meta_stems - label_stems)
             for label_path in sorted((video_dir / "labels").glob("*.txt")):
                 total_frames += 1
                 file = label_path.stem + ".JPG"
@@ -133,6 +148,25 @@ def qa(twin: Path) -> dict:
     top_video, top_video_n = (transition_by_video.most_common(1) or [("", 0)])[0]
     overrep = top_video_n / transition_total if transition_total else 0.0
 
+    # Soft warnings: surface real weaknesses (tiny/zero test transition support, a
+    # regime trained-but-untested, file orphans) WITHOUT flipping a clean dataset to
+    # NOT-ready — the gate keeps its existing hard criteria.
+    warnings: list[str] = []
+    if transition_in_test == 0:
+        warnings.append("Test split has ZERO transition boxes — transition generalization is unmeasured.")
+    elif transition_in_test < TEST_TRANSITION_FLOOR:
+        warnings.append(
+            f"Test split has only {transition_in_test} transition boxes (< {TEST_TRANSITION_FLOOR}); "
+            "transition test metrics carry wide uncertainty."
+        )
+    missing_regimes = sorted(split_regimes.get("train", set()) - split_regimes.get("test", set()))
+    if missing_regimes:
+        warnings.append(
+            f"Regime(s) in train but absent from test: {missing_regimes} — generalization to those is untested."
+        )
+    if sum(orphans.values()):
+        warnings.append(f"Image/label/metadata orphans: {dict(orphans)} (a label has no image, or vice versa).")
+
     hard_fail = bool(leaking) or bool(corrupt) or transition_total < MIN_TRANSITION_BOXES
     ready = (not hard_fail) and transition_in_train > 0 and transition_in_val > 0 and not errors
 
@@ -151,6 +185,9 @@ def qa(twin: Path) -> dict:
         "format_errors": len(errors),
         "corrupt_files": len(corrupt),
         "split_leakage_flights": leaking,
+        "orphans": dict(orphans),
+        "split_regimes": {k: sorted(v) for k, v in split_regimes.items()},
+        "warnings": warnings,
         "min_transition_required": MIN_TRANSITION_BOXES,
         "ready_for_training": ready,
         "hard_fail": hard_fail,
@@ -198,6 +235,8 @@ def _write_report(s: dict, sample_errors: list[str]) -> None:
     ]
     if sample_errors:
         lines += ["", "Sample errors:", "", *[f"- `{e}`" for e in sample_errors]]
+    if s.get("warnings"):
+        lines += ["", "## Warnings (non-blocking)", "", *[f"- ⚠ {w}" for w in s["warnings"]]]
     lines += [
         "",
         "## Verdict",

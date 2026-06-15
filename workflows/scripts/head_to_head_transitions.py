@@ -21,7 +21,7 @@ them during stable red/white?
 Run::
 
     .venv/Scripts/python workflows/scripts/head_to_head_transitions.py \
-        --weights data/runs/detect/transition3class-yolo11s-1280/weights/best.pt
+        --weights data/runs/detect/transition3class-yolo26s-1280/weights/best.pt
 """
 
 from __future__ import annotations
@@ -127,7 +127,29 @@ def run(weights: Path, twin: Path) -> dict:
     per_flight = {}
     for vd in _test_videos(twin):
         meta = sorted(_read_csv(vd / "metadata.csv"), key=lambda r: int(r["sequence_index"]))
-        gt = [int(r["to_frame_index"]) for r in _read_csv(vd / "transitions.csv")] if (vd / "transitions.csv").exists() else []
+        # Detected events live in the sequence_index domain (see `fr` below). GT flips
+        # must be mapped into the SAME domain via to_file -> sequence_index, NOT assumed
+        # equal to the raw to_frame_index column (they coincide only by decimation luck).
+        seq_by_file = {row["file"]: int(row["sequence_index"]) for row in meta}
+        seq_values = set(seq_by_file.values())
+        gt: list[int] = []
+        if (vd / "transitions.csv").exists():
+            for r in _read_csv(vd / "transitions.csv"):
+                to_file = (r.get("to_file") or "").strip()
+                if to_file:
+                    if to_file not in seq_by_file:
+                        raise ValueError(f"{vd.name}: transitions.csv to_file {to_file!r} absent from metadata.csv")
+                    gt.append(seq_by_file[to_file])
+                else:
+                    # No to_file column: fall back to the raw index, but fail loudly if it
+                    # is not a valid sequence_index — a silent domain mismatch would shift GT.
+                    raw = int(r["to_frame_index"])
+                    if raw not in seq_values:
+                        raise ValueError(
+                            f"{vd.name}: transitions.csv has no to_file and to_frame_index {raw} "
+                            "is not a sequence_index; cannot align GT to detected events."
+                        )
+                    gt.append(raw)
         obs: dict[int, list[tuple[int, int]]] = defaultdict(list)
         # persist=False on the first PROCESSED frame, not metadata row 0: if row 0's
         # image is missing, keying the reset on idx==0 would leak the previous

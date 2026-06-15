@@ -66,7 +66,12 @@ def build_oversampled_yaml(combined_dir: Path, factor: int) -> tuple[Path, dict]
 
 
 def train(args: argparse.Namespace) -> dict:
+    import torch
     from ultralytics import YOLO
+
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.set_float32_matmul_precision("high")
 
     if args.resume:
         # Continue an interrupted run from its last.pt (restores optimizer/epoch state); the saved
@@ -88,14 +93,17 @@ def train(args: argparse.Namespace) -> dict:
         # colour-safe augmentation. mosaic defaults OFF: source frames are 20MP, so stitching 4
         # per sample exhausts RAM; the colour-safety (hsv_h/s=0) is the constraint that matters.
         hsv_h=0.0, hsv_s=0.0, hsv_v=0.2, fliplr=0.5, flipud=0.0, degrees=0.0,
-        translate=0.1, scale=0.5, mosaic=args.mosaic, close_mosaic=10, erasing=0.0, mixup=0.0, copy_paste=0.0,
+        translate=0.1, scale=0.5, mosaic=args.mosaic,
+        # close_mosaic only matters when mosaic is on; 0 when it's off avoids a no-op/warning.
+        close_mosaic=(10 if args.mosaic > 0 else 0), erasing=0.0, mixup=0.0, copy_paste=0.0,
         patience=args.patience, workers=args.workers, seed=0, plots=True, cache=False,
+        amp=args.amp,
         project=str(args.project), name=name, exist_ok=True,
     )
     run_dir = args.project / name
     metrics_path = run_dir / "transition_train_meta.json"
     meta = {"base": str(args.base), "data": str(yaml_path), "imgsz": imgsz, "epochs": epochs,
-            "batch": args.batch, "oversample": oversample,
+            "batch": args.batch, "workers": args.workers, "amp": args.amp, "oversample": oversample,
             "note": "INTERIM: flip-anchored + AI-spot-checked labels; colour-safe aug; not a full human pass"}
     metrics_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"run_dir": str(run_dir), **oversample}, indent=2))
@@ -110,11 +118,18 @@ def main() -> int:
     p.add_argument("--name", default="transition3class-yolo26s-1280")  # base yolo26s (needs ultralytics>=8.4)
     p.add_argument("--epochs", type=int, default=80)
     p.add_argument("--imgsz", type=int, default=1280)
-    p.add_argument("--batch", type=int, default=4)
+    p.add_argument("--batch", type=int, default=2)
     p.add_argument("--device", default="0")
     p.add_argument("--patience", type=int, default=15)
-    p.add_argument("--workers", type=int, default=3)  # 20MP frames: keep parallel decodes low
-    p.add_argument("--mosaic", type=float, default=0.0)  # off by default (20MP RAM cost)
+    p.add_argument("--workers", type=int, default=0)  # Windows + 20MP frames: avoid spawn-time commit spikes
+    p.add_argument("--amp", action="store_true", help="Enable mixed precision after a clean smoke run.")
+    p.add_argument(
+        "--mosaic",
+        type=float,
+        default=0.0,
+        help="OFF by default. Enabling mosaic reintroduces colour-mixing across lamps "
+        "(can corrupt red/white/transition labels) AND high RAM use on 20MP frames.",
+    )
     p.add_argument("--oversample", type=int, default=4)
     p.add_argument("--resume", action="store_true", help="continue the run from its last.pt")
     p.add_argument("--smoke", action="store_true")

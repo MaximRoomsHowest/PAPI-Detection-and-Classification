@@ -29,6 +29,14 @@ TIER_AMBIGUOUS = "ambiguous"
 
 W_OFFSET, W_COLOUR = 0.6, 0.4
 
+# Shared minimum lit-pixel floor below which a lamp crop is too small to judge its
+# colour. Used by BOTH colour_intermediacy and classify_lamp_colour so a tiny
+# far-range crop cannot score colour intermediacy while the stable-colour verdict
+# says "unknown" — both refuse to judge at the SAME threshold (audit: n_px floor
+# drift 4 vs 16 let 4-15px crops rank as transition on flip evidence alone, exactly
+# where lamps are smallest).
+MIN_COLOUR_PX = 16
+
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
@@ -66,7 +74,7 @@ def offset_proximity(frame_offset: int) -> float:
 
 def colour_intermediacy(cf: dict) -> float:
     """Red+white coexistence and amber presence; 0 when colour is unavailable."""
-    if not cf or cf.get("n_px", 0) < 4:
+    if not cf or cf.get("n_px", 0) < MIN_COLOUR_PX:
         return 0.0
     amber = _finite(cf.get("orange_amber_ratio", 0.0)) + _finite(cf.get("yellow_ratio", 0.0))
     mix = 2.0 * min(_finite(cf.get("red_ratio", 0.0)), _finite(cf.get("white_ratio", 0.0)))
@@ -92,7 +100,7 @@ def classify_lamp_colour(cf: dict) -> str:
     blend without hand-tuned per-ratio cutoffs. Used by both the label gate (apply_verification) and
     the manual-review triage so the audit numbers and the fix cannot drift apart.
     """
-    if not cf or cf.get("n_px", 0) < 16:
+    if not cf or cf.get("n_px", 0) < MIN_COLOUR_PX:
         return "unknown"
     red = _finite(cf.get("red_ratio", 0.0))
     amber = _finite(cf.get("orange_amber_ratio", 0.0))

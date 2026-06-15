@@ -96,6 +96,11 @@ def apply(twin: Path) -> dict:
     # many disagree with the CURRENT thresholds so a threshold tune that silently
     # applies only to verdict-less rows is visible in the summary (audit LS-7).
     verdict_disagreements = 0
+    # Count transition boxes accepted on the flip anchor ALONE (colour verdict
+    # "unknown" — too few lit pixels to confirm an amber blend), so this blind spot
+    # (worst on small far-range lamps) is visible rather than hidden among the
+    # colour-confirmed accepts (audit: colour-gate n_px floor).
+    accepted_flip_evidence_only = 0
     for c in candidates:
         try:
             colour = json.loads(c.get("colour_features") or "{}")
@@ -110,6 +115,8 @@ def apply(twin: Path) -> dict:
         if (c["source_id"], c["track_id"], int(c["flip_frame"])) in reviewed_keys:
             note += " [visually reviewed]"
         decisions[decision] += 1
+        if decision == "accepted_transition" and verdict == "unknown":
+            accepted_flip_evidence_only += 1
         from_state, to_state = c["previous_state"], c["next_state"]
         # the box's original label = from_state if before the flip boundary else to_state
         old_label = from_state if int(c["frame_offset"]) <= 0 else to_state
@@ -169,6 +176,7 @@ def apply(twin: Path) -> dict:
         "flips_visually_reviewed": len(reviewed_keys),
         "decisions": dict(decisions),
         "persisted_verdicts_disagreeing_with_current_thresholds": verdict_disagreements,
+        "accepted_on_flip_evidence_alone": accepted_flip_evidence_only,
         "final_transition_boxes": final_transition_boxes,
         "verification_log": str(log_path),
     }
