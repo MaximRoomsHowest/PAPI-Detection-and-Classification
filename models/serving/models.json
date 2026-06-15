@@ -3,17 +3,93 @@
   "models": [
     {
       "id": "small",
-      "label": "Small detector",
+      "label": "yolo26s · full-data 1280 (serving)",
       "role": "detector",
       "path": "models/serving/best.pt",
       "class_count": 2,
       "default": true,
-      "description": "Current yolo26s full-data 1280px serving detector.",
-      "card_path": "models/serving/model_card.json"
+      "description": "Current serving detector — yolo26s trained on the full labelled set at 1280px (run yolo26s-fulldata-1280).",
+      "card_path": "models/serving/model_card.json",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "yolo26s-weather-aug",
+      "label": "yolo26s · weather-augmented (weather-ready)",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26s-weather-aug/weights/best.pt",
+      "class_count": 2,
+      "description": "yolo26s fine-tuned with weather augmentation (rain / fog / haze) for robust low-visibility detection — the weather-ready run (train-9).",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "yolo26s-extra-aug",
+      "label": "yolo26s · extra augmentation",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26s-extra-aug/weights/best.pt",
+      "class_count": 2,
+      "description": "yolo26s trained with an extended augmentation set (train-8); comparison run.",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "yolo26s-augmented",
+      "label": "yolo26s · augmented",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26s-augmented/weights/best.pt",
+      "class_count": 2,
+      "description": "Image-augmentation experiment on yolo26s; comparison run.",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "yolo26s-fulldata-640",
+      "label": "yolo26s · full-data 640",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26s-fulldata-640/weights/best.pt",
+      "class_count": 2,
+      "description": "Full dataset trained at 640px; the 1280 serving model supersedes it. Comparison run.",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "yolo26s-baseline",
+      "label": "yolo26s · baseline",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26s-baseline/weights/best.pt",
+      "class_count": 2,
+      "description": "First-cut yolo26s baseline; comparison run.",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
+      "id": "yolo26n-baseline",
+      "label": "yolo26n · baseline",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26n-baseline/weights/best.pt",
+      "class_count": 2,
+      "description": "First-cut yolo26n baseline (fast / INT8-friendly); comparison run.",
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
     },
     {
       "id": "nano",
-      "label": "Nano detector",
+      "label": "yolo26n · sequence 1280 (previous serving)",
       "role": "detector",
       "path": "models/runs/yolo26n-sequence-1280/weights/best.pt",
       "class_count": 2,
@@ -34,11 +110,11 @@
     },
     {
       "id": "transition",
-      "label": "Transition classifier",
+      "label": "yolo26s · transition (3-class)",
       "role": "transition",
-      "path": "data/runs/detect/transition3class-yolo26s-1280/weights/best.pt",
+      "path": "models/runs/detect/transition3class-yolo26s-1280/weights/best.pt",
       "class_count": 3,
-      "description": "Experimental 3-class yolo26s transition-aware detector; optional local artifact.",
+      "description": "Experimental 3-class yolo26s transition-aware detector (red / white / transition). Now shipped in the repo; transitions derive from learned model events.",
       "val_metrics": {
         "selection": "test_split_3class_eval_full_pr_curve",
         "map50": 0.6087,
@@ -48,14 +124,13 @@
           "white": { "precision": 0.9701, "recall": 0.584, "f1": 0.7291, "map50": 0.8633 },
           "transition": { "precision": 0.061, "recall": 0.3333, "f1": 0.1032, "map50": 0.0647 }
         },
-        "note": "Held-out 3-class test eval, measured 2026-06-10 against THIS checkpoint at the full PR curve (val-default conf; the earlier conf=0.25 run hid that 2 of 6 test transitions ARE found at low confidence). Test transition support is only 6 boxes, so the transition row carries wide uncertainty. Source: docs/transition/evaluation_metrics.json."
+        "note": "Held-out 3-class test eval, measured 2026-06-10 against THIS checkpoint at the full PR curve (val-default conf). Test transition support is only 6 boxes, so the transition row carries wide uncertainty. Source: docs/transition/evaluation_metrics.json."
       },
       "classes": {
         "0": "PAPI-Red",
         "1": "PAPI-White",
         "2": "PAPI-Transition"
-      },
-      "disabled_reason": "Transition checkpoint is optional; it is available only when its weights file is present at the configured path (absent in the default Docker image). Enable it via models/MODELS.md section 5c."
+      }
     }
   ]
 }

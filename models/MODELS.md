@@ -41,9 +41,21 @@ learned transition events.
 
 | Selector id | Run / path | Role | Default behavior |
 | --- | --- | --- | --- |
-| `small` | `models/serving/best.pt` → `yolo26s-fulldata-1280` | detector | Default model; transitions via tracking |
+| `small` | `models/serving/best.pt` → `yolo26s-fulldata-1280` | detector | **Default**; transitions via tracking |
+| `yolo26s-weather-aug` | `models/runs/detect/yolo26s-weather-aug/weights/best.pt` | detector | Weather-augmented (rain/fog/haze), weather-ready (train-9) |
+| `yolo26s-extra-aug` | `models/runs/detect/yolo26s-extra-aug/weights/best.pt` | detector | Extra-augmentation comparison run (train-8) |
+| `yolo26s-augmented` | `models/runs/detect/yolo26s-augmented/weights/best.pt` | detector | Augmentation comparison run |
+| `yolo26s-fulldata-640` | `models/runs/detect/yolo26s-fulldata-640/weights/best.pt` | detector | Full-data 640px comparison run |
+| `yolo26s-baseline` | `models/runs/detect/yolo26s-baseline/weights/best.pt` | detector | yolo26s baseline comparison run |
+| `yolo26n-baseline` | `models/runs/detect/yolo26n-baseline/weights/best.pt` | detector | yolo26n baseline comparison run |
 | `nano` | `models/runs/yolo26n-sequence-1280/weights/best.pt` | detector | Previous serving model; transitions via tracking |
-| `transition` | `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt` | transition | Optional ignored artifact; transitions via learned model events |
+| `transition` | `models/runs/detect/transition3class-yolo26s-1280/weights/best.pt` | transition | 3-class; committed + available; transitions via learned model events |
+
+> As of 2026-06-15 every committed trained detector is registered here, so all of
+> them are selectable in the Live-Demo picker and the Models page. The comparison
+> runs (§3.3) ship without inline `val_metrics` — run them through the in-app
+> Evaluate (or `populate_model_metrics.py`) to fill their cards. `small` stays the
+> default serving model; promote another run via the Models page if you rotate it.
 
 ### Rename map (2026-05-31)
 
@@ -300,10 +312,11 @@ label set to an earlier eval).
 
 ## 5c. Enabling the optional transition classifier
 
-The 3-class `transition` registry entry ships disabled-by-default: its weights are
-an experimental local artifact (`data/runs/detect/transition3class-yolo26s-1280/`),
-not committed. The selector button in the Live Demo stays greyed out until the
-backend can see the file. Two working recipes:
+As of 2026-06-15 the 3-class `transition` weight is **committed** at
+`models/runs/detect/transition3class-yolo26s-1280/weights/best.pt` and the registry
+points there, so the entry is **available by default** for everyone who clones (and
+in Docker, since `./models` is mounted). The recipes below remain only if you keep a
+*different* copy and want to re-point it via `PAPI_TRANSITION_MODEL_PATH`:
 
 **Bare-metal / local uvicorn** — nothing to do if the training run is present:
 the registry path `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt`
