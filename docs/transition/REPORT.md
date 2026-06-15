@@ -96,7 +96,7 @@ are flip-anchored + AI-spot-checked.
 
 ## 15. Training results
 
-**`yolo26s`** @ 1280, 19 epochs. Weights `data/runs/detect/transition3class-yolo26s-1280/weights/
+**`yolo26s`** @ 1280, 19 epochs. Weights `models/runs/detect/transition3class-yolo26s-1280/weights/
 best.pt` (git-ignored). Full metrics/plots/logs in that run dir.
 
 ## 16–18. Transition-specific evaluation (TEST split, conf=0.25) — see `evaluation.md`

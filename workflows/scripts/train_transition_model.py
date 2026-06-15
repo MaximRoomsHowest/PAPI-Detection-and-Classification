@@ -24,8 +24,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_COMBINED = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "transition_combined"
 DEFAULT_BASE = REPO_ROOT / "models" / "base" / "yolo26s.pt"
-# data/runs is git-ignored: keep the 20MB+ run out of git; small metrics are copied to docs later.
-DEFAULT_PROJECT = REPO_ROOT / "data" / "runs" / "detect"
+# models/runs/experiments/ is git-ignored: training output stays out of git; promote a finished run to models/runs/detect/ and register it in models/serving/models.json.
+DEFAULT_PROJECT = REPO_ROOT / "models" / "runs" / "experiments"
 CLASS_NAMES = {0: "papi_light_red", 1: "papi_light_white", 2: "papi_light_transition"}
 
 

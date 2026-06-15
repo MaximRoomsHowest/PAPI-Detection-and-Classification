@@ -25,7 +25,7 @@ CLASS_NAMES = {0: "red", 1: "white"}
 
 MODELS = {
     "yolo26s-fulldata-1280": REPO_ROOT / "models" / "serving" / "best.pt",
-    "yolo26n-sequence-1280": REPO_ROOT / "models" / "runs" / "yolo26n-sequence-1280" / "weights" / "best.pt",
+    "yolo26n-sequence-1280": REPO_ROOT / "models" / "runs" / "detect" / "yolo26n-sequence-1280" / "weights" / "best.pt",
 }
 
 REGIME_BY_FLIGHT = {

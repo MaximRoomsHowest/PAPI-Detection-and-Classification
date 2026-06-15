@@ -48,7 +48,7 @@ learned transition events.
 | `yolo26s-fulldata-640` | `models/runs/detect/yolo26s-fulldata-640/weights/best.pt` | detector | Full-data 640px comparison run |
 | `yolo26s-baseline` | `models/runs/detect/yolo26s-baseline/weights/best.pt` | detector | yolo26s baseline comparison run |
 | `yolo26n-baseline` | `models/runs/detect/yolo26n-baseline/weights/best.pt` | detector | yolo26n baseline comparison run |
-| `nano` | `models/runs/yolo26n-sequence-1280/weights/best.pt` | detector | Previous serving model; transitions via tracking |
+| `nano` | `models/runs/detect/yolo26n-sequence-1280/weights/best.pt` | detector | Previous serving model; transitions via tracking |
 | `transition` | `models/runs/detect/transition3class-yolo26s-1280/weights/best.pt` | transition | 3-class; committed + available; transitions via learned model events |
 
 > As of 2026-06-15 every committed trained detector is registered here, so all of
@@ -179,7 +179,7 @@ is the promotion justification on held-out data.
 
 | Field | Value |
 | --- | --- |
-| **Path** | `models/runs/yolo26n-sequence-1280/` |
+| **Path** | `models/runs/detect/yolo26n-sequence-1280/` |
 | **Arch** | yolo26n (≈ 2.6 M params) |
 | **Base** | `models/base/yolo26n.pt` |
 | **Classes** | 2 — `papi_light_red` (0), `papi_light_white` (1) |
@@ -319,7 +319,7 @@ in Docker, since `./models` is mounted). The recipes below remain only if you ke
 *different* copy and want to re-point it via `PAPI_TRANSITION_MODEL_PATH`:
 
 **Bare-metal / local uvicorn** — nothing to do if the training run is present:
-the registry path `data/runs/detect/transition3class-yolo26s-1280/weights/best.pt`
+the registry path `models/runs/detect/transition3class-yolo26s-1280/weights/best.pt`
 resolves against the repo root. (Optionally override with
 `PAPI_TRANSITION_MODEL_PATH=<path>`.)
 

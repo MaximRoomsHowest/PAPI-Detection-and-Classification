@@ -44,7 +44,7 @@ Available selector ids come from `GET /api/models`:
 The transition classifier may live under the ignored data-analysis path:
 
 ```text
-data/runs/detect/transition3class-yolo26s-1280/weights/best.pt
+models/runs/detect/transition3class-yolo26s-1280/weights/best.pt
 ```
 
 If the file is absent, `/api/models` marks `transition` unavailable. In Docker,

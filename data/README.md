@@ -1,85 +1,36 @@
-# Data Folder Structure
+# `data/` — datasets and data-pipeline I/O
 
-This project uses a video-oriented dataset layout for human-facing data. The
-large local data folders were archived outside the repo during the 2026-05-26
-cleanup to keep Git lean:
+This folder holds **data only** — image/label datasets and the pipeline's
+intermediate files. **Models never live here**: every trained weight, run, and the
+serving slot live under [`models/`](../models/) (see [`models/MODELS.md`](../models/MODELS.md)).
+Training output is written to `models/runs/experiments/`, *not* `data/`.
 
-```text
-..\PAPI-artifacts\2026-05-26-cleanup\data\
-```
+## What is committed vs. ignored
 
-Do not commit generated folders directly under `data/`; recreate or junction
-them locally from the archive when a workflow needs them.
+Only small, shareable fixtures are committed; the large/proprietary working data is
+git-ignored and stays local (recreate it with the `workflows/scripts/` builders, or
+junction it from the archive below).
 
-## Reference notebook
+| Path | Tracked | What it is |
+|------|---------|------------|
+| `eval/<id>/` | **committed** | Built-in evaluation seeds shipped with the app — `images/` + `labels/` + `README.md`. Two sets: `builtin-detector-redwhite` (2-class) and `builtin-transition-3class` (3-class). The backend copies these into its datasets store on startup (`PAPI_EVAL_SEED_DIR`). |
+| `datasets/<id>/` | git-ignored | Full train/eval datasets (large). `papi-2class-detection-flightsplit` (2-class detector, flight-level split) and `transition-classification-data/` (the 3-class transition twin; `transition_combined/` is the trainable dataset). Registered in-place on the Datasets page via `PAPI_PROJECT_DATASETS_DIR`. |
+| `raw/`, `interim/`, `labels/`, `annotations/`, `cvat/`, `work/` | git-ignored | Pipeline I/O: raw client frames, extracted metadata, label tables, CVAT corrections, scratch. `.gitkeep` placeholders keep the empty scaffolding; the contents are ignored. |
 
-- `data_analysis.ipynb` — the retained exploratory notebook from the
-  `data_analysis` branch (committed **with** its outputs, hence its size). It is
-  the documented origin of the PAPI 06 `461.37 m` reference altitude wired into
-  `configs/papi_edny.yaml`, `apps/backend/app/services/runways.py`, and
-  `apps/backend/app/api/routers/analyze.py`, and its haversine angle ranges are
-  pinned by `apps/backend/tests/test_angle.py`. The active, output-stripped
-  pipeline version is `workflows/notebooks/05_data_analysis.ipynb`. Keep both:
-  this one is the provenance record, that one is the runnable pipeline step.
+The committed-vs-ignored rules live in [`.gitignore`](../.gitignore) (`data/` block).
 
-## Stable Sources
+## Where the rest of the pipeline lives
 
-- `raw/` - optional local junction to the archived original client image drop.
-  Treat as read-only.
-- `interim/` - extracted metadata, sample manifests, and pipeline intermediates.
-- `labels/` - project-owned label tables and durable label metadata.
-- `annotations/manual_corrections/` - archived CVAT exports corrected by a
-  human. These are durable correction milestones and should not be deleted.
+- **Notebooks** → [`workflows/notebooks/`](../workflows/notebooks/) (`01_…` → `09_…`).
+- **Scripts** → [`workflows/scripts/`](../workflows/scripts/) (dataset builders, eval, training, CVAT export).
+- **Configs** → [`configs/`](../configs/) (`papi_edny.yaml`, `split.yaml`, `projection.yaml`, `weather_yaml/`).
+- The runtime upload / assisted-label dataset store is **app-local**, not here:
+  `apps/backend/storage/datasets/` (a Docker named volume `/datasets` in compose).
+  So there are three dataset tiers — committed seeds (`data/eval`), local full sets
+  (`data/datasets`), and the runtime store — kept separate by lifecycle.
 
-## Canonical Dataset
+## Archive
 
-- `datasets/papi_lamp_sequences/daytime/` - archived corrected daytime frames
-  grouped by source video folder.
-- `datasets/papi_lamp_sequences/nighttime/` - archived trusted nighttime frames
-  grouped by source video folder.
-- Each regime folder has:
-  - `<video_id>/images/*.JPG`
-  - `<video_id>/labels/*.txt`
-  - `<video_id>/metadata.csv`
-  - `train.txt`, `val.txt`, `data.yaml`, and `manifest.json`
-- `datasets/papi_lamp_sequences/validation_summary.json` records the latest
-  full validation pass for both regimes.
-- Each video folder also has:
-  - `tracks.csv` - one row per labeled lamp box with a stable per-video
-    `track_id`.
-  - `transitions.csv` - consecutive-frame `white_to_red` and `red_to_white`
-    switches per tracked lamp.
-- `datasets/papi_lamp_sequences/tracking_manifest.json` summarizes tracking
-  counts, transition counts, assignment methods, and quality flags.
-- `datasets/papi_lamp_sequences/yolo26n_combined/` contains the no-copy
-  train/val/test config for small YOLOv26 training from the canonical sequence
-  folders.
-- Detection classes are red/white only:
-  - `0: papi_light_red`
-  - `1: papi_light_white`
-
-Transitions are no longer a detector class. Detect red/white changes later by
-tracking each individual lamp over the frame sequence.
-
-## Removed Generated Data
-
-The old batch-oriented archive, temporary `work/` outputs, inactive `cvat/`
-placeholder, and converted `night-time-dataset.coco.zip` were removed during
-the 2026-05-24 cleanup. Use the canonical sequence dataset for training,
-evaluation, and video reconstruction.
-
-## Scratch Space
-
-- `work/` - temporary generated files. Anything here can be rebuilt and should
-  not be treated as source of truth.
-
-## Current Workflow
-
-1. Correct annotations in CVAT when needed.
-2. Export corrected annotations into `annotations/manual_corrections/`.
-3. Rebuild `datasets/papi_lamp_sequences/` by grouping frames by `video_id`.
-4. Run `workflows/scripts/build_sequence_tracking.py` to assign stable lamp tracks and
-   derive transition events.
-5. Run `workflows/scripts/prepare_yolo_sequence_dataset.py` to refresh the combined
-   `yolo26n_combined` training config.
-6. Use each `<video_id>/images/` folder to reconstruct videos for live testing.
+The large pre-cleanup data folders were archived outside the repo to keep Git lean:
+`..\PAPI-artifacts\2026-05-26-cleanup\data\`. Recreate or junction folders locally
+from there when a workflow needs them; do not commit generated data under `data/`.

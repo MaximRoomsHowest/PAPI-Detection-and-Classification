@@ -21,7 +21,7 @@ them during stable red/white?
 Run::
 
     .venv/Scripts/python workflows/scripts/head_to_head_transitions.py \
-        --weights data/runs/detect/transition3class-yolo26s-1280/weights/best.pt
+        --weights models/runs/detect/transition3class-yolo26s-1280/weights/best.pt
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TWIN = REPO_ROOT / "data" / "datasets" / "transition-classification-data"
-DEFAULT_WEIGHTS = REPO_ROOT / "data" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
+DEFAULT_WEIGHTS = REPO_ROOT / "models" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
 OUT = REPO_ROOT / "docs" / "transition"
 REGIMES = ("daytime", "nighttime")
 TOL = 6                 # frame tolerance for matching a detected event to a GT flip

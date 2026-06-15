@@ -72,6 +72,11 @@ models/**/*.safetensors
 !models/serving/*.onnx
 !models/runs/
 !models/runs/**
+# ...EXCEPT the training workspace: in-progress / experimental runs live under
+# models/ (so ALL models are in one place) but are NOT committed. Training scripts
+# write here (PAPI run project=models/runs/experiments); promote a finished run by
+# copying it to models/runs/detect/<run>/ and registering it in models/serving/models.json.
+models/runs/experiments/
 
 # Frontend/backend generated outputs
 apps/frontend/node_modules/

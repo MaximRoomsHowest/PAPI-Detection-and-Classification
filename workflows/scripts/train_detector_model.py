@@ -35,7 +35,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "data" / "datasets" / "papi-2class-detection-flightsplit" / "data.yaml"
 DEFAULT_BASE = REPO_ROOT / "models" / "base" / "yolo26s.pt"
-DEFAULT_PROJECT = REPO_ROOT / "data" / "runs" / "detect"
+DEFAULT_PROJECT = REPO_ROOT / "models" / "runs" / "experiments"
 CLASS_NAMES = {0: "papi_light_red", 1: "papi_light_white"}
 
 

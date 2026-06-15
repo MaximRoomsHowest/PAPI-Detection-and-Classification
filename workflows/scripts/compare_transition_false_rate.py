@@ -9,8 +9,8 @@ count. For each model this counts every class-2 PREDICTION and buckets it by the
 plus transition-GT recall. Run::
 
     .venv/Scripts/python workflows/scripts/compare_transition_false_rate.py \
-        --old data/runs/detect/transition3class-yolo26s-1280/weights/best.pt \
-        --new data/runs/detect/transition3class-yolo26s-1280-clean/weights/best.pt
+        --old models/runs/detect/transition3class-yolo26s-1280/weights/best.pt \
+        --new models/runs/detect/transition3class-yolo26s-1280-clean/weights/best.pt
 """
 
 from __future__ import annotations

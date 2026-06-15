@@ -12,12 +12,21 @@ models/runs/detect/yolo26n-baseline/
 models/runs/detect/yolo26s-extra-aug/        <- extra-augmentation experiment
 models/runs/detect/yolo26s-weather-aug/      <- weather-augmentation experiment
 models/runs/detect/yolov8s-transfer/
-models/runs/yolo26n-sequence-1280/           <- previous serving (rollback)
+models/runs/detect/yolo26n-sequence-1280/           <- previous serving (rollback)
 ```
 
 Each run tracks `args.yaml`, `results.csv`, training/validation plots, and
 `weights/best.pt` + `last.pt` (the weights are committed — `models/runs/**`
 is un-ignored in `.gitignore`).
+
+**Committed runs vs. the training workspace.** `models/runs/detect/` holds the
+**committed, registered** runs (every weight tracked). In-progress and experimental
+runs land in **`models/runs/experiments/`**, which is **git-ignored** — so every model
+lives under `models/` (one place), but only promoted runs are committed. The training
+scripts write there (`--project models/runs/experiments`); promote a finished run by
+copying it to `models/runs/detect/<run>/` and registering it in
+`models/serving/models.json` (MODELS.md §5). Nothing trained should land in `data/` —
+`data/` is for datasets only.
 
 The backend does **not** load from here. It loads the serving slot
 `models/serving/best.pt`, which is a copy of the active run's `best.pt`
@@ -42,9 +51,9 @@ renamed here to follow the `<arch>-<dataset>-<res>` convention.
 
 `yolo26s-weather-aug` (`train-9`) re-validated on synthetic weather variants of
 the `PAPI_Split` valid split. Full notebook + degradation plots:
-[`data/weather_evaluation.ipynb`](../../data/weather_evaluation.ipynb)
-(condition transforms in [`data/weather_aug.py`](../../data/weather_aug.py) and
-[`data/weather_yaml/`](../../data/weather_yaml/)).
+[`workflows/notebooks/09_weather_evaluation.ipynb`](../../workflows/notebooks/09_weather_evaluation.ipynb)
+(condition transforms in [`workflows/scripts/weather_aug.py`](../../workflows/scripts/weather_aug.py) and
+[`configs/weather_yaml/`](../../configs/weather_yaml/)).
 
 | Run      | Condition | mAP50 | mAP50-95 |
 |----------|-----------|-------|----------|

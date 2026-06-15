@@ -178,7 +178,7 @@ services:
       # the container pick it up without a rebuild.
       - ./models:/models:ro
       # The optional transition classifier is registered at
-      # data/runs/detect/transition3class-yolo26s-1280/weights/best.pt, but
+      # models/runs/detect/transition3class-yolo26s-1280/weights/best.pt, but
       # data/runs is ignored and not mounted here by default. To enable that
       # selector in Docker, add a read-only mount for that run path or copy the
       # weight under ./models and override PAPI_TRANSITION_MODEL_PATH.

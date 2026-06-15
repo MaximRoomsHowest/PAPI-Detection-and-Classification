@@ -8,7 +8,7 @@ question is transition recall without hallucinating transitions in stable red/wh
 Run::
 
     .venv/Scripts/python workflows/scripts/evaluate_transition_model.py \
-        --weights data/runs/detect/transition3class-yolo11s-1280/weights/best.pt
+        --weights models/runs/experiments/transition3class-yolo11s-1280/weights/best.pt
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from collections import Counter
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_WEIGHTS = REPO_ROOT / "data" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
+DEFAULT_WEIGHTS = REPO_ROOT / "models" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
 DEFAULT_DATA = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "transition_combined" / "data.yaml"
 OUT = REPO_ROOT / "docs" / "transition"
 EXAMPLES = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "eval_examples"
@@ -63,7 +63,7 @@ def evaluate(weights: Path, data: Path) -> dict:
     # behaviour is measured separately by mine_examples/compare_transition_false_rate.
     metrics = model.val(data=str(data), split="test", imgsz=1280, iou=0.5,
                         batch=4, workers=2,
-                        project=str(REPO_ROOT / "data" / "runs" / "detect"), name="transition3class-test", exist_ok=True)
+                        project=str(REPO_ROOT / "models" / "runs" / "experiments"), name="transition3class-test", exist_ok=True)
 
     # Index per-class arrays by ap_class_index: ultralytics orders box.p/r/ap50 by
     # POSITION among the classes present in the split's stats, not by raw class id —

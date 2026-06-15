@@ -22,7 +22,7 @@ import os
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-THREE_CLASS = REPO / "data" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
+THREE_CLASS = REPO / "models" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
 FLIGHT = REPO / "data" / "datasets" / "transition-classification-data" / "daytime" / "DJI_202604281946_014_1000"
 
 

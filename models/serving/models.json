@@ -91,7 +91,7 @@
       "id": "nano",
       "label": "yolo26n · sequence 1280 (previous serving)",
       "role": "detector",
-      "path": "models/runs/yolo26n-sequence-1280/weights/best.pt",
+      "path": "models/runs/detect/yolo26n-sequence-1280/weights/best.pt",
       "class_count": 2,
       "description": "Previous yolo26n sequence detector kept for fast rollback and comparison.",
       "val_metrics": {
