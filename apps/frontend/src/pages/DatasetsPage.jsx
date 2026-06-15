@@ -15,9 +15,12 @@ function DatasetCard({ dataset, copy, busy, onReview, onTrain, onDelete }) {
     <article className="dataset-card">
       <header className="dataset-card__head">
         <h3 className="dataset-card__name">{dataset.name}</h3>
-        <span className={`lc-badge lc-badge--${dataset.status === 'ready' ? 'default' : 'warn'}`}>
-          {copy.datasets.statuses[dataset.status] ?? dataset.status}
-        </span>
+        <div className="model-card__badges">
+          {dataset.source === 'builtin' && <span className="lc-badge">{copy.datasets.sources.builtin}</span>}
+          <span className={`lc-badge lc-badge--${dataset.status === 'ready' ? 'default' : 'warn'}`}>
+            {copy.datasets.statuses[dataset.status] ?? dataset.status}
+          </span>
+        </div>
       </header>
       <p className="dataset-card__meta mono">
         {copy.datasets.sources[dataset.source] ?? dataset.source} ·{' '}
@@ -34,19 +37,21 @@ function DatasetCard({ dataset, copy, busy, onReview, onTrain, onDelete }) {
             <ClipboardCheck size={14} aria-hidden="true" /> {copy.datasets.card.review}
           </button>
         )}
-        {dataset.status === 'ready' && (
+        {dataset.status === 'ready' && dataset.source !== 'builtin' && (
           <button className="secondary-button" type="button" onClick={() => onTrain(dataset)}>
             <GraduationCap size={14} aria-hidden="true" /> {copy.datasets.card.train}
           </button>
         )}
-        <button
-          className="ghost-button ghost-button--danger"
-          type="button"
-          disabled={busy}
-          onClick={() => onDelete(dataset)}
-        >
-          <Trash2 size={14} aria-hidden="true" /> {copy.datasets.card.delete}
-        </button>
+        {dataset.source !== 'builtin' && (
+          <button
+            className="ghost-button ghost-button--danger"
+            type="button"
+            disabled={busy}
+            onClick={() => onDelete(dataset)}
+          >
+            <Trash2 size={14} aria-hidden="true" /> {copy.datasets.card.delete}
+          </button>
+        )}
       </div>
     </article>
   )

@@ -1,15 +1,56 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Star, Trash2, Upload, BarChart3, EyeOff, Eye } from 'lucide-react'
+import { Star, Trash2, Upload, BarChart3, EyeOff, Eye, Info, X } from 'lucide-react'
 import { useModelManagement } from '../hooks/useModelManagement'
 import { useDatasets } from '../hooks/useDatasets'
 import { useJobs } from '../hooks/useJobs'
+import { fetchStats } from '../lib/api'
 import { Modal } from '../components/lifecycle/Modal'
 import { JobMonitor } from '../components/lifecycle/JobMonitor'
 import { PapiGlyph } from '../components/PapiGlyph'
+import { lampStateLabel } from '../lib/stateLabels'
 
+// Number.isFinite (not typeof === 'number') so a stray NaN/Infinity renders the
+// em-dash placeholder instead of the literal "NaN" — typeof NaN is 'number'.
 function metricValue(value) {
-  return typeof value === 'number' ? value.toFixed(3) : '—'
+  return Number.isFinite(value) ? value.toFixed(3) : '—'
+}
+
+function msValue(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} ms` : '—'
+}
+
+function intValue(value) {
+  return Number.isFinite(value) ? value.toLocaleString() : '—'
+}
+
+function sizeValue(value) {
+  return Number.isFinite(value) ? `${value} MB` : '—'
+}
+
+function textValue(value) {
+  return value || '—'
+}
+
+function classCountOf(model) {
+  if (model.classes) return Object.keys(model.classes).length
+  return typeof model.class_count === 'number' ? model.class_count : null
+}
+
+// A 0–1 detection score as a labelled bar: the fill makes "0.99 vs 0.51" legible at a
+// glance (a column of bare numbers does not). Non-finite → empty track + em-dash.
+function ScoreBar({ label, value }) {
+  const finite = Number.isFinite(value)
+  const pct = finite ? Math.max(0, Math.min(1, value)) * 100 : 0
+  return (
+    <div className="score-bar">
+      <span className="score-bar__label mono">{label}</span>
+      <span className="score-bar__track" aria-hidden="true">
+        <span className="score-bar__fill" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="score-bar__value mono tnum">{metricValue(value)}</span>
+    </div>
+  )
 }
 
 // One registry entry as a tactile card: provenance badges, headline metrics, and
@@ -17,16 +58,27 @@ function metricValue(value) {
 function ModelCard({ model, copy, busy, onPromote, onToggleDisabled, onDelete, onEvaluate, selected, onToggleCompare }) {
   const vm = model.val_metrics || {}
   const verdict = model.available ? 'go' : 'stop'
+  const classCount = classCountOf(model)
+  const perClass = vm.per_class ? Object.entries(vm.per_class) : []
   return (
-    <article className={`model-card${model.is_default ? ' model-card--default' : ''}`}>
+    <article
+      className={`model-card${model.is_default ? ' model-card--default' : ''}${
+        !model.available ? ' model-card--muted' : ''
+      }`}
+    >
       <header className="model-card__head">
         <PapiGlyph size="history" verdict={verdict} />
         <div className="model-card__titles">
           <h3 className="model-card__label">{model.model_label || model.model_id}</h3>
           <p className="model-card__meta mono">
-            {copy.models.roles[model.model_role] ?? model.model_role} · {copy.models.sources[model.source] ?? model.source}
+            {copy.models.roles[model.model_role] ?? model.model_role} ·{' '}
+            {copy.models.sources[model.source] ?? model.source}
           </p>
         </div>
+        <label className="model-card__compare" title={copy.models.actions.compare}>
+          <input type="checkbox" checked={selected} onChange={() => onToggleCompare(model.model_id)} />
+          <span>{copy.models.actions.compare}</span>
+        </label>
       </header>
 
       <div className="model-card__badges">
@@ -38,20 +90,64 @@ function ModelCard({ model, copy, busy, onPromote, onToggleDisabled, onDelete, o
         )}
       </div>
 
-      <dl className="model-card__metrics">
-        <div><dt className="mono">mAP@50</dt><dd className="mono tnum">{metricValue(vm.map50)}</dd></div>
-        <div><dt className="mono">mAP@50-95</dt><dd className="mono tnum">{metricValue(vm.map50_95)}</dd></div>
-        <div><dt className="mono">P</dt><dd className="mono tnum">{metricValue(vm.precision)}</dd></div>
-        <div><dt className="mono">R</dt><dd className="mono tnum">{metricValue(vm.recall)}</dd></div>
-      </dl>
-      <p className="model-card__sub mono">
-        {copy.models.classesLabel}: {model.classes ? Object.keys(model.classes).length : model.class_count ?? '—'}
-        {model.file_size_mb != null ? ` · ${model.file_size_mb} MB` : ''}
-      </p>
+      <div className="model-card__scores">
+        <ScoreBar label="mAP@50" value={vm.map50} />
+        <ScoreBar label="mAP@50-95" value={vm.map50_95} />
+        <ScoreBar label="P" value={vm.precision} />
+        <ScoreBar label="R" value={vm.recall} />
+      </div>
+
+      <div className="model-card__cred mono">
+        <span><i>{copy.models.compare.split}</i>{textValue(model.dataset_split_evaluated)}</span>
+        <span>
+          <i>{copy.models.confLabel}</i>
+          {Number.isFinite(model.confidence_threshold) ? `${Math.round(model.confidence_threshold * 100)}%` : '—'}
+        </span>
+        <span><i>{copy.models.compare.classes}</i>{classCount ?? '—'}</span>
+        {model.file_size_mb != null && <span><i>{copy.models.compare.size}</i>{model.file_size_mb} MB</span>}
+      </div>
+
+      {/* Per-class precision/recall/F1 — the detail view that used to live on the
+          Insights page; it belongs with the model now. Collapsed by default. */}
+      {perClass.length > 0 && (
+        <details className="model-card__perclass">
+          <summary>{copy.insights.perClassChartTitle}</summary>
+          <table className="model-per-class">
+            <thead>
+              <tr>
+                <th scope="col" />
+                <th scope="col">{copy.insights.metricPrecision}</th>
+                <th scope="col">{copy.insights.metricRecall}</th>
+                <th scope="col">{copy.insights.metricF1}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perClass.map(([cls, row]) => (
+                <tr key={cls}>
+                  <th scope="row">{lampStateLabel(cls, copy)}</th>
+                  <td className="tnum">{metricValue(row?.precision)}</td>
+                  <td className="tnum">{metricValue(row?.recall)}</td>
+                  <td className="tnum">{metricValue(row?.f1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+
+      {model.disabled_reason && !model.available && (
+        <p className="model-card__reason">{model.disabled_reason}</p>
+      )}
 
       <div className="model-card__actions">
-        {!model.is_default && model.available && (
-          <button className="secondary-button" type="button" disabled={busy} onClick={() => onPromote(model)}>
+        {!model.is_default && !model.disabled && (
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={busy}
+            title={copy.models.promoteHint}
+            onClick={() => onPromote(model)}
+          >
             <Star size={14} aria-hidden="true" /> {copy.models.actions.promote}
           </button>
         )}
@@ -74,12 +170,34 @@ function ModelCard({ model, copy, busy, onPromote, onToggleDisabled, onDelete, o
             <Trash2 size={14} aria-hidden="true" /> {copy.models.actions.delete}
           </button>
         )}
-        <label className="model-card__compare">
-          <input type="checkbox" checked={selected} onChange={() => onToggleCompare(model.model_id)} />
-          {copy.models.actions.compare}
-        </label>
       </div>
     </article>
+  )
+}
+
+// Quick status strip: model count, how many can actually serve, and the current
+// default (the model used when a request names none — see the defaultHint banner).
+function OverviewStrip({ models, copy }) {
+  const total = models.length
+  const available = models.filter((m) => m.available).length
+  const def = models.find((m) => m.is_default)
+  return (
+    <div className="lc-overview" role="group" aria-label={copy.models.title}>
+      <div className="lc-overview__stat">
+        <span className="lc-overview__num tnum">{total}</span>
+        <span className="lc-overview__label">{copy.models.overview.total}</span>
+      </div>
+      <div className="lc-overview__stat">
+        <span className="lc-overview__num tnum">{available}</span>
+        <span className="lc-overview__label">{copy.models.overview.available}</span>
+      </div>
+      <div className="lc-overview__stat lc-overview__stat--wide">
+        <span className="lc-overview__num lc-overview__num--text">
+          {def ? def.model_label || def.model_id : copy.models.overview.none}
+        </span>
+        <span className="lc-overview__label">{copy.models.overview.defaultModel}</span>
+      </div>
+    </div>
   )
 }
 
@@ -150,11 +268,25 @@ function UploadModal({ open, onClose, copy, onSubmit }) {
   )
 }
 
+// Default the Evaluate dialog to the built-in eval set that matches the model's
+// class count (2-class detector -> red/white set; 3-class -> transition set), so
+// a model can be scored out of the box on classes it actually predicts.
+function pickDefaultDataset(ready, model) {
+  if (!ready.length) return ''
+  const cc = classCountOf(model)
+  const builtins = ready.filter((d) => d.source === 'builtin')
+  const byClass = builtins.find((d) => d.class_names && Object.keys(d.class_names).length === cc)
+  return (byClass || builtins[0] || ready[0]).id
+}
+
 function EvaluateModal({ open, onClose, copy, model, datasets, onSubmit }) {
   const ready = datasets.filter((d) => d.status === 'ready')
-  const [datasetId, setDatasetId] = useState('')
+  // Lazy initial value: the modal is remounted per model (key=model_id), so this
+  // captures the role-matched default once, while still letting the user change it.
+  const [datasetId, setDatasetId] = useState(() => pickDefaultDataset(ready, model))
   const [split, setSplit] = useState('test')
   const [submitting, setSubmitting] = useState(false)
+  const selectedIsBuiltin = ready.some((d) => d.id === datasetId && d.source === 'builtin')
 
   const submit = async (event) => {
     event.preventDefault()
@@ -183,6 +315,7 @@ function EvaluateModal({ open, onClose, copy, model, datasets, onSubmit }) {
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
+            {selectedIsBuiltin && <small>{copy.models.evaluate.defaultHint}</small>}
           </label>
           <label className="lc-field">
             <span>{copy.models.evaluate.split}</span>
@@ -200,40 +333,177 @@ function EvaluateModal({ open, onClose, copy, model, datasets, onSubmit }) {
   )
 }
 
-function ComparePanel({ models, ids, copy }) {
+// Highlight the winning cell(s) per row: the highest value for accuracy rows, the
+// lowest for latency. Returns the empty set when it would be meaningless (a single
+// number, all-equal, or a non-ranked row) so nothing is misleadingly flagged.
+function bestValueSet(values, better) {
+  if (!better) return new Set()
+  // Number.isFinite excludes NaN/Infinity, so Math.max/min can't return NaN.
+  const nums = values.filter((v) => Number.isFinite(v))
+  if (nums.length < 2 || nums.every((v) => v === nums[0])) return new Set()
+  const target = better === 'high' ? Math.max(...nums) : Math.min(...nums)
+  return new Set(nums.filter((v) => v === target))
+}
+
+function ComparePanel({ models, ids, copy, onClear }) {
   const chosen = models.filter((m) => ids.has(m.model_id))
+  // Sorted, stable key so the per-model stats effect only refires when the SET of
+  // compared models changes (not on every parent render).
+  const idKey = chosen
+    .map((m) => m.model_id)
+    .sort()
+    .join(',')
+  const [stats, setStats] = useState({})
+  const fetchedRef = useRef(new Set())
+
+  useEffect(() => {
+    let active = true
+    const idsArr = idKey ? idKey.split(',') : []
+    // Per-model inference latency comes from the logged-analyses aggregate
+    // (/api/stats?model_id=…). Fetch once per id, only when a comparison is shown.
+    if (idsArr.length < 2) return undefined
+    idsArr.forEach((id) => {
+      if (fetchedRef.current.has(id)) return
+      fetchedRef.current.add(id)
+      setStats((cur) => ({ ...cur, [id]: { state: 'loading' } }))
+      fetchStats({ modelId: id })
+        .then((data) => {
+          if (active) setStats((cur) => ({ ...cur, [id]: { state: 'ok', data } }))
+        })
+        .catch(() => {
+          if (active) setStats((cur) => ({ ...cur, [id]: { state: 'error' } }))
+        })
+    })
+    return () => {
+      active = false
+    }
+  }, [idKey])
+
   if (chosen.length < 2) {
     return null
   }
-  const rows = [
-    ['mAP@50', 'map50'],
-    ['mAP@50-95', 'map50_95'],
-    ['P', 'precision'],
-    ['R', 'recall'],
+
+  const statOf = (id) => (stats[id]?.state === 'ok' ? stats[id].data : null)
+
+  const classNames = Array.from(
+    new Set(chosen.flatMap((m) => Object.keys(m.val_metrics?.per_class || {}))),
+  ).sort()
+
+  const groups = [
+    {
+      title: copy.models.compare.groupAccuracy,
+      rows: [
+        { label: 'mAP@50', get: (m) => m.val_metrics?.map50, better: 'high', fmt: metricValue, bar: true },
+        { label: 'mAP@50-95', get: (m) => m.val_metrics?.map50_95, better: 'high', fmt: metricValue, bar: true },
+        { label: 'P', get: (m) => m.val_metrics?.precision, better: 'high', fmt: metricValue, bar: true },
+        { label: 'R', get: (m) => m.val_metrics?.recall, better: 'high', fmt: metricValue, bar: true },
+      ],
+    },
+    ...(classNames.length
+      ? [
+          {
+            title: copy.models.compare.groupPerClass,
+            rows: classNames.map((cls) => ({
+              label: `F1 · ${lampStateLabel(cls, copy)}`,
+              get: (m) => m.val_metrics?.per_class?.[cls]?.f1,
+              better: 'high',
+              fmt: metricValue,
+              bar: true,
+            })),
+          },
+        ]
+      : []),
+    {
+      title: copy.models.compare.groupInference,
+      // Latency is split by media type: a whole-video analysis spans many frames,
+      // so its processing time is not comparable to a single image's.
+      rows: [
+        { label: `${copy.models.compare.median} · ${copy.models.compare.mediaImage}`, get: (m) => statOf(m.model_id)?.image_p50_processing_ms, better: 'low', fmt: msValue },
+        { label: `${copy.models.compare.median} · ${copy.models.compare.mediaVideo}`, get: (m) => statOf(m.model_id)?.video_p50_processing_ms, better: 'low', fmt: msValue },
+        { label: `${copy.models.compare.p95} · ${copy.models.compare.mediaImage}`, get: (m) => statOf(m.model_id)?.image_p95_processing_ms, better: 'low', fmt: msValue },
+        { label: `${copy.models.compare.p95} · ${copy.models.compare.mediaVideo}`, get: (m) => statOf(m.model_id)?.video_p95_processing_ms, better: 'low', fmt: msValue },
+        { label: copy.models.compare.samples, get: (m) => statOf(m.model_id)?.total_analyses, better: null, fmt: intValue },
+      ],
+    },
+    {
+      title: copy.models.compare.groupModel,
+      rows: [
+        { label: copy.models.compare.size, get: (m) => m.file_size_mb, better: null, fmt: sizeValue },
+        { label: copy.models.compare.classes, get: (m) => classCountOf(m), better: null, fmt: intValue },
+        { label: copy.models.compare.source, get: (m) => copy.models.sources[m.source] ?? m.source, better: null, fmt: textValue },
+        { label: copy.models.compare.split, get: (m) => m.dataset_split_evaluated, better: null, fmt: textValue },
+      ],
+    },
   ]
+
   return (
     <section className="viz-card compare-panel" aria-label={copy.models.compare.title}>
-      <h3 className="viz-heading">{copy.models.compare.title}</h3>
-      <table className="compare-table">
-        <thead>
-          <tr>
-            <th />
-            {chosen.map((m) => (
-              <th key={m.model_id} className="mono">{m.model_label || m.model_id}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([label, key]) => (
-            <tr key={key}>
-              <th scope="row" className="mono">{label}</th>
+      <div className="compare-panel__head">
+        <h3 className="viz-heading">{copy.models.compare.title}</h3>
+        <button className="ghost-button" type="button" onClick={onClear}>
+          <X size={14} aria-hidden="true" /> {copy.models.compare.clear}
+        </button>
+      </div>
+      <div className="compare-scroll">
+        <table className="compare-table">
+          <thead>
+            <tr>
+              <th scope="col" />
               {chosen.map((m) => (
-                <td key={m.model_id} className="mono tnum">{metricValue(m.val_metrics?.[key])}</td>
+                <th key={m.model_id} className="mono" scope="col">
+                  {m.model_label || m.model_id}
+                  {m.is_default && <span className="compare-th__tag">{copy.models.badge.default}</span>}
+                </th>
               ))}
             </tr>
+          </thead>
+          {/* One <tbody> per metric group so assistive tech announces them as
+              distinct row groups; the section title is a full-width header row. */}
+          {groups.map((group) => (
+            <tbody key={group.title}>
+              <tr className="compare-group">
+                <th colSpan={chosen.length + 1}>{group.title}</th>
+              </tr>
+              {group.rows.map((row) => {
+                const values = chosen.map((m) => row.get(m))
+                const best = bestValueSet(values, row.better)
+                return (
+                  <tr key={`${group.title}:${row.label}`}>
+                    <th scope="row" className="mono">
+                      {row.label}
+                    </th>
+                    {chosen.map((m, i) => {
+                      const value = values[i]
+                      const isBest = Number.isFinite(value) && best.has(value)
+                      // 0–1 score rows get an inline bar so a column scan reads the
+                      // relative gap, not just the digits; other rows stay plain.
+                      const showBar = row.bar && Number.isFinite(value)
+                      return (
+                        <td key={m.model_id} className={`mono tnum${isBest ? ' compare-best' : ''}`}>
+                          {showBar ? (
+                            <span className="compare-cell">
+                              <span className="compare-cell__track" aria-hidden="true">
+                                <span
+                                  className="compare-cell__fill"
+                                  style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
+                                />
+                              </span>
+                              <span className="compare-cell__num">{row.fmt(value)}</span>
+                            </span>
+                          ) : (
+                            row.fmt(value)
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
           ))}
-        </tbody>
-      </table>
+        </table>
+      </div>
+      <p className="compare-note">{copy.models.compare.inferenceNote}</p>
     </section>
   )
 }
@@ -291,6 +561,17 @@ export function ModelsPage({ copy, isAdmin }) {
     }
   }
 
+  const handlePromote = (model) => {
+    // The backend allows promoting any non-disabled model, including one whose
+    // weights are not present in THIS deployment (so the operator can always
+    // restore the canonical serving model as default). Warn first so an
+    // unservable default is never set by accident.
+    if (!model.available && !window.confirm(copy.models.promoteUnavailableConfirm)) {
+      return
+    }
+    withBusy(model.model_id, () => promote(model.model_id), copy.models.toast.promoted)
+  }
+
   const toggleCompare = (id) =>
     setCompareIds((current) => {
       const next = new Set(current)
@@ -311,11 +592,18 @@ export function ModelsPage({ copy, isAdmin }) {
         </button>
       </header>
 
+      <p className="lc-hint">
+        <Info size={15} aria-hidden="true" />
+        <span>{copy.models.defaultHint}</span>
+      </p>
+
       <JobMonitor jobs={evaluateJobs} onCancel={cancel} copy={copy} />
 
       {loading && <p className="lc-empty">{copy.models.loading}</p>}
       {error && <p className="lc-empty lc-empty--error">{copy.models.loadError}</p>}
       {!loading && models.length === 0 && <p className="lc-empty">{copy.models.empty}</p>}
+
+      {models.length > 0 && <OverviewStrip models={models} copy={copy} />}
 
       <div className="model-grid">
         {models.map((model) => (
@@ -326,9 +614,7 @@ export function ModelsPage({ copy, isAdmin }) {
             busy={busyId === model.model_id}
             selected={compareIds.has(model.model_id)}
             onToggleCompare={toggleCompare}
-            onPromote={(m) =>
-              withBusy(m.model_id, () => promote(m.model_id), copy.models.toast.promoted)
-            }
+            onPromote={handlePromote}
             onToggleDisabled={(m) =>
               withBusy(
                 m.model_id,
@@ -346,7 +632,7 @@ export function ModelsPage({ copy, isAdmin }) {
         ))}
       </div>
 
-      <ComparePanel models={models} ids={compareIds} copy={copy} />
+      <ComparePanel models={models} ids={compareIds} copy={copy} onClear={() => setCompareIds(new Set())} />
 
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} copy={copy} onSubmit={handleUpload} />
       <EvaluateModal

@@ -1,6 +1,6 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../i18n/translations.js'
 import { ModelsPage } from './ModelsPage.jsx'
 import { DatasetsPage } from './DatasetsPage.jsx'
@@ -53,6 +53,14 @@ function renderPage(element) {
   }
 }
 
+// Reset the shared hoisted mock list state before every test — vi.clearAllMocks()
+// only clears spy call history, NOT object properties, so a test that mutates
+// mocks.models.models must not leak into the next one (test isolation).
+beforeEach(() => {
+  mocks.models.models = []
+  mocks.datasets.datasets = []
+})
+
 afterEach(() => {
   vi.clearAllMocks()
 })
@@ -68,6 +76,51 @@ describe('ModelsPage', () => {
     const { container, unmount } = renderPage(<ModelsPage copy={copy} isAdmin />)
     expect(container.textContent).toContain(copy.models.title)
     expect(container.textContent).toContain(copy.models.empty)
+    unmount()
+  })
+
+  it('keeps "Set default" reachable on a non-default model even when its weights are missing', () => {
+    // Regression: the promote button used to require model.available, so once the
+    // default landed on the only available model, no other card could be promoted —
+    // there was no way to change the default again. It now shows on any non-default,
+    // non-disabled model (matching the backend, which only refuses disabled ones).
+    mocks.models.models = [
+      {
+        model_id: 'a',
+        model_label: 'Serving detector',
+        model_role: 'detector',
+        source: 'builtin',
+        is_default: true,
+        available: true,
+        disabled: false,
+        protected: true,
+        val_metrics: null,
+      },
+      {
+        model_id: 'b',
+        model_label: 'Spare detector',
+        model_role: 'detector',
+        source: 'uploaded',
+        is_default: false,
+        available: false,
+        disabled: false,
+        protected: false,
+        val_metrics: null,
+      },
+    ]
+    const { container, unmount } = renderPage(<ModelsPage copy={copy} isAdmin />)
+    expect(container.textContent).toContain(copy.models.actions.promote)
+    unmount()
+  })
+
+  it('hides "Set default" on a disabled model (matching the backend, which refuses it)', () => {
+    mocks.models.models = [
+      { model_id: 'a', model_label: 'Default', model_role: 'detector', source: 'builtin', is_default: true, available: true, disabled: false, protected: true, val_metrics: null },
+      { model_id: 'b', model_label: 'Disabled', model_role: 'detector', source: 'uploaded', is_default: false, available: true, disabled: true, protected: false, val_metrics: null },
+    ]
+    const { container, unmount } = renderPage(<ModelsPage copy={copy} isAdmin />)
+    // Neither the default (a) nor the disabled (b) model offers promote.
+    expect(container.textContent).not.toContain(copy.models.actions.promote)
     unmount()
   })
 })

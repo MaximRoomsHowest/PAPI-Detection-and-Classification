@@ -10,13 +10,77 @@ export const STORAGE_KEYS = {
 
 // Write a localStorage key, swallowing failures. Some browsers (Safari
 // private mode) throw on setItem; the persisted choice is a nice-to-have,
-// so we accept the loss for the session rather than crashing.
+// so we accept the loss for the session rather than crashing. This is the RAW
+// writer (no consent gate) — use it only for strictly-necessary keys (the consent
+// record itself). Non-essential preferences must go through ``setPreference``.
 export function safeLocalStorageSet(key, value) {
   try {
     window.localStorage.setItem(key, value)
   } catch {
     /* localStorage not available — accept the loss for this session. */
   }
+}
+
+// Remove a localStorage key, swallowing failures (same private-mode/SSR caveats).
+export function safeLocalStorageRemove(key) {
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    /* nothing to clean up if storage is unavailable. */
+  }
+}
+
+// --- Storage-consent gate -------------------------------------------------- //
+// The app persists only FUNCTIONAL preferences (theme, language, runway) — no
+// tracking, no analytics, no third parties. Even so, we ask before writing them so
+// a visitor can keep the session ephemeral. The decision is itself stored (a
+// strictly-necessary record, so we never re-ask) and versioned, so a future policy
+// change can re-prompt by bumping the version.
+export const CONSENT_KEY = 'papi.consent.v1'
+const CONSENT_VERSION = 1
+const CONSENT_DECISIONS = ['accepted', 'declined']
+
+// 'accepted' | 'declined' | null (undecided / unreadable). Read fresh each call so
+// a choice made in another tab (or in tests) is always reflected.
+export function getConsentDecision() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(CONSENT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && parsed.v === CONSENT_VERSION && CONSENT_DECISIONS.includes(parsed.decision)) {
+      return parsed.decision
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// Record the decision. On a refusal, also drop any preferences a prior 'accept'
+// left behind, so declining genuinely stops us remembering anything.
+export function setConsentDecision(decision) {
+  if (!CONSENT_DECISIONS.includes(decision)) return
+  safeLocalStorageSet(CONSENT_KEY, JSON.stringify({ v: CONSENT_VERSION, decision, ts: Date.now() }))
+  if (decision === 'declined') {
+    for (const key of Object.values(STORAGE_KEYS)) {
+      safeLocalStorageRemove(key)
+    }
+  }
+}
+
+// Forget the decision so the banner is shown again (the "Cookie preferences" link).
+export function resetConsentDecision() {
+  safeLocalStorageRemove(CONSENT_KEY)
+}
+
+// Persist a NON-ESSENTIAL preference — honoured only once the visitor has accepted
+// storage; otherwise the value lives in React state for the session and is never
+// written to disk. Returns whether it was persisted.
+export function setPreference(key, value) {
+  if (getConsentDecision() !== 'accepted') return false
+  safeLocalStorageSet(key, value)
+  return true
 }
 
 // Read a localStorage key and validate against an allowlist. Falls back to

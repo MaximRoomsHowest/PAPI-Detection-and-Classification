@@ -4,7 +4,7 @@ import { PapiGlyph } from './PapiGlyph'
 // constant dark band anchors the page bottom regardless of theme). The
 // certification notice is a contractual honesty requirement — it must stay
 // visible in every redesign.
-export function AppFooter({ copy }) {
+export function AppFooter({ copy, onManageCookies }) {
   return (
     <footer className="site-footer">
       <div className="footer-main">
@@ -32,6 +32,11 @@ export function AppFooter({ copy }) {
       <div className="footer-legal">
         <span>{copy.footer.copyright}</span>
         <span>Howest University × Intersoft Electronics Services BV</span>
+        {onManageCookies && (
+          <button type="button" className="footer-legal__link" onClick={onManageCookies}>
+            {copy.cookie.manage}
+          </button>
+        )}
       </div>
     </footer>
   )

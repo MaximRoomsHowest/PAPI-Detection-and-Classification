@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createRunway, deleteRunway as deleteRunwayRequest, fetchRunways } from '../lib/api'
 import { useFetch } from './useFetch'
 import { resolveRunwayId } from '../lib/runwaySelection'
-import { STORAGE_KEYS, safeLocalStorageSet, initialRunwayId } from '../lib/storage'
+import { STORAGE_KEYS, setPreference, initialRunwayId } from '../lib/storage'
 
 // Runway list + selection, shared app-wide via the Live-Demo context so the Runways
 // page and the Live Demo selector stay in sync. Self-contained except for the one
@@ -38,7 +38,9 @@ export function useRunwayManagement() {
   // Persist the effective id (best-effort; safe in private-mode / SSR) so a stale
   // stored id self-heals on disk too once the live list is known.
   useEffect(() => {
-    safeLocalStorageSet(STORAGE_KEYS.runway, effectiveRunwayId)
+    // Best-effort, consent-gated (private-mode / SSR safe): persisted only when the
+    // visitor accepted storage, so a stale id self-heals on disk too.
+    setPreference(STORAGE_KEYS.runway, effectiveRunwayId)
   }, [effectiveRunwayId])
 
   // The full record for the selected runway, shared app-wide so the Live Demo and

@@ -36,12 +36,13 @@ export const translations = {
       home: 'Back to introduction',
     },
     cookie: {
-      title: 'Would you like a cookie?',
-      message: 'A small welcome moment before you start exploring PAPI Vision.',
-      accept: 'Yes, please',
-      decline: 'No thanks',
-      accepted: 'Enjoy the cookie',
-      declined: 'Maybe next time',
+      title: 'Remember your preferences?',
+      message:
+        'PAPI Vision keeps only your interface settings — theme, language and selected runway — in this browser. No analytics, no tracking, no third parties.',
+      detail: 'Allow to remember them next time, or decline to keep this session only.',
+      accept: 'Allow',
+      decline: 'Decline',
+      manage: 'Cookie preferences',
     },
     nav: {
       introduction: 'Introduction',
@@ -74,6 +75,7 @@ export const translations = {
       loadError: 'Could not load models.',
       close: 'Close',
       classesLabel: 'Classes',
+      confLabel: 'Conf',
       confirmDelete: 'Delete model “{label}”? This cannot be undone.',
       badge: {
         default: 'Default',
@@ -119,9 +121,38 @@ export const translations = {
         split: 'Split',
         noDatasets: 'No ready datasets. Upload or label one first.',
         submit: 'Run evaluation',
+        defaultHint: 'Default evaluation set for this model’s classes.',
+      },
+      defaultHint:
+        'The default model runs when a request doesn’t name one — it’s also the live demo’s starting pick. On the live demo you can switch models per analysis without changing this.',
+      promoteHint: 'Use this model when a request doesn’t specify one',
+      promoteUnavailableConfirm:
+        'This model’s weights aren’t present in this deployment, so it can’t serve until they are. Set it as the default anyway?',
+      overview: {
+        total: 'Models',
+        available: 'Available',
+        defaultModel: 'Default',
+        none: 'None',
       },
       compare: {
         title: 'Comparison',
+        hint: 'Select two or more models to compare them side by side.',
+        clear: 'Clear',
+        groupAccuracy: 'Validation accuracy',
+        groupPerClass: 'Per-class F1',
+        groupInference: 'Inference (logged)',
+        groupModel: 'Model',
+        median: 'Median latency',
+        p95: 'P95 latency',
+        mediaImage: 'Images',
+        mediaVideo: 'Videos',
+        samples: 'Logged analyses',
+        size: 'File size',
+        classes: 'Classes',
+        source: 'Source',
+        split: 'Eval split',
+        inferenceNote:
+          'Latency is measured from analyses logged on this deployment; — means none recorded yet.',
       },
       toast: {
         uploaded: 'Model “{label}” uploaded.',
@@ -149,6 +180,7 @@ export const translations = {
       sources: {
         bundle: 'Bundle',
         assisted: 'Assisted',
+        builtin: 'Built-in',
       },
       card: {
         classesLabel: 'Classes',
@@ -460,7 +492,7 @@ export const translations = {
     },
     insights: {
       eyebrow: 'Insights',
-      title: 'Angle profiles, light transitions, and model metrics.',
+      title: 'Angle profiles, light transitions, and inference performance.',
       preparing: 'Preparing PDF',
       download: 'Download charts (PDF)',
       source: 'Every chart is built from real backend output — no synthetic data.',
@@ -566,6 +598,7 @@ export const translations = {
       statusClimb: 'Climb-through (red→white)',
       statusReversal: 'Reversal (→ red)',
       summaryLabel: 'Session summary',
+      summaryEyebrow: 'Session snapshot',
       summarySource: 'Source',
       summaryCaptured: 'Captured',
       summaryLampsCrossed: 'Lamps crossed',
@@ -596,6 +629,8 @@ export const translations = {
       latencyP95: 'Tail (P95)',
       latencyAvg: 'Mean',
       latencyEmpty: 'No timing data for the current filter.',
+      latencyImages: 'Images',
+      latencyVideos: 'Videos',
       filtersTitle: 'Filter logged analyses',
       filterMediaLabel: 'Media type',
       filterMediaAll: 'All media',
@@ -737,12 +772,13 @@ export const translations = {
       home: 'Zurück zur Einführung',
     },
     cookie: {
-      title: 'Möchtest du einen Cookie?',
-      message: 'Ein kleiner Willkommensmoment, bevor du PAPI Vision erkundest.',
-      accept: 'Ja, gerne',
-      decline: 'Nein danke',
-      accepted: 'Genieß den Cookie',
-      declined: 'Vielleicht nächstes Mal',
+      title: 'Einstellungen merken?',
+      message:
+        'PAPI Vision speichert nur deine Oberflächeneinstellungen — Design, Sprache und ausgewählte Landebahn — in diesem Browser. Keine Analyse, kein Tracking, keine Dritten.',
+      detail: 'Erlaube das Speichern, um sie beim nächsten Mal zu behalten, oder lehne ab, um nur diese Sitzung zu nutzen.',
+      accept: 'Erlauben',
+      decline: 'Ablehnen',
+      manage: 'Cookie-Einstellungen',
     },
     nav: {
       introduction: 'Einführung',
@@ -775,6 +811,7 @@ export const translations = {
       loadError: 'Modelle konnten nicht geladen werden.',
       close: 'Schließen',
       classesLabel: 'Klassen',
+      confLabel: 'Konf.',
       confirmDelete: 'Modell „{label}“ löschen? Dies kann nicht rückgängig gemacht werden.',
       badge: {
         default: 'Standard',
@@ -820,9 +857,38 @@ export const translations = {
         split: 'Split',
         noDatasets: 'Keine bereiten Datensätze. Zuerst einen hochladen oder labeln.',
         submit: 'Bewertung starten',
+        defaultHint: 'Standard-Bewertungssatz für die Klassen dieses Modells.',
+      },
+      defaultHint:
+        'Das Standardmodell wird verwendet, wenn eine Anfrage keines angibt — es ist auch die anfängliche Auswahl der Live-Demo. In der Live-Demo kannst du das Modell pro Analyse wechseln, ohne dies zu ändern.',
+      promoteHint: 'Dieses Modell verwenden, wenn eine Anfrage keines angibt',
+      promoteUnavailableConfirm:
+        'Die Gewichte dieses Modells sind in dieser Installation nicht vorhanden, daher kann es erst nach deren Bereitstellung verwendet werden. Trotzdem als Standard festlegen?',
+      overview: {
+        total: 'Modelle',
+        available: 'Verfügbar',
+        defaultModel: 'Standard',
+        none: 'Keine',
       },
       compare: {
         title: 'Vergleich',
+        hint: 'Wähle zwei oder mehr Modelle aus, um sie nebeneinander zu vergleichen.',
+        clear: 'Zurücksetzen',
+        groupAccuracy: 'Validierungsgenauigkeit',
+        groupPerClass: 'F1 je Klasse',
+        groupInference: 'Inferenz (protokolliert)',
+        groupModel: 'Modell',
+        median: 'Median-Latenz',
+        p95: 'P95-Latenz',
+        mediaImage: 'Bilder',
+        mediaVideo: 'Videos',
+        samples: 'Protokollierte Analysen',
+        size: 'Dateigröße',
+        classes: 'Klassen',
+        source: 'Quelle',
+        split: 'Bewertungs-Split',
+        inferenceNote:
+          'Die Latenz wird aus den in dieser Installation protokollierten Analysen gemessen; — bedeutet, dass noch keine erfasst wurden.',
       },
       toast: {
         uploaded: 'Modell „{label}“ hochgeladen.',
@@ -850,6 +916,7 @@ export const translations = {
       sources: {
         bundle: 'Bündel',
         assisted: 'Assistiert',
+        builtin: 'Integriert',
       },
       card: {
         classesLabel: 'Klassen',
@@ -1161,7 +1228,7 @@ export const translations = {
     },
     insights: {
       eyebrow: 'Einblicke',
-      title: 'Modellnachweise, Lampenübergänge und Laufzeit.',
+      title: 'Winkelprofile, Lampenübergänge und Inferenzleistung.',
       preparing: 'PDF wird vorbereitet',
       download: 'Diagramme herunterladen (PDF)',
       source: 'Jedes Diagramm basiert auf echten Backend-Ausgaben – keine synthetischen Daten.',
@@ -1267,6 +1334,7 @@ export const translations = {
       statusClimb: 'Durchstieg (rot→weiß)',
       statusReversal: 'Umkehrung (→ rot)',
       summaryLabel: 'Sitzungsübersicht',
+      summaryEyebrow: 'Sitzungs-Snapshot',
       summarySource: 'Quelle',
       summaryCaptured: 'Erfasst',
       summaryLampsCrossed: 'Umgeschaltete Lampen',
@@ -1297,6 +1365,8 @@ export const translations = {
       latencyP95: 'Ausreißer (P95)',
       latencyAvg: 'Mittelwert',
       latencyEmpty: 'Keine Zeitdaten für den aktuellen Filter.',
+      latencyImages: 'Bilder',
+      latencyVideos: 'Videos',
       filtersTitle: 'Erfasste Analysen filtern',
       filterMediaLabel: 'Medientyp',
       filterMediaAll: 'Alle Medien',
@@ -1438,12 +1508,13 @@ export const translations = {
       home: 'Terug naar introductie',
     },
     cookie: {
-      title: 'Wil je een cookie?',
-      message: 'Een klein welkomstmoment voordat je PAPI Vision verkent.',
-      accept: 'Ja, graag',
-      decline: 'Nee bedankt',
-      accepted: 'Veel plezier met de cookie',
-      declined: 'Misschien volgende keer',
+      title: 'Voorkeuren onthouden?',
+      message:
+        'PAPI Vision bewaart alleen je interface-instellingen — thema, taal en gekozen baan — in deze browser. Geen analyse, geen tracking, geen derden.',
+      detail: 'Sta toe om ze de volgende keer te onthouden, of weiger om alleen deze sessie te gebruiken.',
+      accept: 'Toestaan',
+      decline: 'Weigeren',
+      manage: 'Cookievoorkeuren',
     },
     nav: {
       introduction: 'Introductie',
@@ -1476,6 +1547,7 @@ export const translations = {
       loadError: 'Kon modellen niet laden.',
       close: 'Sluiten',
       classesLabel: 'Klassen',
+      confLabel: 'Conf.',
       confirmDelete: 'Model “{label}” verwijderen? Dit kan niet ongedaan worden gemaakt.',
       badge: {
         default: 'Standaard',
@@ -1521,9 +1593,38 @@ export const translations = {
         split: 'Split',
         noDatasets: 'Geen gereed datasets. Upload of label er eerst een.',
         submit: 'Evaluatie starten',
+        defaultHint: 'Standaard evaluatieset voor de klassen van dit model.',
+      },
+      defaultHint:
+        'Het standaardmodel wordt gebruikt wanneer een verzoek er geen opgeeft — het is ook de startkeuze van de live demo. In de live demo kun je per analyse van model wisselen zonder dit te wijzigen.',
+      promoteHint: 'Gebruik dit model wanneer een verzoek er geen opgeeft',
+      promoteUnavailableConfirm:
+        'De gewichten van dit model zijn niet aanwezig in deze installatie, dus het kan pas draaien als die er zijn. Toch als standaard instellen?',
+      overview: {
+        total: 'Modellen',
+        available: 'Beschikbaar',
+        defaultModel: 'Standaard',
+        none: 'Geen',
       },
       compare: {
         title: 'Vergelijking',
+        hint: 'Selecteer twee of meer modellen om ze naast elkaar te vergelijken.',
+        clear: 'Wissen',
+        groupAccuracy: 'Validatienauwkeurigheid',
+        groupPerClass: 'F1 per klasse',
+        groupInference: 'Inferentie (gelogd)',
+        groupModel: 'Model',
+        median: 'Mediane latentie',
+        p95: 'P95-latentie',
+        mediaImage: 'Afbeeldingen',
+        mediaVideo: 'Video’s',
+        samples: 'Gelogde analyses',
+        size: 'Bestandsgrootte',
+        classes: 'Klassen',
+        source: 'Bron',
+        split: 'Evaluatie-split',
+        inferenceNote:
+          'Latentie wordt gemeten uit analyses die op deze installatie zijn gelogd; — betekent dat er nog geen zijn vastgelegd.',
       },
       toast: {
         uploaded: 'Model “{label}” geüpload.',
@@ -1551,6 +1652,7 @@ export const translations = {
       sources: {
         bundle: 'Bundel',
         assisted: 'Assistief',
+        builtin: 'Ingebouwd',
       },
       card: {
         classesLabel: 'Klassen',
@@ -1862,7 +1964,7 @@ export const translations = {
     },
     insights: {
       eyebrow: 'Inzichten',
-      title: 'Modelbewijs, lampovergangen en runtime.',
+      title: 'Hoekprofielen, lampovergangen en inferentieprestaties.',
       preparing: 'PDF voorbereiden',
       download: 'Grafieken downloaden (PDF)',
       source: 'Elke grafiek is gebaseerd op echte backend-uitvoer – geen synthetische gegevens.',
@@ -1968,6 +2070,7 @@ export const translations = {
       statusClimb: 'Doorstijging (rood→wit)',
       statusReversal: 'Omkering (→ rood)',
       summaryLabel: 'Sessieoverzicht',
+      summaryEyebrow: 'Sessie-snapshot',
       summarySource: 'Bron',
       summaryCaptured: 'Vastgelegd',
       summaryLampsCrossed: 'Omgeschakelde lampen',
@@ -1998,6 +2101,8 @@ export const translations = {
       latencyP95: 'Uitschieter (P95)',
       latencyAvg: 'Gemiddelde',
       latencyEmpty: 'Geen tijdsgegevens voor het huidige filter.',
+      latencyImages: 'Afbeeldingen',
+      latencyVideos: 'Video’s',
       filtersTitle: 'Geregistreerde analyses filteren',
       filterMediaLabel: 'Mediatype',
       filterMediaAll: 'Alle media',
@@ -2139,12 +2244,13 @@ export const translations = {
       home: 'Retour à l’introduction',
     },
     cookie: {
-      title: 'Voulez-vous un cookie ?',
-      message: 'Un petit moment d’accueil avant d’explorer PAPI Vision.',
-      accept: 'Oui, volontiers',
-      decline: 'Non merci',
-      accepted: 'Profitez du cookie',
-      declined: 'Peut-être plus tard',
+      title: 'Mémoriser vos préférences ?',
+      message:
+        'PAPI Vision ne conserve que vos réglages d’interface — thème, langue et piste sélectionnée — dans ce navigateur. Aucune analyse, aucun suivi, aucun tiers.',
+      detail: 'Autorisez pour les retenir la prochaine fois, ou refusez pour limiter à cette session.',
+      accept: 'Autoriser',
+      decline: 'Refuser',
+      manage: 'Préférences cookies',
     },
     nav: {
       introduction: 'Introduction',
@@ -2177,6 +2283,7 @@ export const translations = {
       loadError: 'Impossible de charger les modèles.',
       close: 'Fermer',
       classesLabel: 'Classes',
+      confLabel: 'Conf.',
       confirmDelete: 'Supprimer le modèle « {label} » ? Cette action est irréversible.',
       badge: {
         default: 'Par défaut',
@@ -2222,9 +2329,38 @@ export const translations = {
         split: 'Partition',
         noDatasets: 'Aucun jeu prêt. Téléversez ou labellisez-en un d’abord.',
         submit: 'Lancer l’évaluation',
+        defaultHint: 'Jeu d’évaluation par défaut pour les classes de ce modèle.',
+      },
+      defaultHint:
+        'Le modèle par défaut est utilisé lorsqu’une requête n’en précise aucun — c’est aussi la sélection initiale de la démo en direct. Dans la démo, vous pouvez changer de modèle à chaque analyse sans modifier ce réglage.',
+      promoteHint: 'Utiliser ce modèle lorsqu’une requête n’en précise aucun',
+      promoteUnavailableConfirm:
+        'Les poids de ce modèle ne sont pas présents dans ce déploiement ; il ne pourra donc pas s’exécuter tant qu’ils n’y sont pas. Le définir tout de même comme modèle par défaut ?',
+      overview: {
+        total: 'Modèles',
+        available: 'Disponibles',
+        defaultModel: 'Par défaut',
+        none: 'Aucun',
       },
       compare: {
         title: 'Comparaison',
+        hint: 'Sélectionnez au moins deux modèles pour les comparer côte à côte.',
+        clear: 'Effacer',
+        groupAccuracy: 'Précision de validation',
+        groupPerClass: 'F1 par classe',
+        groupInference: 'Inférence (journalisée)',
+        groupModel: 'Modèle',
+        median: 'Latence médiane',
+        p95: 'Latence P95',
+        mediaImage: 'Images',
+        mediaVideo: 'Vidéos',
+        samples: 'Analyses journalisées',
+        size: 'Taille du fichier',
+        classes: 'Classes',
+        source: 'Source',
+        split: 'Split d’évaluation',
+        inferenceNote:
+          'La latence est mesurée à partir des analyses journalisées sur ce déploiement ; — signifie qu’aucune n’a encore été enregistrée.',
       },
       toast: {
         uploaded: 'Modèle « {label} » téléversé.',
@@ -2252,6 +2388,7 @@ export const translations = {
       sources: {
         bundle: 'Archive',
         assisted: 'Assisté',
+        builtin: 'Intégré',
       },
       card: {
         classesLabel: 'Classes',
@@ -2563,7 +2700,7 @@ export const translations = {
     },
     insights: {
       eyebrow: 'Analyses',
-      title: 'Preuves du modèle, transitions des lampes et temps d’exécution.',
+      title: 'Profils d’angle, transitions des lampes et performance d’inférence.',
       preparing: 'Préparation du PDF',
       download: 'Télécharger les graphiques (PDF)',
       source: 'Chaque graphique est construit à partir de données réelles du backend – aucune donnée synthétique.',
@@ -2669,6 +2806,7 @@ export const translations = {
       statusClimb: 'Montée (rouge→blanc)',
       statusReversal: 'Inversion (→ rouge)',
       summaryLabel: 'Résumé de la session',
+      summaryEyebrow: 'Aperçu de la session',
       summarySource: 'Source',
       summaryCaptured: 'Capturé',
       summaryLampsCrossed: 'Feux basculés',
@@ -2699,6 +2837,8 @@ export const translations = {
       latencyP95: 'Queue (P95)',
       latencyAvg: 'Moyenne',
       latencyEmpty: 'Aucune donnée de temps pour le filtre actuel.',
+      latencyImages: 'Images',
+      latencyVideos: 'Vidéos',
       filtersTitle: 'Filtrer les analyses enregistrées',
       filterMediaLabel: 'Type de média',
       filterMediaAll: 'Tous les médias',

@@ -81,20 +81,43 @@ function GlobalStateDistribution({ stats, plotTheme, copy }) {
 }
 
 // Cool, non-reserved tones (never red/white/amber, never purple) so the latency
-// bars never read as a lamp state.
-const LATENCY_COLORS = { avg: '#5b6b7b', p50: '#2f6fed' }
+// bars never read as a lamp state. Image vs video get distinct hues.
+const LATENCY_COLORS = { image: '#2f6fed', video: '#0f9d8c' }
+
+function _round(value) {
+  return Number.isFinite(value) ? Math.round(value) : null
+}
 
 function LatencyChart({ stats, plotTheme, copy }) {
-  // Bottom-to-top: Mean, Median (P50), Tail (P95) — so the slow tail sits on top.
-  const rows = [
-    { label: copy.insights.latencyAvg, value: Number.isFinite(stats?.avg_processing_ms) ? Math.round(stats.avg_processing_ms) : null, color: LATENCY_COLORS.avg },
-    { label: copy.insights.latencyP50, value: Number.isFinite(stats?.p50_processing_ms) ? stats.p50_processing_ms : null, color: LATENCY_COLORS.p50 },
-    { label: copy.insights.latencyP95, value: Number.isFinite(stats?.p95_processing_ms) ? stats.p95_processing_ms : null, color: plotTheme.accent },
-  ].filter((row) => Number.isFinite(row.value))
+  // Mean / Median (P50) / Tail (P95), split by media type — a whole-video analysis
+  // spans many frames so its processing time dwarfs a single image's; mixing them
+  // into one bar would be misleading.
+  const labels = [copy.insights.latencyAvg, copy.insights.latencyP50, copy.insights.latencyP95]
+  const imageVals = [_round(stats?.image_avg_processing_ms), stats?.image_p50_processing_ms ?? null, stats?.image_p95_processing_ms ?? null]
+  const videoVals = [_round(stats?.video_avg_processing_ms), stats?.video_p50_processing_ms ?? null, stats?.video_p95_processing_ms ?? null]
+  const hasImage = imageVals.some((v) => Number.isFinite(v))
+  const hasVideo = videoVals.some((v) => Number.isFinite(v))
 
-  if (!rows.length) {
+  if (!hasImage && !hasVideo) {
     return <AngleEmptyState icon={<Gauge size={26} aria-hidden="true" />} message={copy.insights.latencyEmpty} />
   }
+
+  const trace = (name, vals, color) => ({
+    name,
+    type: 'bar',
+    orientation: 'h',
+    y: labels,
+    x: vals,
+    marker: { color },
+    text: vals.map((v) => (Number.isFinite(v) ? `${v.toLocaleString()} ms` : '')),
+    textposition: 'outside',
+    textfont: { color: plotTheme.muted, size: 11 },
+    cliponaxis: false,
+    hovertemplate: `${name} · %{y}<br>%{x:,} ms<extra></extra>`,
+  })
+  const data = []
+  if (hasImage) data.push(trace(copy.insights.latencyImages, imageVals, LATENCY_COLORS.image))
+  if (hasVideo) data.push(trace(copy.insights.latencyVideos, videoVals, LATENCY_COLORS.video))
 
   return (
     <LazyPlot
@@ -102,23 +125,13 @@ function LatencyChart({ stats, plotTheme, copy }) {
       config={plotlyConfig}
       copy={copy}
       ariaLabel={copy.insights.latencyTitle}
-      data={[
-        {
-          type: 'bar',
-          orientation: 'h',
-          y: rows.map((row) => row.label),
-          x: rows.map((row) => row.value),
-          marker: { color: rows.map((row) => row.color) },
-          text: rows.map((row) => `${row.value.toLocaleString()} ms`),
-          textposition: 'outside',
-          textfont: { color: plotTheme.muted, size: 11 },
-          cliponaxis: false,
-          hovertemplate: `%{y}<br>%{x:,} ms<extra></extra>`,
-        },
-      ]}
+      data={data}
       layout={basePlotLayout(plotTheme, {
-        height: 240,
+        height: 260,
         margin: { l: 96, r: 48, t: 10, b: 40 },
+        barmode: 'group',
+        showlegend: data.length > 1,
+        legend: { orientation: 'h', y: 1.12, x: 0, font: { color: plotTheme.muted, size: 11 } },
         xaxis: baseAxisStyle(plotTheme, {
           title: axisTitle(copy.insights.latencyAxis, plotTheme),
           gridcolor: plotTheme.grid,

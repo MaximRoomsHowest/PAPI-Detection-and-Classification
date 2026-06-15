@@ -90,10 +90,12 @@
 
 .model-card__head {
   justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .model-card__titles {
   min-width: 0;
+  flex: 1;
 }
 
 .model-card__label,
@@ -148,7 +150,7 @@
 .model-card__metrics,
 .dataset-card__counts {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin: 0;
 }
@@ -179,6 +181,126 @@
   margin: 2px 0 0;
   font-size: 0.92rem;
   color: var(--text-strong);
+}
+
+/* Redesigned model-card metrics: 0–1 scores as labelled bars (instant visual gap),
+   a credentials chip row, and a collapsible per-class breakdown. */
+.model-card__scores {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 2px 0 0;
+}
+
+.score-bar {
+  display: grid;
+  grid-template-columns: 80px 1fr 46px;
+  align-items: center;
+  gap: 10px;
+}
+
+.score-bar__label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.score-bar__track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.score-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, transparent), var(--accent));
+}
+
+.score-bar__value {
+  font-size: 0.82rem;
+  color: var(--text-strong);
+  text-align: right;
+}
+
+.model-card__cred {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 0;
+}
+
+.model-card__cred span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: 0.74rem;
+  color: var(--text-strong);
+}
+
+.model-card__cred i {
+  font-style: normal;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.model-card__perclass {
+  margin: 0;
+}
+
+.model-card__perclass > summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.model-card__perclass > summary:hover {
+  color: var(--text-strong);
+}
+
+.model-card__perclass .model-per-class {
+  margin-top: 6px;
+}
+
+/* Inline bar inside a compare-table score cell. */
+.compare-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.compare-cell__track {
+  flex: 1;
+  height: 6px;
+  min-width: 28px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.compare-cell__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 60%, transparent), var(--accent));
+}
+
+.compare-cell__num {
+  flex-shrink: 0;
+  min-width: 38px;
+  text-align: right;
 }
 
 .model-card__actions,
@@ -611,9 +733,176 @@
   font: inherit;
 }
 
+/* --- Page hint + overview strip --------------------------------------- */
+.lc-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.lc-hint svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.lc-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lc-overview__stat {
+  flex: 1 1 120px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-overview__stat--wide {
+  flex: 2 1 220px;
+}
+
+.lc-overview__num {
+  font-size: 1.4rem;
+  color: var(--text-strong);
+  line-height: 1.1;
+}
+
+.lc-overview__num--text {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.lc-overview__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+}
+
+/* --- Card refinements -------------------------------------------------- */
+.model-card__head .model-card__compare {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* De-emphasise unavailable models with a recessed surface rather than opacity —
+   card-wide opacity would drop the small metric/label text below WCAG AA contrast.
+   The UNAVAILABLE badge carries the status; the default card keeps its accent
+   border either way. */
+.model-card--muted {
+  background: var(--surface-muted);
+}
+
+.model-card__reason {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--warn);
+}
+
+/* --- Compare refinements ---------------------------------------------- */
+.compare-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.compare-scroll {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.compare-table {
+  margin-top: 0;
+}
+
+.compare-table th:first-child,
+.compare-table td:first-child {
+  text-align: left;
+}
+
+.compare-th__tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 6px;
+  vertical-align: middle;
+}
+
+.compare-group th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  background: var(--surface-muted);
+  padding-top: 12px;
+}
+
+.compare-best {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Non-colour cue so the winning value reads as "best" without relying on hue
+   alone (colour-blind / high-contrast). Pseudo-content is not selectable, so
+   copying a cell still yields just the number. */
+.compare-best::after {
+  content: ' ✓';
+  font-weight: 700;
+}
+
+/* When the winning cell carries an inline bar, the bar length + accent tint already
+   signal "best"; the trailing ✓ would wrap below the full-width bar, so drop it there. */
+.compare-best:has(.compare-cell)::after {
+  content: none;
+}
+
+.compare-note {
+  margin: 10px 0 0;
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
 @media (max-width: 640px) {
   .hyper-grid,
   .train-options {
     grid-template-columns: 1fr;
+  }
+
+  .model-card__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lc-page__head {
+    align-items: flex-start;
+  }
+
+  /* Right-edge shadow hinting the compare table scrolls horizontally where the
+     viewport can't show every column. */
+  .compare-scroll {
+    box-shadow: inset -14px 0 12px -12px rgba(0, 0, 0, 0.35);
   }
 }

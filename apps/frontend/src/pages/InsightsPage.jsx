@@ -6,7 +6,6 @@ import clsx from 'clsx'
 import { AngleVsStateCharts } from '../components/insights/AngleVsStateCharts'
 import { TransitionCharts } from '../components/insights/TransitionCharts'
 import { SessionSummaryCharts } from '../components/insights/SessionSummaryCharts'
-import { ModelPerformance } from '../components/insights/ModelPerformance'
 import { InferencePerformance } from '../components/insights/InferencePerformance'
 import { InsightsSummaryStrip } from '../components/insights/InsightsSummaryStrip'
 import { sessionRunwaySummary } from '../lib/runwaySelection'
@@ -23,17 +22,18 @@ import { useChartExport } from '../hooks/useChartExport'
 import { useFetch } from '../hooks/useFetch'
 import { useLiveDemo } from '../context/liveDemoContext'
 
-// Insights is an overview-first analytical console: an always-visible KPI strip
-// (the verdict layer) above five focused, question-led section tabs —
+// Insights is an overview-first analytical console: an always-visible session
+// snapshot (the verdict layer) above four focused, question-led section tabs —
 //   • Transition analysis   (commissioning: measured crossing angles + flips)
 //   • Angle analysis         (redness vs angle small multiples + descent profile)
 //   • Lamp analysis          (per-light state mix + detection confidence)
-//   • Model performance      (the detector's evaluation card + per-class P/R/F1)
 //   • Inference performance  (filterable fleet distribution + latency percentiles)
-// Progressive disclosure: the user sees one focused section at a time and the most
-// relevant one is selected by default. All panels are force-mounted (CSS parks the
-// inactive ones off-screen at full size) so PDF export captures every chart and
-// Plotly never re-initialises on a tab switch.
+// Model evaluation metrics (precision/recall/mAP + per-class P/R/F1) live on the
+// Models page now — Insights stays focused on the SESSION, not the detector's CV
+// scores. Progressive disclosure: the user sees one focused section at a time and
+// the most relevant one is selected by default. All panels are force-mounted (CSS
+// parks the inactive ones off-screen at full size) so PDF export captures every
+// chart and Plotly never re-initialises on a tab switch.
 export function InsightsPage({ plotTheme, copy }) {
   const { backendResults, runways = [] } = useLiveDemo()
   const [searchParams] = useSearchParams()
@@ -108,12 +108,12 @@ export function InsightsPage({ plotTheme, copy }) {
     { value: 'transition', label: copy.insights.tabTransition, question: copy.insights.qTransition },
     { value: 'angle', label: copy.insights.tabAngle, question: copy.insights.qAngle },
     { value: 'lamp', label: copy.insights.tabLamp, question: copy.insights.qLamp },
-    { value: 'model', label: copy.insights.tabModel, question: copy.insights.qModel },
     { value: 'inference', label: copy.insights.tabInference, question: copy.insights.qInference },
   ]
   // Most relevant section first: a swept video leads with transitions, any other
-  // analysis with lamp states, and a no-session visit with the model card.
-  const preferredTab = hasTransitions ? 'transition' : hasSession ? 'lamp' : 'model'
+  // analysis with lamp states, and a no-session visit with the fleet inference
+  // section (the only tab that always has its own backend data).
+  const preferredTab = hasTransitions ? 'transition' : hasSession ? 'lamp' : 'inference'
   const activeTab = tab ?? preferredTab
 
   useEffect(() => {
@@ -274,8 +274,7 @@ export function InsightsPage({ plotTheme, copy }) {
             tabDefs[2],
             <SessionSummaryCharts backendResults={sourceResults} plotTheme={plotTheme} copy={copy} />,
           )}
-          {renderPanel(tabDefs[3], <ModelPerformance plotTheme={plotTheme} copy={copy} />)}
-          {renderPanel(tabDefs[4], <InferencePerformance plotTheme={plotTheme} copy={copy} />)}
+          {renderPanel(tabDefs[3], <InferencePerformance plotTheme={plotTheme} copy={copy} />)}
         </div>
       </Tabs.Root>
     </section>

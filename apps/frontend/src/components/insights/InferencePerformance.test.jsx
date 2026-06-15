@@ -53,10 +53,20 @@ beforeEach(() => {
   mocks.fetchStats.mockResolvedValue({
     by_global_state: { correct_glidepath: 7, too_low: 3 },
     total_analyses: 10,
+    image_count: 4,
+    video_count: 6,
     avg_confidence: 0.59,
-    avg_processing_ms: 7776,
+    // Internally consistent: overall avg = (4*320 + 6*12000) / 10 = 7328.
+    avg_processing_ms: 7328,
     p50_processing_ms: 404,
     p95_processing_ms: 23714,
+    // Latency is split by media type (a video spans many frames vs a single image).
+    image_avg_processing_ms: 320,
+    image_p50_processing_ms: 300,
+    image_p95_processing_ms: 600,
+    video_avg_processing_ms: 12000,
+    video_p50_processing_ms: 9000,
+    video_p95_processing_ms: 30000,
   })
   mocks.fetchModels.mockResolvedValue([
     { model_id: 'small', model_label: 'Small detector', is_default: true },
@@ -99,6 +109,49 @@ describe('InferencePerformance', () => {
 
     const lastArg = mocks.fetchStats.mock.calls.at(-1)[0]
     expect(lastArg.mediaType).toBe('video')
+  })
+
+  it('still renders the latency chart when only one media type has data', async () => {
+    mocks.fetchStats.mockResolvedValue({
+      by_global_state: { correct_glidepath: 5 },
+      total_analyses: 5,
+      image_count: 5,
+      video_count: 0,
+      avg_processing_ms: 300,
+      image_avg_processing_ms: 300,
+      image_p50_processing_ms: 280,
+      image_p95_processing_ms: 600,
+      video_avg_processing_ms: null,
+      video_p50_processing_ms: null,
+      video_p95_processing_ms: null,
+    })
+    const { container } = render(<InferencePerformance plotTheme={plotTheme} copy={copy} />)
+    await flush()
+    await flush()
+    // Global-state distribution + latency (images-only) both render.
+    expect(container.querySelectorAll('.plot-stub').length).toBe(2)
+  })
+
+  it('shows the latency empty state when no media has timing data', async () => {
+    mocks.fetchStats.mockResolvedValue({
+      by_global_state: { correct_glidepath: 2 },
+      total_analyses: 2,
+      image_count: 2,
+      video_count: 0,
+      avg_processing_ms: null,
+      image_avg_processing_ms: null,
+      image_p50_processing_ms: null,
+      image_p95_processing_ms: null,
+      video_avg_processing_ms: null,
+      video_p50_processing_ms: null,
+      video_p95_processing_ms: null,
+    })
+    const { container } = render(<InferencePerformance plotTheme={plotTheme} copy={copy} />)
+    await flush()
+    await flush()
+    // Only the global-state chart renders; the latency chart shows its empty state.
+    expect(container.querySelectorAll('.plot-stub').length).toBe(1)
+    expect(container.textContent).toContain(copy.insights.latencyEmpty)
   })
 
   it('surfaces a backend error in the section', async () => {

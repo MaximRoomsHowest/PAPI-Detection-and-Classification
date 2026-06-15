@@ -6,8 +6,9 @@ import {
   STORAGE_KEYS,
   initialLanguage,
   initialTheme,
-  safeLocalStorageSet,
+  setPreference,
 } from './lib/storage'
+import { useConsent } from './hooks/useConsent'
 import { translations } from './i18n/translations'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
@@ -74,6 +75,8 @@ function App() {
   const copy = translations[language]
   // Admin mode reveals the model-management surface and carries the API key (if any).
   const admin = useAdminKey()
+  // Storage consent gates whether theme/language/runway are remembered across visits.
+  const consent = useConsent()
 
   // Mirrors the index.css token sheet for the canvas/SVG world Plotly draws
   // into (CSS custom properties can't reach chart internals). Values must stay
@@ -108,19 +111,19 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    // Persist so the choice survives a page reload (regression
-    // FE-MOD-CRIT-3 / papi-user-test-2026-05-28). Wrapped in try/catch
-    // because some browsers (Safari private mode) throw on setItem.
-    safeLocalStorageSet(STORAGE_KEYS.theme, theme)
-  }, [theme])
+    // Persist so the choice survives a reload (regression FE-MOD-CRIT-3) — but only
+    // with storage consent. consent.decision is a dep so accepting later flushes the
+    // current theme; declining is a no-op (the value stays session-only).
+    setPreference(STORAGE_KEYS.theme, theme)
+  }, [theme, consent.decision])
 
   useEffect(() => {
-    safeLocalStorageSet(STORAGE_KEYS.language, language)
+    setPreference(STORAGE_KEYS.language, language)
     // Keep <html lang> in sync so screen readers switch voices with the UI and
     // locale-aware CSS/formatting sees the active language (index.html ships
     // lang="en" statically).
     document.documentElement.lang = language
-  }, [language])
+  }, [language, consent.decision])
 
   return (
     <div className="app-shell">
@@ -168,9 +171,9 @@ function App() {
         </ErrorBoundary>
       </main>
 
-      <AppFooter copy={copy} />
+      <AppFooter copy={copy} onManageCookies={consent.reopen} />
 
-      <CookieConsent copy={copy} />
+      <CookieConsent copy={copy} consent={consent} />
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

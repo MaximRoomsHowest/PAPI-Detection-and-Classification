@@ -315,45 +315,214 @@
   margin-left: 2px;
 }
 
-/* Verdict / summary strip — at-a-glance roll-up above the tabs (readability audit).
-   The verdict panel reads as the console's headline status block. */
-.insights-summary {
+/* Session snapshot — the at-a-glance verdict layer above the tabs. Clear hierarchy
+   (the old flat tile-row gave every number equal weight): a hero "lamps crossed"
+   stat + a data-trust badge on top, an icon-led metric grid below, and the honest
+   verdict sentence at the foot. */
+.session-snapshot {
   margin: 0 0 18px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
 }
 
-.insights-summary__tiles {
+.session-snapshot__top {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.model-credentials {
+.session-snapshot__hero {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 10px 14px;
-  margin: 12px 0 14px;
-  padding: 12px;
+  grid-template-columns: auto auto;
+  grid-template-areas: 'eyebrow eyebrow' 'num label' 'pips pips';
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.session-snapshot__eyebrow {
+  grid-area: eyebrow;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.session-snapshot__crossed {
+  grid-area: num;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.session-snapshot__crossed-num {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-strong);
+}
+
+.session-snapshot__crossed-total {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.session-snapshot__crossed-label {
+  grid-area: label;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.session-snapshot__pips {
+  grid-area: pips;
+  display: inline-flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.snapshot-pip {
+  width: 26px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
+.snapshot-pip.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.session-snapshot__trust {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+.session-snapshot__trust > svg {
+  color: var(--lamp-white-border);
+  flex-shrink: 0;
+}
+
+.session-snapshot__trust.is-warn {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--border));
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+}
+
+.session-snapshot__trust.is-warn > svg {
+  color: var(--warn);
+}
+
+.session-snapshot__trust-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.session-snapshot__trust-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.session-snapshot__trust-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.session-snapshot__trust.is-warn .session-snapshot__trust-value {
+  color: var(--warn);
+}
+
+.session-snapshot__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.snapshot-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-muted);
 }
 
-.insights-summary__verdict {
-  margin: 14px 0 0;
-  padding-top: 12px;
+.snapshot-metric__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.snapshot-metric__label svg {
+  color: var(--text-muted);
+}
+
+.snapshot-metric__value {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+
+.snapshot-metric__value small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.session-snapshot__verdict {
+  margin: 16px 0 0;
+  padding-top: 13px;
   border-top: 1px solid var(--border);
   font-size: 13.5px;
   color: var(--text-muted);
 }
 
-.insights-summary__verdict.is-warn {
+.session-snapshot__verdict.is-warn {
   color: var(--warn);
   font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .session-snapshot__top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .session-snapshot__trust {
+    align-self: flex-start;
+  }
 }
 
 /* Transition table: one Direction cell + a climb-through/reversal status (audit P1-C). */
