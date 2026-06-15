@@ -124,8 +124,11 @@ class MediaStorage:
                 # Test doubles and older wrappers can expose blob operations on the
                 # container object itself. Keep that path while using BlobClient in
                 # production, where ContainerClient has no get_blob_properties().
-                get_properties = lambda: client.get_blob_properties(blob_name)
-                download_blob = lambda **kwargs: client.download_blob(blob_name, **kwargs)
+                def get_properties():
+                    return client.get_blob_properties(blob_name)
+
+                def download_blob(**kwargs):
+                    return client.download_blob(blob_name, **kwargs)
             try:
                 size = get_properties().size
                 byte_range = _parse_byte_range(range_header, size)
