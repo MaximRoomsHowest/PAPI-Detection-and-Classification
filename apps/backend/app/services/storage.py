@@ -116,18 +116,28 @@ class MediaStorage:
             blob_name = _safe_export_blob_name(file_path)
             media_type = _served_media_type(blob_name)
             client = self._container_client()
+            if hasattr(client, "get_blob_client"):
+                blob = client.get_blob_client(blob_name)
+                get_properties = blob.get_blob_properties
+                download_blob = blob.download_blob
+            else:
+                # Test doubles and older wrappers can expose blob operations on the
+                # container object itself. Keep that path while using BlobClient in
+                # production, where ContainerClient has no get_blob_properties().
+                get_properties = lambda: client.get_blob_properties(blob_name)
+                download_blob = lambda **kwargs: client.download_blob(blob_name, **kwargs)
             try:
-                size = client.get_blob_properties(blob_name).size
+                size = get_properties().size
                 byte_range = _parse_byte_range(range_header, size)
                 if byte_range is None:
-                    downloader = client.download_blob(blob_name)
+                    downloader = download_blob()
                     return StreamingResponse(
                         downloader.chunks(),
                         media_type=media_type,
                         headers={"accept-ranges": "bytes", "content-length": str(size)},
                     )
                 start, end = byte_range
-                downloader = client.download_blob(blob_name, offset=start, length=end - start + 1)
+                downloader = download_blob(offset=start, length=end - start + 1)
                 return StreamingResponse(
                     downloader.chunks(),
                     status_code=206,

@@ -87,7 +87,9 @@ export function scenarioFromBackendResult(result, context, angleUnavailableLabel
       boxConfidence: percent(result.confidence),
     },
     environmentClass: 'clear',
-    artifactUrl: context.artifactUrl ?? mediaUrl(result.artifact_url),
+    artifactUrl: Object.hasOwn(context, 'artifactUrl')
+      ? context.artifactUrl
+      : mediaUrl(result.artifact_url),
     artifactType: result.media_type,
     logId: result.log_id,
     angle: result.angle,
