@@ -164,6 +164,14 @@ class Settings(BaseSettings):
     # only, so compose bind-mounts ./data/eval:/eval-seed:ro and sets PAPI_EVAL_SEED_DIR.
     # Absolute in both cases, so it deliberately skips the backend-relative resolver.
     eval_seed_dir: Path = Field(default=REPO_ROOT / "data" / "eval", alias="PAPI_EVAL_SEED_DIR")
+    # Source tree for the full on-disk project datasets (the real training/eval sets
+    # under data/datasets/<...>). Registered IN PLACE on startup as source="project"
+    # rows so they appear on the Datasets page without copying gigabytes. data/datasets
+    # is gitignored, so this is present only where the data actually lives (local dev);
+    # a fresh clone or the Docker image has no such tree and the seeder simply skips it.
+    project_datasets_dir: Path = Field(
+        default=REPO_ROOT / "data" / "datasets", alias="PAPI_PROJECT_DATASETS_DIR"
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod

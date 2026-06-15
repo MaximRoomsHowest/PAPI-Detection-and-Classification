@@ -19,6 +19,7 @@ import logging
 import shutil
 from pathlib import Path
 
+import yaml
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -37,6 +38,28 @@ logger = logging.getLogger(__name__)
 
 # Marks a dataset as a protected, app-shipped evaluation set (undeletable, badged).
 BUILTIN_SOURCE = "builtin"
+
+# Marks a full on-disk project dataset (real training/eval data) registered in place.
+PROJECT_SOURCE = "project"
+
+# The project datasets to register on the Datasets page, by id + path under
+# settings.project_datasets_dir (data/datasets). Each is registered IN PLACE — the
+# row points at the existing directory; nothing is copied. Class names and split
+# counts are read from the dataset's own data.yaml so both the standard images/<split>
+# layout (2-class detector) and the txt-list-split layout (3-class transition, which
+# ultralytics reads natively) are handled.
+PROJECT_DATASETS: tuple[dict, ...] = (
+    {
+        "id": "project-2class-detector",
+        "subpath": "papi-2class-detection-flightsplit",
+        "name": "Project · 2-class detector (flight-split)",
+    },
+    {
+        "id": "project-transition-3class",
+        "subpath": "transition-classification-data/transition_combined",
+        "name": "Project · 3-class transition",
+    },
+)
 
 # Each built-in eval set: a fixed id (matches data/eval/<id>/ and the dataset row),
 # a display name, and its class map. The 2-class set is auto-used for detector-role
@@ -127,4 +150,104 @@ def seed_builtin_datasets(settings: Settings, session: Session) -> int:
             existing.n_train, existing.n_val, existing.n_test = n_train, n_val, n_test
             existing.data_yaml_path = str(data_yaml)
             session.commit()
+    return seeded
+
+
+def _read_data_yaml(path: Path) -> dict:
+    try:
+        with path.open(encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except (OSError, yaml.YAMLError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _class_names_from_yaml(meta: dict) -> dict[int, str]:
+    """Parse YOLO ``names`` (dict {0: 'red', ...} or list ['red', ...]) → {int: str}."""
+    names = meta.get("names")
+    if isinstance(names, dict):
+        out: dict[int, str] = {}
+        for key, value in names.items():
+            try:
+                out[int(key)] = str(value)
+            except (TypeError, ValueError):
+                continue
+        return out
+    if isinstance(names, list):
+        return {i: str(value) for i, value in enumerate(names)}
+    return {}
+
+
+def _count_split(root: Path, value) -> int:
+    """Count one split, resolved relative to the dataset root. Handles both a split
+    DIRECTORY (``images/train`` → count image files) and a LIST FILE (``train.txt`` →
+    count non-empty lines), so the txt-list datasets ultralytics reads still show real
+    counts on the card. Empty/missing → 0."""
+    if not isinstance(value, str) or not value.strip():
+        return 0
+    target = root / value
+    try:
+        if target.is_dir():
+            return sum(
+                1 for p in target.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES
+            )
+        if target.is_file() and target.suffix.lower() == ".txt":
+            return sum(1 for line in target.read_text(encoding="utf-8").splitlines() if line.strip())
+    except OSError:
+        return 0
+    return 0
+
+
+def seed_project_datasets(settings: Settings, session: Session) -> int:
+    """Register the full on-disk project datasets IN PLACE (no copy). Returns the count
+    newly registered.
+
+    Each :data:`PROJECT_DATASETS` entry whose ``data.yaml`` is present under
+    ``settings.project_datasets_dir`` is upserted as a ``source="project"`` row pointing
+    straight at that directory, with class names + split counts read from its own
+    data.yaml. Idempotent per id; absent datasets (fresh clone / Docker image without the
+    gitignored data) are logged and skipped — never fatal.
+    """
+    base = Path(settings.project_datasets_dir)
+    repo = DatasetRepository(session)
+    seeded = 0
+    for spec in PROJECT_DATASETS:
+        root = (base / spec["subpath"]).resolve()
+        data_yaml = root / "data.yaml"
+        if not data_yaml.is_file():
+            logger.info("Project dataset '%s' not found at %s; skipping.", spec["id"], data_yaml)
+            continue
+        existing = repo.get(spec["id"])
+        if existing is not None and existing.source == PROJECT_SOURCE:
+            continue  # already registered
+
+        meta = _read_data_yaml(data_yaml)
+        class_names_json = {str(k): v for k, v in _class_names_from_yaml(meta).items()} or None
+        n_train = _count_split(root, meta.get("train"))
+        n_val = _count_split(root, meta.get("val"))
+        n_test = _count_split(root, meta.get("test"))
+        if existing is None:
+            session.add(
+                Dataset(
+                    id=spec["id"],
+                    name=spec["name"][:160],
+                    source=PROJECT_SOURCE,
+                    status="ready",
+                    storage_path=str(root),
+                    class_names_json=class_names_json,
+                    n_train=n_train,
+                    n_val=n_val,
+                    n_test=n_test,
+                    data_yaml_path=str(data_yaml),
+                )
+            )
+        else:
+            existing.source = PROJECT_SOURCE
+            existing.status = "ready"
+            existing.storage_path = str(root)
+            existing.class_names_json = class_names_json
+            existing.n_train, existing.n_val, existing.n_test = n_train, n_val, n_test
+            existing.data_yaml_path = str(data_yaml)
+        session.commit()
+        seeded += 1
     return seeded

@@ -33,8 +33,10 @@ function textValue(value) {
 }
 
 function classCountOf(model) {
-  if (model.classes) return Object.keys(model.classes).length
-  return typeof model.class_count === 'number' ? model.class_count : null
+  // Null-safe: EvaluateModal computes a default dataset on every render, and `model`
+  // is null while the dialog is closed — a bare model.classes there crashed the page.
+  if (model?.classes) return Object.keys(model.classes).length
+  return typeof model?.class_count === 'number' ? model.class_count : null
 }
 
 // A 0–1 detection score as a labelled bar: the fill makes "0.99 vs 0.51" legible at a
@@ -201,6 +203,36 @@ function OverviewStrip({ models, copy }) {
   )
 }
 
+// Plain-language guide to the evaluation metrics on the cards + compare table.
+// A collapsed disclosure so it informs on demand without crowding the grid; the
+// metric names reuse the same copy keys as the score bars so they read identically.
+function MetricsGuide({ copy }) {
+  const guide = copy.models.metricsGuide
+  const rows = [
+    { term: copy.insights.metricMap50, desc: guide.map50 },
+    { term: copy.insights.metricMap5095, desc: guide.map5095 },
+    { term: copy.insights.metricPrecision, desc: guide.precision },
+    { term: copy.insights.metricRecall, desc: guide.recall },
+    { term: copy.insights.metricF1, desc: guide.f1 },
+  ]
+  return (
+    <details className="metric-guide">
+      <summary className="metric-guide__summary">
+        <Info size={15} aria-hidden="true" />
+        <span>{guide.title}</span>
+      </summary>
+      <dl className="metric-guide__list">
+        {rows.map((row) => (
+          <div className="metric-guide__item" key={row.term}>
+            <dt className="mono">{row.term}</dt>
+            <dd>{row.desc}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  )
+}
+
 function UploadModal({ open, onClose, copy, onSubmit }) {
   const [file, setFile] = useState(null)
   const [label, setLabel] = useState('')
@@ -288,7 +320,9 @@ function EvaluateModal({ open, onClose, copy, model, datasets, datasetsLoading, 
   // still letting the user override — selecting the '—' option sets picked to '',
   // which disables submit as before.
   const [picked, setPicked] = useState(null)
-  const datasetId = picked ?? pickDefaultDataset(ready, model)
+  // Only resolve a default when there's a model (the dialog is open) — pickDefaultDataset
+  // reads the model's class count, and `model` is null while the dialog is closed.
+  const datasetId = picked ?? (model ? pickDefaultDataset(ready, model) : '')
   const [split, setSplit] = useState('test')
   const [submitting, setSubmitting] = useState(false)
   const selectedIsBuiltin = ready.some((d) => d.id === datasetId && d.source === 'builtin')
@@ -618,6 +652,8 @@ export function ModelsPage({ copy, isAdmin }) {
       {!loading && models.length === 0 && <p className="lc-empty">{copy.models.empty}</p>}
 
       {models.length > 0 && <OverviewStrip models={models} copy={copy} />}
+
+      {models.length > 0 && <MetricsGuide copy={copy} />}
 
       <div className="model-grid">
         {models.map((model) => (

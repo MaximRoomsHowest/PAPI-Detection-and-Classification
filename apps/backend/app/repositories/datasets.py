@@ -9,7 +9,14 @@ from app.models.dataset import Dataset
 
 
 class ProtectedDatasetError(RuntimeError):
-    """Raised when deleting a built-in (app-shipped) evaluation dataset is refused."""
+    """Raised when deleting a protected dataset (app-shipped ``builtin`` eval set, or an
+    in-place ``project`` dataset whose files live outside the managed volume) is refused."""
+
+
+# Sources that must never be deleted through the API: built-ins are app-shipped, and
+# project datasets are registered in place (deleting the row must not imply removing the
+# real on-disk training data they point at).
+PROTECTED_SOURCES = ("builtin", "project")
 
 
 class DatasetRepository:
@@ -94,9 +101,9 @@ class DatasetRepository:
         dataset = self.get(dataset_id)
         if dataset is None:
             raise KeyError(dataset_id)
-        if dataset.source == "builtin":
+        if dataset.source in PROTECTED_SOURCES:
             raise ProtectedDatasetError(
-                f"Dataset '{dataset_id}' is a built-in evaluation set and cannot be deleted."
+                f"Dataset '{dataset_id}' is a protected ({dataset.source}) dataset and cannot be deleted."
             )
         self.db.delete(dataset)
         self.db.commit()

@@ -82,24 +82,29 @@ def _seed_model_registry() -> None:
 
 
 def _seed_datasets() -> None:
-    """Seed the built-in per-role evaluation datasets into the datasets table + volume.
+    """Seed the built-in per-role evaluation datasets (copied into the volume) and
+    register the full on-disk project datasets in place.
 
     Idempotent (per id), so it never clobbers operator uploads. Failures are logged,
-    never fatal — a deployment without the eval-seed mount simply has no default set.
+    never fatal — a deployment without the eval-seed mount simply has no default set,
+    and one without the gitignored data/datasets tree has no project datasets.
     """
     try:
         from app.database import get_sessionmaker
-        from app.services.datasets_seed import seed_builtin_datasets
+        from app.services.datasets_seed import seed_builtin_datasets, seed_project_datasets
 
         session = get_sessionmaker()()
         try:
             seeded = seed_builtin_datasets(settings, session)
             if seeded:
                 logger.info("Seeded %d built-in evaluation dataset(s).", seeded)
+            registered = seed_project_datasets(settings, session)
+            if registered:
+                logger.info("Registered %d project dataset(s).", registered)
         finally:
             session.close()
     except Exception as exc:  # noqa: BLE001 - seeding must never abort startup
-        logger.warning("Built-in dataset seeding skipped: %s", exc)
+        logger.warning("Dataset seeding skipped: %s", exc)
 
 
 def _reconcile_orphaned_jobs() -> None:

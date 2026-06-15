@@ -123,6 +123,22 @@ describe('ModelsPage', () => {
     expect(container.textContent).not.toContain(copy.models.actions.promote)
     unmount()
   })
+
+  it('renders without crashing when datasets are loaded and the Evaluate dialog is closed', () => {
+    // Regression: EvaluateModal derives a default dataset on every render via
+    // pickDefaultDataset(ready, model). With ready datasets present and the dialog
+    // closed (model === null), classCountOf(null) threw and blanked the whole page.
+    // The empty-datasets default in other tests masked this (ready was [] → early return).
+    mocks.models.models = [
+      { model_id: 'a', model_label: 'Detector', model_role: 'detector', source: 'builtin', is_default: true, available: true, disabled: false, protected: true, val_metrics: null },
+    ]
+    mocks.datasets.datasets = [
+      { id: 'builtin-detector-redwhite', name: 'Built-in', source: 'builtin', status: 'ready', class_names: { 0: 'red', 1: 'white' }, n_train: 0, n_val: 0, n_test: 10 },
+    ]
+    const { container, unmount } = renderPage(<ModelsPage copy={copy} isAdmin />)
+    expect(container.textContent).toContain(copy.models.title)
+    unmount()
+  })
 })
 
 describe('DatasetsPage', () => {
