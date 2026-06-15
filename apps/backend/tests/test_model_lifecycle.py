@@ -332,6 +332,72 @@ def test_delete_terminal_clears_finished_keeps_active(db):
     assert repo.get(active.id) is not None
 
 
+def test_seed_project_datasets_registers_in_place(db, tmp_path):
+    """Existing on-disk datasets are registered IN PLACE as source='project' rows:
+    a standard images/<split> dataset is counted by image files, and a txt-list-split
+    dataset (which ultralytics reads natively) is counted by list lines. Idempotent."""
+    from types import SimpleNamespace
+
+    from app.repositories.datasets import DatasetRepository, ProtectedDatasetError
+    from app.services.datasets_seed import seed_project_datasets
+
+    # Standard layout (2-class detector): images/{train,val,test} dirs.
+    det = tmp_path / "papi-2class-detection-flightsplit"
+    for split, n in (("train", 2), ("val", 1), ("test", 1)):
+        d = det / "images" / split
+        d.mkdir(parents=True)
+        for i in range(n):
+            (d / f"f{i}.jpg").write_bytes(b"x")
+    (det / "data.yaml").write_text(
+        f"path: {det}\ntrain: images/train\nval: images/val\ntest: images/test\n"
+        "names:\n  0: papi_light_red\n  1: papi_light_white\n",
+        encoding="utf-8",
+    )
+
+    # Txt-list layout (3-class transition): train.txt/val.txt/test.txt list files.
+    tr = tmp_path / "transition-classification-data" / "transition_combined"
+    tr.mkdir(parents=True)
+    (tr / "train.txt").write_text("a.jpg\nb.jpg\nc.jpg\n", encoding="utf-8")
+    (tr / "val.txt").write_text("d.jpg\n", encoding="utf-8")
+    (tr / "test.txt").write_text("e.jpg\n", encoding="utf-8")
+    (tr / "data.yaml").write_text(
+        f"path: {tr}\ntrain: train.txt\nval: val.txt\ntest: test.txt\n"
+        "names:\n  0: papi_light_red\n  1: papi_light_white\n  2: papi_light_transition\n",
+        encoding="utf-8",
+    )
+
+    settings = SimpleNamespace(project_datasets_dir=tmp_path)
+    assert seed_project_datasets(settings, db) == 2
+
+    repo = DatasetRepository(db)
+    detector = repo.get("project-2class-detector")
+    assert detector.source == "project" and detector.status == "ready"
+    assert (detector.n_train, detector.n_val, detector.n_test) == (2, 1, 1)  # counted by files
+    assert detector.class_names_json == {"0": "papi_light_red", "1": "papi_light_white"}
+    assert detector.storage_path == str(det.resolve())
+
+    transition = repo.get("project-transition-3class")
+    assert (transition.n_train, transition.n_val, transition.n_test) == (3, 1, 1)  # counted by txt lines
+    assert len(transition.class_names_json) == 3
+
+    # Idempotent: a second run registers nothing new.
+    assert seed_project_datasets(settings, db) == 0
+
+    # Project datasets are protected from deletion (they point at out-of-volume data).
+    with pytest.raises(ProtectedDatasetError):
+        repo.delete("project-2class-detector")
+
+
+def test_seed_project_datasets_skips_when_absent(db, tmp_path):
+    """A deployment without the gitignored data/datasets tree (fresh clone / Docker)
+    seeds nothing and never raises."""
+    from types import SimpleNamespace
+
+    from app.services.datasets_seed import seed_project_datasets
+
+    assert seed_project_datasets(SimpleNamespace(project_datasets_dir=tmp_path), db) == 0
+
+
 # --------------------------------------------------------------------------- #
 # Dataset helpers + bundle ingestion                                          #
 # --------------------------------------------------------------------------- #

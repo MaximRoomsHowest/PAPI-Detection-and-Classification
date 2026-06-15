@@ -75,6 +75,14 @@ export const translations = {
       close: 'Close',
       classesLabel: 'Classes',
       confLabel: 'Conf',
+      metricsGuide: {
+        title: 'What do these scores mean?',
+        map50: 'Mean average precision at 50% box overlap — overall detection accuracy. Higher is better.',
+        map5095: 'Average precision across overlap thresholds from 50% to 95% — rewards tighter boxes (the strict COCO metric).',
+        precision: 'Of the lamps the model flagged, the share that were real — low precision means false alarms.',
+        recall: 'Of the real lamps present, the share the model found — low recall means missed lamps.',
+        f1: 'The balance of precision and recall in one score (per class).',
+      },
       confirmDelete: 'Delete model “{label}”? This cannot be undone.',
       badge: {
         default: 'Default',
@@ -180,6 +188,7 @@ export const translations = {
         bundle: 'Bundle',
         assisted: 'Assisted',
         builtin: 'Built-in',
+        project: 'Project',
       },
       card: {
         classesLabel: 'Classes',
@@ -828,6 +837,14 @@ export const translations = {
       close: 'Schließen',
       classesLabel: 'Klassen',
       confLabel: 'Konf.',
+      metricsGuide: {
+        title: 'Was bedeuten diese Werte?',
+        map50: 'Mittlere durchschnittliche Präzision bei 50 % Boxüberlappung — die Gesamterkennungsgenauigkeit. Höher ist besser.',
+        map5095: 'Durchschnittliche Präzision über Überlappungsschwellen von 50 % bis 95 % — belohnt genauere Boxen (die strenge COCO-Metrik).',
+        precision: 'Von den vom Modell gemeldeten Lampen der Anteil, der echt war — geringe Präzision bedeutet Fehlalarme.',
+        recall: 'Von den tatsächlich vorhandenen Lampen der Anteil, den das Modell fand — geringer Recall bedeutet übersehene Lampen.',
+        f1: 'Das Gleichgewicht aus Präzision und Recall in einem Wert (pro Klasse).',
+      },
       confirmDelete: 'Modell „{label}“ löschen? Dies kann nicht rückgängig gemacht werden.',
       badge: {
         default: 'Standard',
@@ -933,6 +950,7 @@ export const translations = {
         bundle: 'Bündel',
         assisted: 'Assistiert',
         builtin: 'Integriert',
+        project: 'Projekt',
       },
       card: {
         classesLabel: 'Klassen',
@@ -1581,6 +1599,14 @@ export const translations = {
       close: 'Sluiten',
       classesLabel: 'Klassen',
       confLabel: 'Conf.',
+      metricsGuide: {
+        title: 'Wat betekenen deze scores?',
+        map50: 'Gemiddelde precisie bij 50% boxoverlap — de algehele detectienauwkeurigheid. Hoger is beter.',
+        map5095: 'Gemiddelde precisie over overlapdrempels van 50% tot 95% — beloont strakkere boxen (de strenge COCO-maat).',
+        precision: 'Van de lampen die het model aanduidde, het aandeel dat echt was — lage precisie betekent valse meldingen.',
+        recall: 'Van de werkelijk aanwezige lampen, het aandeel dat het model vond — lage recall betekent gemiste lampen.',
+        f1: 'De balans tussen precisie en recall in één score (per klasse).',
+      },
       confirmDelete: 'Model “{label}” verwijderen? Dit kan niet ongedaan worden gemaakt.',
       badge: {
         default: 'Standaard',
@@ -1686,6 +1712,7 @@ export const translations = {
         bundle: 'Bundel',
         assisted: 'Assistief',
         builtin: 'Ingebouwd',
+        project: 'Project',
       },
       card: {
         classesLabel: 'Klassen',
@@ -2334,6 +2361,14 @@ export const translations = {
       close: 'Fermer',
       classesLabel: 'Classes',
       confLabel: 'Conf.',
+      metricsGuide: {
+        title: 'Que signifient ces scores ?',
+        map50: 'Précision moyenne à 50 % de recouvrement des boîtes — la précision de détection globale. Plus c’est élevé, mieux c’est.',
+        map5095: 'Précision moyenne sur des seuils de recouvrement de 50 % à 95 % — récompense des boîtes plus serrées (la métrique COCO stricte).',
+        precision: 'Parmi les feux signalés par le modèle, la part réellement présente — une faible précision signifie de fausses alertes.',
+        recall: 'Parmi les feux réellement présents, la part trouvée par le modèle — un faible rappel signifie des feux manqués.',
+        f1: 'L’équilibre entre précision et rappel en un seul score (par classe).',
+      },
       confirmDelete: 'Supprimer le modèle « {label} » ? Cette action est irréversible.',
       badge: {
         default: 'Par défaut',
@@ -2439,6 +2474,7 @@ export const translations = {
         bundle: 'Archive',
         assisted: 'Assisté',
         builtin: 'Intégré',
+        project: 'Projet',
       },
       card: {
         classesLabel: 'Classes',

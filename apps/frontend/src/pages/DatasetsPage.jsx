@@ -17,6 +17,7 @@ function DatasetCard({ dataset, copy, busy, onReview, onTrain, onDelete }) {
         <h3 className="dataset-card__name">{dataset.name}</h3>
         <div className="model-card__badges">
           {dataset.source === 'builtin' && <span className="lc-badge">{copy.datasets.sources.builtin}</span>}
+          {dataset.source === 'project' && <span className="lc-badge">{copy.datasets.sources.project}</span>}
           <span className={`lc-badge lc-badge--${dataset.status === 'ready' ? 'default' : 'warn'}`}>
             {copy.datasets.statuses[dataset.status] ?? dataset.status}
           </span>
@@ -42,7 +43,7 @@ function DatasetCard({ dataset, copy, busy, onReview, onTrain, onDelete }) {
             <GraduationCap size={14} aria-hidden="true" /> {copy.datasets.card.train}
           </button>
         )}
-        {dataset.source !== 'builtin' && (
+        {dataset.source !== 'builtin' && dataset.source !== 'project' && (
           <button
             className="ghost-button ghost-button--danger"
             type="button"
