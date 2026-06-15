@@ -254,14 +254,16 @@ def add_runway(payload: RunwayCreate) -> dict[str, Any]:
         # gives concurrent readers a stable snapshot instead of a half-mutated dict.
         store = dict(_load_custom())
         raw_id = (payload.id or "").strip() or _slugify(payload.designation or payload.label)
-        # Cap the slug at the explicit-id budget (80 chars). The label/designation
-        # fallback path otherwise inherits RunwayCreate.label's 120-char budget, and
-        # "custom_" + 120 chars overflows analysis_logs.runway_id VARCHAR(96) —
-        # every analysis on that runway then 503s on Postgres at the log commit.
-        runway_id = _slugify(raw_id)[:80].rstrip("_")
+        runway_id = _slugify(raw_id).rstrip("_")
         # Namespace every custom runway so it can never collide with papi_06 / papi_24.
         if not runway_id.startswith("custom_"):
             runway_id = f"custom_{runway_id}"
+        # Cap the FINAL namespaced id at the RunwayCreate.id budget (80 chars). The
+        # persisted sidecar is re-validated through RunwayCreate on every reload, so a
+        # longer id would silently vanish on restart; capping after the prefix also
+        # keeps it within analysis_logs.runway_id VARCHAR(96) (else every analysis on
+        # that runway 503s on Postgres at the log commit).
+        runway_id = runway_id[:80].rstrip("_")
         if runway_id in _runways():
             raise ValueError(f"Runway id '{runway_id}' is reserved by a built-in runway.")
         if runway_id in store:

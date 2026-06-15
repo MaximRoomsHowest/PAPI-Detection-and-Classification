@@ -64,6 +64,14 @@ class ModelRegistryRepository:
     def get(self, model_id: str) -> ModelRegistryRow | None:
         return self.db.get(ModelRegistryRow, model_id)
 
+    def _get_locked(self, model_id: str) -> ModelRegistryRow | None:
+        """Row-locked fetch (``SELECT ... FOR UPDATE`` on Postgres; a no-op on SQLite,
+        which serializes writes) so concurrent promote/disable/delete can't both pass
+        their invariant checks before either commits (TOCTOU)."""
+        return self.db.scalar(
+            select(ModelRegistryRow).where(ModelRegistryRow.id == model_id).with_for_update()
+        )
+
     def is_empty(self) -> bool:
         return self.db.scalar(select(ModelRegistryRow.id).limit(1)) is None
 
@@ -76,7 +84,7 @@ class ModelRegistryRepository:
 
     def set_default(self, model_id: str) -> ModelRegistryRow:
         """Transactionally make ``model_id`` the sole default. Refuses disabled models."""
-        target = self.get(model_id)
+        target = self._get_locked(model_id)
         if target is None:
             raise KeyError(model_id)
         if target.disabled:
@@ -88,7 +96,7 @@ class ModelRegistryRepository:
         return target
 
     def disable(self, model_id: str, reason: str | None = None) -> ModelRegistryRow:
-        row = self.get(model_id)
+        row = self._get_locked(model_id)
         if row is None:
             raise KeyError(model_id)
         if row.is_default:
@@ -117,7 +125,7 @@ class ModelRegistryRepository:
         Refuses the committed serving model (protected) and the current default
         (promote a replacement first) so the demo can never be left unservable.
         """
-        row = self.get(model_id)
+        row = self._get_locked(model_id)
         if row is None:
             raise KeyError(model_id)
         if row.protected:
@@ -175,7 +183,10 @@ class ModelRegistryRepository:
 
         This covers local/prod databases seeded by older code with incomplete
         paths such as ``best.pt``. Uploaded/trained rows are ignored, and existing
-        disabled/default choices are preserved.
+        disabled/default choices are preserved. Operator-written evaluation results
+        (``val_metrics_json`` / ``split_evaluated``) are ALSO preserved: re-evaluating
+        a built-in model must survive a restart, so reconcile repairs provenance/paths
+        but never reverts metrics the operator produced via the Evaluate flow.
         """
         changed = 0
         rows = {row.id: row for row in self.list_all()}
@@ -192,6 +203,8 @@ class ModelRegistryRepository:
             if row.source not in (None, "", "builtin"):
                 continue
             row_changed = False
+            # NB: val_metrics_json + split_evaluated are intentionally NOT reconciled —
+            # they hold operator Evaluate results that must persist across restarts.
             for field in (
                 "label",
                 "role",
@@ -201,10 +214,8 @@ class ModelRegistryRepository:
                 "protected",
                 "description",
                 "classes_json",
-                "val_metrics_json",
                 "training_run",
                 "base_weights",
-                "split_evaluated",
             ):
                 next_value = values[field]
                 if getattr(row, field) != next_value:

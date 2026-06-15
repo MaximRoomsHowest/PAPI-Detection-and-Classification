@@ -78,11 +78,14 @@ COPY app ./app
 
 # Non-root runtime user owning the app + storage + model mount points and a
 # home dir (ultralytics writes its settings/cache under $HOME on first use)
-# (audit DCK-MAJ-3).
+# (audit DCK-MAJ-3). The model-lifecycle volumes (/user_models, /datasets, /jobs)
+# MUST be created + chowned here too: a named volume inherits the ownership of its
+# image mountpoint when first created, so without this they mount root-owned and
+# the non-root papi user gets EPERM writing uploads / datasets / startup seeds.
 RUN groupadd --system papi \
  && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \
- && mkdir -p /storage /models \
- && chown -R papi:papi /app /storage /models /home/papi
+ && mkdir -p /storage /models /user_models /datasets /jobs \
+ && chown -R papi:papi /app /storage /models /user_models /datasets /jobs /home/papi
 
 USER papi
 

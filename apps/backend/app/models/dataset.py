@@ -7,10 +7,12 @@ existing trainer (``workflows/scripts/train_transition_model.py``) and evaluator
 (``workflows/scripts/evaluate_transition_model.py``) already consume, so neither
 script needs to change.
 
-Two sources:
+Three sources:
 * ``bundle``   — operator uploaded a prepared labelled YOLO zip.
 * ``assisted`` — operator uploaded raw images; an existing model pre-annotated them
   and the operator reviewed/corrected the boxes before committing.
+* ``builtin``  — app-shipped per-role evaluation set, seeded on startup from
+  ``data/eval/`` and protected from deletion (see ``services/datasets_seed.py``).
 """
 
 from datetime import datetime
@@ -27,7 +29,7 @@ class Dataset(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(160))
-    # "bundle" | "assisted"
+    # "bundle" | "assisted" | "builtin"
     source: Mapped[str] = mapped_column(String(32), default="bundle")
     # "ready" (usable for train/eval) | "labeling" (assisted job pending/in review) |
     # "draft" (created, nothing committed yet).

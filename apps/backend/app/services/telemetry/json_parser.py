@@ -8,13 +8,18 @@ Named ``json_parser`` (not ``json``) so it does not shadow the stdlib :mod:`json
 from __future__ import annotations
 
 import json
+import logging
 
 from app.services.telemetry.sample import (
+    MAX_TELEMETRY_SAMPLES,
     DroneSample,
+    _capped_indices,
     _coerce_float,
     _coerce_frame_index,
     _make_sample,
 )
+
+logger = logging.getLogger("app.services.telemetry")
 
 _JSON_LAT_KEYS = ("latitude", "lat", "drone_latitude")
 _JSON_LON_KEYS = ("longitude", "lon", "lng", "long", "drone_longitude")
@@ -60,8 +65,19 @@ def _parse_json(text: str) -> list[DroneSample]:
     else:
         return []
 
+    # Cap the materialized list up front (entries is always a list here) so a
+    # pathological file can't allocate millions of samples before the post-parse
+    # downsample runs (audit #14). Logged so a silently-thinned track is diagnosable.
+    total = len(entries)
+    if total > MAX_TELEMETRY_SAMPLES:
+        logger.warning(
+            "Telemetry track downsampled from %d to %d samples (cap).",
+            total,
+            MAX_TELEMETRY_SAMPLES,
+        )
     samples: list[DroneSample] = []
-    for order, entry in enumerate(entries):
+    for order in _capped_indices(total):
+        entry = entries[order]
         if not isinstance(entry, dict):
             continue
         lat = _coerce_float(_pick(entry, _JSON_LAT_KEYS))

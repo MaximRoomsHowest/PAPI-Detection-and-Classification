@@ -23,6 +23,7 @@ from app.repositories.model_registry import (
     ModelRegistryRepository,
     ProtectedModelError,
 )
+from app.services.datasets import count_images, dataset_root
 from app.services.jobs import get_job_runner
 from app.services.model_upload import (
     register_model_from_path,
@@ -58,9 +59,11 @@ def _model_info_from_row(row, settings) -> ModelInfo:
 @router.post("/models", response_model=ModelInfo, status_code=status.HTTP_201_CREATED)
 def upload_model(
     file: UploadFile,
-    label: Annotated[str, Form()],
-    role: Annotated[str, Form()] = "detector",
-    description: Annotated[str | None, Form()] = None,
+    # Bound the free-text fields: label maps to String(160), so an unbounded value
+    # would 500 on Postgres at commit instead of returning a clean 422 here (audit #18).
+    label: Annotated[str, Form(max_length=160)],
+    role: Annotated[str, Form(max_length=32)] = "detector",
+    description: Annotated[str | None, Form(max_length=2000)] = None,
     make_default: Annotated[bool, Form()] = False,
     _auth: Annotated[None, Depends(routes.require_api_key)] = None,
 ) -> ModelInfo:
@@ -204,6 +207,23 @@ def evaluate_model(
         raise HTTPException(status_code=404, detail="Unknown dataset.")
     if dataset.status != "ready":
         raise HTTPException(status_code=400, detail="Dataset is not ready for evaluation.")
+    # A row can be 'ready' in the DB while its files are absent on THIS node (e.g. a
+    # built-in seeded into a shared DB whose data landed elsewhere, or an unmounted
+    # datasets volume). Reject up front with an actionable message rather than
+    # enqueuing a job that dies with the opaque "no data.yaml" handler error.
+    settings = routes.get_settings()
+    root = dataset_root(settings, payload.dataset_id)
+    if not (root / "data.yaml").is_file():
+        raise HTTPException(
+            status_code=400,
+            detail="Dataset files are not available on this server (no data.yaml). "
+            "Restart/redeploy the backend to re-seed built-ins, or re-upload the dataset.",
+        )
+    if count_images(root, payload.split) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dataset has no images in the '{payload.split}' split to evaluate.",
+        )
     job_id = get_job_runner().submit(
         "evaluate",
         {"model_id": model_id, "dataset_id": payload.dataset_id, "split": payload.split},

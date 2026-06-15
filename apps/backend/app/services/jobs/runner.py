@@ -104,7 +104,11 @@ class JobRunner:
             if handler is None:
                 repo.mark_failed(job_id, f"No handler registered for job kind '{job.kind}'.")
                 return
-            repo.mark_running(job_id)
+            if repo.mark_running(job_id) == 0:
+                # A cancel (or other terminal transition) landed in the window
+                # between the status check above and here — the guarded CAS did not
+                # apply, so honour the cancel instead of running the job.
+                return
             ctx = JobContext(job_id, self._settings, repo)
             params = dict(job.params_json or {})
             result = handler(params, ctx)

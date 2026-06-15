@@ -10,13 +10,18 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 
 from app.services.telemetry.sample import (
+    MAX_TELEMETRY_SAMPLES,
     DroneSample,
+    _capped_indices,
     _coerce_float,
     _coerce_frame_index,
     _make_sample,
 )
+
+logger = logging.getLogger("app.services.telemetry")
 
 _CSV_ALIASES: dict[str, tuple[str, ...]] = {
     "lat": ("latitude", "lat", "gpslatitude", "drone_latitude"),
@@ -92,8 +97,19 @@ def _parse_csv(text: str) -> list[DroneSample]:
         lat_i, lon_i, alt_i = 0, 1, 2
         frame_i = time_i = None
 
+    # Cap the materialized list up front so a pathological file can't allocate
+    # millions of samples before the post-parse downsample runs (audit #14). Logged
+    # so a silently-thinned track is diagnosable.
+    total = len(data_rows)
+    if total > MAX_TELEMETRY_SAMPLES:
+        logger.warning(
+            "Telemetry track downsampled from %d to %d samples (cap).",
+            total,
+            MAX_TELEMETRY_SAMPLES,
+        )
     samples: list[DroneSample] = []
-    for order, row in enumerate(data_rows):
+    for order in _capped_indices(total):
+        row = data_rows[order]
         biggest = max(i for i in (lat_i, lon_i, alt_i) if i is not None)
         if len(row) <= biggest:
             continue

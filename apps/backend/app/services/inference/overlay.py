@@ -54,6 +54,8 @@ def draw_overlay(
     ]
     y = 40
     for line in lines:
-        cv2.putText(frame, line, (20, y), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 0), 2)
+        # Yellow in BGR is (0,255,255); (255,255,0) is RGB-yellow, which cv2 renders
+        # as cyan. Banner stays high-contrast yellow over the (often dark) sky.
+        cv2.putText(frame, line, (20, y), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
         y += 36
     return frame

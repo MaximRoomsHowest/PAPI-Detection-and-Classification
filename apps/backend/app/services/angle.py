@@ -69,6 +69,12 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def _geodetic_to_ecef(lat_deg: float, lon_deg: float, alt_m: float) -> tuple[float, float, float]:
     """WGS-84 geodetic (lat, lon, ellipsoidal height) → ECEF (X, Y, Z) in metres."""
+    # Defence in depth: NaN/inf are already rejected upstream (API range checks fail the
+    # `<=` comparison for NaN; telemetry/EXIF parsers drop non-finite values), but a bare
+    # NaN here would propagate silently into a "valid" elevation_angle_deg. Fail loud
+    # instead, so a future caller that skips validation can't emit a NaN angle.
+    if not all(math.isfinite(v) for v in (lat_deg, lon_deg, alt_m)):
+        raise ValueError("Coordinate contains NaN or infinity")
     lat = math.radians(lat_deg)
     lon = math.radians(lon_deg)
     sin_lat = math.sin(lat)
@@ -359,9 +365,19 @@ def _exif_pose(media_path: Path) -> tuple[float, float, float] | None:
     if latitude is None or longitude is None or altitude is None:
         return None
 
-    if lat_ref and getattr(lat_ref, "values", "N") != "N":
+    # Like GPSAltitudeRef below, exifread can return the hemisphere ref as a
+    # single-element list (e.g. ["S"]); comparing the list to a str is always
+    # unequal, which would flip an Eastern ["E"] longitude to West. Unwrap to a
+    # scalar first; an absent ref leaves the value None -> defaults to N/E.
+    lat_ref_value = getattr(lat_ref, "values", None) if lat_ref else None
+    if isinstance(lat_ref_value, (list, tuple)) and lat_ref_value:
+        lat_ref_value = lat_ref_value[0]
+    if lat_ref_value and lat_ref_value != "N":
         latitude = -latitude
-    if lon_ref and getattr(lon_ref, "values", "E") != "E":
+    lon_ref_value = getattr(lon_ref, "values", None) if lon_ref else None
+    if isinstance(lon_ref_value, (list, tuple)) and lon_ref_value:
+        lon_ref_value = lon_ref_value[0]
+    if lon_ref_value and lon_ref_value != "E":
         longitude = -longitude
     # GPSAltitudeRef comes back from exifread as a single-element list (e.g. [1]
     # = below sea level), so read element 0 — comparing the list itself (`[1] == 1`)
@@ -399,6 +415,11 @@ def _xmp_uncertainty(xmp: dict) -> tuple[float, float] | None:
         return None
     # Reject negative/garbage std — a standard deviation is non-negative.
     if std_lat < 0.0 or std_lon < 0.0 or std_hgt < 0.0:
+        return None
+    # All-zero is the placeholder DJI writes when RTK is not actually engaged; a 0
+    # std would render a ±0.000 deg band that reads as a perfect, certain fix. Treat
+    # it as "no measured uncertainty" so the band shows only when genuinely measured.
+    if std_lat == 0.0 and std_lon == 0.0 and std_hgt == 0.0:
         return None
     return math.hypot(std_lat, std_lon), std_hgt
 

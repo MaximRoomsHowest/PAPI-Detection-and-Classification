@@ -50,6 +50,12 @@ def prepare_training(
         raise HTTPException(status_code=404, detail="Unknown dataset.")
     if dataset.status != "ready":
         raise HTTPException(status_code=400, detail="Dataset is not ready for training.")
+    if dataset.source == "builtin":
+        # Built-in eval sets are fixed, protected hold-out sets (delete is refused
+        # too) — training on one would defeat their purpose as a stable benchmark.
+        raise HTTPException(
+            status_code=400, detail="Built-in evaluation datasets cannot be used for training."
+        )
 
     base = _base_weights_name(settings, payload.base_model_id, db)
     hyper = payload.hyperparams
@@ -83,7 +89,12 @@ def prepare_training(
         "note": "Run on a CUDA GPU, then re-import best.pt via the Models page.",
     }
     root = dataset_root(settings, payload.dataset_id)
-    bundle = build_training_bundle(settings, root, job.id, manifest)
+    try:
+        bundle = build_training_bundle(settings, root, job.id, manifest)
+    except Exception as exc:
+        # Without this the job row stays 'queued' forever on a build failure (audit).
+        repo.mark_failed(job.id, f"Training bundle build failed: {exc}")
+        raise HTTPException(status_code=500, detail="Could not build the training bundle.") from exc
     repo.mark_succeeded(
         job.id,
         {"bundle": str(bundle), "command": command, "expecting_reimport": True},

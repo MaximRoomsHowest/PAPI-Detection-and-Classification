@@ -153,7 +153,10 @@ def denoise_track_observations(
             continue
         cleaned = list(ordered)
         for index in range(1, len(ordered) - 1):
-            prev = ordered[index - 1]
+            # Read prev from the partially-corrected list, not the original: otherwise a
+            # consecutive alternating run (R W R W R) chains into a phantom isolated W,
+            # emitting spurious transition events from a steady lamp (audit).
+            prev = cleaned[index - 1]
             current = ordered[index]
             next_obs = ordered[index + 1]
             prev_frame, prev_state = prev[0], prev[1]

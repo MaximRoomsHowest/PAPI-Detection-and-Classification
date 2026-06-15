@@ -96,6 +96,10 @@ services:
       PAPI_USER_MODELS_DIR: /user_models
       PAPI_DATASETS_DIR: /datasets
       PAPI_JOBS_DIR: /jobs
+      # Read-only source of the committed built-in evaluation datasets. The image
+      # build context is apps/backend only, so ./data/eval is bind-mounted (below)
+      # and seeded into /datasets on startup as the default per-role eval sets.
+      PAPI_EVAL_SEED_DIR: /eval-seed
       PAPI_MAX_MODEL_UPLOAD_MB: ${PAPI_MAX_MODEL_UPLOAD_MB:-500}
       PAPI_MAX_DATASET_UPLOAD_MB: ${PAPI_MAX_DATASET_UPLOAD_MB:-500}
       PAPI_MAX_DATASET_EXTRACT_MB: ${PAPI_MAX_DATASET_EXTRACT_MB:-4000}
@@ -181,6 +185,9 @@ services:
       # Runway geometry YAML — read-only. Without this the backend silently
       # falls back to a hardcoded runway copy (audit DCK-D7).
       - ./configs:/app/configs:ro
+      # Committed built-in evaluation datasets (data/eval/<id>/), read-only. Seeded
+      # into the /datasets volume on startup as the default per-role eval sets.
+      - ./data/eval:/eval-seed:ro
       # Uploaded originals + annotated exports persist across container
       # restarts in a named volume.
       - papi_backend_storage:/storage

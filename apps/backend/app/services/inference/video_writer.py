@@ -25,5 +25,13 @@ def open_video_writer(
         writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*codec), fps, (width, height))
         if writer.isOpened():
             return writer, path
+        # A failed codec can still have created a 0-byte stub file; release AND
+        # remove it so a later codec's success doesn't leave an orphan on disk.
+        # A harmless orphan is preferable to crashing codec fallback, so a
+        # permission/other OSError on unlink must not abort the loop.
         writer.release()
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
     return None, None

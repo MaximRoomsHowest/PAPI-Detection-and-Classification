@@ -64,6 +64,28 @@ def test_stats_breakdowns_aggregate_whole_table(session):
     assert stats.p50_processing_ms == 200  # nearest-rank of [100, 200, 300]
 
 
+def test_stats_split_latency_by_media_type(session):
+    # Images are fast; a video processes many frames so its latency is far higher.
+    # The split keeps them from being averaged into one misleading number.
+    _add(session, media_type="image", processing_ms=100)
+    _add(session, media_type="image", processing_ms=200)
+    _add(session, media_type="video", processing_ms=5000)
+    _add(session, media_type="video", processing_ms=9000)
+
+    stats = AnalysisLogRepository(session).stats()
+
+    # Nearest-rank p50 of a 2-element list is index round((2-1)*0.5)=0 → the lower value.
+    assert stats.image_p50_processing_ms == 100  # [100, 200]
+    assert stats.image_p95_processing_ms == 200
+    assert stats.image_avg_processing_ms == pytest.approx(150.0)
+    assert stats.video_p50_processing_ms == 5000  # [5000, 9000]
+    assert stats.video_avg_processing_ms == pytest.approx(7000.0)
+    # An all-image filter leaves the video latencies null (no rows of that type).
+    image_only = AnalysisLogRepository(session).stats(media_type="image")
+    assert image_only.video_p50_processing_ms is None
+    assert image_only.image_p50_processing_ms == 100
+
+
 def test_stats_empty_table_is_zeroed(session):
     stats = AnalysisLogRepository(session).stats()
     assert stats.total_analyses == 0

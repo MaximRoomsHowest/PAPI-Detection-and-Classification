@@ -49,12 +49,22 @@ def _name_map(model: Any, dataset_id: str, settings) -> dict[int, str]:
 def _to_val_metrics(metrics: Any, name_map: dict[int, str], split: str) -> dict[str, Any]:
     box = metrics.box
     per_class: dict[str, dict[str, float]] = {}
-    for pos, raw_cls_id in enumerate(getattr(box, "ap_class_index", []) or []):
+    # ap_class_index is a numpy array at runtime; `array or []` raises "truth value
+    # ambiguous", so normalise None -> [] explicitly instead of with `or`.
+    ap_class_index = getattr(box, "ap_class_index", None)
+    if ap_class_index is None:
+        ap_class_index = []
+    # zip the parallel per-class arrays rather than indexing box.p[pos]: if YOLO ever
+    # returns mismatched lengths it truncates cleanly instead of raising IndexError
+    # (or, worse, silently mis-attributing a metric to the wrong class).
+    for raw_cls_id, p_val, r_val, ap50_val in zip(
+        ap_class_index, box.p, box.r, box.ap50, strict=False
+    ):
         cls_id = int(raw_cls_id)
         name = name_map.get(cls_id, str(cls_id))
-        p = float(box.p[pos])
-        r = float(box.r[pos])
-        ap50 = float(box.ap50[pos])
+        p = float(p_val)
+        r = float(r_val)
+        ap50 = float(ap50_val)
         f1 = (2 * p * r / (p + r)) if (p + r) > 0 else 0.0
         per_class[name] = {
             "precision": round(p, 4),
@@ -85,7 +95,9 @@ def run_evaluate(params: dict[str, Any], ctx: JobContext) -> dict[str, Any]:
     root = dataset_root(ctx.settings, dataset_id)
     data_yaml = root / "data.yaml"
     if not data_yaml.is_file():
-        raise RuntimeError("Dataset has no data.yaml yet (it may still be in labeling).")
+        raise RuntimeError(
+            "Dataset has no data.yaml on this server (files missing, or still in labeling)."
+        )
 
     ctx.check_cancelled()
     from ultralytics import YOLO
@@ -108,6 +120,10 @@ def run_evaluate(params: dict[str, Any], ctx: JobContext) -> dict[str, Any]:
         exist_ok=True,
         verbose=False,
     )
+
+    # A cancel requested DURING the (uninterruptible) val() call must not still write
+    # metrics back to the model card — honour it before persisting.
+    ctx.check_cancelled()
 
     ctx.progress("writing metrics", 0.85)
     val_metrics = _to_val_metrics(metrics, name_map, split)

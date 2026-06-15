@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 import app.api.routes as routes
 from app.database import get_session
 from app.models.dataset import Dataset
-from app.repositories.datasets import DatasetRepository
+from app.repositories.datasets import DatasetRepository, ProtectedDatasetError
 from app.repositories.model_registry import ModelRegistryRepository
 from app.services.dataset_bundle import ingest_bundle, is_zip
 from app.services.datasets import (
@@ -104,7 +104,9 @@ def _cleanup_dataset(repo: DatasetRepository, dataset_id: str, root: Path) -> No
         pass
     try:
         repo.delete(dataset_id)
-    except KeyError:
+    except (KeyError, ProtectedDatasetError):
+        # A just-created upload is never a built-in, but cleanup is best-effort:
+        # never let a delete-guard raise abort the rollback + file removal.
         pass
     shutil.rmtree(root, ignore_errors=True)
 
@@ -162,6 +164,8 @@ def upload_dataset_bundle(
 
     repo = DatasetRepository(db)
     repo.set_class_names(dataset.id, result["class_names"])
+    # Persist storage_path in the SAME commit that flips status to "ready", so a
+    # concurrent evaluate/train can never observe a ready dataset with no storage.
     dataset = repo.update_counts(
         dataset.id,
         n_train=result["n_train"],
@@ -169,11 +173,8 @@ def upload_dataset_bundle(
         n_test=result["n_test"],
         data_yaml_path=result["data_yaml"],
         status="ready",
+        storage_path=str(root),
     )
-    # storage_path was empty at create; persist it now.
-    dataset.storage_path = str(root)
-    db.commit()
-    db.refresh(dataset)
     return _to_response(dataset)
 
 
@@ -433,6 +434,8 @@ def delete_dataset(
         repo.delete(dataset_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Unknown dataset.") from exc
+    except ProtectedDatasetError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
         root = dataset_root(settings, dataset_id)
         shutil.rmtree(root, ignore_errors=True)

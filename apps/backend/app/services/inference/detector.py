@@ -54,6 +54,7 @@ def detect_frame(
     imgsz: int = 1280,
     iou: float = 0.7,
     max_det: int = 4,
+    half: bool = False,
 ) -> list[dict]:
     """Run YOLO on a single frame.
 
@@ -78,6 +79,7 @@ def detect_frame(
             imgsz=imgsz,
             device=device,
             max_det=max_det,
+            half=half,
             verbose=False,
         )
     else:
@@ -88,6 +90,7 @@ def detect_frame(
             imgsz=imgsz,
             device=device,
             max_det=max_det,
+            half=half,
             verbose=False,
         )
 

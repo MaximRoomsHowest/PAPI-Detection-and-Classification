@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class DatasetResponse(BaseModel):
     id: str
     name: str
-    source: str  # bundle | assisted
+    source: str  # bundle | assisted | builtin
     status: str  # ready | labeling | draft
     class_names: dict[int, str] | None = None
     n_train: int = 0

@@ -114,6 +114,28 @@ def test_reconcile_repairs_stale_builtin_paths_without_clobbering_operator_state
     assert repo.get("uploaded").storage_path == "/abs/up.pt"
 
 
+def test_reconcile_preserves_operator_evaluation_metrics(db):
+    """Regression (found in live user testing): an in-app Evaluate of a BUILT-IN model
+    writes val_metrics; a restart's reconcile must NOT revert them to the frozen
+    models.json — re-evaluating a built-in has to survive a restart."""
+    from app.repositories.model_registry import ModelRegistryRepository
+
+    repo = ModelRegistryRepository(db)
+    repo.seed_from_frozen(_frozen_registry())
+    # 'transition' seeds with frozen val_metrics (map50=0.6); operator re-evaluates it.
+    repo.update_val_metrics("transition", {"map50": 0.99, "precision": 0.9}, split="test")
+    # 'small' seeds without val_metrics; operator evaluates it for the first time.
+    repo.update_val_metrics("small", {"map50": 0.95}, split="test")
+
+    repo.reconcile_builtins_from_frozen(_frozen_registry())
+
+    assert repo.get("transition").val_metrics_json["map50"] == 0.99  # NOT reverted to 0.6
+    assert repo.get("transition").split_evaluated == "test"
+    assert repo.get("small").val_metrics_json["map50"] == 0.95
+    # Provenance/path repair still happens (storage_path stays the resolved frozen path).
+    assert Path(repo.get("small").storage_path) == Path("models/serving/best.pt")
+
+
 def test_promote_swaps_default(db):
     from app.models.model_registry import ModelRegistryRow
     from app.repositories.model_registry import ModelRegistryRepository
@@ -245,9 +267,46 @@ def test_reconcile_orphans(db):
     assert repo.get(a.id).status == "failed"
 
 
+def test_mark_running_is_a_guarded_cas(db):
+    """mark_running is a compare-and-swap: it transitions ONLY a still-queued job and
+    returns the row count, so a cancel that landed first wins and the worker aborts."""
+    from app.repositories.jobs import JobRepository
+
+    repo = JobRepository(db)
+    # Happy path: queued -> running returns 1.
+    job = repo.create("evaluate", {})
+    assert repo.mark_running(job.id) == 1
+    assert repo.get(job.id).status == "running"
+
+    # Race: a queued job cancelled before the worker calls mark_running -> 0 rows,
+    # status stays cancelled (the runner uses this 0 to skip running the job).
+    other = repo.create("evaluate", {})
+    repo.request_cancel(other.id)
+    assert repo.get(other.id).status == "cancelled"
+    assert repo.mark_running(other.id) == 0
+    assert repo.get(other.id).status == "cancelled"
+
+
 # --------------------------------------------------------------------------- #
 # Dataset helpers + bundle ingestion                                          #
 # --------------------------------------------------------------------------- #
+def test_safe_run_name_neutralises_shell_metacharacters():
+    """The run name is interpolated into a copy-paste shell command, so dangerous
+    characters must be stripped, the result bounded, and empties given a safe default."""
+    from app.services.training_prepare import _safe_run_name, build_command
+
+    assert _safe_run_name("papi train; rm -rf /") == "papi-train-rm--rf"
+    assert _safe_run_name("$(whoami)`id`|cat") == "whoami-id-cat"
+    assert _safe_run_name("好 emoji 🚀 name") == "emoji-name"
+    assert _safe_run_name("!!!") == "papi-train"  # all-unsafe -> default
+    assert _safe_run_name("") == "papi-train"
+    assert len(_safe_run_name("x" * 200)) <= 64
+    # The cleaned name is what lands in the command string (no raw metacharacters).
+    cmd = build_command(base="yolo26s.pt", epochs=1, imgsz=640, batch=2, oversample=4, name="a; rm b")
+    assert "; rm" not in cmd
+    assert "--name a-rm-b" in cmd
+
+
 def test_parse_yolo_label_line_validates():
     from app.services.datasets import parse_yolo_label_line
 
@@ -350,6 +409,25 @@ def test_evaluate_to_val_metrics_uses_ap_class_index():
     result = _to_val_metrics(metrics, {0: "red", 1: "white"}, "test")
     assert "white" in result["per_class"]
     assert "red" not in result["per_class"]  # absent class not fabricated
+
+
+def test_evaluate_to_val_metrics_handles_numpy_ap_class_index():
+    """ap_class_index is a numpy array at runtime; the old ``array or []`` raised
+    'truth value of an array is ambiguous', crashing every real evaluation. The list
+    stub above never caught it — this pins the numpy path (regression)."""
+    import numpy as np
+    from app.services.jobs.handlers.evaluate import _to_val_metrics
+
+    # Position order follows ap_class_index: red=class 0 (pos 0), white=class 1 (pos 1).
+    # White carries p=0.9/r=0.8 so its f1 is f1(0.9, 0.8).
+    box = SimpleNamespace(
+        mp=0.9, mr=0.8, map50=0.85, map=0.5,
+        p=np.array([0.7, 0.9]), r=np.array([0.6, 0.8]),
+        ap50=np.array([0.9, 0.95]), ap_class_index=np.array([0, 1]),
+    )
+    result = _to_val_metrics(SimpleNamespace(box=box), {0: "red", 1: "white"}, "test")
+    assert set(result["per_class"]) == {"red", "white"}
+    assert result["precision"] == 0.9
     assert result["map50"] == 0.85
     assert result["per_class"]["white"]["f1"] == pytest.approx(2 * 0.9 * 0.8 / (0.9 + 0.8), rel=1e-3)
 
@@ -562,6 +640,28 @@ def test_evaluate_enqueues_job(client):
     assert job.status_code == 200, job.text
     assert job.json()["kind"] == "evaluate"
     assert job.json()["status"] == "queued"
+
+
+def test_evaluate_rejects_ready_dataset_with_missing_files(client):
+    # A row can be 'ready' while its data.yaml is absent on this node (e.g. a built-in
+    # seeded into a shared DB whose files landed elsewhere). The endpoint must reject
+    # with a clear 400 up front, not enqueue a job that dies as "no data.yaml".
+    from app.database import get_sessionmaker
+    from app.repositories.datasets import DatasetRepository
+
+    session = get_sessionmaker()()
+    try:
+        ghost = DatasetRepository(session).create(
+            name="ghost", source="builtin", status="ready",
+            storage_path="/does/not/exist", class_names={0: "red", 1: "white"},
+        )
+        ghost_id = ghost.id
+    finally:
+        session.close()
+
+    resp = client.post("/api/models/small/evaluate", json={"dataset_id": ghost_id, "split": "test"})
+    assert resp.status_code == 400, resp.text
+    assert "data.yaml" in resp.json()["detail"]
 
 
 def test_evaluate_rejects_train_split(client):

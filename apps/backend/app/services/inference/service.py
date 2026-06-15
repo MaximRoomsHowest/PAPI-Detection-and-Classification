@@ -151,10 +151,12 @@ class InferenceService:
             for model_id in list(self._models):
                 new_entry = new_by_id.get(model_id)
                 old_entry = old_by_id.get(model_id)
-                # Evict a cached model if its entry vanished, or if its resolved
-                # weights path changed (an id was re-uploaded with new weights).
-                # A still-valid cached model stays hot across the reload.
-                if new_entry is None or (
+                # Evict a cached model if its entry vanished, if it was just disabled
+                # (a disabled entry stays listed but is no longer servable, so it must
+                # not linger hot in the cache), or if its resolved weights path changed
+                # (an id was re-uploaded with new weights). A still-valid cached model
+                # stays hot across the reload.
+                if new_entry is None or new_entry.disabled or (
                     old_entry is not None and str(new_entry.path) != str(old_entry.path)
                 ):
                     self._models.pop(model_id, None)
@@ -690,7 +692,7 @@ class InferenceService:
                     yield frame
 
             model, selected_model, effective_method = self._resolve_selected_model(model_id, transition_method)
-            return self._run_tracked_sequence(
+            payload = self._run_tracked_sequence(
                 frames(),
                 fps=fps,
                 width=width,
@@ -710,7 +712,28 @@ class InferenceService:
                 # ANY skipped unreadable file is a reportable shortfall.
                 expected_frame_count=len(image_paths),
                 shortfall_tolerance=0,
+                defer_export=True,
             )
+        # Persist the artifact OUTSIDE the lock: an Azure upload (seconds of network
+        # I/O) must not extend the already-long held lock and stall live single-image
+        # inference. Local mode is a no-op rewrite to the same /media URL (audit #6).
+        self._persist_deferred_export(payload)
+        return payload
+
+    def _persist_deferred_export(self, payload: AnalysisPayload) -> None:
+        """Persist a deferred-local artifact to the media backend and rewrite the
+        payload URL. Called only after the inference lock is released (folder->video).
+        The local name is recoverable from the ``/media/<name>`` URL the core stamped
+        when ``store_export`` was skipped.
+        """
+        local_name = payload.artifact_url.rsplit("/", 1)[-1]
+        artifact_path = self.settings.exports_dir / local_name
+        if not artifact_path.is_file():
+            # The core wrote this under the lock moments ago; if it has vanished
+            # (disk error / external cleanup) fail with a clear message rather than
+            # a cryptic FileNotFoundError from deep inside the Azure upload.
+            raise RuntimeError(f"Annotated artifact missing before export: {artifact_path}")
+        _reference, payload.artifact_url = self._store_export_artifact(artifact_path)
 
     def _run_tracked_sequence(
         self,
@@ -732,6 +755,7 @@ class InferenceService:
         transition_method: str = "tracking",
         expected_frame_count: int | None = None,
         shortfall_tolerance: int = 0,
+        defer_export: bool = False,
     ) -> AnalysisPayload:
         """Source-agnostic tracked-video core shared by ``analyze_video`` (frames from a
         ``VideoCapture``) and ``analyze_frame_sequence`` (frames from a folder of images).
@@ -767,7 +791,11 @@ class InferenceService:
             max_frames=max_frames,
             empty_message=empty_message,
             exports_dir=self.settings.exports_dir,
-            store_export=self._store_export_artifact,
+            # When the caller holds the inference lock around this whole run (the
+            # folder->video path), defer the export: keep the artifact local here and
+            # let the caller persist it AFTER releasing the lock, so a slow Azure blob
+            # upload never blocks live inference behind the lock.
+            store_export=None if defer_export else self._store_export_artifact,
             drone_samples=drone_samples,
             transition_method=transition_method,
             expected_frame_count=expected_frame_count,
@@ -818,6 +846,9 @@ class InferenceService:
         default, or the 3-class transition model for the "model" method) + the configured
         confidence threshold + resolved device. ``warmup`` and the tracked-sequence core
         both reach YOLO through here."""
+        # fp16 only on CUDA: Ultralytics ignores half on CPU, and the flag is opt-in
+        # (default off) so the default CPU deploy's numeric output is unchanged.
+        half = self.settings.inference_half and self.device.lower().startswith("cuda")
         return detect_frame(
             model or self.model,
             frame,
@@ -827,6 +858,7 @@ class InferenceService:
             imgsz=self.settings.inference_imgsz,
             iou=self.settings.inference_iou,
             device=self.device,
+            half=half,
         )
 
     @staticmethod

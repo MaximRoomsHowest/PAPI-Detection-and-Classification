@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     # trained at 1280; the NMS IoU keeps the predict default 0.7.
     inference_imgsz: int = Field(default=1280, ge=320, le=4096, alias="PAPI_INFERENCE_IMGSZ")
     inference_iou: float = Field(default=0.7, ge=0.0, le=1.0, alias="PAPI_INFERENCE_IOU")
+    # Mixed-precision (fp16) inference. OFF by default so the numeric output of the
+    # default deploy is unchanged; opt-in for CUDA + PyTorch (.pt) deploys, where it
+    # ~halves VRAM and speeds up inference at negligible detection-accuracy cost. It is
+    # a no-op on CPU (Ultralytics ignores half there) and is only applied to .pt models
+    # on a CUDA device (an ONNX checkpoint carries its own export precision).
+    inference_half: bool = Field(default=False, alias="PAPI_INFERENCE_HALF")
     # Per-file upload ceiling in megabytes (media.save_upload streams and aborts
     # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
     # env var from effectively disabling the limit.
@@ -152,6 +158,12 @@ class Settings(BaseSettings):
     job_scratch_ttl_hours: int = Field(default=168, ge=1, le=8760, alias="PAPI_JOB_SCRATCH_TTL_HOURS")
     # Master switch so a CPU-only / locked-down deployment can hide training entirely.
     training_enabled: bool = Field(default=True, alias="PAPI_TRAINING_ENABLED")
+    # Source tree for the committed built-in evaluation datasets (data/eval/<id>/),
+    # copied into the datasets volume on startup so the app ships a default eval set.
+    # Defaults to the repo's data/eval; in Docker the build context is apps/backend
+    # only, so compose bind-mounts ./data/eval:/eval-seed:ro and sets PAPI_EVAL_SEED_DIR.
+    # Absolute in both cases, so it deliberately skips the backend-relative resolver.
+    eval_seed_dir: Path = Field(default=REPO_ROOT / "data" / "eval", alias="PAPI_EVAL_SEED_DIR")
 
     @field_validator("cors_origins", mode="before")
     @classmethod

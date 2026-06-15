@@ -263,6 +263,11 @@ def run_tracked_sequence(
                         bbox,
                     )
                 )
+            # Rank from ALL observations-so-far (not just this frame): the clip-learned
+            # slot reference is what lets a dropped L1 stay an "obscured" gap instead of
+            # shifting L2 into slot 1 on the overlay (gap-preserving slots, covered by
+            # test_video_overlay_uses_gap_preserving_lamp_slots). The recompute is O(N)
+            # per frame but negligible against the per-frame YOLO inference it rides on.
             current_ranked_observations = frame_ranked_lamp_observations(track_observations)
             raw_lamps = _ranked_lamps_for_frame(current_ranked_observations, frame_count)
             if not any(lamp.bbox is not None for lamp in raw_lamps):

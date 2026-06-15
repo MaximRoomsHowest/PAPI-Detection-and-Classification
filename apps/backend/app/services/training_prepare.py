@@ -9,11 +9,22 @@ so the external run reproduces the project's training regime.
 from __future__ import annotations
 
 import json
+import re
 import zipfile
 from pathlib import Path
 from typing import Any
 
 from app.config import Settings
+
+# The run name is interpolated into a shell command the operator copy-pastes, so
+# it must be restricted to a safe charset (also exactly what Ultralytics accepts
+# for a run-directory name) — never trust the raw, user-supplied dataset name.
+_UNSAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _safe_run_name(name: str) -> str:
+    cleaned = _UNSAFE_NAME_RE.sub("-", name).strip("-._")
+    return cleaned[:64] or "papi-train"
 
 # Colour-safe augmentation (hue/sat jitter would swap red<->white<->transition).
 COLOUR_SAFE_AUG: dict[str, float] = {
@@ -30,12 +41,14 @@ COLOUR_SAFE_AUG: dict[str, float] = {
 
 
 def build_command(*, base: str, epochs: int, imgsz: int, batch: int, oversample: int, name: str) -> str:
+    # epochs/imgsz/batch/oversample are ints (schema-validated); name is the only
+    # free-text field, so harden it before it lands in the shell string.
     return (
         "python workflows/scripts/train_transition_model.py "
         "--combined ./dataset "
         f"--base models/base/{base} "
         f"--epochs {epochs} --imgsz {imgsz} --batch {batch} --device 0 "
-        f"--oversample {oversample} --name {name}"
+        f"--oversample {oversample} --name {_safe_run_name(name)}"
     )
 
 

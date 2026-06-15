@@ -49,6 +49,8 @@ data/annotations/
 data/datasets/
 data/runs/
 data/cvat/
+# YOLO label caches under the committed eval seeds are generated artifacts.
+data/eval/**/*.cache
 
 # Model binary artifacts — ignored by default everywhere
 runs/

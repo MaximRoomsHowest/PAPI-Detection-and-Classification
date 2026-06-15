@@ -157,9 +157,15 @@ class RequestIdMiddleware:
         rid = sanitize_request_id(inbound) or uuid.uuid4().hex
         token = request_id_ctx.set(rid)
 
-        # Wrap the send callable so we can inject the X-Request-ID response header.
+        method = scope.get("method", "-")
+        path = scope.get("path", "-")
+        status_holder: dict[str, int] = {}
+
+        # Wrap the send callable so we can inject the X-Request-ID response header
+        # and capture the final status for the structured access log below.
         async def send_with_id(message):
             if message["type"] == "http.response.start":
+                status_holder["status"] = message.get("status")
                 headers = list(message.get("headers", []))
                 headers.append((b"x-request-id", rid.encode("latin-1")))
                 message = {**message, "headers": headers}
@@ -168,4 +174,11 @@ class RequestIdMiddleware:
         try:
             await self.app(scope, receive, send_with_id)
         finally:
+            # Structured access log that actually replaces uvicorn's quieted default
+            # (previously claimed but never emitted — self.logger was dead). Carries
+            # the request id so one request is greppable end to end.
+            self.logger.info(
+                "request",
+                extra={"method": method, "path": path, "status": status_holder.get("status")},
+            )
             request_id_ctx.reset(token)

@@ -56,13 +56,18 @@ class JobRepository:
         )
         return list(self.db.scalars(stmt).all())
 
-    def mark_running(self, job_id: str) -> None:
-        self.db.execute(
+    def mark_running(self, job_id: str) -> int:
+        """Compare-and-swap ``queued`` -> ``running``. Returns the number of rows
+        updated: 0 means the job was cancelled (or otherwise left ``queued``) in the
+        window after the worker's status check, so the caller must NOT run it. The
+        ``WHERE status == 'queued'`` guard is what makes a concurrent cancel win."""
+        result = self.db.execute(
             update(Job)
-            .where(Job.id == job_id)
+            .where(Job.id == job_id, Job.status == "queued")
             .values(status="running", phase="starting", started_at=utcnow_aware())
         )
         self.db.commit()
+        return int(result.rowcount or 0)
 
     def set_progress(self, job_id: str, phase: str | None = None, progress: float | None = None) -> None:
         values: dict[str, Any] = {}

@@ -76,6 +76,15 @@ class InferenceStats(BaseModel):
     avg_processing_ms: float | None = None
     p50_processing_ms: int | None = None
     p95_processing_ms: int | None = None
+    # Per-media-type latency: a whole-video analysis spans many frames, so its
+    # processing time is not comparable to a single image's — surfaced separately.
+    # Null when the filtered slice has no rows of that media type.
+    image_avg_processing_ms: float | None = None
+    image_p50_processing_ms: int | None = None
+    image_p95_processing_ms: int | None = None
+    video_avg_processing_ms: float | None = None
+    video_p50_processing_ms: int | None = None
+    video_p95_processing_ms: int | None = None
     avg_confidence: float | None = None
     by_runway: dict[str, int] = Field(default_factory=dict)
     by_global_state: dict[str, int] = Field(default_factory=dict)

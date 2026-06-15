@@ -156,9 +156,18 @@ class AnalysisLogRepository:
         avg_conf = self.db.scalar(select(func.avg(AnalysisLog.confidence)).where(*conditions))
         first_at = self.db.scalar(select(func.min(AnalysisLog.created_at)).where(*conditions))
         latest_at = self.db.scalar(select(func.max(AnalysisLog.created_at)).where(*conditions))
-        processing_times = sorted(
-            self.db.scalars(select(AnalysisLog.processing_ms).where(*conditions)).all()
-        )
+        # Pull (processing_ms, media_type) once and partition in Python so the
+        # latency percentiles can be reported per media type. A whole-video analysis
+        # processes many frames, so its processing_ms dwarfs a single image's —
+        # mixing them into one number is misleading (split requested by the user).
+        proc_rows = self.db.execute(
+            select(AnalysisLog.processing_ms, AnalysisLog.media_type).where(*conditions)
+        ).all()
+        processing_times = sorted(p for p, _ in proc_rows if p is not None)
+        image_times = sorted(p for p, m in proc_rows if p is not None and m == "image")
+        video_times = sorted(p for p, m in proc_rows if p is not None and m == "video")
+        image_avg = round(sum(image_times) / len(image_times), 2) if image_times else None
+        video_avg = round(sum(video_times) / len(video_times), 2) if video_times else None
 
         return InferenceStats(
             sample_size=total,
@@ -168,6 +177,12 @@ class AnalysisLogRepository:
             avg_processing_ms=round(float(avg_proc), 2) if avg_proc is not None else None,
             p50_processing_ms=_percentile_nearest_rank(processing_times, 0.50),
             p95_processing_ms=_percentile_nearest_rank(processing_times, 0.95),
+            image_avg_processing_ms=image_avg,
+            image_p50_processing_ms=_percentile_nearest_rank(image_times, 0.50),
+            image_p95_processing_ms=_percentile_nearest_rank(image_times, 0.95),
+            video_avg_processing_ms=video_avg,
+            video_p50_processing_ms=_percentile_nearest_rank(video_times, 0.50),
+            video_p95_processing_ms=_percentile_nearest_rank(video_times, 0.95),
             avg_confidence=round(float(avg_conf), 4) if avg_conf is not None else None,
             by_runway=by_runway,
             by_global_state=by_state,

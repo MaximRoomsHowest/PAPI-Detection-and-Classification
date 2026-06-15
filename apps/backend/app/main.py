@@ -81,6 +81,27 @@ def _seed_model_registry() -> None:
         logger.warning("Model registry seeding skipped: %s", exc)
 
 
+def _seed_datasets() -> None:
+    """Seed the built-in per-role evaluation datasets into the datasets table + volume.
+
+    Idempotent (per id), so it never clobbers operator uploads. Failures are logged,
+    never fatal — a deployment without the eval-seed mount simply has no default set.
+    """
+    try:
+        from app.database import get_sessionmaker
+        from app.services.datasets_seed import seed_builtin_datasets
+
+        session = get_sessionmaker()()
+        try:
+            seeded = seed_builtin_datasets(settings, session)
+            if seeded:
+                logger.info("Seeded %d built-in evaluation dataset(s).", seeded)
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001 - seeding must never abort startup
+        logger.warning("Built-in dataset seeding skipped: %s", exc)
+
+
 def _reconcile_orphaned_jobs() -> None:
     """Mark jobs left ``running`` by a previous process as failed (no resume).
 
@@ -122,6 +143,7 @@ def _startup_warmup() -> None:
     """
     init_db()
     _seed_model_registry()
+    _seed_datasets()
     _reconcile_orphaned_jobs()
     _reap_job_scratch()
     # Azure Blob readiness is a hard dependency when configured: an unreachable

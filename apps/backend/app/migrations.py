@@ -29,6 +29,13 @@ from sqlalchemy import Engine, inspect, text
 logger = logging.getLogger(__name__)
 
 # (table, column, DDL type) tuples applied in order at startup.
+#
+# NOTE for the model-lifecycle tables (``model_registry``, ``datasets``, ``jobs``):
+# they are created whole by ``create_all`` on fresh DBs, so they need NO entry here
+# today. But ``create_all`` never ALTERs an existing table — so any column ADDED to
+# one of them later MUST get a row here too, or deployments that already built the
+# table on an earlier version will be missing the column (same contract as
+# ``analysis_logs.model_id`` below).
 _STARTUP_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("analysis_logs", "model_id", "VARCHAR(96)"),
 )

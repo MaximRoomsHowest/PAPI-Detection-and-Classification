@@ -56,6 +56,26 @@ class TelemetryError(ValueError):
 MAX_TELEMETRY_SAMPLES = 50_000
 
 
+def _capped_indices(total: int, cap: int = MAX_TELEMETRY_SAMPLES) -> range | list[int]:
+    """Indices to materialize so a parser builds at most ``cap`` samples, spread
+    uniformly across the whole track (endpoints ~preserved).
+
+    Bounds the per-parser list BEFORE it is fully built: a hostile file with millions
+    of rows would otherwise allocate millions of ``DroneSample`` objects before the
+    post-parse downsample runs (audit #14). The selection ``int(i * stride)`` mirrors
+    that downsample exactly, so an over-cap track yields the SAME samples either way.
+    Unlike a prefix cap it samples across the WHOLE track (so the descent/landing tail
+    is represented, not truncated away) — though the very last index may be dropped:
+    the last kept sample is ``int((cap-1) * stride) ≈ total - stride`` (>=99.99% of the
+    track at the cap), which is what matters for the angle sweep. ``total <= cap``
+    returns ``range(total)``: the normal path is byte-for-byte unchanged.
+    """
+    if total <= cap:
+        return range(total)
+    stride = total / cap
+    return [int(i * stride) for i in range(cap)]
+
+
 def _coerce_float(value: object) -> float | None:
     if value is None:
         return None
