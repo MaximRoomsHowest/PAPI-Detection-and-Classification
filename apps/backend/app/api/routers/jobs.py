@@ -78,3 +78,30 @@ def cancel_job(
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown job.")
     return job_to_response(job)
+
+
+@router.delete("/jobs", status_code=200)
+def clear_finished_jobs(
+    kind: Annotated[str | None, Query()] = None,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(routes.require_api_key)] = None,
+) -> dict[str, int]:
+    """Bulk-remove every finished/failed/cancelled job (optionally of one kind) so
+    the monitor can be cleared in one action. Active jobs are left running."""
+    deleted = JobRepository(db).delete_terminal(kind=kind)
+    return {"deleted": deleted}
+
+
+@router.delete("/jobs/{job_id}", status_code=204)
+def delete_job(
+    job_id: str,
+    db: Annotated[Session, Depends(get_session)] = None,
+    _auth: Annotated[None, Depends(routes.require_api_key)] = None,
+) -> None:
+    """Dismiss a single finished job. 404 if unknown, 409 if still active — a
+    queued/running job must be cancelled first (clearing it would orphan the worker)."""
+    outcome = JobRepository(db).delete(job_id)
+    if outcome is None:
+        raise HTTPException(status_code=404, detail="Unknown job.")
+    if outcome == "active":
+        raise HTTPException(status_code=409, detail="Cancel the job before dismissing it.")

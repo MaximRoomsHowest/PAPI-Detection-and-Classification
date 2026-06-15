@@ -19,6 +19,11 @@ export function Modal({ open, onClose, title, children, closeLabel = 'Close', wi
         aria-modal="true"
         aria-label={title}
         ref={ref}
+        // useModalA11y calls ref.current.focus() on open to move focus into the
+        // dialog; a plain <div> isn't focusable without tabIndex=-1, so without
+        // this the call is a no-op and focus stays on the trigger behind the scrim
+        // (matches HistoryDetailModal's dialog).
+        tabIndex={-1}
       >
         <div className="lc-modal__head">
           <h2 className="lc-modal__title">{title}</h2>

@@ -287,6 +287,51 @@ def test_mark_running_is_a_guarded_cas(db):
     assert repo.get(other.id).status == "cancelled"
 
 
+def test_delete_dismisses_terminal_job_only(db):
+    """delete() removes a finished job and returns its id, refuses an active one with
+    the 'active' sentinel (so the endpoint can 409 it), and returns None for unknown."""
+    from app.repositories.jobs import JobRepository
+
+    repo = JobRepository(db)
+    running = repo.create("evaluate", {})
+    repo.mark_running(running.id)
+    assert repo.delete(running.id) == "active"  # still active -> refused
+    assert repo.get(running.id) is not None
+
+    repo.mark_succeeded(running.id, {"map50": 0.9})
+    assert repo.delete(running.id) == running.id  # now terminal -> removed
+    assert repo.get(running.id) is None
+
+    assert repo.delete("does-not-exist") is None
+
+
+def test_delete_terminal_clears_finished_keeps_active(db):
+    """delete_terminal() bulk-clears finished/failed/cancelled jobs (optionally by kind)
+    and leaves queued/running jobs in place."""
+    from app.repositories.jobs import JobRepository
+
+    repo = JobRepository(db)
+    done = repo.create("evaluate", {})
+    repo.mark_succeeded(done.id, {})
+    failed = repo.create("evaluate", {})
+    repo.mark_failed(failed.id, "boom")
+    active = repo.create("label_assist", {})
+    repo.mark_running(active.id)
+    other_kind_done = repo.create("label_assist", {})
+    repo.mark_succeeded(other_kind_done.id, {})
+
+    # Kind-scoped clear removes only finished evaluate jobs.
+    assert repo.delete_terminal(kind="evaluate") == 2
+    assert repo.get(done.id) is None and repo.get(failed.id) is None
+    assert repo.get(active.id) is not None  # still running
+    assert repo.get(other_kind_done.id) is not None  # other kind untouched
+
+    # Unscoped clear removes the remaining terminal job, still leaving the active one.
+    assert repo.delete_terminal() == 1
+    assert repo.get(other_kind_done.id) is None
+    assert repo.get(active.id) is not None
+
+
 # --------------------------------------------------------------------------- #
 # Dataset helpers + bundle ingestion                                          #
 # --------------------------------------------------------------------------- #
@@ -535,6 +580,43 @@ def test_promote_uploaded_model(client, monkeypatch):
     resp = client.post(f"/api/models/{new_id}/promote")
     assert resp.status_code == 200
     assert resp.json()["is_default"] is True
+
+
+def test_dismiss_and_clear_jobs_endpoints(client):
+    """DELETE /api/jobs/{id} dismisses a finished job (404 unknown, 409 active);
+    DELETE /api/jobs bulk-clears finished jobs (optionally by kind), leaving active ones."""
+    from app.database import get_sessionmaker
+    from app.repositories.jobs import JobRepository
+
+    s = get_sessionmaker()()
+    try:
+        repo = JobRepository(s)
+        active = repo.create("evaluate", {})
+        active_id = active.id
+        repo.mark_running(active.id)
+        done = repo.create("evaluate", {})
+        done_id = done.id
+        repo.mark_succeeded(done.id, {})
+    finally:
+        s.close()
+
+    # Unknown -> 404; still-active -> 409 (must cancel first); finished -> 204.
+    assert client.delete("/api/jobs/nope").status_code == 404
+    assert client.delete(f"/api/jobs/{active_id}").status_code == 409
+    assert client.delete(f"/api/jobs/{done_id}").status_code == 204
+    assert all(j["id"] != done_id for j in client.get("/api/jobs").json())
+
+    # Bulk clear of finished evaluate jobs leaves the active one in place.
+    s = get_sessionmaker()()
+    try:
+        repo = JobRepository(s)
+        repo.mark_succeeded(repo.create("evaluate", {}).id, {})
+    finally:
+        s.close()
+    resp = client.delete("/api/jobs?kind=evaluate")
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] >= 1
+    assert active_id in {j["id"] for j in client.get("/api/jobs").json()}
 
 
 def test_dataset_bundle_upload(client, tmp_path):

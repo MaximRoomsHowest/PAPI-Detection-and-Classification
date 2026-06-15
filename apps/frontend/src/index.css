@@ -53,6 +53,10 @@
   --footer-bg-deep: #0b1016;
   --warn: #c98414;
   --danger: #c03b35;
+  /* Positive/success readout (job succeeded). A forest green held above WCAG AA
+     on the white/paper surfaces it appears on — distinct from --accent (cyan) so
+     "succeeded" doesn't read as a link. */
+  --success: #1d7a44;
   --focus: #0096c7;
   /* Lamp state colours — the only place red / white / amber may come from. */
   --lamp-white: #f4edd8;
@@ -113,6 +117,8 @@ html[data-theme='dark'] {
   --footer-bg-deep: #0b1016;
   --warn: #e8a33d;
   --danger: #e5544b;
+  /* Brighter green for the dark surface — AA on the dark job-row/card tints. */
+  --success: #5fd08a;
   --focus: #6fd3e8;
   --lamp-white: #f2ecda;
   --lamp-white-border: #c9bc97;

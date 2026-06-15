@@ -94,7 +94,7 @@ function BundleUploadModal({ open, onClose, copy, onSubmit }) {
   )
 }
 
-function AssistedModal({ open, onClose, copy, models, onSubmit }) {
+function AssistedModal({ open, onClose, copy, models, modelsLoading, onSubmit }) {
   const usable = models.filter((m) => m.available)
   const [files, setFiles] = useState([])
   const [name, setName] = useState('')
@@ -116,7 +116,9 @@ function AssistedModal({ open, onClose, copy, models, onSubmit }) {
   return (
     <Modal open={open} onClose={onClose} title={copy.datasets.assisted.title} closeLabel={copy.models.close}>
       {usable.length === 0 ? (
-        <p className="lc-empty">{copy.datasets.assisted.noModels}</p>
+        // Don't show the dead-end "no models" message while the registry is still
+        // loading — that reads as a hard failure when models are about to arrive.
+        <p className="lc-empty">{modelsLoading ? copy.datasets.loading : copy.datasets.assisted.noModels}</p>
       ) : (
         <form className="lc-form" onSubmit={submit}>
           <label className="lc-field">
@@ -220,8 +222,8 @@ function TrainModal({ open, onClose, copy, dataset, models, onPrepared }) {
 
 export function DatasetsPage({ copy, isAdmin }) {
   const { datasets, loading, error, uploadBundle, startAssisted, remove } = useDatasets()
-  const { models } = useModelManagement()
-  const { jobs, cancel, refetch: refetchJobs } = useJobs()
+  const { models, loading: modelsLoading } = useModelManagement()
+  const { jobs, cancel, dismiss, clearFinished, refetch: refetchJobs } = useJobs()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [assistedOpen, setAssistedOpen] = useState(false)
   const [reviewDataset, setReviewDataset] = useState(null)
@@ -291,7 +293,15 @@ export function DatasetsPage({ copy, isAdmin }) {
         </div>
       </header>
 
-      <JobMonitor jobs={trainingJobs} onCancel={cancel} copy={copy} />
+      <JobMonitor
+        jobs={trainingJobs}
+        onCancel={cancel}
+        onDismiss={dismiss}
+        onClearFinished={() =>
+          Promise.all([clearFinished('label_assist'), clearFinished('train_prepare')])
+        }
+        copy={copy}
+      />
 
       {loading && <p className="lc-empty">{copy.datasets.loading}</p>}
       {error && <p className="lc-empty lc-empty--error">{copy.datasets.loadError}</p>}
@@ -311,12 +321,22 @@ export function DatasetsPage({ copy, isAdmin }) {
         ))}
       </div>
 
-      <BundleUploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} copy={copy} onSubmit={handleUpload} />
+      {/* key tied to open state so each modal remounts fresh — otherwise typed
+          fields linger and reappear when reopened after a cancel. */}
+      <BundleUploadModal
+        key={uploadOpen ? 'bundle-open' : 'bundle-closed'}
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        copy={copy}
+        onSubmit={handleUpload}
+      />
       <AssistedModal
+        key={assistedOpen ? 'assisted-open' : 'assisted-closed'}
         open={assistedOpen}
         onClose={() => setAssistedOpen(false)}
         copy={copy}
         models={models}
+        modelsLoading={modelsLoading}
         onSubmit={handleAssisted}
       />
       <Modal

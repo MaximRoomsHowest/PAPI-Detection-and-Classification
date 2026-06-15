@@ -6,6 +6,7 @@ import { runwayDisplayName } from '../../lib/runwaySelection'
 import { globalStateLabel } from '../../lib/stateLabels'
 import { stateLampPattern } from '../../catalog/stateCatalog'
 import { PapiGlyph } from '../PapiGlyph'
+import { StateDistributionBar } from './StateDistributionBar'
 
 // The analyses table (with its loading/empty states + the horizontal-scroll cue)
 // and the pagination controls. Presentational — the parent owns the logs/paging
@@ -85,14 +86,35 @@ export function HistoryTable({
                         {runwayDisplayName(log.runway_id, runways)}
                       </td>
                       <td data-label={copy.history.state}>
-                        <span className="history-state">
-                          {stateLampPattern[displayState] && (
-                            <PapiGlyph size="sm" states={stateLampPattern[displayState]} />
-                          )}
-                          <span className={clsx('state-pill', `state-pill-${displayState}`)}>
-                            {globalStateLabel(displayState, copy)}
+                        <div className="history-state-cell">
+                          {/* For a video the pill is the DOMINANT (most-frequent)
+                              frame state, not a single reading — the hint says so,
+                              and the distribution bar below shows the full mix so a
+                              clip is visibly distinct from a still image. */}
+                          <span
+                            className="history-state"
+                            title={
+                              log.media_type === 'video'
+                                ? copy.history.videoStateHint.replace('{frames}', displayFrameCount)
+                                : undefined
+                            }
+                          >
+                            {stateLampPattern[displayState] && (
+                              <PapiGlyph size="sm" states={stateLampPattern[displayState]} />
+                            )}
+                            <span className={clsx('state-pill', `state-pill-${displayState}`)}>
+                              {globalStateLabel(displayState, copy)}
+                            </span>
                           </span>
-                        </span>
+                          {log.media_type === 'video' && log.state_counts && (
+                            <StateDistributionBar
+                              counts={log.state_counts}
+                              copy={copy}
+                              compact
+                              className="history-row-dist"
+                            />
+                          )}
+                        </div>
                       </td>
                       <td data-label={copy.history.confidence} className="tnum">
                         {percent(displayConfidence)}%

@@ -784,3 +784,25 @@ export async function cancelJob(jobId) {
   if (!response.ok) throw await errorFrom(response, 'Could not cancel job')
   return parseJsonBody(response, 'Job')
 }
+
+// Dismiss one finished/failed/cancelled job (backend 409s an active one — the UI
+// only offers this on terminal rows). 204 No Content, so nothing is parsed back.
+export async function deleteJob(jobId) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/jobs/${encodeURIComponent(jobId)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not dismiss job')
+}
+
+// Bulk-clear every finished job (optionally of one kind so the Models page clears
+// only evaluate jobs and Datasets only its own). Returns { deleted }.
+export async function clearFinishedJobs({ kind } = {}) {
+  const qs = kind ? `?kind=${encodeURIComponent(kind)}` : ''
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/jobs${qs}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not clear jobs')
+  return parseJsonBody(response, 'Jobs')
+}

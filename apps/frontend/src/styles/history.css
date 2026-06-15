@@ -564,7 +564,10 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--surface-muted);
+  /* Opaque header — --surface-muted is only ~5-6% alpha, so as the frame rows
+     scrolled up their text bled straight through the pinned column keys. --paper
+     is solid and matches the main history table's sticky header. */
+  background: var(--paper);
 }
 
 .history-modal-columns {
@@ -694,4 +697,88 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* --- State-distribution bar ------------------------------------------------
+   Shared by the header summary (overall by_global_state) and per video row
+   (per-frame state_counts). Segments grow in proportion to their counts; the
+   colours mirror the .state-pill tints but solid so a thin bar reads clearly. */
+.state-dist {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.state-dist--compact {
+  height: 6px;
+  max-width: 150px;
+}
+
+.state-dist__seg {
+  flex-basis: 0;
+  min-width: 2px;
+}
+
+/* Segment + legend-swatch colours, keyed by global state. */
+.state-seg-far_too_high { background: #35d7b7; }
+.state-seg-too_high { background: #6fc8ff; }
+.state-seg-correct_glidepath { background: #a7e35c; }
+.state-seg-too_low { background: #ffb657; }
+.state-seg-far_too_low { background: #ff6b6b; }
+.state-seg-transition { background: #ffb11f; }
+.state-seg-unknown { background: var(--faint); }
+
+/* Header state-distribution card spans the full summary grid and leads the strip. */
+.history-summary--wide {
+  grid-column: 1 / -1;
+}
+
+.history-summary__dist {
+  margin-top: 2px;
+}
+
+.history-state-legend {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.history-state-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-state-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.history-state-legend__count {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+/* Video rows stack the dominant-state pill over a compact distribution bar, so a
+   clip is visibly distinct from an image's single static pill. */
+.history-state-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.history-row-dist {
+  max-width: 140px;
 }

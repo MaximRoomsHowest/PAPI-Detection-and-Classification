@@ -476,7 +476,9 @@
     grid-template-columns: 1fr;
   }
   .runway-lamp-grid {
-    grid-template-columns: 1fr 1fr;
+    /* One field per row: at 1fr 1fr the three coordinate inputs split 2 + 1, leaving
+       the altitude field orphaned beside an empty cell once the header is hidden. */
+    grid-template-columns: 1fr;
   }
   .runway-lamp-grid--head {
     display: none;

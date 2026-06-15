@@ -101,7 +101,11 @@ export function AnalysisHistoryPanel({ activeScenario, backendFrames, backendFra
                   <span className="history-pattern">{formatLampCounts(frame.lamps, copy)}</span>
                   <span className="history-state">{state.label}</span>
                   <span className="history-angle">{frameAngle(frame, copy)}</span>
-                  <span className="history-confidence">{frame.metrics?.boxConfidence ?? '—'}%</span>
+                  <span className="history-confidence">
+                    {Number.isFinite(frame.metrics?.boxConfidence)
+                      ? `${frame.metrics.boxConfidence}%`
+                      : '—'}
+                  </span>
                 </button>
               </div>
             )

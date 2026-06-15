@@ -4,7 +4,6 @@ import {
   downloadLogsCsv,
   fetchLogDetail,
   fetchLogs,
-  fetchModelInfo,
   fetchModels,
   fetchStats,
   resolveMediaUrl,
@@ -60,7 +59,6 @@ export function HistoryPage({ copy }) {
   const { runways = [] } = useLiveDemo()
   const [logs, setLogs] = useState([])
   const [total, setTotal] = useState(0)
-  const [modelInfo, setModelInfo] = useState(null)
   const [stats, setStats] = useState(null)
   const [selectedLog, setSelectedLog] = useState(null)
   const [openingLogId, setOpeningLogId] = useState(null)
@@ -90,18 +88,12 @@ export function HistoryPage({ copy }) {
   const [stateOptions, setStateOptions] = useState([])
   const [modelOptions, setModelOptions] = useState([])
 
-  // Model info changes rarely, so fetch it once on mount rather than on every
-  // refresh or filter change (audit IMP-FE-19). A failure here is non-critical —
-  // the model card just renders "Unavailable". The registry list seeds the model
-  // filter options the same way (logs from since-removed models are folded in by
-  // the logs effect below, so the dropdown can still name them).
+  // Seed the model filter options from the registry once on mount (logs from
+  // since-removed models are folded in by the logs effect below, so the dropdown
+  // can still name them). A failure here is non-critical — the dropdown just grows
+  // from the logs instead.
   useEffect(() => {
     let ignore = false
-    fetchModelInfo()
-      .then((info) => {
-        if (!ignore) setModelInfo(info)
-      })
-      .catch(() => {})
     fetchModels()
       .then((models) => {
         if (ignore || !Array.isArray(models)) return
@@ -356,7 +348,7 @@ export function HistoryPage({ copy }) {
         </div>
       )}
 
-      <HistoryStats modelInfo={modelInfo} stats={stats} isFiltered={hasActiveFilters} copy={copy} />
+      <HistoryStats stats={stats} isFiltered={hasActiveFilters} copy={copy} />
 
       <HistoryFilters
         runwayFilter={filters.runway}

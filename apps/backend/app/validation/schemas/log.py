@@ -23,5 +23,10 @@ class LogListItem(BaseModel):
     # every log's detail payload.
     truncated_at_frame: int | None = None
     decode_shortfall: int | None = None
+    # Per-global-state frame tally for video rows (derived from result_json.per_frame).
+    # Lets the history table render a state-distribution bar instead of a single
+    # dominant-state pill, so a time-varying clip reads differently from a still
+    # image. None for images and for legacy video rows that have no per_frame.
+    state_counts: dict[str, int] | None = None
     artifact_url: str | None = None
     created_at: str

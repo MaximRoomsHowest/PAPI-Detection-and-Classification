@@ -210,6 +210,17 @@ def test_to_list_item_summarizes_video_rows_from_every_persisted_frame(session):
     assert item.global_state == "correct_glidepath"
     assert item.confidence == pytest.approx(0.8)
     assert item.frame_count == 3
+    # Per-state frame tally drives the history table's distribution bar.
+    assert item.state_counts == {"far_too_low": 1, "correct_glidepath": 2}
+
+
+def test_to_list_item_leaves_state_counts_none_for_images(session):
+    """state_counts is video-only; an image row carries None so the table renders a
+    plain single-state pill (no distribution bar)."""
+    _add(session, media_type="image", global_state="correct_glidepath")
+    repo = AnalysisLogRepository(session)
+    item = repo.to_list_item(repo.list_recent(1, 0)[0])
+    assert item.state_counts is None
 
 
 def test_to_list_item_falls_back_to_result_json_model_id_for_legacy_rows(session):
