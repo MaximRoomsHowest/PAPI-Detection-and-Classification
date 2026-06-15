@@ -107,12 +107,14 @@ export function FrameStage({
   artifactWarning,
   videoSeek,
   onVideoDuration,
+  analysisProgress,
   copy,
 }) {
   const [isDragActive, setIsDragActive] = useState(false)
   const [viewerMode, setViewerMode] = useState('annotated')
   const [isZoomed, setIsZoomed] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [failedMediaUrl, setFailedMediaUrl] = useState(null)
   const videoRef = useRef(null)
   const annotatedSource = scenario.artifactUrl
     ? { type: scenario.artifactType ?? 'image', url: scenario.artifactUrl }
@@ -121,14 +123,18 @@ export function FrameStage({
       : null
   const originalSource =
     media?.url && media.type !== 'folder' ? { type: media.type, url: media.url } : null
+  const annotatedPreviewFailed = Boolean(
+    annotatedSource?.url && failedMediaUrl === annotatedSource.url,
+  )
+  const usableAnnotatedSource = annotatedPreviewFailed ? null : annotatedSource
   // Only offer the toggle when both an original upload and an annotated export exist.
-  const canToggleView = Boolean(annotatedSource && originalSource)
+  const canToggleView = Boolean(usableAnnotatedSource && originalSource)
   const displayMedia =
     folderVideo
       ? folderVideo
       : canToggleView && viewerMode === 'original'
       ? originalSource
-      : annotatedSource ?? originalSource ?? media
+      : usableAnnotatedSource ?? originalSource ?? media
   const timelineFrameCount =
     displayMedia?.type === 'video'
       ? (scenario.perFrame?.length || scenario.rawResult?.angle_track?.length || folderVideo?.frameCount || 0)
@@ -248,6 +254,12 @@ export function FrameStage({
 
   const handleDragLeave = () => {
     setIsDragActive(false)
+  }
+
+  const handleMediaError = () => {
+    if (displayMedia?.url) {
+      setFailedMediaUrl(displayMedia.url)
+    }
   }
 
   return (
@@ -399,13 +411,19 @@ export function FrameStage({
             onPause={() => setIsPaused(true)}
             onTimeUpdate={syncVideoFrame}
             onSeeked={syncVideoFrame}
+            onError={handleMediaError}
             onLoadedMetadata={(event) => {
               onVideoDuration?.(event.currentTarget.duration)
               syncVideoFrame()
             }}
           />
         ) : displayMedia?.type === 'image' ? (
-          <img key={displayMedia.url} src={displayMedia.url} alt={copy.live.frameAlt} />
+          <img
+            key={displayMedia.url}
+            src={displayMedia.url}
+            alt={copy.live.frameAlt}
+            onError={handleMediaError}
+          />
         ) : analyzing ? (
           <div className="processing-placeholder" aria-hidden="true" />
         ) : (
@@ -419,7 +437,7 @@ export function FrameStage({
         {analyzing && (
           <div className="analyzing-layer" role="status" aria-live="polite">
             <Radar size={34} />
-            <span>{copy.live.backendInference}</span>
+            <span>{analysisProgress || copy.live.backendInference}</span>
           </div>
         )}
       </div>

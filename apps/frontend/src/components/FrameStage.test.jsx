@@ -145,6 +145,41 @@ describe('FrameStage', () => {
     expect(findButton(freshToggle, copy.live.viewAnnotated).getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('falls back to the original upload when the annotated preview fails to load', () => {
+    const props = makeProps({
+      scenario: { ...baseScenario, artifactUrl: '/media/annotated.png' },
+      media: { type: 'image', url: 'blob:original' },
+    })
+    const { container } = render(<FrameStage {...props} />)
+
+    const image = container.querySelector('.video-surface img')
+    expect(image.getAttribute('src')).toBe('/media/annotated.png')
+
+    act(() => {
+      image.dispatchEvent(new Event('error', { bubbles: false }))
+    })
+
+    const fallback = container.querySelector('.video-surface img')
+    expect(fallback.getAttribute('src')).toBe('blob:original')
+    expect(container.querySelector(`[role="group"][aria-label="${copy.live.viewToggle}"]`)).toBeNull()
+  })
+
+  it('shows the active analysis progress inside the frame overlay', () => {
+    const { container } = render(
+      <FrameStage
+        {...makeProps({
+          analyzing: true,
+          analysisProgress: 'Detecting the four PAPI lights…',
+        })}
+      />,
+    )
+
+    expect(container.querySelector('.analysis-status')).toBeNull()
+    expect(container.querySelector('.analyzing-layer').textContent).toContain(
+      'Detecting the four PAPI lights…',
+    )
+  })
+
   it('labels the folder-video button as a toggle that can exit the preview', () => {
     const props = makeProps({
       canTransformFolderToVideo: true,

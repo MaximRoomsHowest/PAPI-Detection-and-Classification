@@ -64,22 +64,43 @@ h1 {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(330px, auto) 1fr auto;
   align-items: stretch;
   width: 100%;
   border-bottom: 1px solid var(--border);
-  background: var(--paper);
+  background: color-mix(in srgb, var(--paper) 96%, transparent);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 13px;
-  padding: 10px 20px;
+  gap: 16px;
+  padding: 12px 22px;
   border-right: 1px solid var(--border);
   color: var(--text-strong);
   text-decoration: none;
   min-width: 0;
+}
+
+.brand-logo {
+  width: 156px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.brand-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+html[data-theme='light'] .brand-logo .logo-dark {
+  display: none;
+}
+
+html[data-theme='dark'] .brand-logo .logo-light {
+  display: none;
 }
 
 /* The four-box PAPI unit as the product mark. Cell colours come from the
@@ -154,7 +175,7 @@ h1 {
 
 .brand-text {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .brand strong,
@@ -165,16 +186,19 @@ h1 {
 .brand strong {
   color: var(--text-strong);
   font-size: 16px;
-  font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0.2px;
 }
 
 .brand small {
-  color: var(--faint);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.brand-company {
+  font-size: 11px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
 }
 
@@ -212,39 +236,6 @@ h1 {
   display: inline-flex;
   justify-self: end;
   align-items: stretch;
-}
-
-/* Read-only info cells in the util cluster (status / SITE EDNY / UTC clock).
-   Each is divided from its neighbour by a hairline left rule; labels are
-   uppercase mono in var(--faint). */
-.util-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  border-left: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.util-cell__label {
-  color: var(--faint);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-}
-
-.util-cell__value {
-  color: var(--text-strong);
-  font-size: 12.5px;
-  letter-spacing: 0.4px;
-}
-
-/* Geist Mono is fixed-pitch, so the ticking clock never jitters horizontally;
-   the min-width just reserves the cell before the first paint. */
-.clock-cell {
-  min-width: 118px;
-  justify-content: center;
 }
 
 /* Wrappers that keep the existing language dropdown + theme toggle button

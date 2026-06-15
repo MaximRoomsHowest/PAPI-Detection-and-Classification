@@ -19,12 +19,14 @@
    text/overlay colours are fixed light values rather than theme tokens.
    ============================================================ */
 .approach-hero {
+  --approach-topbar-offset: clamp(86px, 5.7vw, 116px);
+
   position: relative;
   isolation: isolate;
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: clamp(540px, 82vh, 820px);
+  min-height: calc(100svh - var(--approach-topbar-offset));
   overflow: hidden;
   background: #06121a;
 }
@@ -130,20 +132,28 @@
 /* ---- Scroll cue ---- */
 .scroll-cue {
   position: absolute;
-  bottom: 16px;
+  bottom: clamp(16px, 3vh, 30px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  color: rgba(220, 230, 240, 0.68);
+  gap: 4px;
+  padding: 9px 14px 8px;
+  border: 1px solid rgba(124, 213, 236, 0.32);
+  border-radius: 999px;
+  background: rgba(7, 15, 23, 0.48);
+  color: rgba(230, 242, 250, 0.82);
   text-decoration: none;
   font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 14px 34px -22px rgba(0, 0, 0, 0.8);
+  animation: scroll-cue-float 2.4s ease-in-out infinite;
 }
 
 .scroll-cue svg {
@@ -155,8 +165,19 @@
   50% { transform: translateY(4px); }
 }
 
+.scroll-cue small {
+  line-height: 1;
+}
+
+@keyframes scroll-cue-float {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -6px); }
+}
+
 .scroll-cue:hover {
   color: #9fe3f4;
+  border-color: rgba(124, 213, 236, 0.62);
+  background: rgba(8, 20, 31, 0.72);
 }
 
 .scroll-cue:focus-visible {
@@ -245,6 +266,19 @@
     0 14px 30px -12px color-mix(in oklab, var(--accent-fill) 85%, transparent),
     0 0 0 1px color-mix(in oklab, var(--accent-cyan) 32%, transparent);
   transform: translateY(-1px);
+}
+
+.cta-button--hero {
+  min-height: 50px;
+  padding-inline: 30px;
+  border-color: color-mix(in srgb, var(--accent-cyan) 34%, var(--accent-fill-strong));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 42%),
+    linear-gradient(135deg, #00588d 0%, #00426e 58%, #002c4a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 16px 32px -16px rgba(0, 168, 230, 0.75),
+    0 0 0 1px rgba(0, 168, 230, 0.22);
 }
 
 .cta-button:focus-visible {

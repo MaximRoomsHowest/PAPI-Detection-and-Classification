@@ -19,12 +19,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import {
   STORAGE_KEYS,
-  CONSENT_KEY,
   safeLocalStorageSet,
   setPreference,
-  getConsentDecision,
-  setConsentDecision,
-  resetConsentDecision,
   readStoredChoice,
   readStoredString,
   initialTheme,
@@ -92,56 +88,8 @@ describe('safeLocalStorageSet', () => {
   })
 })
 
-describe('storage consent', () => {
-  it('returns null when no decision has been recorded', () => {
-    expect(getConsentDecision()).toBeNull()
-  })
-
-  it('persists a versioned record that getConsentDecision reads back', () => {
-    setConsentDecision('accepted')
-    expect(getConsentDecision()).toBe('accepted')
-    const raw = JSON.parse(window.localStorage.getItem(CONSENT_KEY))
-    expect(raw.v).toBe(1)
-    expect(raw.decision).toBe('accepted')
-  })
-
-  it('ignores an unknown decision and a wrong-version record', () => {
-    setConsentDecision('bogus')
-    expect(window.localStorage.getItem(CONSENT_KEY)).toBeNull()
-    window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ v: 999, decision: 'accepted' }))
-    expect(getConsentDecision()).toBeNull()
-  })
-
-  it('declining clears any previously-stored preferences', () => {
-    window.localStorage.setItem(STORAGE_KEYS.theme, 'light')
-    window.localStorage.setItem(STORAGE_KEYS.runway, 'custom_x')
-    setConsentDecision('declined')
-    expect(getConsentDecision()).toBe('declined')
-    expect(window.localStorage.getItem(STORAGE_KEYS.theme)).toBeNull()
-    expect(window.localStorage.getItem(STORAGE_KEYS.runway)).toBeNull()
-  })
-
-  it('resetConsentDecision forgets the choice so the banner shows again', () => {
-    setConsentDecision('accepted')
-    resetConsentDecision()
-    expect(getConsentDecision()).toBeNull()
-  })
-})
-
-describe('setPreference (consent-gated)', () => {
-  it('does not write while undecided', () => {
-    expect(setPreference(STORAGE_KEYS.theme, 'light')).toBe(false)
-    expect(window.localStorage.getItem(STORAGE_KEYS.theme)).toBeNull()
-  })
-
-  it('does not write when declined', () => {
-    setConsentDecision('declined')
-    expect(setPreference(STORAGE_KEYS.theme, 'light')).toBe(false)
-    expect(window.localStorage.getItem(STORAGE_KEYS.theme)).toBeNull()
-  })
-
-  it('writes through once accepted', () => {
-    setConsentDecision('accepted')
+describe('setPreference', () => {
+  it('writes through to localStorage', () => {
     expect(setPreference(STORAGE_KEYS.theme, 'light')).toBe(true)
     expect(window.localStorage.getItem(STORAGE_KEYS.theme)).toBe('light')
   })
@@ -181,14 +129,14 @@ describe('initialTheme', () => {
     expect(initialTheme()).toBe('dark')
   })
 
-  it('falls back to dark when nothing valid is stored, even if the system prefers dark', () => {
+  it('falls back to light when nothing valid is stored, even if the system prefers dark', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true })
-    expect(initialTheme()).toBe('dark')
+    expect(initialTheme()).toBe('light')
   })
 
-  it('falls back to dark when nothing is stored and the system prefers light', () => {
+  it('falls back to light when nothing is stored and the system prefers light', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false })
-    expect(initialTheme()).toBe('dark')
+    expect(initialTheme()).toBe('light')
   })
 })
 

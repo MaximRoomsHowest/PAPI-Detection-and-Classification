@@ -29,17 +29,17 @@ import { useChartExport } from './useChartExport'
 // Number(...) || 200 would let through as a nonsensical cap.
 const MAX_BATCH_FRAMES = positiveNumberEnv(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES, 200)
 
-// Video and folder-as-sequence analyses are ONE long backend await with no
-// per-frame callbacks (unlike the angle-sweep loop, which counts frames), so
-// tick the elapsed seconds into the progress line — a message frozen for
-// minutes reads as a hang.
-async function withElapsedProgress(initialMessage, elapsedTemplate, setProgress, task) {
-  setProgress(initialMessage)
-  const startedAt = Date.now()
+// Video and folder-as-sequence analyses are one long backend await with no
+// per-frame callbacks. Cycle through human-readable work steps so the UI feels
+// alive without exposing raw elapsed seconds that do not help a demo user.
+async function withStepProgress(messages, setProgress, task) {
+  const steps = Array.isArray(messages) && messages.length ? messages : ['Analyzing media…']
+  let index = 0
+  setProgress(steps[index])
   const ticker = window.setInterval(() => {
-    const seconds = Math.round((Date.now() - startedAt) / 1000)
-    setProgress(elapsedTemplate.replace('{seconds}', String(seconds)))
-  }, 1000)
+    index = (index + 1) % steps.length
+    setProgress(steps[index])
+  }, 2500)
   try {
     return await task()
   } finally {
@@ -581,9 +581,8 @@ export function useAnalysis(copy) {
       const telemetryFile = metadataFileForAnalysis(media.type, currentFolderMode, metadataFile)
 
       if (media.type === 'video') {
-        const result = await withElapsedProgress(
-          copy.live.uploadingVideo,
-          copy.live.analyzingVideoElapsed,
+        const result = await withStepProgress(
+          copy.live.videoAnalysisSteps,
           setAnalysisProgress,
           () => analyzeMedia(media.file, metadata, telemetryFile, signal),
         )
@@ -602,9 +601,8 @@ export function useAnalysis(copy) {
             copy.live.tooManyImages.replace('{count}', files.length).replace('{max}', MAX_BATCH_FRAMES),
           )
         }
-        const result = await withElapsedProgress(
-          copy.live.uploadingSequence.replace('{count}', files.length),
-          copy.live.analyzingSequenceElapsed,
+        const result = await withStepProgress(
+          copy.live.sequenceAnalysisSteps.map((step) => step.replace('{count}', files.length)),
           setAnalysisProgress,
           () => analyzeSequence(files, metadata, telemetryFile, signal),
         )

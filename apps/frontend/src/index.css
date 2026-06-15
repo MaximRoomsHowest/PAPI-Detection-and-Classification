@@ -16,48 +16,39 @@
     "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #1a2733;
-  background: #eef1f4;
+  color: #131a22;
+  background: #f4f3ee;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0;
 
-  /* ---- Day-ops theme (light): cool engineering grey, never cream. ---- */
-  --bg: #eef1f4;
-  --bg-soft: #e7ecf0;
-  --paper: #f6f8fa;
+  --bg: #f4f3ee;
+  --bg-soft: #efeee7;
+  --paper: #fbfaf6;
   --surface: #ffffff;
   --surface-raised: #ffffff;
-  --surface-muted: rgba(13, 60, 80, 0.05);
-  --grid: rgba(20, 60, 90, 0.05);
-  --text: #1a2733;
-  --text-strong: #0d1822;
-  --text-muted: #52677a;
-  /* Quietest label colour, for small mono micro-labels. Held just above WCAG AA
-     (4.5:1) on the paper/surface backgrounds it appears on. */
-  --faint: #5c6e80;
-  --border: rgba(13, 50, 75, 0.16);
-  --border-strong: rgba(13, 50, 75, 0.34);
-  /* Interactive accent: deep cockpit cyan (Intersoft radar lineage). Passes
-     AA as text on --bg and as white-on-fill (audit CSS-01/02 still holds). */
-  --accent: #0a6e89;
-  --accent-fill: #0a6e89;
-  --accent-fill-strong: #07566c;
-  --accent-cyan: #0e8fb0;
-  --accent-soft: rgba(10, 110, 137, 0.1);
-  /* The footer is a graphite ops panel in BOTH themes — it anchors the page
-     and the partner logo artwork is white. */
-  --footer-bg: #10161e;
-  --footer-bg-deep: #0b1016;
-  --warn: #c98414;
-  --danger: #c03b35;
-  /* Positive/success readout (job succeeded). A forest green held above WCAG AA
-     on the white/paper surfaces it appears on — distinct from --accent (cyan) so
-     "succeeded" doesn't read as a link. */
+  --surface-muted: color-mix(in oklab, #00426e 5%, transparent);
+  --grid: rgba(0, 36, 60, 0.045);
+  --text: #131a22;
+  --text-strong: #14263a;
+  --text-muted: #5c6573;
+  --faint: #6b7280;
+  --border: rgba(0, 36, 60, 0.14);
+  --border-strong: rgba(0, 36, 60, 0.28);
+  --accent: #00426e;
+  --accent-strong: #002c4a;
+  --accent-fill: #00426e;
+  --accent-fill-strong: #002c4a;
+  --accent-cyan: #00a8e6;
+  --accent-soft: color-mix(in oklab, #00426e 12%, transparent);
+  --footer-bg: #245b93;
+  --footer-bg-deep: #174f82;
+  --warn: #f0a22f;
+  --danger: #d24b4b;
   --success: #1d7a44;
-  --focus: #0096c7;
+  --focus: #00a8e6;
   /* Lamp state colours — the only place red / white / amber may come from. */
   --lamp-white: #f4edd8;
   --lamp-white-border: #b3a576;
@@ -68,58 +59,58 @@
   /* Hairline-first elevation: shadows stay almost invisible on surfaces and
      only overlays (menus / dialogs) get real depth. */
   --shadow-soft:
-    0 1px 0 rgba(13, 40, 60, 0.04),
-    0 1px 2px rgba(13, 40, 60, 0.05);
+    0 1px 0 rgba(0, 36, 60, 0.04),
+    0 1px 2px rgba(0, 36, 60, 0.06);
   --shadow-elev:
-    0 1px 2px rgba(13, 40, 60, 0.06),
-    0 6px 16px -6px rgba(13, 40, 60, 0.12);
+    0 1px 2px rgba(0, 36, 60, 0.06),
+    0 6px 16px -6px rgba(0, 36, 60, 0.12);
   --shadow-strong:
-    0 2px 4px rgba(13, 40, 60, 0.06),
-    0 24px 56px -16px rgba(13, 40, 60, 0.28);
+    0 2px 4px rgba(0, 36, 60, 0.06),
+    0 24px 56px -16px rgba(0, 36, 60, 0.28);
   /* Tactile-edge primitives: a top bevel highlight + a recessed inner shade so
      controls and raised surfaces read as physical panel hardware, not flat fills.
      Day-ops: a near-white catch-light on the top edge; a faint cool shade below. */
   --edge-highlight: rgba(255, 255, 255, 0.9);
   --edge-shade: rgba(13, 40, 60, 0.07);
   /* Radius scale — small radii on purpose; this is equipment, not a card deck. */
-  --radius-sm: 3px;
-  --radius: 5px;
-  --radius-lg: 8px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
   --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ---- Night-ops theme (dark): the primary identity. Cold graphite-blue,
    high-contrast readouts, lamp colours at full signal value. ---- */
 html[data-theme='dark'] {
-  color: #dce5ee;
-  background: #0b1016;
+  color: #e7eef5;
+  background: #0a0e14;
 
-  --bg: #0b1016;
-  --bg-soft: #0e141c;
-  --paper: #0f151e;
-  --surface: #131b25;
-  --surface-raised: #18222f;
-  --surface-muted: rgba(151, 183, 214, 0.06);
-  --grid: rgba(125, 165, 200, 0.055);
-  --text: #dce5ee;
-  --text-strong: #f4f8fc;
-  --text-muted: #94a3b4;
-  --faint: #8593a3;
-  --border: rgba(148, 178, 205, 0.16);
-  --border-strong: rgba(148, 178, 205, 0.34);
-  --accent: #53c1dc;
-  /* Deepened fill so white button text keeps AA on dark (audit CSS-01/02). */
-  --accent-fill: #0e7d9c;
-  --accent-fill-strong: #0c6b86;
-  --accent-cyan: #6fd3e8;
-  --accent-soft: rgba(83, 193, 220, 0.13);
-  --footer-bg: #0f151e;
-  --footer-bg-deep: #0b1016;
-  --warn: #e8a33d;
-  --danger: #e5544b;
+  --bg: #0a0e14;
+  --bg-soft: #0f141c;
+  --paper: #0f141c;
+  --surface: #131923;
+  --surface-raised: #182236;
+  --surface-muted: rgba(255, 255, 255, 0.05);
+  --grid: rgba(120, 180, 230, 0.06);
+  --text: #e7eef5;
+  --text-strong: #ffffff;
+  --text-muted: #94a0b1;
+  --faint: #7b8696;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --accent: #6fb4e6;
+  --accent-strong: #9fcef2;
+  --accent-fill: #1f6fb0;
+  --accent-fill-strong: #185f98;
+  --accent-cyan: #00a8e6;
+  --accent-soft: rgba(0, 168, 230, 0.16);
+  --footer-bg: #123f6b;
+  --footer-bg-deep: #082a49;
+  --warn: #f0a22f;
+  --danger: #f07a7a;
   /* Brighter green for the dark surface — AA on the dark job-row/card tints. */
   --success: #5fd08a;
-  --focus: #6fd3e8;
+  --focus: #58aee6;
   --lamp-white: #f2ecda;
   --lamp-white-border: #c9bc97;
   --lamp-red: #e5483f;

@@ -1,8 +1,7 @@
 import { Play, Radar } from 'lucide-react'
 import clsx from 'clsx'
 import { LampCard } from '../LampCard'
-import { InlineMetric } from '../InlineMetric'
-import { formatDistanceM, formatDurationMs } from '../../lib/format'
+import { formatDistanceM } from '../../lib/format'
 import { useLiveDemo } from '../../context/liveDemoContext'
 
 function formatVideoTime(seconds) {
@@ -135,20 +134,6 @@ export function ResultPanel({ copy }) {
             {activeScenario.lamps.map((lamp) => (
               <LampCard key={lamp.id} lamp={lamp} copy={copy} />
             ))}
-          </div>
-
-          {/* Real backend metrics only — detection confidence + processing time. */}
-          <div className="metric-grid metric-grid--compact">
-            <InlineMetric
-              label={copy.live.detection}
-              value={activeScenario.metrics.boxConfidence}
-              suffix="%"
-            />
-            <InlineMetric
-              label={copy.live.latency}
-              value={formatDurationMs(activeScenario.metrics.latency).value}
-              suffix={formatDurationMs(activeScenario.metrics.latency).suffix}
-            />
           </div>
 
           {(activeScenario.rawResult?.model_label || activeScenario.rawResult?.model_id) && (

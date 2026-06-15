@@ -98,13 +98,13 @@ export function LiveDemoPage({ copy, plotTheme }) {
         </div>
       )}
 
-      {(analysisError || analysisProgress) && (
+      {analysisError && (
         <div
-          className={clsx('analysis-status', analysisError && 'error')}
-          role={analysisError ? 'alert' : 'status'}
-          aria-live={analysisError ? 'assertive' : 'polite'}
+          className="analysis-status error"
+          role="alert"
+          aria-live="assertive"
         >
-          {analysisError || analysisProgress}
+          {analysisError}
         </div>
       )}
 
@@ -130,6 +130,7 @@ export function LiveDemoPage({ copy, plotTheme }) {
             artifactWarning={artifactWarning}
             videoSeek={videoSeek}
             onVideoDuration={reportVideoDuration}
+            analysisProgress={analysisProgress}
             copy={copy}
           />
         </div>

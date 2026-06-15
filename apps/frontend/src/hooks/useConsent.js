@@ -1,27 +1,15 @@
 import { useCallback, useState } from 'react'
-import { getConsentDecision, resetConsentDecision, setConsentDecision } from '../lib/storage'
 
-// Storage-consent state for the whole app. `decision` is 'accepted' | 'declined' |
-// null (undecided → the banner shows). `accept`/`decline` record the choice (so it
-// never re-asks) and update local state so preference-persistence effects re-run;
-// `reopen` clears it for the footer "Cookie preferences" control.
+// Legacy compatibility hook for older callers. The current cookie card is a
+// friendly reload-visible welcome moment, not a persistence gate.
 export function useConsent() {
-  const [decision, setDecision] = useState(getConsentDecision)
+  const [decision, setDecision] = useState(null)
 
-  const accept = useCallback(() => {
-    setConsentDecision('accepted')
-    setDecision('accepted')
-  }, [])
+  const accept = useCallback(() => setDecision('accepted'), [])
 
-  const decline = useCallback(() => {
-    setConsentDecision('declined')
-    setDecision('declined')
-  }, [])
+  const decline = useCallback(() => setDecision('declined'), [])
 
-  const reopen = useCallback(() => {
-    resetConsentDecision()
-    setDecision(null)
-  }, [])
+  const reopen = useCallback(() => setDecision(null), [])
 
   return { decision, decided: decision !== null, accept, decline, reopen }
 }

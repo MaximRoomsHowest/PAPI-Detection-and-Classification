@@ -236,31 +236,7 @@
   height: clamp(420px, 56dvh, 680px);
   min-height: 0;
   overflow: hidden;
-  /* The stage stays graphite in both themes — detection footage and overlays
-     are calibrated against a dark surround, like any monitoring monitor. */
-  background: #0a0f15;
-}
-
-/* Reticle corners: four registration ticks framing the stage — the one place
-   the CV-overlay language is allowed into the chrome. Painted above the media,
-   inert to the pointer. */
-.video-surface::after {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  z-index: 3;
-  pointer-events: none;
-  opacity: 0.5;
-  background:
-    linear-gradient(var(--accent-cyan) 0 0) top left / 16px 1.5px,
-    linear-gradient(var(--accent-cyan) 0 0) top left / 1.5px 16px,
-    linear-gradient(var(--accent-cyan) 0 0) top right / 16px 1.5px,
-    linear-gradient(var(--accent-cyan) 0 0) top right / 1.5px 16px,
-    linear-gradient(var(--accent-cyan) 0 0) bottom left / 16px 1.5px,
-    linear-gradient(var(--accent-cyan) 0 0) bottom left / 1.5px 16px,
-    linear-gradient(var(--accent-cyan) 0 0) bottom right / 16px 1.5px,
-    linear-gradient(var(--accent-cyan) 0 0) bottom right / 1.5px 16px;
-  background-repeat: no-repeat;
+  background: #0b1521;
 }
 
 .video-surface img,
@@ -298,14 +274,14 @@
 }
 
 .dropzone-placeholder:hover {
-  background: rgba(10, 22, 33, 0.84);
+  background: rgba(0, 66, 110, 0.38);
   border-color: var(--accent-cyan);
   transform: scale(0.995);
 }
 
 .dropzone-placeholder.active {
-  background: rgba(12, 30, 44, 0.9);
-  border-color: var(--accent-cyan);
+  background: rgba(0, 66, 110, 0.5);
+  border-color: var(--accent);
   transform: scale(0.99);
 }
 
@@ -530,13 +506,8 @@
   background: var(--surface-muted);
 }
 
-/* Scoped to the result panel's summary so it no longer collides with the
-   topbar backend-status badge, which is also `.status-dot` but smaller and
-   colour-driven by its own `--online/--offline/--checking` modifiers in
-   base.css. Before scoping, this (later-imported) rule leaked onto the topbar
-   dot — forcing it to 18px and `background: var(--dot-color)`, which is unset
-   there, so the badge rendered transparent. Descendant scope keeps this dot
-   pixel-identical while freeing the topbar badge to use its base.css size. */
+/* Scoped to the result panel's summary so the verdict lamp dot keeps its own
+   dimensions and colour without leaking into other status-dot uses. */
 .state-summary .status-dot {
   width: 18px;
   height: 18px;

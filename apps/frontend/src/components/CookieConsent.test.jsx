@@ -1,6 +1,6 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { translations } from '../i18n/translations.js'
 import { CookieConsent } from './CookieConsent.jsx'
 
@@ -25,45 +25,30 @@ afterEach(() => {
   )
 })
 
-function fakeConsent(overrides = {}) {
-  return { decision: null, decided: false, accept: vi.fn(), decline: vi.fn(), reopen: vi.fn(), ...overrides }
-}
-
 describe('CookieConsent', () => {
-  it('shows a real, informative banner while undecided', () => {
-    const container = render(<CookieConsent copy={copy} consent={fakeConsent()} />)
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+  it('shows the friendly cookie banner on mount', () => {
+    const container = render(<CookieConsent copy={copy} />)
+    expect(container.querySelector('.cookie-card')).not.toBeNull()
     expect(container.textContent).toContain(copy.cookie.title)
-    expect(container.textContent).toContain(copy.cookie.message) // explains what's stored
+    expect(container.textContent).toContain(copy.cookie.message)
     expect(container.textContent).toContain(copy.cookie.accept)
     expect(container.textContent).toContain(copy.cookie.decline)
   })
 
-  it('renders nothing once a decision has been made (no re-nag)', () => {
-    const container = render(
-      <CookieConsent copy={copy} consent={fakeConsent({ decision: 'accepted', decided: true })} />,
-    )
-    expect(container.textContent).toBe('')
-  })
-
-  it('wires Allow/Decline to the consent handlers', () => {
-    const consent = fakeConsent()
-    const container = render(<CookieConsent copy={copy} consent={consent} />)
-    const [accept, decline] = container.querySelectorAll('.cookie-card__actions button')
+  it('shows a short accepted toast after accepting', () => {
+    const container = render(<CookieConsent copy={copy} />)
+    const [accept] = container.querySelectorAll('.cookie-card__actions button')
     act(() => accept.click())
-    expect(consent.accept).toHaveBeenCalledTimes(1)
-    act(() => decline.click())
-    expect(consent.decline).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('.cookie-toast--accepted')).not.toBeNull()
+    expect(container.textContent).toContain(copy.cookie.accepted)
+    expect(container.textContent).not.toContain(copy.cookie.declined)
   })
 
-  it('Escape declines (necessary-only) so keyboard users are not trapped', () => {
-    const consent = fakeConsent()
-    const container = render(<CookieConsent copy={copy} consent={consent} />)
-    act(() => {
-      container
-        .querySelector('[role="dialog"]')
-        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    })
-    expect(consent.decline).toHaveBeenCalledTimes(1)
+  it('shows a short declined toast after declining', () => {
+    const container = render(<CookieConsent copy={copy} />)
+    const decline = container.querySelectorAll('.cookie-card__actions button')[1]
+    act(() => decline.click())
+    expect(container.querySelector('.cookie-toast--declined')).not.toBeNull()
+    expect(container.textContent).toContain(copy.cookie.declined)
   })
 })

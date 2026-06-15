@@ -8,7 +8,6 @@ import {
   initialTheme,
   setPreference,
 } from './lib/storage'
-import { useConsent } from './hooks/useConsent'
 import { translations } from './i18n/translations'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
@@ -75,8 +74,6 @@ function App() {
   const copy = translations[language]
   // Admin mode reveals the model-management surface and carries the API key (if any).
   const admin = useAdminKey()
-  // Storage consent gates whether theme/language/runway are remembered across visits.
-  const consent = useConsent()
 
   // Mirrors the index.css token sheet for the canvas/SVG world Plotly draws
   // into (CSS custom properties can't reach chart internals). Values must stay
@@ -86,36 +83,34 @@ function App() {
       theme === 'dark'
         ? {
             paper: 'rgba(0,0,0,0)',
-            text: '#dce5ee',
-            strong: '#f4f8fc',
-            muted: '#94a3b4',
-            grid: 'rgba(148, 178, 205, 0.14)',
-            border: 'rgba(148, 178, 205, 0.2)',
-            accent: '#53c1dc',
-            accentSoft: 'rgba(83, 193, 220, 0.22)',
-            track: 'rgba(148, 178, 205, 0.14)',
+            text: '#e7eef5',
+            strong: '#ffffff',
+            muted: '#94a0b1',
+            grid: 'rgba(255, 255, 255, 0.14)',
+            border: 'rgba(255, 255, 255, 0.2)',
+            accent: '#6fb4e6',
+            accentSoft: 'rgba(0, 168, 230, 0.22)',
+            track: 'rgba(255, 255, 255, 0.12)',
           }
         : {
             paper: 'rgba(0,0,0,0)',
-            text: '#1a2733',
-            strong: '#0d1822',
-            muted: '#52677a',
-            grid: 'rgba(13, 50, 75, 0.15)',
-            border: 'rgba(13, 50, 75, 0.2)',
-            accent: '#0a6e89',
-            accentSoft: 'rgba(10, 110, 137, 0.16)',
-            track: 'rgba(13, 50, 75, 0.12)',
+            text: '#131a22',
+            strong: '#14263a',
+            muted: '#5c6573',
+            grid: 'rgba(0, 36, 60, 0.15)',
+            border: 'rgba(0, 36, 60, 0.2)',
+            accent: '#00426e',
+            accentSoft: 'rgba(0, 66, 110, 0.16)',
+            track: 'rgba(0, 36, 60, 0.12)',
           },
     [theme],
   )
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    // Persist so the choice survives a reload (regression FE-MOD-CRIT-3) — but only
-    // with storage consent. consent.decision is a dep so accepting later flushes the
-    // current theme; declining is a no-op (the value stays session-only).
+    // Persist so the choice survives a reload (regression FE-MOD-CRIT-3).
     setPreference(STORAGE_KEYS.theme, theme)
-  }, [theme, consent.decision])
+  }, [theme])
 
   useEffect(() => {
     setPreference(STORAGE_KEYS.language, language)
@@ -123,7 +118,7 @@ function App() {
     // locale-aware CSS/formatting sees the active language (index.html ships
     // lang="en" statically).
     document.documentElement.lang = language
-  }, [language, consent.decision])
+  }, [language])
 
   return (
     <div className="app-shell">
@@ -171,9 +166,9 @@ function App() {
         </ErrorBoundary>
       </main>
 
-      <AppFooter copy={copy} onManageCookies={consent.reopen} />
+      <AppFooter copy={copy} />
 
-      <CookieConsent copy={copy} consent={consent} />
+      <CookieConsent copy={copy} />
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

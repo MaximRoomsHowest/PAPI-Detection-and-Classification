@@ -18,18 +18,13 @@
   }
 }
 
-
-/* The UTC clock is the first util cell to go — it's ambience, the backend
-   readiness cell is information. */
-@media (max-width: 1280px) {
-  .clock-cell {
-    display: none;
-  }
-}
-
 /* Five nav items + brand + language/theme controls need room. Below that, drop
    the nav to its own full-width second row so the topbar never overflows. */
 @media (max-width: 1450px) {
+  .approach-hero {
+    --approach-topbar-offset: 140px;
+  }
+
   .topbar {
     grid-template-columns: 1fr auto;
   }
@@ -117,32 +112,28 @@
   }
 
   .approach-hero {
-    min-height: clamp(460px, 76vh, 640px);
+    --approach-topbar-offset: 112px;
+    min-height: calc(100svh - var(--approach-topbar-offset));
   }
 
   .approach-hero__copy {
     width: calc(100% - 32px);
   }
 
-  /* Compact brand on phones: the glyph + wordmark stay, the mono version
-     line goes — it's repeated in the footer. */
+  /* Compact brand on phones: the logo stays, the text goes — it's repeated in
+     the footer. */
   .brand {
     gap: 10px;
     padding: 10px 14px;
   }
 
-  .brand small {
-    display: none;
+  .brand-logo {
+    width: 120px;
+    height: 38px;
   }
 
-  /* The readiness LED keeps its meaning without the text cell. */
-  .status-cell .util-cell__label,
-  .status-cell .util-cell__value {
+  .brand-text {
     display: none;
-  }
-
-  .status-cell {
-    padding: 0 10px;
   }
 
   .topbar-actions {

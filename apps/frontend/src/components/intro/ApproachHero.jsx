@@ -47,7 +47,7 @@ export function ApproachHero({ copy }) {
           loop
           playsInline
           autoPlay={!reduceMotion}
-          preload="metadata"
+          preload="auto"
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
         />
@@ -80,11 +80,8 @@ export function ApproachHero({ copy }) {
           {copy.intro.description}
         </m.p>
         <m.div className="intro-actions" variants={copyItem}>
-          <Link className="cta-button" to="/live-demo">
+          <Link className="cta-button cta-button--hero" to="/live-demo">
             {copy.intro.cta}
-          </Link>
-          <Link className="hero-secondary" to="/history">
-            {copy.intro.secondaryCta}
           </Link>
         </m.div>
       </m.div>
