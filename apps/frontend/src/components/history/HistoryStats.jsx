@@ -1,4 +1,6 @@
 import { percent } from '../../lib/format'
+import { globalStateLabel } from '../../lib/stateLabels'
+import { StateDistributionBar } from './StateDistributionBar'
 
 // A stats-card heading, with a "filtered" chip when the aggregates describe the
 // active filter selection rather than the whole table — without it a user who
@@ -12,29 +14,39 @@ function ScopedLabel({ label, isFiltered, copy }) {
   )
 }
 
-// Summary cards: serving model + provenance, optional val accuracy, sample counts,
-// avg confidence, and processing-time percentiles. Presentational — all data comes
-// from props (the HistoryPage parent owns the fetches). The model/accuracy cards
-// describe the serving model and never carry the filtered-scope chip.
-export function HistoryStats({ modelInfo, stats, isFiltered = false, copy }) {
+// Processing-time values carry their unit (ms) to match the Insights latency
+// labelling; the em-dash stands in for an absent/empty value with no stray unit.
+function ms(value) {
+  return Number.isFinite(value) ? `${value} ms` : '—'
+}
+
+// Summary strip for the History page. Reshaped to lead with what the log is ABOUT
+// — the spread of glide-path states across the (optionally filtered) analyses —
+// followed by the sample counts, average confidence, and processing percentiles.
+// The serving-model filename / training-run / checksum / val-accuracy that used to
+// head this strip are model provenance, not log analytics, and now live on the
+// Models page. Presentational: all data comes from the parent's /api/stats fetch.
+export function HistoryStats({ stats, isFiltered = false, copy }) {
+  const stateCounts = stats?.by_global_state ?? {}
+  const states = Object.entries(stateCounts)
+    .filter(([, n]) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => b[1] - a[1])
+
   return (
     <div className="history-summary-grid">
-      <div className="history-summary">
-        <span>{copy.history.model}</span>
-        <strong>{modelInfo?.model_filename ?? copy.history.unavailable}</strong>
-        <small>{`${copy.history.trainingRun}: ${modelInfo?.training_run ?? copy.history.unavailable}`}</small>
-        {modelInfo?.sha256 && (
-          <small className="history-checksum" title={modelInfo.sha256}>
-            {`${copy.history.checksum}: `}
-            <span className="mono">{`${modelInfo.sha256.slice(0, 12)}…`}</span>
-          </small>
-        )}
-      </div>
-      {modelInfo?.val_metrics?.map50_95 != null && (
-        <div className="history-summary">
-          <span>{copy.history.accuracy}</span>
-          <strong className="tnum">{`${(modelInfo.val_metrics.map50_95 * 100).toFixed(1)}%`}</strong>
-          <small>{`${modelInfo.dataset_split_evaluated ?? 'val'} split`}</small>
+      {states.length > 0 && (
+        <div className="history-summary history-summary--wide">
+          <ScopedLabel label={copy.history.stateMix} isFiltered={isFiltered} copy={copy} />
+          <StateDistributionBar counts={stateCounts} copy={copy} className="history-summary__dist" />
+          <ul className="history-state-legend">
+            {states.map(([state, count]) => (
+              <li key={state}>
+                <span className={`history-state-legend__swatch state-seg-${state}`} aria-hidden="true" />
+                {globalStateLabel(state, copy)}
+                <span className="history-state-legend__count tnum">{count}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <div className="history-summary">
@@ -53,9 +65,9 @@ export function HistoryStats({ modelInfo, stats, isFiltered = false, copy }) {
       </div>
       <div className="history-summary">
         <ScopedLabel label={copy.history.avg} isFiltered={isFiltered} copy={copy} />
-        <strong className="tnum">{stats?.avg_processing_ms ?? '—'}</strong>
+        <strong className="tnum">{ms(stats?.avg_processing_ms)}</strong>
         <small className="tnum">
-          {`${copy.history.p50} ${stats?.p50_processing_ms ?? '—'} · ${copy.history.p95} ${stats?.p95_processing_ms ?? '—'}`}
+          {`${copy.history.p50} ${ms(stats?.p50_processing_ms)} · ${copy.history.p95} ${ms(stats?.p95_processing_ms)}`}
         </small>
       </div>
     </div>

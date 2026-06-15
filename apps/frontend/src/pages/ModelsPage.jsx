@@ -91,10 +91,10 @@ function ModelCard({ model, copy, busy, onPromote, onToggleDisabled, onDelete, o
       </div>
 
       <div className="model-card__scores">
-        <ScoreBar label="mAP@50" value={vm.map50} />
-        <ScoreBar label="mAP@50-95" value={vm.map50_95} />
-        <ScoreBar label="P" value={vm.precision} />
-        <ScoreBar label="R" value={vm.recall} />
+        <ScoreBar label={copy.insights.metricMap50} value={vm.map50} />
+        <ScoreBar label={copy.insights.metricMap5095} value={vm.map50_95} />
+        <ScoreBar label={copy.insights.metricPrecision} value={vm.precision} />
+        <ScoreBar label={copy.insights.metricRecall} value={vm.recall} />
       </div>
 
       <div className="model-card__cred mono">
@@ -279,11 +279,16 @@ function pickDefaultDataset(ready, model) {
   return (byClass || builtins[0] || ready[0]).id
 }
 
-function EvaluateModal({ open, onClose, copy, model, datasets, onSubmit }) {
+function EvaluateModal({ open, onClose, copy, model, datasets, datasetsLoading, onSubmit }) {
   const ready = datasets.filter((d) => d.status === 'ready')
-  // Lazy initial value: the modal is remounted per model (key=model_id), so this
-  // captures the role-matched default once, while still letting the user change it.
-  const [datasetId, setDatasetId] = useState(() => pickDefaultDataset(ready, model))
+  // Derive the selection instead of storing it: `picked` stays null until the user
+  // explicitly chooses, so the role-matched default is recomputed each render and is
+  // adopted automatically once /api/datasets resolves (the modal is often opened
+  // before the list loads). This avoids a setState-in-effect render cascade while
+  // still letting the user override — selecting the '—' option sets picked to '',
+  // which disables submit as before.
+  const [picked, setPicked] = useState(null)
+  const datasetId = picked ?? pickDefaultDataset(ready, model)
   const [split, setSplit] = useState('test')
   const [submitting, setSubmitting] = useState(false)
   const selectedIsBuiltin = ready.some((d) => d.id === datasetId && d.source === 'builtin')
@@ -303,13 +308,16 @@ function EvaluateModal({ open, onClose, copy, model, datasets, onSubmit }) {
   return (
     <Modal open={open} onClose={onClose} title={copy.models.evaluate.title} closeLabel={copy.models.close}>
       {ready.length === 0 ? (
-        <p className="lc-empty">{copy.models.evaluate.noDatasets}</p>
+        // Distinguish "still loading" from "genuinely none" — otherwise opening
+        // Evaluate before the dataset list resolves shows a dead-end "upload one
+        // first" even though the built-in eval sets are about to appear.
+        <p className="lc-empty">{datasetsLoading ? copy.models.loading : copy.models.evaluate.noDatasets}</p>
       ) : (
         <form className="lc-form" onSubmit={submit}>
           <p className="model-card__meta mono">{model?.model_label}</p>
           <label className="lc-field">
             <span>{copy.models.evaluate.dataset}</span>
-            <select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}>
+            <select value={datasetId} onChange={(event) => setPicked(event.target.value)}>
               <option value="">—</option>
               {ready.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
@@ -393,10 +401,10 @@ function ComparePanel({ models, ids, copy, onClear }) {
     {
       title: copy.models.compare.groupAccuracy,
       rows: [
-        { label: 'mAP@50', get: (m) => m.val_metrics?.map50, better: 'high', fmt: metricValue, bar: true },
-        { label: 'mAP@50-95', get: (m) => m.val_metrics?.map50_95, better: 'high', fmt: metricValue, bar: true },
-        { label: 'P', get: (m) => m.val_metrics?.precision, better: 'high', fmt: metricValue, bar: true },
-        { label: 'R', get: (m) => m.val_metrics?.recall, better: 'high', fmt: metricValue, bar: true },
+        { label: copy.insights.metricMap50, get: (m) => m.val_metrics?.map50, better: 'high', fmt: metricValue, bar: true },
+        { label: copy.insights.metricMap5095, get: (m) => m.val_metrics?.map50_95, better: 'high', fmt: metricValue, bar: true },
+        { label: copy.insights.metricPrecision, get: (m) => m.val_metrics?.precision, better: 'high', fmt: metricValue, bar: true },
+        { label: copy.insights.metricRecall, get: (m) => m.val_metrics?.recall, better: 'high', fmt: metricValue, bar: true },
       ],
     },
     ...(classNames.length
@@ -510,8 +518,8 @@ function ComparePanel({ models, ids, copy, onClear }) {
 
 export function ModelsPage({ copy, isAdmin }) {
   const { models, loading, error, upload, promote, setDisabled, remove, evaluate } = useModelManagement()
-  const { datasets } = useDatasets()
-  const { jobs, cancel } = useJobs()
+  const { datasets, loading: datasetsLoading } = useDatasets()
+  const { jobs, cancel, dismiss, clearFinished } = useJobs()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [evalModel, setEvalModel] = useState(null)
   const [busyId, setBusyId] = useState(null)
@@ -597,7 +605,13 @@ export function ModelsPage({ copy, isAdmin }) {
         <span>{copy.models.defaultHint}</span>
       </p>
 
-      <JobMonitor jobs={evaluateJobs} onCancel={cancel} copy={copy} />
+      <JobMonitor
+        jobs={evaluateJobs}
+        onCancel={cancel}
+        onDismiss={dismiss}
+        onClearFinished={() => clearFinished('evaluate')}
+        copy={copy}
+      />
 
       {loading && <p className="lc-empty">{copy.models.loading}</p>}
       {error && <p className="lc-empty lc-empty--error">{copy.models.loadError}</p>}
@@ -634,7 +648,15 @@ export function ModelsPage({ copy, isAdmin }) {
 
       <ComparePanel models={models} ids={compareIds} copy={copy} onClear={() => setCompareIds(new Set())} />
 
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} copy={copy} onSubmit={handleUpload} />
+      {/* key tied to open state so the form remounts fresh each time — otherwise
+          typed-but-not-submitted fields linger and reappear on the next open. */}
+      <UploadModal
+        key={uploadOpen ? 'upload-open' : 'upload-closed'}
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        copy={copy}
+        onSubmit={handleUpload}
+      />
       <EvaluateModal
         key={evalModel?.model_id || 'none'}
         open={Boolean(evalModel)}
@@ -642,6 +664,7 @@ export function ModelsPage({ copy, isAdmin }) {
         copy={copy}
         model={evalModel}
         datasets={datasets}
+        datasetsLoading={datasetsLoading}
         onSubmit={handleEvaluate}
       />
     </section>

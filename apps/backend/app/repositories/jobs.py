@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import desc, select, update
+from sqlalchemy import delete, desc, select, update
 from sqlalchemy.orm import Session
 
 from app.models.analysis_log import utcnow_aware
@@ -130,6 +130,30 @@ class JobRepository:
     def is_cancel_requested(self, job_id: str) -> bool:
         value = self.db.scalar(select(Job.cancel_requested).where(Job.id == job_id))
         return bool(value)
+
+    def delete(self, job_id: str) -> str | None:
+        """Delete one TERMINAL job and return its id, or None if it does not exist.
+        A still-active (queued/running) job is left untouched and reported via the
+        sentinel below so the endpoint can refuse it with a 409 — clearing a live
+        job from under the worker would orphan its progress writes."""
+        job = self.get(job_id)
+        if job is None:
+            return None
+        if job.status not in TERMINAL_STATUSES:
+            return "active"
+        self.db.delete(job)
+        self.db.commit()
+        return job_id
+
+    def delete_terminal(self, kind: str | None = None) -> int:
+        """Bulk-clear every finished/failed/cancelled job (optionally of one kind),
+        leaving active jobs in place. Returns the number of rows removed."""
+        conditions = [Job.status.in_(TERMINAL_STATUSES)]
+        if kind:
+            conditions.append(Job.kind == kind)
+        result = self.db.execute(delete(Job).where(*conditions))
+        self.db.commit()
+        return int(result.rowcount or 0)
 
     def reconcile_orphans(self) -> int:
         """Mark jobs left ``running``/``queued`` by a dead process as failed."""

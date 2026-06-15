@@ -103,8 +103,10 @@
 
 .frame-tool-controls button,
 .frame-nav-controls button {
-  width: 30px;
-  height: 30px;
+  /* 36px minimum tap target (was 30px) — these icon-only zoom/play/step controls
+     are the primary way to scrub a video/sequence result. */
+  width: 36px;
+  height: 36px;
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--border);
@@ -1633,7 +1635,9 @@
 }
 
 .history-stat--white strong {
-  color: #6d7f96;
+  /* Full-strength text (was a fixed dim #6d7f96 that ignored the theme and read as
+     ~3.8:1 / disabled-looking on the light card, unlike the legible red count). */
+  color: var(--text-strong);
 }
 
 .history-stat--red strong {

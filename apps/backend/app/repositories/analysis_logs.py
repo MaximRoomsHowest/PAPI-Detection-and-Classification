@@ -193,7 +193,7 @@ class AnalysisLogRepository:
 
     def to_list_item(self, log: AnalysisLog) -> LogListItem:
         result = log.result_json if isinstance(log.result_json, dict) else {}
-        global_state, confidence, frame_count = _video_display_summary(
+        global_state, confidence, frame_count, state_counts = _video_display_summary(
             result,
             fallback_state=log.global_state,
             fallback_confidence=log.confidence,
@@ -221,6 +221,7 @@ class AnalysisLogRepository:
             # analysis as indistinguishable from a complete one (audit 2026-06-12).
             truncated_at_frame=result.get("truncated_at_frame"),
             decode_shortfall=result.get("decode_shortfall"),
+            state_counts=state_counts,
             artifact_url=media_url_for_path(log.artifact_path, get_settings()),
             created_at=log.created_at.isoformat(),
         )
@@ -258,23 +259,25 @@ def _video_display_summary(
     fallback_state: str,
     fallback_confidence: float,
     fallback_frame_count: int,
-) -> tuple[str, float, int]:
+) -> tuple[str, float, int, dict[str, int] | None]:
     """Derive list-row video headline fields from every persisted frame.
 
     Legacy video rows can have column-level state/confidence copied from one
     representative frame. The full result_json still carries per_frame, so use it
-    for display without fetching every detail payload.
+    for display without fetching every detail payload. The returned ``state_counts``
+    (per-global-state frame tally, or None when unavailable) lets the history table
+    show a distribution bar so a clip's state mix reads differently from a still.
     """
 
     if result.get("media_type") != "video":
-        return fallback_state, fallback_confidence, fallback_frame_count
+        return fallback_state, fallback_confidence, fallback_frame_count, None
     raw_samples = result.get("per_frame")
     if not isinstance(raw_samples, list):
-        return fallback_state, fallback_confidence, fallback_frame_count
+        return fallback_state, fallback_confidence, fallback_frame_count, None
 
     samples = [sample for sample in raw_samples if isinstance(sample, dict)]
     if not samples:
-        return fallback_state, fallback_confidence, fallback_frame_count
+        return fallback_state, fallback_confidence, fallback_frame_count, None
 
     state_counts: dict[str, int] = {}
     confidences: list[float] = []
@@ -294,7 +297,7 @@ def _video_display_summary(
         else fallback_state
     )
     confidence = sum(confidences) / len(confidences) if confidences else fallback_confidence
-    return state, confidence, len(samples)
+    return state, confidence, len(samples), (state_counts or None)
 
 
 def _percentile_nearest_rank(values: list[int], percentile: float) -> int | None:

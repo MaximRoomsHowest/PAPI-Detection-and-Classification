@@ -243,6 +243,8 @@ export const translations = {
     jobs: {
       title: 'Background jobs',
       cancel: 'Cancel',
+      dismiss: 'Dismiss',
+      clearFinished: 'Clear finished ({count})',
       kinds: {
         evaluate: 'Evaluation',
         label_assist: 'Assisted labeling',
@@ -360,7 +362,7 @@ export const translations = {
       metadataApplyHint:
         'Choose the runway and add a telemetry file or manual drone position, then apply to re-run the analysis with angle calculation.',
       telemetryInvalidHint:
-        'Position values must be numbers: latitude -90 to 90, longitude -180 to 180, altitude -500 to 20000 m.',
+        'Position values must be numbers: latitude −90 to 90, longitude −180 to 180, altitude −500 to 20000 m.',
       droneIdLabel: 'Drone ID (optional)',
       droneLatitude: 'Latitude',
       droneLongitude: 'Longitude',
@@ -698,6 +700,8 @@ export const translations = {
       filterConfidence: 'Any confidence',
       confidenceAtLeast: 'Confidence ≥ {percent}%',
       filteredScope: 'filtered',
+      stateMix: 'State distribution',
+      videoStateHint: 'Most common state across {frames} frames',
       clearFilters: 'Clear filters',
       noMatch: 'No analyses match these filters',
       showRaw: 'Show raw detections',
@@ -979,6 +983,8 @@ export const translations = {
     jobs: {
       title: 'Hintergrundjobs',
       cancel: 'Abbrechen',
+      dismiss: 'Entfernen',
+      clearFinished: 'Erledigte entfernen ({count})',
       kinds: {
         evaluate: 'Bewertung',
         label_assist: 'Assistiertes Labeln',
@@ -1096,7 +1102,7 @@ export const translations = {
       metadataApplyHint:
         'Wählen Sie die Piste und laden Sie eine Telemetriedatei hoch oder geben Sie die Drohnenposition manuell ein. Danach wird die Analyse mit Winkelberechnung erneut ausgeführt.',
       telemetryInvalidHint:
-        'Positionswerte müssen Zahlen sein: Breite -90 bis 90, Länge -180 bis 180, Höhe -500 bis 20000 m.',
+        'Positionswerte müssen Zahlen sein: Breite −90 bis 90, Länge −180 bis 180, Höhe −500 bis 20000 m.',
       droneIdLabel: 'Drohnen-ID (optional)',
       droneLatitude: 'Breite',
       droneLongitude: 'Länge',
@@ -1434,6 +1440,8 @@ export const translations = {
       filterConfidence: 'Beliebige Sicherheit',
       confidenceAtLeast: 'Sicherheit ≥ {percent}%',
       filteredScope: 'gefiltert',
+      stateMix: 'Zustandsverteilung',
+      videoStateHint: 'Häufigster Zustand über {frames} Bilder',
       clearFilters: 'Filter zurücksetzen',
       noMatch: 'Keine Analysen entsprechen diesen Filtern',
       showRaw: 'Rohdaten anzeigen',
@@ -1715,6 +1723,8 @@ export const translations = {
     jobs: {
       title: 'Achtergrondtaken',
       cancel: 'Annuleren',
+      dismiss: 'Verwijderen',
+      clearFinished: 'Voltooide wissen ({count})',
       kinds: {
         evaluate: 'Evaluatie',
         label_assist: 'Assistief labelen',
@@ -1735,8 +1745,8 @@ export const translations = {
         'PAPI Vision leest naderingsbeelden zoals een piloot de lampen leest — het lokaliseert alle vier de lampen, classificeert rood, wit en overgangstoestanden en bepaalt het glijpadoordeel beeld voor beeld.',
       cta: 'Open de live demo',
       secondaryCta: 'Bekijk analysegeschiedenis',
-      pauseMedia: 'Anvliegbeelden pauzeren',
-      playMedia: 'Anvliegbeelden afspelen',
+      pauseMedia: 'Aanvliegbeelden pauzeren',
+      playMedia: 'Aanvliegbeelden afspelen',
       scroll: 'Scroll om te verkennen',
       capabilitiesEyebrow: 'Wat het systeem controleert',
       capabilitiesTitle: 'Vier uitlezingen per nadering.',
@@ -1768,7 +1778,7 @@ export const translations = {
       runwayDetails: 'Baangegevens',
       runwayDescription:
         'Het project richt zich op de enige baan van Bodensee-Airport Friedrichshafen. De baanaanduiding is 06/24, met asfaltverharding en een lengte van 2.356 meter (7.729 feet).',
-      coordinates: 'Coordinaten',
+      coordinates: 'Coördinaten',
       elevation: 'Hoogte',
     },
     live: {
@@ -1832,7 +1842,7 @@ export const translations = {
       metadataApplyHint:
         'Kies de baan en voeg een telemetriebestand of handmatige dronepositie toe. Daarna voeren we de analyse opnieuw uit met hoekberekening.',
       telemetryInvalidHint:
-        'Positiewaarden moeten getallen zijn: breedte -90 tot 90, lengte -180 tot 180, hoogte -500 tot 20000 m.',
+        'Positiewaarden moeten getallen zijn: breedte −90 tot 90, lengte −180 tot 180, hoogte −500 tot 20000 m.',
       droneIdLabel: 'Drone-ID (optioneel)',
       droneLatitude: 'Breedte',
       droneLongitude: 'Lengte',
@@ -2170,6 +2180,8 @@ export const translations = {
       filterConfidence: 'Elke zekerheid',
       confidenceAtLeast: 'Zekerheid ≥ {percent}%',
       filteredScope: 'gefilterd',
+      stateMix: 'Toestandsverdeling',
+      videoStateHint: 'Meest voorkomende toestand over {frames} frames',
       clearFilters: 'Filters wissen',
       noMatch: 'Geen analyses voldoen aan deze filters',
       showRaw: 'Ruwe detecties tonen',
@@ -2451,6 +2463,8 @@ export const translations = {
     jobs: {
       title: 'Tâches en arrière-plan',
       cancel: 'Annuler',
+      dismiss: 'Supprimer',
+      clearFinished: 'Effacer les terminés ({count})',
       kinds: {
         evaluate: 'Évaluation',
         label_assist: 'Labellisation assistée',
@@ -2568,7 +2582,7 @@ export const translations = {
       metadataApplyHint:
         'Choisissez la piste et ajoutez un fichier de télémétrie ou une position drone manuelle, puis relancez l’analyse avec le calcul d’angle.',
       telemetryInvalidHint:
-        'Les valeurs de position doivent être des nombres : latitude -90 à 90, longitude -180 à 180, altitude -500 à 20000 m.',
+        'Les valeurs de position doivent être des nombres : latitude −90 à 90, longitude −180 à 180, altitude −500 à 20000 m.',
       droneIdLabel: 'ID du drone (optionnel)',
       droneLatitude: 'Latitude',
       droneLongitude: 'Longitude',
@@ -2906,6 +2920,8 @@ export const translations = {
       filterConfidence: 'Toute confiance',
       confidenceAtLeast: 'Confiance ≥ {percent}%',
       filteredScope: 'filtré',
+      stateMix: 'Répartition des états',
+      videoStateHint: 'État le plus fréquent sur {frames} images',
       clearFilters: 'Effacer les filtres',
       noMatch: 'Aucune analyse ne correspond à ces filtres',
       showRaw: 'Afficher les détections brutes',

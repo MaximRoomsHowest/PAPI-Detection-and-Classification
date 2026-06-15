@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cancelJob, fetchJobs } from '../lib/api'
+import { cancelJob, clearFinishedJobs, deleteJob, fetchJobs } from '../lib/api'
 
 // Poll the job list while mounted. The backend has no websockets, so the
 // management surface polls — matching the topbar's health-poll pattern. A short
@@ -44,5 +44,29 @@ export function useJobs() {
     [load],
   )
 
-  return { jobs, error, refetch: load, cancel }
+  // Dismiss one finished job. Optimistically drop it so the row disappears
+  // immediately (the next poll would anyway), then reconcile from the server.
+  const dismiss = useCallback(
+    async (jobId) => {
+      setJobs((current) => current.filter((job) => job.id !== jobId))
+      try {
+        await deleteJob(jobId)
+      } finally {
+        load()
+      }
+    },
+    [load],
+  )
+
+  // Clear every finished job (optionally scoped to one kind so a page only
+  // clears the jobs it shows). Refreshes from the server afterwards.
+  const clearFinished = useCallback(
+    async (kind) => {
+      await clearFinishedJobs({ kind })
+      load()
+    },
+    [load],
+  )
+
+  return { jobs, error, refetch: load, cancel, dismiss, clearFinished }
 }

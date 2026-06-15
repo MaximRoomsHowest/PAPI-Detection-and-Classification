@@ -61,6 +61,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
+  /* Each card sizes to its own content. Without this the default align-items:stretch
+     makes every card in a row grow to the tallest, so expanding one card's per-class
+     <details> stretched all its row-mates, leaving them with empty whitespace. */
+  align-items: start;
 }
 
 .model-card,
@@ -362,6 +366,13 @@
   max-width: 920px;
 }
 
+/* The dialog takes programmatic focus on open (tabIndex=-1 in Modal.jsx); it
+   doesn't need a ring of its own — the focusable controls inside still show theirs
+   (mirrors .history-modal:focus). */
+.lc-modal:focus {
+  outline: none;
+}
+
 .lc-modal__head {
   display: flex;
   align-items: center;
@@ -480,6 +491,17 @@
   padding: 16px;
 }
 
+.job-monitor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.job-clear {
+  font-size: 0.76rem;
+}
+
 .job-list {
   list-style: none;
   margin: 10px 0 0;
@@ -518,7 +540,9 @@
 }
 
 .job-status--running { color: var(--accent); }
-.job-status--succeeded { color: var(--lamp-white-border); }
+/* --success (not the tan --lamp-white-border, which was only ~2.5:1 on the light
+   job-row surface — the "Succeeded" label was barely readable in day mode). */
+.job-status--succeeded { color: var(--success); }
 .job-status--failed { color: var(--danger); }
 .job-status--cancelled { color: var(--faint); }
 
@@ -538,7 +562,10 @@
 
 .job-row__phase {
   font-size: 0.76rem;
-  color: var(--text-muted);
+  /* Full body text, not --text-muted: the phase line ('epoch 3/80', 'exporting…')
+     is the only live progress signal besides the bar, and muted-grey on the
+     translucent card tint sat below comfortable contrast. */
+  color: var(--text);
   margin: 0;
 }
 

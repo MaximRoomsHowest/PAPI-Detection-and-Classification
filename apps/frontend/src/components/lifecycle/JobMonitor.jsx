@@ -1,17 +1,28 @@
-import { XCircle } from 'lucide-react'
+import { Trash2, XCircle } from 'lucide-react'
 
 const ACTIVE_STATUSES = new Set(['queued', 'running'])
 
 // Shared background-job list with live progress, used on the Models (evaluate) and
 // Datasets (labeling + training) pages. Driven by the polling useJobs hook.
-export function JobMonitor({ jobs, onCancel, copy, kinds }) {
+// onDismiss removes one terminal job; onClearFinished clears them all at once —
+// both optional so a caller can render a read-only monitor.
+export function JobMonitor({ jobs, onCancel, onDismiss, onClearFinished, copy, kinds }) {
   const filtered = kinds ? jobs.filter((job) => kinds.includes(job.kind)) : jobs
   if (!filtered.length) {
     return null
   }
+  const finishedCount = filtered.filter((job) => !ACTIVE_STATUSES.has(job.status)).length
   return (
     <section className="viz-card job-monitor" aria-label={copy.jobs.title}>
-      <h3 className="viz-heading">{copy.jobs.title}</h3>
+      <div className="job-monitor__head">
+        <h3 className="viz-heading">{copy.jobs.title}</h3>
+        {onClearFinished && finishedCount > 0 && (
+          <button className="ghost-button job-clear" type="button" onClick={onClearFinished}>
+            <Trash2 size={14} aria-hidden="true" />{' '}
+            {copy.jobs.clearFinished.replace('{count}', finishedCount)}
+          </button>
+        )}
+      </div>
       <ul className="job-list">
         {filtered.map((job) => {
           const active = ACTIVE_STATUSES.has(job.status)
@@ -40,10 +51,16 @@ export function JobMonitor({ jobs, onCancel, copy, kinds }) {
                   {job.error || job.phase}
                 </p>
               )}
-              {active && (
+              {active ? (
                 <button className="ghost-button job-cancel" type="button" onClick={() => onCancel(job.id)}>
                   <XCircle size={14} aria-hidden="true" /> {copy.jobs.cancel}
                 </button>
+              ) : (
+                onDismiss && (
+                  <button className="ghost-button job-cancel" type="button" onClick={() => onDismiss(job.id)}>
+                    <Trash2 size={14} aria-hidden="true" /> {copy.jobs.dismiss}
+                  </button>
+                )
               )}
             </li>
           )
