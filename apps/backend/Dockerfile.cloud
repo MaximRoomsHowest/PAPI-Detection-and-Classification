@@ -5,11 +5,11 @@
 # Build context must be the repository root:
 #   docker build -f apps/backend/Dockerfile.cloud -t papi-backend-cloud .
 #
-# Unlike the local Compose image, this image bakes models/serving/ (weights,
-# registry, model card) so Azure does not need a host bind mount. Keep the
-# stage structure in sync with apps/backend/Dockerfile — same digest-pinned
-# base, the torch pins shared via torch-requirements.txt (pip-audit scans
-# them in CI), and the same headless-opencv last-write fix.
+# Unlike the local Compose image, this image bakes models/serving/ plus the
+# committed best.pt files referenced by the registry, so Azure does not need a
+# host bind mount. Keep the stage structure in sync with apps/backend/Dockerfile
+# — same digest-pinned base, the torch pins shared via torch-requirements.txt
+# (pip-audit scans them in CI), and the same headless-opencv last-write fix.
 #
 # NOT built by CI (the docker job builds the compose images only — adding this
 # one would re-download torch every run without layer caching). It is built by
@@ -62,10 +62,19 @@ WORKDIR /app/apps/backend
 
 COPY apps/backend/app ./app
 COPY configs /app/configs
-# The whole serving slot: weights + registry + model card (+ the INT8 edge
-# export the registry may list). Registry entries pointing at non-baked
-# training paths (nano/transition) simply surface as available:false.
+# The serving slot (default weights + registry + model card) and the committed
+# registry weights. .dockerignore keeps this to weights/best.pt, not full
+# training runs, so optional selectors are available in cloud without shipping
+# every plot, CSV, last.pt, and export artifact.
 COPY models/serving /models/serving
+COPY models/runs/detect/transition3class-yolo26s-1280/weights/best.pt /models/runs/detect/transition3class-yolo26s-1280/weights/best.pt
+COPY models/runs/detect/yolo26n-baseline/weights/best.pt /models/runs/detect/yolo26n-baseline/weights/best.pt
+COPY models/runs/detect/yolo26s-augmented/weights/best.pt /models/runs/detect/yolo26s-augmented/weights/best.pt
+COPY models/runs/detect/yolo26s-baseline/weights/best.pt /models/runs/detect/yolo26s-baseline/weights/best.pt
+COPY models/runs/detect/yolo26s-extra-aug/weights/best.pt /models/runs/detect/yolo26s-extra-aug/weights/best.pt
+COPY models/runs/detect/yolo26s-fulldata-640/weights/best.pt /models/runs/detect/yolo26s-fulldata-640/weights/best.pt
+COPY models/runs/detect/yolo26s-weather-aug/weights/best.pt /models/runs/detect/yolo26s-weather-aug/weights/best.pt
+COPY models/runs/yolo26n-sequence-1280/weights/best.pt /models/runs/yolo26n-sequence-1280/weights/best.pt
 
 RUN groupadd --system papi \
  && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \
