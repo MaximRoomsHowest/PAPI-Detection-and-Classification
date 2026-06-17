@@ -29,15 +29,3 @@ for what you need to do.
 |---|---|
 | [`final-report.md`](final-report.md) | What was built, the headline results, and the honest limitations. |
 | [`deliverables/`](deliverables/) | Project deliverable documents (design document, components overview, model comparison, presentation outlines, handover email, meeting reports). See [`deliverables/README.md`](deliverables/README.md). |
-
-## Internal / working references
-
-These document how the work was done and back up the claims above. They are kept
-for traceability rather than as day-to-day operator docs.
-
-| Path | Covers |
-|---|---|
-| [`transition/`](transition/) | The detailed methodology for the optional learned transition classifier (recon → verification → evaluation). |
-| [`qa-artifacts/`](qa-artifacts/) | Benchmark JSON/CSV, held-out test-split evaluation, and smoke-test frames cited by the reports above. |
-| [`qa-screenshots/`](qa-screenshots/) | UI reference screenshots. |
-| [`user-testing/`](user-testing/) | User-test plan and the fixtures/media used to run it. |

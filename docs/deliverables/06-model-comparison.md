@@ -49,8 +49,7 @@ The decision criteria are spelled out in §4.
 ## 3. Results
 
 > **Test-split numbers measured 2026-06-10** via
-> `workflows/scripts/run_redwhite_test_eval.py` (artifact
-> `docs/qa-artifacts/test-split-eval.json`) — the §3.1/3.2 tables below are that
+> `workflows/scripts/run_redwhite_test_eval.py` — the §3.1/3.2 tables below are that
 > like-for-like comparison. For context, the
 > committed runs already give validation-split box metrics for three points: the **serving
 > yolo26s at 1280px** (`yolo26s-fulldata-1280`: mAP@0.5 **0.983**, mAP@0.5:0.95 **0.679** —
@@ -65,7 +64,7 @@ The decision criteria are spelled out in §4.
 ### 3.1 Accuracy on the held-out test split
 
 Measured 2026-06-10 (`workflows/scripts/run_redwhite_test_eval.py`, full PR curve,
-IoU 0.5; artifact `docs/qa-artifacts/test-split-eval.json`). The test split covers the
+IoU 0.5). The test split covers the
 day-wide and night-wide flights; the day-zoom flight is absent from the evaluated
 dataset (focal calibration pending) — see §3.2.
 
@@ -105,7 +104,7 @@ Cross-references `docs/edge-benchmark.md §5`. Numbers below are
 the same fps@p50 / RSS measurements consolidated for comparison.
 
 Measured 2026-06-10 on the project laptop (30 frames × 3 runs, bare `model.predict`;
-artifacts `docs/qa-artifacts/benchmarks/`). No Jetson hardware is available — that
+reproduce with `workflows/scripts/edge_benchmark.py`). No Jetson hardware is available — that
 column is honestly empty pending the client's WL051 specs. For GPU reference the
 laptop RTX 4070 runs yolo26s at p50 29.1 ms (34.4 fps).
 
@@ -169,8 +168,8 @@ python workflows\scripts\pipeline.py train --base yolo26s --epochs 100   # early
 # yolo26m: not trained for v1.0 (see §5)
 
 # Evaluate each on the held-out test split
-# (writes docs/qa-artifacts/test-split-eval.json; latency rows come from
-#  workflows/scripts/edge_benchmark.py -> docs/qa-artifacts/benchmarks/)
+# (run_redwhite_test_eval writes the eval JSON; latency rows come from
+#  workflows/scripts/edge_benchmark.py)
 python workflows\scripts\build_redwhite_test_view.py
 python workflows\scripts\run_redwhite_test_eval.py
 

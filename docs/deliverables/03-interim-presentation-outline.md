@@ -273,7 +273,7 @@ each speaker on the *one* question they're the canonical expert on.
 - [ ] `docker compose up -d --build` cold-start from a fresh `.env`
 - [ ] Open `http://localhost:5173/` in Chrome, Firefox, Safari
 - [ ] Run the §8 demo flow end-to-end, time each step
-- [ ] Re-run the user-testing-rerun verification commands:
+- [ ] Re-run the verification commands:
   ```powershell
   .venv\Scripts\python.exe -m pytest packages/papi/tests
   cd apps\backend; ..\..\.venv\Scripts\python.exe -m pytest

@@ -59,10 +59,8 @@ learned transition events.
 
 ### Rename map (2026-05-31)
 
-The old Ultralytics auto-names were renamed to the convention above. The
-historical benchmark records under `docs/qa-artifacts/benchmarks/` still
-reference the **old** paths (they record what was run at that time and are
-left intact); use this map to trace them:
+The old Ultralytics auto-names were renamed to the convention above; use
+this map to trace any historical record that still references the old names:
 
 | Old name | New name |
 | --- | --- |
@@ -142,8 +140,8 @@ Measured 2026-06-10 on the flight-level test split (`configs/split.yaml`) via
 `workflows/scripts/run_redwhite_test_eval.py` over the 2-class test view built by
 `workflows/scripts/build_redwhite_test_view.py` (same frames and human-corrected
 red/white boxes as the sequence dataset; the 6 test transition boxes restored to
-their tracked colours). Full PR curve (val-default conf), IoU 0.5. Artifact:
-`docs/qa-artifacts/test-split-eval.json`.
+their tracked colours). Full PR curve (val-default conf), IoU 0.5. Regenerate with
+`workflows/scripts/run_redwhite_test_eval.py`.
 
 | Metric | Day rwy 24 Wide (1000 m) | Night rwy 06 Wide (500 m) | Day rwy 24 Zoom | Aggregate |
 | --- | ---: | ---: | ---: | ---: |
@@ -198,7 +196,7 @@ is the promotion justification on held-out data.
 | Per-state F1 — white | 0.977 | 0.788 | 0.893 |
 | mAP@0.5 | 0.993 | 0.786 | 0.949 |
 
-Artifact: `docs/qa-artifacts/test-split-eval.json`. Both models are near-ceiling on
+Regenerate with `workflows/scripts/run_redwhite_test_eval.py`. Both models are near-ceiling on
 the day-wide flight; the night regime separates them (yolo26s mAP@0.5 0.886 vs
 0.786) — the test-split evidence behind the §3.1 promotion.
 

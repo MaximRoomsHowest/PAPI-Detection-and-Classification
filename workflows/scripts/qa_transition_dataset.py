@@ -3,12 +3,11 @@
 Validates label format, class distribution, bbox bounds, duplicates, and — most importantly —
 split integrity (no flight spans two splits => no adjacent-frame / source-video leakage). Reads
 the per-flight split from each video's metadata.csv and the verified 3-class labels in the twin.
-Writes docs/transition/dataset_qa_report.md and a JSON summary. Exits non-zero if a hard check
-fails or transition examples are too few to train.
+Writes dataset_qa_report.md (+ JSON summary) under models/runs/experiments/. Exits
+non-zero if a hard check fails or transition examples are too few to train.
 
 Run::
 
-    .venv/Scripts/python workflows/scripts/prepare_transition_dataset.py
     .venv/Scripts/python workflows/scripts/qa_transition_dataset.py
 """
 
@@ -22,7 +21,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_TWIN = REPO_ROOT / "data" / "datasets" / "transition-classification-data"
-REPORT = REPO_ROOT / "docs" / "transition" / "dataset_qa_report.md"
+REPORT = REPO_ROOT / "models" / "runs" / "experiments" / "dataset_qa_report.md"
 REGIMES = ("daytime", "nighttime")
 CLASS_NAMES = {0: "papi_light_red", 1: "papi_light_white", 2: "papi_light_transition"}
 MIN_TRANSITION_BOXES = 100  # below this, stop and report rather than pretend trainable
@@ -257,6 +256,7 @@ def _write_report(s: dict, sample_errors: list[str]) -> None:
         "- Verification was an AI spot-check of 36/~150 flips + a dataset-wide rule; a fuller human "
         "/ CVAT pass can extend it (`transition_cvat_bundle.zip`).",
     ]
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

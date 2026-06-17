@@ -319,7 +319,7 @@ Same as the interim plus the additional final-day items:
       Windows + macOS + Linux laptop (rotate one each per team
       member)
 - [ ] Live demo runs in Chrome, Firefox, Safari without warning
-- [ ] Re-run user-testing-rerun verification commands; tape the
+- [ ] Re-run the verification commands; tape the
       green screenshot into speaker notes
 - [ ] Fallback MP4 recorded the evening before (≤ 24 h old)
 - [ ] Source ZIP generated via `git archive --format=zip

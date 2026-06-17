@@ -124,7 +124,7 @@
           "white": { "precision": 0.9701, "recall": 0.584, "f1": 0.7291, "map50": 0.8633 },
           "transition": { "precision": 0.061, "recall": 0.3333, "f1": 0.1032, "map50": 0.0647 }
         },
-        "note": "Held-out 3-class test eval, measured 2026-06-10 against THIS checkpoint at the full PR curve (val-default conf). Test transition support is only 6 boxes, so the transition row carries wide uncertainty. Source: docs/transition/evaluation_metrics.json."
+        "note": "Held-out 3-class test eval, measured 2026-06-10 against THIS checkpoint at the full PR curve (val-default conf). Test transition support is only 6 boxes, so the transition row carries wide uncertainty. Regenerate with workflows/scripts/evaluate_transition_model.py."
       },
       "classes": {
         "0": "PAPI-Red",

@@ -9,8 +9,7 @@ model:
   horizontal flip (the detector classifies boxes; lamp ordering is post-processing) are
   applied. ``mosaic/mixup/copy_paste/erasing=0`` (4-frame stitching mixes lamp colours and
   exhausts RAM on 20MP frames).
-* **Flight-level split** — the dataset (built by
-  ``build_yolo_2class_flightsplit_dataset.py``) assigns whole flights to train/val/test, so
+* **Flight-level split** — the dataset assigns whole flights to train/val/test, so
   no near-duplicate frames leak across the split (unlike the random-split serving model).
 
 No transition oversampling here (red/white are ~55/45, already balanced).

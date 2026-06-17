@@ -41,8 +41,8 @@ near-identical-frame leakage).
 **Validation split** (`models/runs/detect/yolo26s-fulldata-1280/results.csv`, MODELS.md §3.1.1):
 precision 0.948 · recall 0.937 · mAP@0.5 0.983 · mAP@0.5:0.95 0.679.
 
-**Held-out test split** (artifact: `docs/qa-artifacts/test-split-eval.json`; harness:
-`workflows/scripts/run_redwhite_test_eval.py`, full PR curve, IoU 0.5): see MODELS.md §3.1.2
+**Held-out test split** (harness: `workflows/scripts/run_redwhite_test_eval.py`,
+full PR curve, IoU 0.5): see MODELS.md §3.1.2
 for the per-regime table. The test split covers the 1000 m day-wide and 500 m night-wide
 flights; the day-zoom test flight is not part of the evaluated dataset (zoom-camera focal
 calibration pending from the client), so zoom-regime numbers are reported as absent — not zero
@@ -57,19 +57,16 @@ fewer than 4 lamps are confidently detected.
 Two methods ship, selectable per analysis:
 
 - **Temporal tracking (default)** — red↔white flips on stable ByteTrack identities.
-  Robust in production; head-to-head F1 0.278 on the pre-cleanup test set
-  (`docs/transition/head_to_head.json`).
+  Robust in production; head-to-head F1 0.278 on the pre-cleanup test set.
 - **Learned 3-class model** (`transition3class-yolo26s-1280`, opt-in via the model selector) —
   after the 2026-06-09 label cleanup (487 → 250 transition boxes; ~49% of the old labels were
   stable-colour mislabels, removed by a colour-verdict gate) the retrained model hallucinates
-  almost no transitions on stable lamps (false transitions 53 → 1, ~98% cut,
-  `workflows/scripts/compare_transition_false_rate.py`) but is recall-starved on the tiny test
-  class. Full-PR-curve test metrics (`docs/transition/evaluation_metrics.json`): red F1 0.80
+  almost no transitions on stable lamps (false transitions 53 → 1, ~98% cut) but is
+  recall-starved on the tiny test class. Full-PR-curve test metrics: red F1 0.80
   (support 765) · white F1 0.73 (support 625) · **transition F1 0.10, recall 2/6 (support 6)**.
 
 **Decision on record**: temporal tracking stays the default; the learned model needs label
-*quantity* (more verified flips), not more cleaning, before promotion
-([06_method_toggle.md](transition/06_method_toggle.md), [REPORT.md](transition/REPORT.md)).
+*quantity* (more verified flips), not more cleaning, before promotion.
 The 6-box test support means per-class transition numbers carry very wide uncertainty — stated
 here rather than hidden.
 
@@ -86,8 +83,8 @@ data-collection effort it requires.
 
 ## 5. Real-time and edge deployment
 
-- Measured 2026-06-10 (artifacts in `docs/qa-artifacts/benchmarks/`, bare warm inference at
-  1280 px, 30 frames × 3 runs): laptop CPU p50 — yolo26s **316 ms (3.2 fps)**, yolo26n
+- Measured 2026-06-10 (bare warm inference at 1280 px, 30 frames × 3 runs; reproduce with
+  `workflows/scripts/edge_benchmark.py`): laptop CPU p50 — yolo26s **316 ms (3.2 fps)**, yolo26n
   **142 ms (7.0 fps)**; laptop **RTX 4070 — 29 ms (34 fps)**. The full serialized request
   pipeline (decode → detect → overlay → artifact write) is slower — the historically quoted
   ~0.4 fps end-to-end CPU figure remains the honest serving number for CPU-only deployments.
@@ -133,7 +130,7 @@ F1 drop exceeds ~5 pp.
 | Transition-model recall | 2/6 at full PR curve; needs label quantity (CVAT pass) before promotion |
 | Cross-airport generalisation | Untested; roadmap above |
 | Rwy-06 commissioned set-angles | Pending from client (FAA defaults in config; flagged per analysis) |
-| Lamp↔set-angle binding | Config order does not match the data's empirical angles; transitions.csv is authoritative (`docs/transition/00_lamp_binding.md`) |
+| Lamp↔set-angle binding | Config order does not match the data's empirical angles; transitions.csv is authoritative |
 
 Everything in this report is reproducible from the repo; nothing here is estimated or
 extrapolated beyond what the named artifacts contain.

@@ -20,7 +20,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VIEW = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "redwhite_test_view"
-OUT = REPO_ROOT / "docs" / "qa-artifacts" / "test-split-eval.json"
+OUT = REPO_ROOT / "models" / "runs" / "experiments" / "test-split-eval.json"
 CLASS_NAMES = {0: "red", 1: "white"}
 
 MODELS = {

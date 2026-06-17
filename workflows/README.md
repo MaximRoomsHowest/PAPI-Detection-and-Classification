@@ -60,12 +60,11 @@ reproducibility steps. Use this map to tell them apart.
 ### Scripts (`scripts/`), grouped by purpose
 
 - **Pipeline entrypoint** — `pipeline.py` (+ shared `_pipeline_utils.py`): the auto-labelling pipeline (extract → calibrate → pre-label → sample → export).
-- **Dataset build / prep** — `prepare_yolo_seed.py`, `prepare_yolo_sequence_dataset.py`, `build_yolo_2class_flightsplit_dataset.py`, `build_eval_seed.py`, `build_sequence_tracking.py`, `duplicate_transition_dataset.py`, `prepare_transition_dataset.py`, `build_transition_labels.py`.
-- **Transition mining / verification** — `score_transition_candidates.py`, `review_transition_labels.py`, `export_transition_cvat.py`, `apply_verification.py`, `qa_transition_dataset.py` (the pre-training gate), `build_cvat_normal_batches.py`, `export_yolo_assisted_cvat.py`.
+- **Dataset build / prep** — `prepare_yolo_sequence_dataset.py`, `build_sequence_tracking.py`, `build_eval_seed.py` (the committed evaluation seeds).
+- **Verification / QA gate** — `apply_verification.py` (colour-gate), `qa_transition_dataset.py` (the pre-training split-leak gate).
 - **Training** — `train_detector_model.py`, `train_transition_model.py` (+ `weather_aug.py` for synthetic-weather augmentation).
-- **Evaluation / metrics** — `evaluate_builtin.py`, `evaluate_transition_model.py`, `run_redwhite_test_eval.py`, `build_redwhite_test_view.py`, `populate_model_metrics.py`, `head_to_head_transitions.py`, `compare_transition_false_rate.py`.
-- **Benchmark / diagnostics** — `edge_benchmark.py`, `backend_bench.py`, `diagnose_angle_altitude.py`, `plot_angle_distribution.py`.
-- **End-to-end / integration checks** — `e2e_user_test.py`, `integration_check_transition_toggle.py`.
+- **Evaluation / metrics** — `evaluate_builtin.py`, `evaluate_transition_model.py`, `run_redwhite_test_eval.py`, `build_redwhite_test_view.py`, `populate_model_metrics.py`.
+- **Benchmark** — `edge_benchmark.py`, `backend_bench.py`.
 
 ## Authoritative model doc
 

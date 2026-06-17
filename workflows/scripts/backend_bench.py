@@ -9,7 +9,7 @@ the fairness flaw that the first §5.4 measurement missed (OpenVINO was unbounde
 
 Usage (from repo root, via the backend .venv):
   python workflows/scripts/backend_bench.py --threads 2 --device cpu \
-      --frames data/eval/builtin-detector-redwhite/images --json-out docs/qa-artifacts/benchmarks/backend-cpu2.json
+      --frames data/eval/builtin-detector-redwhite/images --json-out models/runs/experiments/backend-cpu2.json
 
 Note: an in-process thread cap is a PROXY for a cgroup CFS quota; the authoritative cloud
 number is this script run inside `docker run --cpus 2 --memory 4g` on the cloud image.

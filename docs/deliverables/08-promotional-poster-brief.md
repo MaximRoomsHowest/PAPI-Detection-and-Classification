@@ -225,4 +225,4 @@ before the final-week design pass. -->**
 
 - Design system tokens: `01-design-document.md §4`.
 - Application screenshots (for inspiration only, *not* for the
-  poster): `docs/qa-screenshots/`.
+  poster): capture fresh from a running Live Demo.

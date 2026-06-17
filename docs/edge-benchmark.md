@@ -98,24 +98,24 @@ python workflows/scripts/edge_benchmark.py \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/local-best-pt.json \
-    --csv-out docs/qa-artifacts/benchmarks/results.csv
+    --json-out models/runs/experiments/benchmarks/local-best-pt.json \
+    --csv-out models/runs/experiments/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
     --model models/runs/detect/yolo26n-baseline/weights/best.onnx \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/local-best-fp32-onnx.json \
-    --csv-out docs/qa-artifacts/benchmarks/results.csv
+    --json-out models/runs/experiments/benchmarks/local-best-fp32-onnx.json \
+    --csv-out models/runs/experiments/benchmarks/results.csv
 
 python workflows/scripts/edge_benchmark.py \
     --model models/serving/best_int8.onnx \
     --frames data/bench/ \
     --device-label "Laptop CPU" \
     --inference-device cpu \
-    --json-out docs/qa-artifacts/benchmarks/local-best-int8-onnx.json \
-    --csv-out docs/qa-artifacts/benchmarks/results.csv
+    --json-out models/runs/experiments/benchmarks/local-best-int8-onnx.json \
+    --csv-out models/runs/experiments/benchmarks/results.csv
 ```
 
 ## 5. Results table — [TODO: fill in]
@@ -141,8 +141,7 @@ P95 + P99**, not just mean — outliers matter for the
 | Intel NUC i7 | best.pt | [TODO] | [TODO] | [TODO] | [TODO] |
 
 > **Reading these honestly** (2026-06-10): rows above measure BARE model inference
-> (`model.predict`, warm) via `edge_benchmark.py` — artifacts in
-> `docs/qa-artifacts/benchmarks/yolo26{s,n}-{cpu,gpu}.json`. The older
+> (`model.predict`, warm) via `edge_benchmark.py`. The older
 > "smoke, 1 frame" rows and the ~0.4 fps figure quoted elsewhere describe the
 > FULL serialized request pipeline (decode → detect → overlay → artifact write)
 > including cold start — both are real, they measure different things. Bare
@@ -177,7 +176,7 @@ INT8 path may not be deployable.
 
 | Model | Detection F1 | Per-lamp state F1 |
 | --- | ---: | ---: |
-| best.pt (FP32 reference) | 0.915 (held-out test — `docs/qa-artifacts/test-split-eval.json`) | red 0.901 / white 0.928 |
+| best.pt (FP32 reference) | 0.915 (held-out test — `run_redwhite_test_eval.py`) | red 0.901 / white 0.928 |
 | best.onnx fp32 (yolo26s export, 2026-06-10) | identical detections to best.pt on the 10-frame parity sample (40/40 boxes, max conf drift 0.03) | identical |
 | best_int8.onnx | no working artifact — see MODELS.md §3.2.1 (old yolo26n export CPU-broken; yolo26s re-quantisation crashed the quantiser) | — |
 | Δ (fp32 ONNX vs torch) | none observed on the parity sample | none observed |

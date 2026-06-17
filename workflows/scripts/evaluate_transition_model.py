@@ -22,7 +22,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_WEIGHTS = REPO_ROOT / "models" / "runs" / "detect" / "transition3class-yolo26s-1280" / "weights" / "best.pt"
 DEFAULT_DATA = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "transition_combined" / "data.yaml"
-OUT = REPO_ROOT / "docs" / "transition"
+OUT = REPO_ROOT / "models" / "runs" / "experiments" / "transition-eval"
 EXAMPLES = REPO_ROOT / "data" / "datasets" / "transition-classification-data" / "eval_examples"
 CLASS_NAMES = {0: "red", 1: "white", 2: "transition"}
 
@@ -60,7 +60,7 @@ def evaluate(weights: Path, data: Path) -> dict:
     # conf left at the ultralytics val default (0.001): valing at the serving operating
     # point (0.25) truncates the PR curve before AP integration and conflates "no
     # predictions above 0.25" with "model finds nothing" (audit WS-2). Operating-point
-    # behaviour is measured separately by mine_examples/compare_transition_false_rate.
+    # behaviour is measured separately by the example-mining step below.
     metrics = model.val(data=str(data), split="test", imgsz=1280, iou=0.5,
                         batch=4, workers=2,
                         project=str(REPO_ROOT / "models" / "runs" / "experiments"), name="transition3class-test", exist_ok=True)
@@ -175,6 +175,7 @@ def main() -> int:
     if not args.no_examples:
         result["example_counts"] = mine_examples(args.weights, args.data)
 
+    OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "evaluation_metrics.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
     return 0
