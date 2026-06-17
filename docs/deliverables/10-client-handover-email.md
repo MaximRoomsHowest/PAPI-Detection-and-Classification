@@ -6,21 +6,17 @@ fontsize: 10pt
 geometry: "a4paper, margin=2cm"
 ---
 
-# Client Handover Email — PAPI Lights Detection and Classification
-
 > Template for the handover email to Daoud Uahabi at Intersoft
-> Electronics Services BV. **Send by Tue 2026-06-17** so the
-> screenshot can land in Slide 14 of the final presentation deck.
-> Save the sent message + Daoud's acknowledgement as PDFs and
-> include both in the final submission packet as proof of handover.
+> Electronics Services BV. Save the sent message and Daoud's
+> acknowledgement as PDFs and keep both on file as a record of the
+> handover.
 
 ## Send-checklist (before hitting Send)
 
 - [ ] Repo is on a tagged release (e.g. `v1.0-final`); CI green on
       that commit.
-- [ ] `models/serving/best.pt` and `models/serving/best_int8.onnx`
-      both present and renderable from a clean clone (or the
-      installation manual explains the manual placement).
+- [ ] `models/serving/best.pt` present and loadable from a clean clone
+      (or the installation manual explains the manual placement).
 - [ ] Source ZIP attached or linked.
 - [ ] All `<!-- TEAM: ... -->` placeholders below filled.
 - [ ] Email copied to all four team members + the project
@@ -36,7 +32,7 @@ geometry: "a4paper, margin=2cm"
 From:    Sousa Rodrigo <rodrigo.sousa@student.howest.be>
 To:      Daoud Uahabi <daoud.uahabi@intersoft-electronics.com>
 Cc:      Chekhun Maksym, Kattan Hamzzah, Rooms Maxim,
-         <!-- TEAM: supervisor email -->
+         [supervisor email]
 Bcc:     (none)
 Subject: PAPI Lights Detection and Classification — Howest Industry Project handover
 
@@ -82,27 +78,28 @@ Five things worth flagging:
      metadata, not lamp height. Lamp order and commissioned set angles
      still need binding.
 
-  2. The detector is YOLO 26<!-- TEAM: n / s / m, per slide 7 of
-     the final deck -->, fine-tuned on the EDNY dataset only.
+  2. The detector is YOLO 26s, fine-tuned on the EDNY dataset only.
      Generalisation to other airports requires a fresh
      papi_*.yaml geometry file plus retraining on capture from
      the new site.
 
-  3. The recommended edge deployment is <!-- TEAM: Jetson Orin
-     Nano with INT8 ONNX OR Intel NUC + FP32 -->, achieving
-     <!-- TEAM: N --> fps at p50 (full numbers in §5 of the edge
-     benchmark report). The web demo on localhost is CPU-bound
+  3. The recommended edge deployment is [edge device — to be
+     confirmed once the WL051 hardware specs arrive], achieving
+     [N] fps at p50 (full numbers in §5 of the edge benchmark
+     report). The web demo on localhost is CPU-bound
      and runs at ~ 0.4 fps — that's expected.
 
   4. Production deployment requires PAPI_ENV=production and a
      PAPI_API_KEY set in .env. The installation manual covers
      HTTPS termination via Caddy in the Production section.
 
-  5. The model under models/serving/best_int8.onnx fails on
-     stock CPU ONNX Runtime (ConvInteger operator not
-     implemented). The FP32 fallback at models/serving/best.pt
-     runs anywhere. We recommend the INT8 path only on devices
-     with GPU acceleration.
+  5. The serving model is models/serving/best.pt (PyTorch), which
+     runs on any CPU or GPU. For a ~1.5x CPU speedup, enable the
+     bundled OpenVINO export by setting BACKEND_INSTALL_ACCEL=true
+     in .env and rebuilding. There is no working INT8/ONNX build at
+     present (the earlier INT8 export is retired and CPU-incompatible
+     - see models/MODELS.md section 3.2.1); revisit quantisation once
+     an edge target is fixed.
 
 We are happy to answer questions for the next 30 days at the
 addresses above — no commercial commitment, just a courtesy
@@ -177,16 +174,15 @@ namens het PAPI Lights Detection and Classification-team
 ## Acknowledgement to capture
 
 Ask Daoud to reply with **"Received and accepted"** so the team has
-a written confirmation. Keep his reply alongside the sent email in
-the submission packet — both saved as PDF.
+a written confirmation. Keep his reply alongside the sent email on
+file — both saved as PDF.
 
-Filename convention for the packet:
+Filename convention for the records:
 
 - `handover-email-sent-2026-06-17.pdf`
 - `handover-email-received-2026-06-1X.pdf`
 
 ## Cross-references
 
-- Final deck slide 14: `09-final-presentation-outline.md`
-- Source-of-truth for what was handed over: `00-deliverables/README.md`
-- Project hub: BigBrain `03-projects/intersoft-papi-detection.md`
+- Source of truth for what was handed over: `README.md` (this folder)
+- Model registry / lineage: `../../models/MODELS.md`

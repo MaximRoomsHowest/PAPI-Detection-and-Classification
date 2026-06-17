@@ -1,13 +1,12 @@
 # Final Presentation — Content Outline
 
 > Slide-by-slide content for the **Fri 2026-06-19 08:30** final
-> presentation (60 % of the module grade — combined with project
-> quality assessment). The team styles this into the actual deck
+> presentation. The team styles this into the actual deck
 > using the design tokens in `01-design-document.md §4`.
 >
 > Total target: **20 minutes content + 10 minutes Q&A**. Longer
-> than the interim because the jury weighs depth and the handover
-> narrative.
+> than the interim because of the added technical depth and the
+> handover narrative.
 
 ## What's different from the interim
 
@@ -17,10 +16,9 @@ This deck is a **delivery presentation**, not a progress update:
 - Add real edge-benchmark numbers (the §5 [TODO] cells will be
   filled by sprint 4 / 5).
 - Add the alternative-model comparison (yolo26n vs 26s vs 26m) —
-  band-lift evidence for LR1D 16+.
+  evidence that alternatives were evaluated and the best adopted.
 - Add a proof-of-handover slide (see §"Slide 14" below).
-- Add a "what we learned" reflection (LR3 16+ "every member can
-  enthuse the jury").
+- Add a "what we learned" reflection from each team member.
 - Drop the "what's next in sprint 3" slide entirely.
 
 ## Speaker plan
@@ -165,8 +163,8 @@ Bullets:
 - See `docs/deliverables/06-model-comparison.md` for the full
   methodology and trade-off table.
 
-Talking point (60 s): hits the LR1D 16+ "alternative AI models
-implemented when they add value" marker directly.
+Talking point (60 s): shows that alternative models were evaluated
+and the best one adopted where it added value.
 
 ### Slide 8 — System architecture (deployed view)
 
@@ -193,19 +191,19 @@ in.
 | Device | Model | p50 ms | fps@p50 | RSS MB |
 |---|---|---:|---:|---:|
 | Laptop CPU | best.pt (FP32) | **<!-- TEAM -->** | **<!-- TEAM -->** | **<!-- TEAM -->** |
-| Raspberry Pi 5 | best_int8.onnx | **<!-- TEAM -->** | **<!-- TEAM -->** | **<!-- TEAM -->** |
-| Jetson Orin Nano (INT8) | best_int8.onnx | **<!-- TEAM -->** | **<!-- TEAM -->** | **<!-- TEAM -->** |
+| Raspberry Pi 5 | best.pt (OpenVINO) | **<!-- TEAM -->** | **<!-- TEAM -->** | **<!-- TEAM -->** |
+| Jetson Orin Nano | best.pt | **<!-- TEAM -->** | **<!-- TEAM -->** | **<!-- TEAM -->** |
 | Intel NUC i7 | best.pt | **<!-- TEAM -->** | **<!-- TEAM -->** | **<!-- TEAM -->** |
 
 Bullets:
 
 - Real-time target was **≥ 10 fps**.
 - Recommended deployment: **<!-- TEAM: per §8 of edge-benchmark.md -->**.
-- INT8 quantisation cost: **<!-- TEAM: ΔF1 between best.pt and best_int8.onnx -->**.
+- CPU acceleration: **<!-- TEAM: OpenVINO speedup vs best.pt, per §5.4 of edge-benchmark.md -->**.
 - Three-year TCO per airport: **<!-- TEAM: per §7.4 of edge-benchmark.md -->**.
 
-Talking point (90 s): this is the LR1B + LR1D 16+ evidence — real
-numbers, honest fall-backs, named recommendation.
+Talking point (90 s): real numbers, honest fall-backs, named
+recommendation.
 
 ### Slide 10 — Live demo (4 minutes)
 
@@ -221,7 +219,7 @@ Same flow as the interim, expanded:
 
 Fallback: pre-recorded MP4 at `docs/deliverables/assets/demo-fallback.mp4`.
 
-### Slide 11 — Engineering practices we want graders to notice
+### Slide 11 — Engineering practices worth highlighting
 
 Same three-column layout as the interim slide 9, updated:
 
@@ -250,10 +248,10 @@ Bullets:
 - Trello board, four members, daily 09:30 standup on Discord.
 - 5 one-week sprints, retro after each (Glad / Sad / Mad / Add).
 - 4 client meetings on record (kickoff, two syncs, closure).
-- Weekly P2P evaluations submitted on Leho.
+- Weekly peer evaluations on record.
 - Time tracking: **<!-- TEAM: total team hours, range per member -->**.
 
-Talking point (60 s): pure LR2 + LR3 evidence. Keep tone modest.
+Talking point (60 s): keep tone modest.
 
 ### Slide 13 — What we learned
 
@@ -269,8 +267,8 @@ A reflection slide. Five bullets — one per member + one team.
   the highest-leverage process change in the whole project — round
   1 caught six demo blockers, round 2 verified the fixes by lunch." -->**.
 
-Talking point (60 s): this is LR3 16+ "every member can enthuse the
-jury". Practise this slide more than any other.
+Talking point (60 s): every member speaks to their work with genuine
+enthusiasm. Practise this slide more than any other.
 
 ### Slide 14 — Handover to the client
 
@@ -286,8 +284,8 @@ Bullets:
 - See `docs/deliverables/10-client-handover-email.md` for the
   artifact.
 
-Talking point (45 s): satisfies the Leho "proof of handover to the
-client" requirement; doubles as a closing punctuation mark.
+Talking point (45 s): provides documented proof of handover to the
+client; doubles as a closing punctuation mark.
 
 ### Slide 15 — Close + Q&A
 
@@ -297,7 +295,7 @@ PAPI Lights Detection and Classification — Delivered
 ✔  Drone → web app → traceable verdict in ~ 2-3 s per frame (CPU)
 ✔  Two-class detector + geometric transition (one source of truth)
 ✔  Dual runway, dual camera, dual regime — flight-level eval
-✔  Edge deployment path (Jetson Orin Nano INT8) — benchmark pending hardware
+✔  Edge deployment path (Jetson Orin Nano) — benchmark pending hardware
 ✔  Three-year TCO ≈ <!-- TEAM --> EUR per airport
 ✔  Hardened Docker stack with CI + tests + audit-tracked issues
 ✔  Two user-testing rounds with same-day iteration
@@ -331,10 +329,8 @@ Same as the interim plus the additional final-day items:
       "TEAM:" -Recurse`)
 - [ ] PDFs in `docs/deliverables/*.pdf` regenerated via
       `scripts/build-deliverables.ps1`
-- [ ] All Leho upload slots populated (cross-check
+- [ ] All deliverables populated (cross-check
       `docs/deliverables/README.md §Final`)
-- [ ] Coaches (Dieter, Martijn, Gilles, Nathan, Frederik) confirmed
-      access to repo + Trello
 
 ## Pre-Q&A briefings — who answers what (updated for final)
 
@@ -345,17 +341,17 @@ Same as the interim plus the additional final-day items:
 | How did model comparison play out? | Sousa Rodrigo | `06-model-comparison.md` |
 | Domain adaptation / new airport? | Rooms Maxim | One YAML per airport; `configs/papi_edny.yaml` is the template |
 | Security / auth / production deployment? | Chekhun Maksym | `architecture-overview.md §7` + install manual `Production` section |
-| Sprint mgmt, P2P, time | Kattan Hamzzah | `05-project-management-summary.md` |
+| Sprint mgmt, peer review, time | Kattan Hamzzah | `05-project-management-summary.md` |
 | What's not done yet / known limits? | Rooms Maxim | `architecture-overview.md §8` |
 | Handover, support window? | Sousa Rodrigo | `10-client-handover-email.md` |
 | How honest are the visuals? | Any (this is a values question) | Design doc §1 "Honest visuals" principle |
 
 Each answer rehearsed in **≤ 30 seconds**.
 
-## Submission packet (Fri 2026-06-19 by 08:30)
+## Deliverables package
 
-Each as a separate Leho upload (PDF / ZIP / MP4 as the slot
-allows). Cross-reference `docs/deliverables/README.md §Final`:
+Each as a separate deliverable (PDF / ZIP / MP4 as appropriate).
+Cross-reference `docs/deliverables/README.md §Final`:
 
 1. This deck → PDF.
 2. Weekly meeting reports bundle (≥ 5 reports → one PDF or zipped).
@@ -365,5 +361,5 @@ allows). Cross-reference `docs/deliverables/README.md §Final`:
 6. `papi-vision-poster-A3.pdf` (per `08-promotional-poster-brief.md`).
 7. Source-code ZIP via `git archive`.
 8. `04-components-overview-a4.md` → PDF (1 A4 page).
-9. *Not applicable for CTAI*.
-10. Additional rubric-implied: `01-design-document.md` → PDF.
+9. *Not applicable*.
+10. Additional reference document: `01-design-document.md` → PDF.

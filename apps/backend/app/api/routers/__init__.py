@@ -8,7 +8,7 @@ Each submodule owns one slice of the surface:
 * ``meta``         — runway list, model info, host/runtime facts
 * ``models_admin`` — model upload / promote / disable / delete / evaluate
 * ``datasets``     — dataset bundle upload + assisted labeling + commit
-* ``training``     — external-prepare + Hugging Face Jobs launchers
+* ``training``     — external training bundle preparation
 * ``jobs``         — background-job status + cancellation
 
 ``app.api.routes`` includes them all into its ``router`` and remains the public
