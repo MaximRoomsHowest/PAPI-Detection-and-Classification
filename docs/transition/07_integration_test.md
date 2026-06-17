@@ -13,7 +13,7 @@ through the running backend to the real models and the database.
 ## Static gates (all green)
 - `ruff` clean across `apps/backend/app`, `packages/papi/src/papi`, `workflows/scripts`.
 - Backend **249 passed** (incl. 9 toggle tests). Frontend **149 passed**, eslint clean.
-- `data/data_analysis.ipynb` valid JSON.
+- `workflows/notebooks/05_data_analysis.ipynb` valid JSON.
 
 ## Real-model service path (`integration_check_transition_toggle.py`)
 Loaded the real `InferenceService` (2-class serving model + the 3-class transition model via

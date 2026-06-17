@@ -23,11 +23,17 @@ pip install -e .[dev]
 ## Link The Raw Dataset
 
 The pipeline reads images from `data/raw/<flight>/<file>.JPG`. To avoid copying
-the archived raw dataset, create a Windows directory junction from `data/raw`
-to the archived artifact folder:
+the archived raw dataset, link `data/raw` to wherever you keep the archived
+artifact folder:
 
 ```powershell
-cmd /c mklink /J data\raw ..\PAPI-artifacts\2026-05-26-cleanup\PROJECT1-PAPI
+# Windows (directory junction)
+cmd /c mklink /J data\raw <path-to-archive>\PROJECT1-PAPI
+```
+
+```bash
+# Linux / macOS (symlink)
+ln -s <path-to-archive>/PROJECT1-PAPI data/raw
 ```
 
 The canonical corrected sequence dataset is archived under:
@@ -173,12 +179,12 @@ Start here when looking for a part of the project:
 - **Pipeline**: [`docs/pipeline.md`](docs/pipeline.md) · **Label spec**: [`docs/label_spec.md`](docs/label_spec.md)
 - **Model card**: [`docs/model-card.md`](docs/model-card.md) · **Data card**: [`docs/data-card.md`](docs/data-card.md)
 - **Model registry**: [`models/MODELS.md`](models/MODELS.md) · **Edge benchmark**: [`docs/edge-benchmark.md`](docs/edge-benchmark.md)
-- **Deliverables board** (submission tracker): [`docs/deliverables/README.md`](docs/deliverables/README.md)
+- **Project documentation index**: [`docs/deliverables/README.md`](docs/deliverables/README.md)
 - **Security policy**: [`SECURITY.md`](SECURITY.md) · **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-**License**: see [`LICENSE`](LICENSE) — terms are pending confirmation with
-Intersoft, and the file records the Ultralytics **AGPL-3.0** dependency
-obligation (see also [`SECURITY.md`](SECURITY.md)).
+**License**: proprietary to Intersoft Electronics Services BV — see
+[`LICENSE`](LICENSE), which also records the Ultralytics **AGPL-3.0**
+dependency obligation (see also [`SECURITY.md`](SECURITY.md)).
 
 ## Verification
 
