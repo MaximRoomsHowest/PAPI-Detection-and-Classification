@@ -6,13 +6,13 @@ export const translations = {
     // <html lang> attribute. en-GB keeps the established day-first "11 Jun" look.
     locale: 'en-GB',
     footer: {
-      project: 'PAPI Vision student project',
+      project: 'PAPI Vision',
       description:
-        'Developed by Howest University students for Intersoft Electronics Services BV.',
+        'Developed at Howest University for Intersoft Electronics Services BV.',
       academic: 'Howest University of Applied Sciences',
       partner: 'Intersoft Electronics Services BV',
       notice: 'Educational prototype. Not certified for operational airport use.',
-      copyright: 'Copyright © 2026 PAPI Vision student project.',
+      copyright: 'Copyright © 2026 Intersoft Electronics Services BV.',
     },
     brand: {
       subtitle: 'PAPI Detection v1.0',
@@ -769,13 +769,13 @@ export const translations = {
   de: {
     locale: 'de-DE',
     footer: {
-      project: 'PAPI Vision Studentenprojekt',
+      project: 'PAPI Vision',
       description:
-        'Entwickelt von Studierenden der Howest University für Intersoft Electronics Services BV.',
+        'Entwickelt an der Howest University für Intersoft Electronics Services BV.',
       academic: 'Howest University of Applied Sciences',
       partner: 'Intersoft Electronics Services BV',
       notice: 'Bildungsprototyp. Nicht für den operativen Flughafenbetrieb zertifiziert.',
-      copyright: 'Copyright © 2026 PAPI Vision Studentenprojekt.',
+      copyright: 'Copyright © 2026 Intersoft Electronics Services BV.',
     },
     brand: {
       subtitle: 'PAPI-Erkennung v1.0',
@@ -1532,13 +1532,13 @@ export const translations = {
   nl: {
     locale: 'nl-NL',
     footer: {
-      project: 'PAPI Vision studentenproject',
+      project: 'PAPI Vision',
       description:
-        'Ontwikkeld door studenten van Howest University voor Intersoft Electronics Services BV.',
+        'Ontwikkeld aan de Howest University voor Intersoft Electronics Services BV.',
       academic: 'Howest University of Applied Sciences',
       partner: 'Intersoft Electronics Services BV',
       notice: 'Educatief prototype. Niet gecertificeerd voor operationeel luchthavengebruik.',
-      copyright: 'Copyright © 2026 PAPI Vision studentenproject.',
+      copyright: 'Copyright © 2026 Intersoft Electronics Services BV.',
     },
     brand: {
       subtitle: 'PAPI-detectie v1.0',
@@ -2295,13 +2295,13 @@ export const translations = {
   fr: {
     locale: 'fr-FR',
     footer: {
-      project: 'Projet étudiant PAPI Vision',
+      project: 'PAPI Vision',
       description:
-        'Développé par des étudiants de Howest University pour Intersoft Electronics Services BV.',
+        'Développé à la Howest University pour Intersoft Electronics Services BV.',
       academic: 'Howest University of Applied Sciences',
       partner: 'Intersoft Electronics Services BV',
       notice: 'Prototype éducatif. Non certifié pour une utilisation aéroportuaire opérationnelle.',
-      copyright: 'Copyright © 2026 projet étudiant PAPI Vision.',
+      copyright: 'Copyright © 2026 Intersoft Electronics Services BV.',
     },
     brand: {
       subtitle: 'Détection PAPI v1.0',

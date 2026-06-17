@@ -122,7 +122,7 @@ docker-compose.override.yml
 
 # Rendered deliverable artifacts (Word/PDF) built from the Markdown sources
 # under docs/deliverables/. The .md files are the source of truth; these
-# binaries are produced on demand for Leho upload and should not be tracked.
+# binaries are produced on demand for the deliverables package and should not be tracked.
 docs/deliverables/_build/
 
 # --------------------------------------------------------------------------

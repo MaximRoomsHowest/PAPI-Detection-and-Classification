@@ -1,7 +1,8 @@
 # Contributing
 
-This is a Howest CTAI industry project (2025-26) for Intersoft Electronics. These
-notes keep the four-person team — and any future maintainer — consistent.
+Engineering notes for PAPI Lights Detection and Classification, developed for
+Intersoft Electronics Services BV. These conventions keep contributions consistent
+for current and future maintainers.
 
 ## Setup
 

@@ -3,12 +3,12 @@
 > ⚠ **Template — fill in measurements after running on actual hardware.**
 > Placeholders are marked `[TODO]`. This document is intentionally a
 > runbook plus an empty results table so the methodology is set
-> before numbers are produced (avoids cherry-picking and gives the
-> rubric grader a defensible audit trail).
+> before numbers are produced (avoids cherry-picking and provides a
+> reproducible, defensible audit trail).
 
 Reproducible methodology for benchmarking PAPI Lights Detection and Classification on
-resource-constrained hardware. Required for rubric LR1B (real-time
-inference, edge deployment, scalability).
+resource-constrained hardware — validating real-time inference,
+edge deployment, and scalability.
 
 ## 1. Devices to benchmark
 
@@ -252,7 +252,7 @@ Implementation note: the metric should live in `apps/frontend/src/`
 as a static JSON imported at build time, not as part of the API
 response (the demo runs in a browser, not on edge hardware).
 
-## 7. Cost projection (rubric LR1D 16+)
+## 7. Cost projection for multi-airport deployment
 
 > **Methodology**: cost per airport, broken into one-time CAPEX and
 > recurring OPEX. Numbers below are 2026 EUR list prices; the team
@@ -330,8 +330,8 @@ operational profile -->**.
 
 ## 8. Conclusion
 
-> Fill in after §5 and §7 are populated. Reviewers / jury graders
-> look at this section first — write it as if it's the only
+> Fill in after §5 and §7 are populated. Stakeholders and
+> decision-makers look at this section first — write it as if it's the only
 > paragraph they read.
 
 **Recommended deployment**: **<!-- TEAM: e.g. "Jetson Orin Nano 8 GB
@@ -342,7 +342,7 @@ remains blocked on the CPU operator set." -->**.
 **Cost per airport (3-year TCO)**: **<!-- TEAM: e.g. "≈ 8 500 EUR
 per airport using the midpoint estimates in §7.4." -->**.
 
-**Caveats the jury must know**:
+**Key caveats stakeholders must know**:
 
 1. **<!-- TEAM: e.g. "Real-time target was not met on the Raspberry
    Pi tier; only the Jetson tier reaches ≥10 fps at p50." -->**.

@@ -28,8 +28,8 @@ this card adds the intended-use, limitations and ethics framing a registry omits
 ## Intended use
 
 - **Primary**: a demonstrator that proves automated PAPI detection + per-lamp
-  classification is viable from drone imagery, for Intersoft Electronics and the
-  Howest jury.
+  classification is viable from drone imagery, for Intersoft Electronics and
+  technical stakeholders.
 - **Out of scope**: this is **not** a certified safety-of-flight system. It must not be
   used as an authoritative source for approach-path guidance. Outputs are advisory and
   intended for review by qualified aviation engineers.

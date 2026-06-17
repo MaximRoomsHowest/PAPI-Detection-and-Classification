@@ -1,7 +1,7 @@
 # PAPI Lights Detection and Classification — User Manual
 
-For end users of the PAPI Lights Detection and Classification demo application: drone operators,
-review engineers, and the jury. If you want to install the system
+For end users of the PAPI Lights Detection and Classification application: drone operators,
+review engineers, and technical stakeholders. If you want to install the system
 from scratch, see [installation-manual.md](installation-manual.md)
 instead.
 

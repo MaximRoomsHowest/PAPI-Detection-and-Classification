@@ -1,7 +1,7 @@
 # Interim Presentation — Content Outline
 
 > Slide-by-slide content for the **Wed 2026-06-03 08:30** interim
-> presentation (20 % of the module grade). The team styles this
+> presentation. The team styles this
 > into the actual deck (PowerPoint / Keynote / Google Slides) using
 > the design tokens in `01-design-document.md §4`.
 >
@@ -10,9 +10,8 @@
 
 ## Speaker plan
 
-Rotate ownership so every member speaks (LR3 13-15 marker "each
-member speaks during the presentation"). Four speakers, ~3.5 min
-each. Cue cards are in §"Per-slide content" below.
+Rotate ownership so every member speaks during the presentation. Four
+speakers, ~3.5 min each. Cue cards are in §"Per-slide content" below.
 
 | Member | Section | Slides |
 |---|---|---|
@@ -132,7 +131,7 @@ Bullets:
 
 Talking point (45 s): "Numbers are interim. Final-presentation
 slide will show the same chart against a YOLO-26s and YOLO-26m
-baseline so the band-lift comparison is on the record."
+baseline so the model comparison is on the record."
 
 ### Slide 7 — System architecture (one diagram)
 
@@ -149,7 +148,7 @@ Bullets:
   + Docker build on every push.
 
 Talking point (60 s): no surprises here — keep it short, this slide
-exists so the jury knows the engineering is intentional.
+exists so reviewers know the engineering is intentional.
 
 ### Slide 8 — Live demo (3 minutes)
 
@@ -173,7 +172,7 @@ Fallback if the demo fails: pre-recorded MP4 of the same flow
 checked into `docs/deliverables/assets/demo-fallback.mp4` (todo:
 record this Mon evening so we have it ready Wed morning).
 
-### Slide 9 — Engineering practices we want graders to notice
+### Slide 9 — Engineering practices worth highlighting
 
 Three columns — each a stat with a one-sentence explanation.
 
@@ -245,8 +244,8 @@ Bullets (taken from the plan-file remediation list):
   install manual, source zip, technical-components A4, A3 poster,
   weekly reports bundle.
 
-Talking point (45 s): be honest about the open items — graders
-reward "we know what's left" over "we're done already."
+Talking point (45 s): be honest about the open items — reviewers
+value "we know what's left" over "we're done already."
 
 ### Slide 13 — Close + Q&A
 
@@ -285,22 +284,21 @@ each speaker on the *one* question they're the canonical expert on.
 - [ ] Record the fallback MP4 (see Slide 8).
 - [ ] Confirm GitHub Actions on `main` shows green badge.
 
-## Submission packet (Wed 2026-06-03 by 08:30)
+## Interim deliverables packet (Wed 2026-06-03 by 08:30)
 
-Four PDFs uploaded separately on Leho:
+Four PDFs in the interim deliverables package:
 
 1. This deck → PDF.
 2. `05-project-management-summary.md` → PDF.
 3. `meeting-reports/2026-05-18-kickoff.md`,
    `meeting-reports/2026-05-26-geometry-sync.md`,
    `meeting-reports/2026-06-01-scope-and-features.md` → 3 reports
-   bundled into one PDF (Leho accepts a single combined file).
+   bundled into one PDF (a single combined file is accepted).
 4. *Not applicable for CTAI* — MCT-only functional analysis.
 
 ## Pre-Q&A briefings — who answers what
 
-To avoid the rubric LR3 *insufficient* marker "can't smoothly answer
-jury questions":
+So we can smoothly answer reviewer questions:
 
 | Likely question | Canonical speaker | Prep notes |
 |---|---|---|
@@ -312,4 +310,4 @@ jury questions":
 | Generalisation to other airports? | Sousa Rodrigo | Out-of-scope; one config per airport |
 | What's not done yet? | Kattan Hamzzah | Slide 12 list verbatim |
 
-Rehearse each answer in **≤ 30 seconds**; jurors penalise rambling.
+Rehearse each answer in **≤ 30 seconds**; reviewers penalise rambling.

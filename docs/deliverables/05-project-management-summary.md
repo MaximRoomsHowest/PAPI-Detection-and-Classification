@@ -10,7 +10,7 @@ geometry: "a4paper, margin=2cm"
 # Project Management Summary
 
 <!--
-Internal note (not rendered): source for the LR2 project-management summary.
+Internal note (not rendered): source for the project-management summary.
 Fill the TEAM markers (burndown, weeks 3–5 hours) before each export.
 Find them with: Select-String -Path 05-project-management-summary.md -Pattern "TEAM"
 -->

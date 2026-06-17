@@ -6,23 +6,21 @@ fontsize: 10pt
 geometry: "a4paper, margin=2cm"
 ---
 
-# Alternative-Model Comparison
-
-> **Rubric**: LR1D **16+** band marker — *"alternative AI models
-> implemented when they add value"*. The serving model is **yolo26s**
-> (run `yolo26s-fulldata-1280`), promoted over the smaller yolo26n;
-> this document justifies that yolo26n→yolo26s choice on the record by
-> training variants (26n, 26s, optionally 26m) on the same split and
-> comparing accuracy × latency × cost.
+> **Model-selection rationale**: we evaluated alternative YOLO variants
+> and adopted the one that added the most value. The serving model is
+> **yolo26s** (run `yolo26s-fulldata-1280`), promoted over the smaller
+> yolo26n; this document justifies that yolo26n→yolo26s choice on the
+> record by training variants (26n, 26s, optionally 26m) on the same
+> split and comparing accuracy × latency × cost.
 >
 > Source data: `workflows/notebooks/04_yolov26n_sequence_model_evaluation.ipynb`
 > (run for each variant). Eval split: `configs/split.yaml`.
 
 ## 1. Why compare at all
 
-The 16+ band rewards "alternative models implemented when they add
-value." That's a *test*, not a checkbox — we need to show we
-considered the alternatives and chose for a defensible reason.
+An alternative model is only worth adopting when it adds value. That's
+a *test*, not a checkbox — we need to show we considered the
+alternatives and chose for a defensible reason.
 
 Three candidates were trained on the same dataset, same split,
 same augmentation, same loss. The hypothesis under test:
@@ -189,4 +187,3 @@ are populated from those run folders.
 - Per-regime split design: `configs/split.yaml` + `docs/pipeline.md`
 - Edge latency cross-ref: `docs/edge-benchmark.md §5`
 - Model registry / lineage: `models/MODELS.md`
-- Rubric line: BigBrain `02-courses/industry-project/industry-project-rubric-summary.md` — LR1D 16+

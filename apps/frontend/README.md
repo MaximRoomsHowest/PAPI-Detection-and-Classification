@@ -1,7 +1,7 @@
 # PAPI Lights Detection and Classification Frontend
 
-React prototype for the Industry Project assignment: AI model for PAPI detection and
-classification.
+React dashboard for the PAPI Lights Detection and Classification system: AI-assisted
+analysis of drone imagery to detect and classify PAPI light installations.
 
 ## What is included
 

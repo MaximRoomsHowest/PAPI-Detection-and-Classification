@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Renders every Markdown file under docs/deliverables/ to PDF for
-    Leho submission.
+    the deliverables package.
 
 .DESCRIPTION
     Walks docs/deliverables/ recursively and converts each *.md to
@@ -151,7 +151,7 @@ foreach ($md in $markdownFiles) {
         $placeholders = Select-String -Path $md.FullName -Pattern $MarkerPattern
         if ($placeholders) {
             $totalPlaceholders += $placeholders.Count
-            Write-Warning "  $($placeholders.Count) unfilled marker(s) (TEAM / TODO / TBD) still present. Fill them before submission."
+            Write-Warning "  $($placeholders.Count) unfilled marker(s) (TEAM / TODO / TBD) still present. Fill them before producing the package."
         }
     }
 

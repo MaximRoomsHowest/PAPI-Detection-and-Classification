@@ -574,9 +574,9 @@ class InferenceService:
 
     def warmup(self) -> None:
         """Run dummy inferences so a broken checkpoint surfaces at startup rather than on
-        the first real request in front of the jury (audit IMP-SRV-9), and so the first
-        real frame doesn't pay one-time init latency. Best-effort — the caller logs failures
-        and never aborts startup."""
+        the first real request (audit IMP-SRV-9), and so the first real frame doesn't pay
+        one-time init latency. Best-effort — the caller logs failures and never aborts
+        startup."""
         import numpy as np
 
         dummy = np.zeros((64, 64, 3), dtype=np.uint8)

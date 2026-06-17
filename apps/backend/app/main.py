@@ -3,7 +3,7 @@
 The lifespan context manager replaces the deprecated ``@app.on_event``
 decorators and is used to (a) initialise the database schema and
 (b) pre-warm the YOLO model so the first inference request after boot
-does not pay the ~5 s model-load latency in front of a jury (audit
+does not pay the ~5 s model-load latency in production (audit
 B-CRIT-4 + SMOKE-MAJ-2).
 """
 
@@ -161,8 +161,8 @@ def _startup_warmup() -> None:
 
     ``init_db()`` creates the tables; seeding copies the built-in models into the
     registry table; touching ``.model`` triggers the lazy YOLO weight load; ``warmup()``
-    runs one dummy inference so a broken checkpoint fails here, not in front of the jury
-    on the first request. All failures are logged, never fatal — a missing-weights local
+    runs one dummy inference so a broken checkpoint fails here at startup, not on the
+    first real request. All failures are logged, never fatal — a missing-weights local
     dev env can still serve /health and /api/runways.
     """
     init_db()

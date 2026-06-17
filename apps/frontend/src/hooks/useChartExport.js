@@ -112,7 +112,7 @@ function stampFooters(pdf) {
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(8)
     setTextColor(pdf, MUTED)
-    pdf.text('PAPI Vision student project - educational prototype, not certified for operational airport use.', PAGE_MARGIN, height - 7)
+    pdf.text('PAPI Vision - educational prototype, not certified for operational airport use.', PAGE_MARGIN, height - 7)
     pdf.text(`${page} / ${total}`, width - PAGE_MARGIN, height - 7, { align: 'right' })
   }
 }

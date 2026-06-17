@@ -10,9 +10,10 @@ geometry: "a4paper, margin=2cm"
 
 > Brief for the final-deliverable **A3 promotional poster** (PDF,
 > portrait orientation). The team executes this in Figma or Canva
-> using the design tokens below and exports to PDF for Leho upload.
+> using the design tokens below and exports to PDF for the
+> deliverables package.
 >
-> **Rubric constraints (verbatim from the deliverables spec):**
+> **Constraints:**
 >
 > - **Format**: A3, PDF.
 > - **Must include**: team-member names, "Industry Project" mention,
@@ -20,7 +21,7 @@ geometry: "a4paper, margin=2cm"
 > - **Must NOT include**: technology mentions (no "YOLO", "FastAPI",
 >   "React", "Python", "Docker", etc.).
 > - **Goal**: promotional events. The audience is prospective
->   students and visitors — not jury graders. Lead with the *story*,
+>   students and visitors. Lead with the *story*,
 >   not the engineering.
 
 ## 1. Specs
@@ -83,7 +84,7 @@ Vertical zones (top to bottom):
 4. **Footer (330 – 420 mm)** — team names + "Howest · Industry
    Project · 2026". Small, balanced.
 
-The rubric demands *one* image. Avoid the impulse to add screenshots
+The brief calls for *one* image. Avoid the impulse to add screenshots
 of the app or supporting illustrations.
 
 ## 3. Hero image — direction
@@ -162,7 +163,7 @@ overseeing approach safety). No tech jargon, no acronyms.
 - "Drone-assisted approach safety." — clear but flat.
 
 Avoid: anything that mentions AI, ML, computer vision, real-time, or
-specific airports. Those are jury-deck words, not poster words.
+specific airports. Those are presentation-deck words, not poster words.
 
 ### Footer copy
 
@@ -175,7 +176,7 @@ Howest · Industry Project · 2026
 Two lines, centred. Names in Poppins Regular 18 pt; programme line
 in Poppins Medium 14 pt with Intersoft-navy underline accent.
 
-The phrase "Industry Project" is **required** by the rubric.
+The phrase "Industry Project" is **required**.
 
 ## 5. What to leave off
 
@@ -192,7 +193,7 @@ The phrase "Industry Project" is **required** by the rubric.
 
 ## 6. Production checklist
 
-Before exporting and uploading to Leho:
+Before exporting for the deliverables package:
 
 - [ ] Image is at least 300 dpi at A3 size (3500 × 4960 px minimum).
 - [ ] All text is real text, not flattened to the image (so the PDF
@@ -215,15 +216,13 @@ before the final-week design pass. -->**
 1. Image source: licensed photograph, AI render, or composite?
 2. Tagline: which of the four options (or another)?
 3. Design tool: Figma or Canva?
-4. Print run: digital-only for Leho, or also printed for the demo
-   day / promotional table?
+4. Print run: digital-only for the deliverables package, or also
+   printed for the demo day / promotional table?
 5. Does the team want a sub-tagline in Dutch and / or French for
    the bilingual promotional version?
 
 ## 8. Sources
 
 - Design system tokens: `01-design-document.md §4`.
-- Rubric constraints: BigBrain
-  `02-courses/industry-project/industry-project-deliverables-summary.md`.
 - Application screenshots (for inspiration only, *not* for the
   poster): `docs/qa-screenshots/`.

@@ -6,14 +6,10 @@ fontsize: 10pt
 mainfont: "Calibri"
 ---
 
-# PAPI Lights Detection and Classification — Technical Components Overview
-
-> One A4 page (Leho deliverable #8). Distil of [architecture-overview.md](../architecture-overview.md) for the final-submission packet.
-
 ## System diagram
 
 ```
-   DJI Matrice 4E drone                 Browser (jury / reviewer)
+   DJI Matrice 4E drone                 Browser (operator / reviewer)
    │ JPGs + EXIF + DJI XMP              │ Chrome · Firefox · Edge · Safari
    ▼                                    ▼
 ┌──────────────────────────┐    ┌────────────────────────────────────┐
@@ -60,10 +56,10 @@ mainfont: "Calibri"
 
 ## Why these technologies
 
-- **FastAPI** — async + Pydantic v2 + free OpenAPI docs for the jury.
+- **FastAPI** — async + Pydantic v2 + free OpenAPI docs for integrators.
 - **Postgres** — transactional, native UUID/JSON, free; no NoSQL data shape required.
 - **YOLO (Ultralytics)** — de-facto standard for one-shot detection with an INT8-ONNX edge-export path already available.
 - **React 19 + Vite 8** — team familiarity, fast HMR, mature ecosystem for charts (Plotly) and PDF export (jsPDF).
-- **Docker compose** — single-command `docker compose up -d --build` from a clean machine; reproducible for any jury member.
+- **Docker compose** — single-command `docker compose up -d --build` from a clean machine; reproducible on any machine.
 
 *Full design rationale, scope limits and open questions in [architecture-overview.md](../architecture-overview.md). Source of truth for components, ports, healthchecks and security floor: [compose.yaml](../../compose.yaml).*

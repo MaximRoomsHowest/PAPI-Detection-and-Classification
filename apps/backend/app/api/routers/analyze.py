@@ -150,7 +150,7 @@ def _analysis_error_handling(runway_id: str):
     A ``ValueError`` (bad upload / unreadable media / telemetry) becomes a 400; any
     other failure — RuntimeError (missing model/OpenCV), cv2.error, or a
     SQLAlchemyError on commit — is logged server-side and returned as a generic 503
-    so internal paths/library internals are never disclosed (rubric LR1D). An
+    so internal paths/library internals are never disclosed (no information leakage). An
     already-formed HTTPException passes through unchanged. The success-path file
     cleanup stays in each caller's own ``finally`` (the saved-file set differs).
     """

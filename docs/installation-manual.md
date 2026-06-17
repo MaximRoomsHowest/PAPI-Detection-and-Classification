@@ -332,7 +332,7 @@ For any choice, two operational rules hold:
    path, the analyze endpoints become unreachable from the public
    internet except via TLS.
 
-## 8. Verification checklist (for graders / reviewers)
+## 8. Verification checklist
 
 After installation, the following should all succeed without error:
 

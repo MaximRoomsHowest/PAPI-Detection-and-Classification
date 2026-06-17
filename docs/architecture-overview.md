@@ -1,6 +1,6 @@
 # PAPI Lights Detection and Classification — Technical Architecture Overview
 
-For graders, reviewers, and new contributors. Explains how the
+For maintainers, operators, and new contributors. Explains how the
 pieces fit together and why specific design choices were made.
 
 > **Need to install or run the system?** See
@@ -344,7 +344,6 @@ to `/api/analyze-sequence` for the folder→video path.
 - **Code structure**: this file + `README.md`
 - **Labels and per-lamp state semantics**: `docs/label_spec.md`
 - **Pipeline stages and their I/O**: `docs/pipeline.md`
-- **Open questions and decisions**:
-  [BigBrain project hub](../README.md) (`03-projects/intersoft-papi-detection`)
-- **Known issues (audited 2026-05-27)**:
-  [BigBrain audit](../README.md) (`03-projects/papi-codebase-audit-2026-05-27`)
+- **Open questions and known limitations**:
+  [`README.md`](../README.md) (Notes) and [`models/MODELS.md`](../models/MODELS.md) (§6 Open items)
+- **Security posture and known gaps**: [`SECURITY.md`](../SECURITY.md)

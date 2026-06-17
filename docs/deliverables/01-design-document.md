@@ -1,15 +1,16 @@
 # PAPI Lights Detection and Classification — Design Document
 
-> **Audience**: jury, supervisors, future maintainers. Companion to
+> **Audience**: maintainers, operations engineers, and technical
+> stakeholders. Companion to
 > [user-manual.md](../user-manual.md) (how to *use* the app) and
 > [architecture-overview.md](../architecture-overview.md) (how the
 > code is *organised*). This document explains how the application
 > was **designed** — for whom, why those choices, what trade-offs.
 >
-> **Maps to**: LR1A (interactive prototype from a good design) and
-> the LR1A 16+ band markers "well-thought-out visual components",
-> "semantic HTML", "user-feedback integrated and iterated on",
-> "proper input validation".
+> **Design goals**: deliver an interactive prototype from a sound
+> design — well-thought-out visual components, semantic HTML,
+> user feedback integrated and iterated on, and proper input
+> validation.
 
 ## 1. Design goals
 
@@ -22,7 +23,7 @@ viable. A demo for two distinct audiences in the same room:
   decisions. They need to see exactly what was detected, the
   confidence behind it, and which inputs (frame, GPS, altitude,
   runway) produced the output.
-- **Industry-project jurors** — Howest evaluators who judge the
+- **Technical stakeholders** — reviewers who assess the
   *whole engineered system*. They need to see the demo clearly from
   across a room, understand it without aviation background, and
   walk away convinced the team built something operationally real.
@@ -35,8 +36,8 @@ Three design principles fell out of that brief:
    412 MB" metric was caught in the 2026-05-27 audit (F-CRIT-2) and
    removed; nothing on screen is invented.
 3. **Two-tempo navigation.** Three pages — Introduction, Live Demo,
-   Insights — short enough for a 5-minute jury demo but deep enough
-   for a 30-minute review session.
+   Insights — short enough for a 5-minute stakeholder demo but deep
+   enough for a 30-minute review session.
 
 ## 2. Users and contexts of use
 
@@ -44,7 +45,7 @@ Three design principles fell out of that brief:
 |---|---|---|---|
 | **Drone operator at a small airfield** | Outdoors, tablet, gloves | "Did the lamps look right on this approach?" | Clear pass/fail per lamp + global state |
 | **Aviation review engineer** | Office desk, dual monitor | "Why did the model say this is *correct glidepath*?" | Per-lamp confidence, angle math, ability to inspect any frame |
-| **Howest jury member** | Conference room, projector | "Does this product look credible and finished?" | Polished UI, smooth demo, no fabricated values |
+| **Reviewing stakeholder** | Conference room, projector | "Does this product look credible and finished?" | Polished UI, smooth demo, no fabricated values |
 | **Future maintainer** | IDE + browser | "Where is the lamp-state logic?" | Components named after concepts, not implementation details |
 
 The first three personas drive UI choices; the fourth drives code
@@ -190,7 +191,7 @@ relative to the `set_angle ± transition_half_width` zone. The
 reviewer can see *not just* "this is transition" but *how close to
 the centre of transition* — which makes border calls explainable.
 
-### 5.3 Jury demo: "show us this works"
+### 5.3 Stakeholder demo: "show us this works"
 
 ```
 Open Insights ─► Pick the "Clean example" scenario tab
@@ -240,8 +241,8 @@ audio off. No surprise tooltips, no first-launch overlays.
 └──────────────────────────────────────────────────────────┘
 ```
 
-- **Why a hero with two CTAs?** Reviewers go to docs; jurors go to
-  the demo. Both are first-class.
+- **Why a hero with two CTAs?** Some reviewers go to docs; others go
+  to the demo. Both are first-class.
 - **Why airport context?** Without it the project reads as "computer
   vision for some traffic lights." The map anchors the system in a
   real airport with real safety implications.
@@ -292,7 +293,7 @@ Three vertical regions:
   the panel were flex, the cards would stretch and confuse the
   "one lamp per card" mental model.
 - **Why the amber DEMO badge on scenario tabs?** Honest visuals. A
-  juror who clicks "Clean example" must immediately understand the
+  reviewer who clicks "Clean example" must immediately understand the
   preset is illustrative, not live. The badge is the single piece
   of decoration in the UI — and it's there *because* the absence
   would mislead.
@@ -363,8 +364,8 @@ Live Demo right panel, fed from `GET /api/logs/{log_id}`.
 
 ## 7. Accessibility — what was implemented and verified
 
-Maps to LR1A 16+ "semantic HTML" + 13-15 "complies with current
-browser standards."
+Evidences the design principles of semantic HTML and compliance with
+current browser standards.
 
 | Concern | Implementation | Verified by |
 |---|---|---|
@@ -405,8 +406,8 @@ so no full i18n library is pulled in for ~80 strings); the active language
 selects a `copy` object threaded from the app root.
 
 **Why these locales?** The client and the airport are in Germany, so
-German is included; the jury and the client also have native Dutch and
-French speakers; English is the engineering lingua franca.
+German is included; the reviewers and the client also have native Dutch
+and French speakers; English is the engineering lingua franca.
 
 **Persistence**: locale + theme are stored in `localStorage` and
 restored on next visit. Locale persistence specifically was caught
@@ -415,8 +416,9 @@ and fixed in the rerun (§10).
 
 ## 10. Iteration log — user testing and feedback
 
-LR1A 16+ marker: "user-feedback integrated and iterated on."
-Two rounds, same day (2026-05-28), recorded inline below.
+Demonstrates the design principle that user feedback was integrated
+and iterated on. Two rounds, same day (2026-05-28), recorded inline
+below.
 
 ### Round 1 — initial demo (2026-05-28 morning)
 
@@ -441,25 +443,25 @@ documented but not yet shipped:
 - PAPI 06 geometry uses the data-analysis branch's `461.37 m` reference; lamp
   order and commissioned set angles still need binding.
 
-The round-2 rerun (above) is the headline evidence for the LR1A 16+
-"user-feedback integrated and iterated on" band claim — same-day
-round-trip with documented before/after.
+The round-2 rerun (above) is the headline evidence that user feedback
+was integrated and iterated on — a same-day round-trip with documented
+before/after.
 
-## 11. Where this maps in the rubric
+## 11. Design principles and where they are evidenced
 
-| Rubric line | Evidence in this document or the app |
+| Design principle | Evidence in this document or the app |
 |---|---|
-| LR1A 16+: well-thought-out visual components | §6 page designs with rationale |
-| LR1A 16+: minimum requirements extended with logical extras | Multi-language, dark mode, PDF export |
-| LR1A 16+: performance focus | Lazy-loaded Plotly, chunk split, self-hosted fonts |
-| LR1A 16+: semantic HTML | §7 landmark structure |
-| LR1A 16+: thoughtful naming | Routes named after mental tasks, not URLs (§3) |
-| LR1A 16+: user-feedback integrated and iterated on | §10 iteration log (round 1 + round 2, 2026-05-28) |
-| LR1A 16+: proper input validation | Pending — see §12 |
-| LR1A 13-15: consistent house style | §4 design system tokens |
-| LR1A 13-15: user-friendly responsive design | §8 responsive design |
-| LR1A 13-15: complies with current browser standards | CI checks; works in Chrome, Firefox, Edge, Safari |
-| LR1E 13-15: suitable platform / framework | React 19 + Vite 8 — see [architecture-overview.md §3](../architecture-overview.md#3-tech-stack-rationale) |
+| Well-thought-out visual components | §6 page designs with rationale |
+| Minimum requirements extended with logical extras | Multi-language, dark mode, PDF export |
+| Performance focus | Lazy-loaded Plotly, chunk split, self-hosted fonts |
+| Semantic HTML | §7 landmark structure |
+| Thoughtful naming | Routes named after mental tasks, not URLs (§3) |
+| User-feedback integrated and iterated on | §10 iteration log (round 1 + round 2, 2026-05-28) |
+| Proper input validation | Pending — see §12 |
+| Consistent house style | §4 design system tokens |
+| User-friendly responsive design | §8 responsive design |
+| Complies with current browser standards | CI checks; works in Chrome, Firefox, Edge, Safari |
+| Suitable platform / framework | React 19 + Vite 8 — see [architecture-overview.md §3](../architecture-overview.md#3-tech-stack-rationale) |
 
 ## 12. Known design debt
 
@@ -480,8 +482,8 @@ Honest list of what's missing or wrong, for the next iteration:
    insightsTransforms, papi) with 54 tests; component-level tests
    (React Testing Library) are the next coverage step.
 4. **No first-time-user tutorial overlay** — intentional for the
-   jury demo (would surprise the presenter), but useful for drone
-   operators in the field. Planned for v1.1.
+   stakeholder demo (would surprise the presenter), but useful for
+   drone operators in the field. Planned for v1.1.
 5. **Form-control `id`/`name`** — see §10.
 
 ## Sources
