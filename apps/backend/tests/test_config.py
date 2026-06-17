@@ -71,6 +71,36 @@ def test_confidence_threshold_rejects_out_of_range_value():
         Settings(PAPI_CONFIDENCE_THRESHOLD=4.0)
 
 
+def test_inference_threads_default_is_auto_zero():
+    assert Settings().inference_threads == 0
+
+
+def test_inference_threads_rejects_out_of_range_value():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Settings(PAPI_INFERENCE_THREADS=-1)
+    with pytest.raises(ValidationError):
+        Settings(PAPI_INFERENCE_THREADS=1000)
+
+
+def test_inference_backend_defaults_to_auto():
+    assert Settings().inference_backend == "auto"
+
+
+def test_inference_backend_normalizes_case_and_whitespace():
+    assert Settings(PAPI_INFERENCE_BACKEND="  ONNX ").inference_backend == "onnx"
+
+
+def test_inference_backend_rejects_unknown_value():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Settings(PAPI_INFERENCE_BACKEND="tensorrt")
+
+
 def test_environment_defaults_to_local():
     """Production-mode security checks must not fire by default (audit B-CRIT-5)."""
     settings = Settings()

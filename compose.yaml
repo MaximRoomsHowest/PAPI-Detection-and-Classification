@@ -60,6 +60,9 @@ services:
     # a few caps to chown its data dir on first init.
     security_opt:
       - no-new-privileges:true
+    # `docker compose up` (non-swarm) IGNORES deploy.resources.limits — mem_limit is the key it
+    # actually honors. Keep BOTH: mem_limit for the documented compose path, deploy for swarm parity.
+    mem_limit: 1g
     deploy:
       resources:
         limits:
@@ -73,6 +76,12 @@ services:
   backend:
     build:
       context: ./apps/backend
+      args:
+        # Install the OpenVINO accelerator (~+400 MB) so local CPU inference uses the IR like the
+        # cloud image (~1.5x faster at a 2-CPU budget). Default off keeps the local image lean; the
+        # backend transparently falls back to best.pt when it's absent. Build with
+        # BACKEND_INSTALL_ACCEL=true in .env to opt in, then `docker compose build backend`.
+        INSTALL_ACCEL: ${BACKEND_INSTALL_ACCEL:-false}
     container_name: papi-backend
     depends_on:
       postgres:
@@ -89,6 +98,9 @@ services:
       # transition_method: tracking | model.
       PAPI_TRANSITION_METHOD: ${PAPI_TRANSITION_METHOD:-tracking}
       PAPI_STORAGE_DIR: /storage
+      # Point $HOME at the writable /tmp tmpfs (see tmpfs: below) so the read-only root filesystem
+      # doesn't block the ultralytics / matplotlib / torch caches that default to ~/.config + ~/.cache.
+      HOME: /tmp
       # Model-lifecycle writable stores (upload / datasets / training scratch). These
       # live on dedicated named volumes (see backend.volumes) because ./models is
       # mounted READ-ONLY — uploaded/trained weights and datasets must never touch the
@@ -115,8 +127,11 @@ services:
       # by a direct (non-proxied) frontend such as the Vite dev server — the
       # bundled frontend is same-origin via its nginx proxy and needs no CORS.
       PAPI_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
-      # cpu | cuda | 0 | auto (cuda-if-available). Default cpu; set PAPI_DEVICE=auto
-      # in .env to use a GPU when the host and container runtime expose one.
+      # cpu | cuda | 0 | auto. NOTE: this image ships CPU-only torch and compose declares no GPU
+      # device, so under the local stack `auto` resolves to cpu and an explicit `cuda`/`0` falls
+      # back to cpu with a warning (it cannot run on GPU here). Running on a real GPU needs a
+      # CUDA-torch image AND a device reservation (deploy.resources.reservations.devices +
+      # nvidia-container-toolkit) — out of scope for this CPU demo stack.
       PAPI_DEVICE: ${PAPI_DEVICE:-cpu}
       PAPI_CONFIDENCE_THRESHOLD: ${PAPI_CONFIDENCE_THRESHOLD:-0.4}
       PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
@@ -161,11 +176,16 @@ services:
       # Security floor: ``production`` makes the API key mandatory at startup.
       PAPI_ENV: ${PAPI_ENV:-local}
       PAPI_API_KEY: ${PAPI_API_KEY:-}
-      # Optional: cap torch intra-op threads on shared/constrained hosts (audit
-      # DCK-D13). Inference is serialized (one analysis at a time), so the
-      # default (all cores) is fine on a dedicated host. Uncomment + set in .env
-      # to bound it on a shared host:
-      # OMP_NUM_THREADS: ${OMP_NUM_THREADS:-}
+      # CPU thread budget for inference (torch + OpenBLAS + OpenCV + ONNX Runtime).
+      # 0 = auto: resolved from the container's REAL cpu allotment (cgroup-aware on
+      # Linux), which prevents thread oversubscription under a fractional-CPU cap.
+      # Set it to your CPU/quota count on a shared host. Numerically inert (audit DCK-D13).
+      PAPI_INFERENCE_THREADS: ${PAPI_INFERENCE_THREADS:-0}
+      # Inference backend: auto = device-aware. On CPU it prefers an OpenVINO IR sibling over
+      # best.pt (needs INSTALL_ACCEL — see the build args above; absent locally by default, so it
+      # falls back to best.pt). ONNX is NOT auto-selected (it is slower than .pt on CPU) — force it
+      # with PAPI_INFERENCE_BACKEND=onnx. CUDA uses native best.pt. Force with pt | onnx | openvino.
+      PAPI_INFERENCE_BACKEND: ${PAPI_INFERENCE_BACKEND:-auto}
     ports:
       # Loopback by default so the unauthenticated local API isn't exposed on
       # the LAN (audit DCK-D1) — the frontend reaches it via its nginx proxy.
@@ -210,12 +230,26 @@ services:
       retries: 5
       start_period: 40s
     restart: unless-stopped
+    # tini as PID 1: reaps any stray children and forwards signals to uvicorn so `docker stop`
+    # drains cleanly within stop_grace_period instead of risking a SIGKILL fall-through.
+    init: true
     # Defense in depth: the image already runs as the non-root papi user; also
     # forbid privilege escalation and drop all Linux capabilities (audit DCK-D12).
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Read-only root filesystem: the app writes ONLY the named volumes below (/storage,
+    # /user_models, /datasets, /jobs) plus /tmp — make everything else immutable so a compromised
+    # process can't tamper with the code or venv. HOME is redirected to /tmp (see environment)
+    # because a tmpfs mounted over /home/papi inherits that dir's root-owned 0700 mode and would
+    # EPERM the non-root papi user's ultralytics/matplotlib/torch caches.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # `docker compose up` (non-swarm) IGNORES deploy.resources.limits — mem_limit is the honored
+    # key (deploy kept for swarm parity). CPU torch on a 1280px frame peaks ~2-3 GB (audit DCK-D6).
+    mem_limit: ${PAPI_BACKEND_MEM_LIMIT:-4g}
     deploy:
       resources:
         limits:
@@ -252,10 +286,19 @@ services:
       # Host port 5173 keeps frontend reachable at the same URL as before.
       - "5173:8080"
     restart: unless-stopped
+    init: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # NOTE: read_only:true is intentionally NOT set on the frontend. nginx-unprivileged must write
+    # its nginx-owned dirs at runtime — /var/cache/nginx (proxy/client temp) and /etc/nginx/conf.d
+    # (where the stock envsubst entrypoint renders default.conf from the template) — and a tmpfs
+    # mounted over them inherits the dir's root ownership + 0775 mode, EPERM-ing the non-root nginx
+    # user (uid 101). The marginal gain isn't worth a world-writable (0777) tmpfs workaround on a
+    # static proxy already locked down with cap_drop: ALL + no-new-privileges + non-root + a
+    # loopback-only backend. The BACKEND (the torch.load / pickle attack surface) IS read_only.
+    mem_limit: 256m
     deploy:
       resources:
         limits:

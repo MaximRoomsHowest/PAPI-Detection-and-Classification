@@ -80,6 +80,29 @@ For native development (Postgres in Docker, backend + frontend run locally),
 follow the step-by-step path in
 [`docs/installation-manual.md`](docs/installation-manual.md).
 
+### Operating the local stack
+
+Convenience `make` targets wrap the common Compose operations (`make help` lists all):
+
+```bash
+make up        # docker compose up -d --build
+make logs      # follow backend + frontend + db logs
+make down      # stop the stack — KEEPS your data
+make backup    # tar the data volumes into ./backups (run `make down` first)
+make restore   # restore the data volumes from ./backups
+```
+
+**Data persistence.** Uploaded originals/annotated exports, the Postgres analysis
+history, and the model-lifecycle stores live in named volumes that survive
+`docker compose down` / `make down`. **Only `docker compose down -v` deletes them** —
+run `make backup` first. Annotated exports accumulate one per analysis, so on a
+long-running demo box periodically `make backup`, then reset with
+`docker compose down -v && make up` if the storage volume grows large.
+
+> **GPU / acceleration.** The Docker image is CPU-only, so `PAPI_DEVICE=auto`/`cuda`
+> resolve to CPU under Compose. For the optional ~1.5× OpenVINO CPU speedup, set
+> `BACKEND_INSTALL_ACCEL=true` in `.env` and rebuild (`docker compose build backend`).
+
 Open `http://127.0.0.1:5173/live-demo`, optionally pick an **Inference model**
 (the selector is fed by `GET /api/models`: the default `small` serving detector,
 the previous `nano` detector, and the experimental `transition` classifier when

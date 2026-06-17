@@ -81,6 +81,25 @@ class Settings(BaseSettings):
     # a no-op on CPU (Ultralytics ignores half there) and is only applied to .pt models
     # on a CUDA device (an ONNX checkpoint carries its own export precision).
     inference_half: bool = Field(default=False, alias="PAPI_INFERENCE_HALF")
+    # CPU thread budget for inference: torch intra-op, OpenBLAS/MKL, OpenCV, and the ONNX
+    # Runtime intra-op pool. 0 = auto, resolved from the container's REAL cpu allotment
+    # (os.sched_getaffinity on Linux — respects the cgroup quota; os.cpu_count() elsewhere).
+    # Left at the library default, torch/ORT each spawn one thread per HOST core and then
+    # thrash inside a fractional-CPU cgroup (e.g. the 2.0-CPU Azure Container Apps replica)
+    # — classic oversubscription that costs latency with zero benefit. Auto is correct on a
+    # dedicated host (all cores) and a constrained container alike; set it explicitly (e.g.
+    # =2) only to pin a known allocation. Numerically inert: it changes scheduling, not output.
+    inference_threads: int = Field(default=0, ge=0, le=256, alias="PAPI_INFERENCE_THREADS")
+    # Inference execution backend. "auto" (default) is DEVICE-AWARE so every machine gets its
+    # best path: on CPU it prefers an OpenVINO IR sibling next to the .pt (best_openvino_model/)
+    # for lower latency at parity-verified accuracy (~1.5x faster than torch at the 2-CPU budget);
+    # on CUDA it always loads the native .pt (ONNX/OpenVINO on GPU is typically slower and forfeits
+    # the fp16 option). ONNX is NOT in "auto" — fp32 ONNX Runtime measured ~2.2x SLOWER than torch
+    # on CPU — so "onnx" is opt-in only. "pt" / "onnx" / "openvino" force a backend. A missing or
+    # unloadable optimized artifact (incl. a first-inference failure) transparently falls back to
+    # .pt, so an uploaded custom model — or an unusual host — still serves. Detection output is
+    # parity-verified (<=0.04 conf drift, identical boxes) against .pt on CPU.
+    inference_backend: str = Field(default="auto", alias="PAPI_INFERENCE_BACKEND")
     # Per-file upload ceiling in megabytes (media.save_upload streams and aborts
     # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
     # env var from effectively disabling the limit.
@@ -231,6 +250,14 @@ class Settings(BaseSettings):
         normalized = (value or "local").strip().lower()
         if normalized not in ("local", "azure_blob"):
             raise ValueError("storage_backend must be 'local' or 'azure_blob'")
+        return normalized
+
+    @field_validator("inference_backend")
+    @classmethod
+    def validate_inference_backend(cls, value: str) -> str:
+        normalized = (value or "auto").strip().lower()
+        if normalized not in ("auto", "pt", "onnx", "openvino"):
+            raise ValueError("inference_backend must be 'auto', 'pt', 'onnx', or 'openvino'")
         return normalized
 
     @property

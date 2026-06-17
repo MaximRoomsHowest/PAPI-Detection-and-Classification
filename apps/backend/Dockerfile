@@ -42,6 +42,15 @@ RUN pip install -r requirements.txt \
  && pip uninstall -y opencv-python opencv-python-headless \
  && pip install "opencv-python-headless==${opencv_pin}"
 
+# Optional CPU accelerator (OpenVINO, ~+400 MB). OFF by default to keep the local image lean;
+# build with `--build-arg INSTALL_ACCEL=true` (compose: BACKEND_INSTALL_ACCEL=true in .env) so
+# local CPU inference auto-selects the OpenVINO IR like the cloud image (~1.5x faster at a 2-CPU
+# budget). The backend transparently falls back to best.pt when openvino is absent, so leaving
+# this off is fully supported — the IR bind-mounted via ./models is simply unused.
+ARG INSTALL_ACCEL=false
+COPY requirements-accel.txt ./
+RUN if [ "$INSTALL_ACCEL" = "true" ]; then pip install -r requirements-accel.txt; fi
+
 # ---- runtime stage --------------------------------------------------------
 # Slim final image: no compilers, no GUI libs, no curl, no test tooling.
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
@@ -49,7 +58,9 @@ FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dc
 # No DATABASE_URL here: baking even the default dev credentials into image ENV
 # exposes them to every `docker inspect`/registry scan, and compose always supplies
 # the real value. The identical app-level default in config.py covers standalone
-# runs (audit IS-8).
+# runs (audit IS-8). Likewise FORWARDED_ALLOW_IPS and the runway geometry under
+# /app/configs are supplied by compose (env + ./configs:ro bind mount); the supported
+# local entrypoint is `docker compose up`, not a bare `docker run` of this image.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
@@ -64,6 +75,9 @@ ENV YOLO_AUTOINSTALL=False
 # Runtime-only system libs. opencv-python-headless still needs libglib2.0-0
 # (libgthread); the libGL/X11 stack is gone with the headless wheel (audit
 # DCK-D2). No curl — the healthcheck uses the Python stdlib (audit DCK-D11).
+# NOTE: the base image is digest-pinned and pip deps are version-pinned, but this apt layer is
+# the one intentionally NON-reproducible input — pinning an exact libglib2.0-0 version would just
+# break on the next Debian mirror rotation, and the lib is ABI-stable, so we accept floating it.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
@@ -91,9 +105,12 @@ USER papi
 
 EXPOSE 8000
 
-# Liveness via the stdlib (no curl in the image). start-period covers the model
-# pre-warm + smoke inference at startup.
+# Readiness via the stdlib (no curl in the image), matching Dockerfile.cloud + the compose
+# override: the bare /health liveness stub would report healthy with the database unreachable or
+# the model unloaded, so a standalone `docker run` of this image would look healthy but 500 on the
+# first request. /health/ready checks DB + model. start-period covers the model pre-warm + smoke
+# inference at startup.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')" || exit 1
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

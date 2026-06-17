@@ -133,6 +133,10 @@ docs/deliverables/_build/
 # canonical store is Postgres; this file is per-machine and must never be committed.
 *.db
 
+# Volume backup tarballs written by `make backup` (Postgres + storage snapshots). Local
+# operational artefacts, often hundreds of MB — never commit them.
+backups/
+
 # Generated charts produced on demand (workflows/scripts/plot_angle_distribution.py
 # and the project-management burndown tooling) — regenerated, not source.
 /angle_distribution.png

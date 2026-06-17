@@ -187,6 +187,59 @@ but fails on CPU with `ConvInteger(10)` not implemented. Keep the
 artifact as a measured failure until it is re-exported with CPU-supported
 quantization operators or benchmarked on compatible acceleration.
 
+### 5.4 Backend selection at the cloud CPU budget (2026-06-16, re-measured fairly)
+
+The Azure Container Apps replica runs on a **2.0-CPU** cgroup. Measured warm `model.predict`
+(production args: conf 0.4 / iou 0.7 / imgsz 1280 / max_det 4) over the 18-frame leak-free
+`data/eval/builtin-detector-redwhite` set, 5 runs × 5 warmup (n=90). **All three backends are
+bounded to 2 threads via the shipped `app.runtime_threads` code** (torch `set_num_threads`,
+ONNX `intra_op_num_threads`, and OpenVINO `INFERENCE_NUM_THREADS` — the last is essential
+because OpenVINO's oneTBB pool ignores `OMP_NUM_THREADS`). `cores_used` = process CPU-time /
+wall-time during the timed loop, reported to **prove** each backend stayed within budget.
+Reproduce with `python workflows/scripts/backend_bench.py --threads 2 --device cpu`.
+
+| Device | Backend | p50 ms | p95 ms | p99 ms | fps@p50 | cores_used | vs best.pt |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| CPU @ 2 threads | best.pt (torch fp32) | 240.0 | 262.9 | 298.9 | 4.17 | 4.53 | 1.00× |
+| CPU @ 2 threads | best.onnx fp32 (ONNX Runtime / MLAS) | 548.3 | 589.1 | 612.6 | 1.82 | 1.93 | 0.44× (slower) |
+| CPU @ 2 threads | **best_openvino_model fp32 (OpenVINO)** | **157.3** | **159.9** | 540.8 | **6.36** | **1.05** | **1.53×** |
+| RTX 4070 | best.pt (torch fp32, CUDA) | 21.7 | 38.8 | — | 46.2 | — | reference |
+
+Parity vs `best.pt` over the set (production args): **OpenVINO and ONNX both identical** —
+0 box-count mismatches, 0 class mismatches, max confidence drift 0.0377.
+
+**Reading `cores_used` (the fairness fix):** the first §5.4 draft left OpenVINO unbounded, so it
+was an unfair comparison. Re-bounded, OpenVINO uses only **1.05 cores** and still wins — it is the
+most *efficient* backend, not just the fastest. Conversely **torch used 4.53 cores** despite
+`set_num_threads(2)` (oneDNN spawns helper threads); under the real 2-CPU **CFS quota** torch is
+hard-throttled to 2 cores, so its production latency is *worse* than 240 ms and OpenVINO's margin
+is **larger** in the cloud than this in-process proxy shows.
+
+**Why ONNX is slower (not a tuning miss):** for all three backends, letterboxing and the
+(NMS-free, end2end) detection head run in identical PyTorch — only the conv **backbone** differs.
+ONNX Runtime's graph optimization is already at its `ORT_ENABLE_ALL` default, so nothing was left
+un-optimized. The gap is purely kernel-library quality on a large-spatial (1280²) fp32 graph:
+OpenVINO's Intel-tuned convs < torch's oneDNN < ORT's portable MLAS at a low thread count.
+
+**Decisions (shipped):**
+- **OpenVINO is the CPU serving backend** — 1.5× faster than torch, accuracy-identical, and uses
+  ~1 core. Auto-selected on CPU (`InferenceService._resolve_backend_artifact`, `PAPI_INFERENCE_BACKEND=auto`);
+  threads pinned via `install_ov_thread_limit`.
+- **Native `best.pt` is the GPU + universal fallback backend** — device-aware never routes CUDA to
+  ONNX/OpenVINO (46 fps preserved); any optimized-artifact load OR first-inference failure falls back to `.pt`.
+- **ONNX excluded from `auto`** — fp32 ONNX is ~2.2× *slower* than torch on CPU, so it is opt-in
+  only (`PAPI_INFERENCE_BACKEND=onnx`). The committed `best.onnx` (under `models/runs/detect/...`,
+  not `models/serving/`) stays as the documented edge-export artifact.
+
+Caveats: the 2-thread cap is an in-process proxy — the authoritative cloud number is
+`backend_bench.py` run inside `docker run --cpus 2 --memory 4g` on the cloud image (a CFS quota
+throttles differently than a thread cap). OpenVINO's p99 (540 ms) is a single-sample tail spike at
+n=90 (p95 is 160 ms); worth re-confirming with more runs. OpenVINO's CPU plugin is Intel-tuned and
+ACA does not guarantee Intel nodes — on AMD it should still beat torch but by less; the `.pt`
+fallback + `PAPI_INFERENCE_BACKEND=pt` cover that. Only the **2-class serving detector** has an
+OpenVINO IR; the experimental 3-class transition model runs `.pt` on CPU (acceptable — its class-2
+quality is low and it is not the primary path).
+
 ## 6. Wiring measurements into the frontend
 
 The previous build had a fabricated "edge memory: 412 MB" metric on

@@ -1,0 +1,17 @@
+# Optional CPU inference accelerator — installed in the CLOUD image only
+# (apps/backend/Dockerfile.cloud), NOT in the base requirements.txt, the local
+# compose image, or local dev/CI, so those installs stay lean and fast.
+#
+# On CPU the backend auto-selects the OpenVINO IR at models/serving/best_openvino_model
+# over best.pt (device-aware backend selection in app/services/inference/service.py),
+# which measured a ~1.5x latency win at the 2.0-CPU Azure Container Apps allocation
+# (157 ms vs 240 ms p50, both fairly bounded to 2 threads) with parity-verified detections
+# (identical boxes/classes, <=0.04 confidence drift). OpenVINO threads are pinned to
+# PAPI_INFERENCE_THREADS via app.runtime_threads.install_ov_thread_limit (its oneTBB pool
+# ignores OMP_NUM_THREADS). On CUDA the native best.pt is always used instead.
+#
+# Pinned to the exact version the committed IR was exported with, so the OpenVINO
+# runtime always reads a compatible IR. If OpenVINO is absent or fails to load on a
+# given host, the loader transparently falls back to best.pt — so this is purely an
+# accelerator, never a hard dependency.
+openvino==2026.2.0

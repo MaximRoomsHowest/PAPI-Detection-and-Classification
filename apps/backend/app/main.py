@@ -28,6 +28,12 @@ from app.middleware import (
     SecurityHeadersMiddleware,
     request_body_cap_bytes,
 )
+from app.runtime_threads import (
+    apply_runtime_threads,
+    configure_thread_env,
+    install_ort_thread_limit,
+    install_ov_thread_limit,
+)
 from app.services.inference import get_inference_service
 from app.services.storage import get_media_storage
 
@@ -39,6 +45,19 @@ configure_logging(level="INFO")
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+# Bound every CPU thread pool to the container's REAL cpu allotment before torch is ever
+# imported (the *_NUM_THREADS env vars are read at import time). Without this, torch/ORT
+# spawn one thread per HOST core and thrash inside a fractional-CPU cgroup (e.g. the 2-CPU
+# Azure Container Apps replica). Auto-resolves per host (all cores on a dedicated box, the
+# cgroup quota in a container), so it is correct on every hardware target. Numerically inert.
+# The resolved count is reused at warmup to set the torch/cv2/ORT runtime knobs.
+_INFERENCE_THREADS = configure_thread_env(settings.inference_threads)
+logger.info(
+    "Inference CPU thread budget: %d (PAPI_INFERENCE_THREADS=%s).",
+    _INFERENCE_THREADS,
+    settings.inference_threads or "auto",
+)
 
 # Substring used to detect the default development DB credentials in
 # settings.database_url. Anything else (including a non-default user
@@ -157,6 +176,12 @@ def _startup_warmup() -> None:
     # because the SDK call is blocking network I/O. Local mode is a no-op.
     if settings.storage_backend == "azure_blob":
         get_media_storage(settings).ensure_ready()
+    # Now that torch/cv2/onnxruntime are about to be imported (lazily, on the model load
+    # below), pin their runtime thread pools. The ORT patch is the only lever for the ONNX
+    # backend (ultralytics passes no SessionOptions) and is a no-op when onnxruntime is absent.
+    apply_runtime_threads(_INFERENCE_THREADS)
+    install_ort_thread_limit(_INFERENCE_THREADS)
+    install_ov_thread_limit(_INFERENCE_THREADS)
     try:
         service = get_inference_service()
         _ = service.model

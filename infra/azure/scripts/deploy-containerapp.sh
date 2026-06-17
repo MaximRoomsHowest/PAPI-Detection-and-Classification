@@ -111,6 +111,17 @@ jq -n \
               {name: "PAPI_BLOB_CONTAINER", value: $blob_container},
               {name: "AZURE_STORAGE_CONNECTION_STRING", secretRef: "azure-storage-connection-string"},
               {name: "PAPI_DEVICE", value: "cpu"},
+              # Pin inference threads to the replica's CPU allocation (resources.cpu below):
+              # the 2.0-CPU cgroup otherwise lets torch / ONNX Runtime / OpenVINO each spawn one
+              # thread per HOST core and thrash. app.runtime_threads bounds all three (OpenVINO's
+              # oneTBB pool needs an explicit INFERENCE_NUM_THREADS — it ignores OMP_NUM_THREADS).
+              # Keep this equal to resources.cpu if you change the allocation.
+              {name: "PAPI_INFERENCE_THREADS", value: "2"},
+              # Device-aware backend: this CPU deploy auto-selects the OpenVINO IR
+              # (models/serving/best_openvino_model, baked into the image) over best.pt for
+              # ~1.5x lower latency at parity-verified accuracy. Falls back to best.pt if it
+              # can't load. If an ACA node turns out to be AMD and slower, set this to "pt".
+              {name: "PAPI_INFERENCE_BACKEND", value: "auto"},
               {name: "PAPI_CONFIDENCE_THRESHOLD", value: "0.4"},
               {name: "PAPI_MAX_UPLOAD_MB", value: "100"},
               {name: "PAPI_MAX_BATCH_UPLOAD_MB", value: "400"},

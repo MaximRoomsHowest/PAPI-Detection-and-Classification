@@ -181,24 +181,44 @@ class InferenceService:
 
     @property
     def device(self) -> str:
-        """The device passed to YOLO, expanding ``PAPI_DEVICE=auto`` to cuda when a
-        GPU is available else cpu (audit IMP-SRV-2). Cached so torch is probed once;
-        an explicit ``cpu``/``cuda``/``0`` setting is used verbatim and never imports torch."""
+        """The device passed to YOLO, expanding ``PAPI_DEVICE=auto`` to cuda when a GPU is
+        available else cpu (audit IMP-SRV-2). An explicit cuda / GPU-index request is GUARDED:
+        if no CUDA is present (e.g. this CPU-only image), it falls back to cpu with a warning
+        instead of letting every inference 500 on a missing device while /health/ready still
+        reports ready. Cached so torch is probed at most once."""
         if self._resolved_device is None:
             configured = (self.settings.device or "cpu").strip().lower()
-            self._resolved_device = self._detect_device() if configured == "auto" else configured
+            if configured == "auto":
+                self._resolved_device = self._detect_device()
+            elif self._wants_cuda(configured) and not self._cuda_available():
+                logger.warning(
+                    "PAPI_DEVICE=%s requested but CUDA is not available (this image ships CPU-only "
+                    "torch); falling back to cpu. Build/run a CUDA-enabled image + expose a GPU to "
+                    "use one.",
+                    self.settings.device,
+                )
+                self._resolved_device = "cpu"
+            else:
+                self._resolved_device = configured
         return self._resolved_device
 
     @staticmethod
-    def _detect_device() -> str:
+    def _wants_cuda(configured: str) -> bool:
+        """True when the configured device targets a GPU: 'cuda', 'cuda:N', or a bare GPU index."""
+        return configured.startswith("cuda") or configured.isdigit()
+
+    @staticmethod
+    def _cuda_available() -> bool:
         try:
             import torch
 
-            if torch.cuda.is_available():
-                return "cuda"
+            return bool(torch.cuda.is_available())
         except Exception:  # noqa: BLE001 - torch import/probe is best-effort
-            pass
-        return "cpu"
+            return False
+
+    @staticmethod
+    def _detect_device() -> str:
+        return "cuda" if InferenceService._cuda_available() else "cpu"
 
     @staticmethod
     def _open_video_writer(
@@ -220,6 +240,41 @@ class InferenceService:
             return None
         return self._load_model(entry)
 
+    def _resolve_backend_artifact(self, entry: ModelRegistryEntry) -> Path:
+        """Pick the on-disk artifact to load for ``entry`` based on the resolved device and
+        the configured backend, so every hardware target gets its best path with no quality
+        loss. CUDA always uses the native ``.pt`` (ONNX/OpenVINO on GPU is typically slower
+        and forfeits the fp16 option). On CPU, ``auto`` prefers an OpenVINO IR SIBLING of the
+        registered ``.pt`` (``best_openvino_model/``) for lower latency at parity-verified
+        accuracy — measured ~1.5x faster than torch at the 2-CPU budget. ONNX is NOT part of
+        ``auto``: fp32 ONNX Runtime measured ~2.2x SLOWER than torch on CPU (MLAS conv kernels),
+        so an ``.onnx`` sibling is used only when ``PAPI_INFERENCE_BACKEND=onnx`` is forced. A
+        missing sibling (or a non-``.pt`` entry, e.g. an uploaded ``.onnx``) is taken verbatim,
+        so unusual hosts and custom models still load."""
+        base = entry.path
+        backend = (self.settings.inference_backend or "auto").strip().lower()
+        on_cuda = self.device.lower().startswith("cuda")
+        if on_cuda or backend == "pt" or base.suffix.lower() != ".pt":
+            return base
+        if backend in ("auto", "openvino"):
+            openvino_dir = base.with_name(base.stem + "_openvino_model")
+            if openvino_dir.is_dir():
+                return openvino_dir
+        if backend == "onnx":  # ONNX only when explicitly forced — it is slower than .pt on CPU
+            onnx_path = base.with_suffix(".onnx")
+            if onnx_path.is_file():
+                return onnx_path
+        return base
+
+    @staticmethod
+    def _is_loadable_artifact(path: Path) -> bool:
+        """Allowlist the artifact type before handing it to YOLO (which unpickles ``.pt``):
+        only ``.pt`` / ``.onnx`` files or an ``*_openvino_model`` directory, so a malformed
+        registry entry can't point the loader at an arbitrary file (audit: path containment)."""
+        if path.is_dir():
+            return path.name.endswith("_openvino_model")
+        return path.suffix.lower() in (".pt", ".onnx")
+
     def _load_model(self, entry: ModelRegistryEntry) -> Any:
         if not entry.available:
             reason = entry.disabled_reason or f"Model file not found: {entry.path}"
@@ -227,27 +282,68 @@ class InferenceService:
         if entry.id not in self._models:
             with self._lock:
                 if entry.id not in self._models:
-                    # Allowlist the weight type before handing the path to YOLO (which unpickles
-                    # .pt weights): only ever load .pt / .onnx, so a malformed registry entry can't
-                    # point the loader at an arbitrary file (audit: registry path lacks containment).
-                    if entry.path.suffix.lower() not in (".pt", ".onnx"):
+                    resolved = self._resolve_backend_artifact(entry)
+                    if not self._is_loadable_artifact(resolved):
                         raise RuntimeError(
                             f"Refusing to load model '{entry.id}': unsupported weight type "
-                            f"'{entry.path.suffix}' (only .pt and .onnx are allowed)."
+                            f"'{resolved.name}' (only .pt, .onnx, or an *_openvino_model dir are allowed)."
                         )
                     os.environ.setdefault("YOLO_AUTOINSTALL", "False")
                     try:
                         from ultralytics import YOLO
                     except ImportError as exc:
                         raise RuntimeError("Ultralytics is not installed. Run `pip install -r requirements.txt`.") from exc
-                    self._models[entry.id] = YOLO(str(entry.path))
+                    optimized = resolved != entry.path
+                    try:
+                        # task="detect" pins the task so an ONNX/OpenVINO artifact does not trip
+                        # Ultralytics' "Unable to guess task" startup warning (every PAPI model
+                        # is a detector).
+                        model = YOLO(str(resolved), task="detect")
+                        if optimized:
+                            # Smoke-test the optimized artifact at the CONFIGURED imgsz so a
+                            # static-shape / imgsz mismatch or an ISA mis-execute demotes to .pt
+                            # HERE — the construction try/except alone only catches load failures,
+                            # not a first-inference failure, which would otherwise 500 every request.
+                            self._smoke_test_model(model)
+                    except Exception as exc:  # noqa: BLE001 - any optimized-artifact failure
+                        # Hardware-portability guarantee: an optimized sibling that fails to load
+                        # OR fails its first inference (unusual host, corrupt/static-shape export,
+                        # ORT/OpenVINO quirk) must NOT break serving — fall back to the registered
+                        # .pt, which runs on every host and at any imgsz. INFO, not WARNING: this is
+                        # the EXPECTED path locally where openvino isn't installed (cloud-only dep).
+                        if optimized:
+                            logger.info(
+                                "Optimized backend '%s' unavailable for '%s' (%s); using %s.",
+                                resolved.name, entry.id, exc, entry.path.name,
+                            )
+                            resolved = entry.path
+                            model = YOLO(str(resolved), task="detect")
+                        else:
+                            raise
+                    self._models[entry.id] = model
                     self._loaded_at[entry.id] = datetime.now(timezone.utc).isoformat()
-                    # Hash at load time: compose mounts ./models read-only precisely so
-                    # the checkpoint can be swapped under a running container, and the
-                    # digest must describe the weights IN MEMORY, not whatever file is
-                    # currently on disk (audit SHA-1).
-                    self._loaded_sha256[entry.id] = compute_sha256(entry.path)
+                    # Hash at load time: compose mounts ./models read-only precisely so the
+                    # checkpoint can be swapped under a running container, and the digest must
+                    # describe the weights IN MEMORY (audit SHA-1). A directory artifact (OpenVINO
+                    # IR) has no file digest, so hash the SOURCE .pt instead — keeps /api/model
+                    # provenance + the checkpoint-swap detector working for the OpenVINO-served
+                    # model rather than reporting sha256=null (audit: provenance lost for dirs).
+                    digest_target = resolved if resolved.is_file() else entry.path
+                    self._loaded_sha256[entry.id] = compute_sha256(digest_target)
         return self._models[entry.id]
+
+    def _smoke_test_model(self, model: Any) -> None:
+        """Run one tiny inference at the configured imgsz/device so a runtime failure (static
+        OpenVINO shape vs a non-default PAPI_INFERENCE_IMGSZ, or an ISA mis-execute) surfaces at
+        load time — letting ``_load_model`` fall back to .pt — instead of 500ing every request."""
+        import numpy as np
+
+        model.predict(
+            np.zeros((64, 64, 3), dtype=np.uint8),
+            imgsz=self.settings.inference_imgsz,
+            device=self.device,
+            verbose=False,
+        )
 
     def preload_available_models(self) -> list[str]:
         """Best-effort load of every available registry entry so a corrupt optional
@@ -477,12 +573,24 @@ class InferenceService:
         return options
 
     def warmup(self) -> None:
-        """Run one dummy inference so a broken checkpoint surfaces at startup rather
-        than on the first real request in front of the jury (audit IMP-SRV-9).
-        Best-effort — the caller logs failures and never aborts startup."""
+        """Run dummy inferences so a broken checkpoint surfaces at startup rather than on
+        the first real request in front of the jury (audit IMP-SRV-9), and so the first
+        real frame doesn't pay one-time init latency. Best-effort — the caller logs failures
+        and never aborts startup."""
         import numpy as np
 
-        self._detect_frame(np.zeros((64, 64, 3), dtype=np.uint8), use_tracking=False)
+        dummy = np.zeros((64, 64, 3), dtype=np.uint8)
+        # Single-image / per-frame predict path.
+        self._detect_frame(dummy, use_tracking=False)
+        # Tracked-sequence (ByteTrack) path used by video + folder analysis: model.track's
+        # first call initialises the tracker. reset_tracker=True (persist=False) primes that
+        # init AND leaves the tracker reset, so warmup state never bleeds into the first real
+        # video (matches the per-request tracker-isolation contract). Best-effort: a tracking
+        # warmup hiccup must not mask the successful detector warmup above.
+        try:
+            self._detect_frame(dummy, use_tracking=True, reset_tracker=True)
+        except Exception:  # noqa: BLE001 - tracker warmup is best-effort only
+            logger.warning("Tracking-path warmup skipped.", exc_info=True)
 
     def _check_pixel_budget(self, width: int, height: int, what: str = "image") -> None:
         """Delegates to ``frame_source.check_pixel_budget`` (kept as a method so the

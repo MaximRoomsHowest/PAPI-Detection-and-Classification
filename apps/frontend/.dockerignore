@@ -25,6 +25,7 @@ Thumbs.db
 README.md
 Dockerfile
 .dockerignore
-# NOTE: nginx.conf MUST stay in the build context — the multi-stage Dockerfile
-# copies it into /etc/nginx/conf.d/default.conf in the `serve` stage. Excluding
-# it breaks `docker compose up --build` (see audit SMOKE-CRIT-1).
+# NOTE: nginx.conf.template and nginx.azure.conf.template MUST stay in the build context — the
+# Dockerfile copies the selected one (ARG NGINX_CONF) to /etc/nginx/templates/default.conf.template,
+# which the stock nginx envsubst entrypoint renders into /etc/nginx/conf.d/default.conf at container
+# start. Excluding a *.template breaks `docker compose up --build` (see audit SMOKE-CRIT-1).

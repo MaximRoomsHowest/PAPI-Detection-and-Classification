@@ -1,0 +1,40 @@
+{
+  "device": "cpu",
+  "threads_resolved": 2,
+  "host_cores": 24,
+  "frames": 18,
+  "runs": 5,
+  "warmup": 5,
+  "results": [
+    {
+      "model": "best.pt",
+      "p50_ms": 240.0,
+      "p95_ms": 262.9,
+      "p99_ms": 298.9,
+      "fps_p50": 4.17,
+      "cores_used": 4.53,
+      "samples": 90,
+      "backend": "torch.pt"
+    },
+    {
+      "model": "best.onnx",
+      "p50_ms": 548.3,
+      "p95_ms": 589.1,
+      "p99_ms": 612.6,
+      "fps_p50": 1.82,
+      "cores_used": 1.93,
+      "samples": 90,
+      "backend": "onnx"
+    },
+    {
+      "model": "best_openvino_model",
+      "p50_ms": 157.3,
+      "p95_ms": 159.9,
+      "p99_ms": 540.8,
+      "fps_p50": 6.36,
+      "cores_used": 1.05,
+      "samples": 90,
+      "backend": "openvino"
+    }
+  ]
+}

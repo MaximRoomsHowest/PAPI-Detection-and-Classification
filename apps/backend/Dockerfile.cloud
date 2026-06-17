@@ -42,6 +42,13 @@ RUN pip install -r requirements.txt \
  && pip uninstall -y opencv-python opencv-python-headless \
  && pip install "opencv-python-headless==${opencv_pin}"
 
+# CPU inference accelerator (OpenVINO). Cloud-only: the backend auto-selects the
+# OpenVINO IR (models/serving/best_openvino_model, baked below) over best.pt on CPU
+# for ~1.5x lower latency at the 2-CPU allocation, with parity-verified detections.
+# Falls back to best.pt if it can't load, so this never breaks the image.
+COPY apps/backend/requirements-accel.txt ./
+RUN pip install -r requirements-accel.txt
+
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -67,6 +74,12 @@ COPY configs /app/configs
 # training runs, so optional selectors are available in cloud without shipping
 # every plot, CSV, last.pt, and export artifact.
 COPY models/serving /models/serving
+# Fail the build LOUDLY if the OpenVINO IR (the auto-selected CPU serving backend) is missing,
+# rather than silently shipping a slower .pt-only image. The IR is a committed artifact under
+# models/serving/best_openvino_model/; a clean clone / CI that lacks it should not deploy a
+# degraded image (audit: the IR was once untracked and absent on fresh builds).
+RUN test -f /models/serving/best_openvino_model/best.xml \
+ || (echo "ERROR: OpenVINO IR missing at /models/serving/best_openvino_model/ — commit it (git add models/serving/best_openvino_model) or set PAPI_INFERENCE_BACKEND=pt and drop this check." && exit 1)
 COPY models/runs/detect/transition3class-yolo26s-1280/weights/best.pt /models/runs/detect/transition3class-yolo26s-1280/weights/best.pt
 COPY models/runs/detect/yolo26n-baseline/weights/best.pt /models/runs/detect/yolo26n-baseline/weights/best.pt
 COPY models/runs/detect/yolo26s-augmented/weights/best.pt /models/runs/detect/yolo26s-augmented/weights/best.pt
