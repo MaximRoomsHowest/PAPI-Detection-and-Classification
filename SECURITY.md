@@ -1,8 +1,8 @@
 # Security
 
-PAPI Detection & Classification is an academic industry-project demo built for
-Intersoft Electronics. It is not a public service, but the backend is hardened so
-it can be deployed safely.
+PAPI Lights Detection and Classification is a demonstrator built for Intersoft
+Electronics Services BV. It is not a public service, but the backend is hardened
+so it can be deployed safely.
 
 ## Reporting a vulnerability
 
@@ -39,6 +39,8 @@ project audit notes.
 
 ## Third-party licensing
 
-The detector is built on Ultralytics YOLO, which is **AGPL-3.0**. Any distribution
-or hosted use of the trained weights must respect that license; confirm the
-intended licensing of this repository with Intersoft before handover.
+The project is licensed proprietary to Intersoft Electronics Services BV (see
+[`LICENSE`](LICENSE)). The detector is built on Ultralytics YOLO, which is
+**AGPL-3.0**: any distribution or hosted use of the trained weights must comply
+with AGPL-3.0 or be covered by a separate commercial Ultralytics license. Resolve
+that obligation before any external distribution or hosted offering.

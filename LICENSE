@@ -1,13 +1,18 @@
-PAPI Detection and Classification - Licensing
-=============================================
+PAPI Lights Detection and Classification - Licensing
+=====================================================
 
-Status: PENDING client confirmation (see README.md and SECURITY.md).
+Copyright (c) 2026 Intersoft Electronics Services BV. All rights reserved.
 
-This software was developed by the Howest industry-project team for Intersoft
-Electronics Services BV (May-June 2026). The final license terms for the
-project source code are to be agreed with Intersoft before hand-off and have
-not yet been finalised. Until those terms are confirmed, all rights are
-reserved by the authors and Intersoft; do not redistribute without permission.
+This software and its documentation were developed for Intersoft Electronics
+Services BV and are the property of Intersoft Electronics Services BV. No part
+of this repository may be copied, modified, distributed, or used outside
+Intersoft Electronics Services BV without prior written permission from
+Intersoft Electronics Services BV.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. It is a demonstrator and
+is NOT a certified safety-of-flight system (see docs/model-card.md).
 
 Third-party dependency notice
 ------------------------------
@@ -15,7 +20,7 @@ The detector is built on Ultralytics YOLO, which is licensed under the GNU
 Affero General Public License v3.0 (AGPL-3.0). Any distribution, or networked
 / hosted use, of the trained weights or of code that links Ultralytics at
 runtime must comply with the AGPL-3.0 - or be covered by a separate commercial
-license obtained from Ultralytics. This obligation must be resolved with
-Intersoft as part of finalising the project license above.
+license obtained from Ultralytics. Resolve this obligation before any external
+distribution or hosted offering.
 
 See SECURITY.md ("Third-party licensing") and docs/model-card.md for details.
