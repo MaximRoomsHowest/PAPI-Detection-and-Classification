@@ -12,7 +12,7 @@ deployment status see the registry: [`models/MODELS.md`](MODELS.md).
 | `models/serving/best.pt` | Serving slot | The model the FastAPI backend loads by default. A **copy** of the active run's `best.pt`; the slot filename is stable (see below). |
 | `models/serving/model_card.json` | Provenance | Identifies which run is in the slot + its val metrics; served by `/api/model`. |
 | `models/serving/models.json` | Runtime registry | Backend-owned selector options served by `/api/models`; includes `small`, `nano`, and the optional transition classifier with availability checks. |
-| `models/serving/best_int8.onnx` | INT8 export | Quantised export of the **previous** yolo26n model; experimental / CPU-broken (MODELS.md §3.2.1). |
+| `models/serving/best_int8.onnx` | INT8 export | **DEPRECATED — do not use.** Quantised export of the **retired** yolo26n model; fails on CPU ONNX Runtime (`ConvInteger` unimplemented) and has no working replacement (MODELS.md §3.2.1). Kept only as a record of the attempt; deploy `best.pt` (or the OpenVINO export) instead. |
 
 > **Git tracking:** `.gitignore` ignores `*.pt`/`*.onnx` globally but
 > **un-ignores** `models/base/*`, `models/serving/*`, and `models/runs/**`,
@@ -35,9 +35,11 @@ The registry also exposes:
 
 - `nano` — previous `yolo26n-sequence-1280` detector for rollback/comparison.
 - `transition` — `transition3class-yolo26s-1280`, a 3-class transition
-  classifier. Its expected path lives under ignored `data/runs/...`; if the
-  weight is absent, `/api/models` marks it unavailable and the Live Demo
-  disables it.
+  classifier committed at
+  `models/runs/detect/transition3class-yolo26s-1280/weights/best.pt` and
+  available by default. Experimental (low transition-class recall) — see
+  MODELS.md §5c. If the weight is absent, `/api/models` marks it unavailable
+  and the Live Demo disables it.
 
 To rotate the serving model, copy a different run's `best.pt` into the slot
 and regenerate the card — full procedure in [`models/MODELS.md`](MODELS.md) §5.
@@ -47,9 +49,9 @@ all reference it).
 To roll back to the previous yolo26n model, from the repo root:
 
 ```powershell
-Copy-Item models\runs\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force
+Copy-Item models\runs\detect\yolo26n-sequence-1280\weights\best.pt models\serving\best.pt -Force
 .venv\Scripts\python.exe workflows\scripts\populate_model_metrics.py `
-  models\runs\yolo26n-sequence-1280 --write-model-card models\serving\model_card.json
+  models\runs\detect\yolo26n-sequence-1280 --write-model-card models\serving\model_card.json
 ```
 
 ## Deprecated archived runs

@@ -161,7 +161,8 @@ is the promotion justification on held-out data.
 
 > ⚠ **Leakage + augmentation caveat (pending retrain).** This checkpoint trained on
 > `PAPI_Split`, built by a **random per-frame shuffle** of all merged frames
-> (`data/data_analysis.ipynb`), **not** a flight-level split. Because the footage is
+> (the data-analysis notebook, `workflows/notebooks/05_data_analysis.ipynb`), **not** a
+> flight-level split. Because the footage is
 > video-like (adjacent near-duplicate frames), frames from the flight-level test
 > flights above were also in this model's *training* set — so these "held-out"
 > numbers **overlap training and are optimistic, not a clean held-out estimate**.
@@ -231,7 +232,7 @@ straight from each run's `results.csv`.
 | `yolo26s-augmented` | yolo26s | augmented | `models/runs/detect/yolo26s-augmented/` | Image-augmentation experiment |
 | `yolo26s-fulldata-640` | yolo26s | full dataset, 640 | `models/runs/detect/yolo26s-fulldata-640/` | Full-dataset at 640; the 1280 sibling (§3.1) supersedes it |
 | `yolov8s-transfer` | yolov8s | transfer | `models/runs/detect/yolov8s-transfer/` | Legacy YOLOv8 transfer seed; comparison only |
-| `val`, `val-2…4` | yolo26s | validation passes | `models/runs/detect/val*/` | PR/F1 curves + confusion matrices, no weights |
+| `val-5…7`, `val-12…15` | yolo26s | validation passes | `models/runs/detect/val-*/` | PR/F1 curves + confusion matrices, no weights (weather-robustness set; see [`runs/README.md`](runs/README.md)) |
 
 ## 4. Deprecated / archived runs
 
