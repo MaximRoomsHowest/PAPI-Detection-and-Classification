@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  CloudRain,
   CloudSnow,
   Film,
   Images,
@@ -55,22 +56,6 @@ const SAMPLE_SWEEP_FRAMES = Array.from({ length: 10 }, (_, index) => {
   }
 })
 
-// Same 10-frame angle sweep with synthetic medium snow applied (pure-OpenCV
-// weather_aug, the same transform the weather-robust nano trains on). The
-// drone geometry is unchanged, so it reuses the sweep telemetry — angle and
-// ground-truth states still agree; only the pixels are degraded. Picking the
-// weather-robust model holds the detection where the clear-weather detectors
-// lose the lamps to bright snow speckle.
-const SAMPLE_WEATHER_FRAMES = Array.from({ length: 10 }, (_, index) => {
-  const frame = String(index + 1).padStart(3, '0')
-  return {
-    url: `/demo-samples/weather-frame-${frame}.jpg`,
-    name: `frame_${frame}.jpg`,
-    type: 'image/jpeg',
-    path: `sample-papi-frames-snow/frame_${frame}.jpg`,
-  }
-})
-
 // Labels/descriptions are i18n keys under copy.live (resolved at render time)
 // so the picker follows the active locale like every other Live-Demo string.
 const SAMPLE_MEDIA = [
@@ -105,14 +90,39 @@ const SAMPLE_MEDIA = [
     ],
     metadataFile: SAMPLE_VIDEO_METADATA,
   },
+  // Full two-minute angle sweep with synthetic medium snow / rain applied (pure-OpenCV
+  // weather_aug — the same transform the weather-robust nano trains on, rendered by
+  // workflows/scripts/make_weather_videos.py). The drone geometry is unchanged, so both
+  // reuse the per-frame video telemetry; only the pixels are degraded. Picking the
+  // weather-robust model holds the detection where the clear-weather detectors lose the
+  // lamps to bright snow speckle / rain streaks.
   {
-    id: 'weather-sequence',
+    id: 'weather-snow',
     labelKey: 'sampleWeatherLabel',
     descriptionKey: 'sampleWeatherDescription',
     icon: CloudSnow,
-    folderMode: FOLDER_MODE_SEQUENCE,
-    files: SAMPLE_WEATHER_FRAMES,
-    metadataFile: SAMPLE_SWEEP_METADATA,
+    files: [
+      {
+        url: '/demo-samples/papi24-angle-sweep-snow.mp4',
+        name: 'papi24-angle-sweep-snow.mp4',
+        type: 'video/mp4',
+      },
+    ],
+    metadataFile: SAMPLE_VIDEO_METADATA,
+  },
+  {
+    id: 'weather-rain',
+    labelKey: 'sampleWeatherRainLabel',
+    descriptionKey: 'sampleWeatherRainDescription',
+    icon: CloudRain,
+    files: [
+      {
+        url: '/demo-samples/papi24-angle-sweep-rain.mp4',
+        name: 'papi24-angle-sweep-rain.mp4',
+        type: 'video/mp4',
+      },
+    ],
+    metadataFile: SAMPLE_VIDEO_METADATA,
   },
 ]
 

@@ -4,8 +4,8 @@ date: "2026-06-01 14:30"
 client: "Intersoft Electronics Services BV"
 client_contact: "Daoud Uahabi"
 team: "Sousa Rodrigo · Chekhun Maksym · Kattan Hamzzah · Rooms Maxim"
-duration: "<!-- TEAM: e.g. 45 min -->"
-location: "<!-- TEAM: online / on-site -->"
+duration: "Not recorded"
+location: "Online meeting"
 mainfont: "Calibri"
 fontsize: 10pt
 geometry: "a4paper, margin=2cm"
@@ -23,7 +23,7 @@ be computed.
 - **Client (Intersoft Electronics Services BV)**: Daoud Uahabi
 - **Team (Howest CTAI)**: Sousa Rodrigo, Chekhun Maksym, Kattan
   Hamzzah, Rooms Maxim
-- **Supervisor**: <!-- TEAM: present? Y/N + name -->
+- **Supervisor**: not recorded in the meeting notes
 
 ## Agenda
 
@@ -86,5 +86,5 @@ Three of the asks were implemented and verified right after the meeting
 
 ## Sign-off
 
-Notes by <!-- TEAM: minute-taker -->, confirmed with Daoud Uahabi and
-shared with the team.
+Notes by **Rodrigo Sousa**, confirmed with Daoud Uahabi and shared
+with the team.

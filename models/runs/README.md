@@ -11,14 +11,15 @@ models/runs/detect/yolo26s-baseline/
 models/runs/detect/yolo26n-baseline/
 models/runs/detect/yolo26s-extra-aug/        <- extra-augmentation experiment
 models/runs/detect/yolo26s-weather-aug/      <- weather-augmentation experiment (train-9; rain/fog/haze only)
-models/runs/detect/yolov8s-transfer/
 models/runs/detect/yolo26n-sequence-1280/           <- previous serving (rollback)
 models/runs/detect/yolo26n-weather-flightsplit-1280/ <- weather-robust nano (2026-06-18; leak-free + OpenCV weather)
+models/runs/detect/yolo26n-weather-aug2-1280/        <- weather-robust nano v2 (strong aug)
 ```
 
-Each run tracks `args.yaml`, `results.csv`, training/validation plots, and
-`weights/best.pt` + `last.pt` (the weights are committed — `models/runs/**`
-is un-ignored in `.gitignore`).
+Each promoted handover run tracks the runnable `weights/best.pt` plus compact
+metadata (`args.yaml`, `results.csv`, and optional JSON cards). Training preview
+images, PR/F1 plots, validation batch dumps, and `last.pt` resume checkpoints are
+generated artifacts and are intentionally not committed.
 
 **Committed runs vs. the training workspace.** `models/runs/detect/` holds the
 **committed, registered** runs (every weight tracked). In-progress and experimental
@@ -66,8 +67,10 @@ the `PAPI_Split` valid split. Full notebook + degradation plots:
 Takeaway: the detector is robust to rain (≈clear) but degrades sharply under
 fog — the headline result behind the weather-degradation graphs.
 
-`val-5` / `val-6` / `val-7` are additional validation runs imported from the
-same branch (provenance not recorded in their folders — no `args.yaml`).
+The generated `val-*` folders are no longer committed. Regenerate them with the
+evaluation workflow if you need the underlying PR/F1 curves or confusion
+matrices. `val-5` / `val-6` / `val-7` were additional imported validation runs
+with incomplete provenance and are kept only in historical notes.
 
 ### Weather-robust nano (2026-06-18) — supersedes the experiments above
 

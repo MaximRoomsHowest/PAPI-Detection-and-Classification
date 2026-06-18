@@ -10,9 +10,10 @@ associated with each event; it annotates the transition, it does not decide it.
 """
 
 from collections import Counter
+from typing import NamedTuple
 
 from papi.global_state import WHITE_COUNT_TO_CODE
-from papi.lamp_state import FAA_DEFAULT_SET_ANGLES_DEG
+from papi.lamp_state import FAA_DEFAULT_SET_ANGLES_DEG, NUM_PAPI_LAMPS
 
 from app.validation.schemas import AngleResult, BoundingBox, LampResult, TransitionEvent
 
@@ -26,6 +27,20 @@ DETECTION_CLASS_TO_STATE = {
     # 2-class models; aggregate_transition_state_events is the path for a 3-class model.
     2: "transition",
 }
+
+
+class TrackObservation(NamedTuple):
+    """Tracked lamp sample carried through video aggregation and transition logic."""
+
+    frame_index: int
+    state: str
+    center_x: float
+    confidence: float
+    redness: float | None = None
+    bbox: dict | None = None
+
+
+PAPI_LAMP_TRACK_IDS = frozenset(range(1, NUM_PAPI_LAMPS + 1))
 
 # The only per-frame lamp states that represent a real detection the model made.
 # A slot that is "obscured" (detector found nothing) or "unknown" (class fell
@@ -68,7 +83,7 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
         center_x = (bbox["x1"] + bbox["x2"]) / 2
         candidates.append((center_x, confidence, state, bbox, detection.get("redness")))
 
-    candidates = sorted(candidates, key=lambda item: item[1], reverse=True)[:4]
+    candidates = sorted(candidates, key=lambda item: item[1], reverse=True)[:NUM_PAPI_LAMPS]
     candidates = sorted(candidates, key=lambda item: item[0])
 
     lamps: list[LampResult] = []
@@ -87,7 +102,7 @@ def normalize_detections(raw_detections: list[dict]) -> list[LampResult]:
     # slot is "obscured" (see _OBSCURED_LAMP_STATE) rather than the generic
     # "unknown", giving the insights charts a distinct "nothing detected here"
     # category instead of silently dropping the lamp.
-    while len(lamps) < 4:
+    while len(lamps) < NUM_PAPI_LAMPS:
         lamps.append(
             LampResult(index=len(lamps) + 1, state=_OBSCURED_LAMP_STATE, confidence=0.0)
         )
@@ -185,7 +200,7 @@ def lamp_index_by_track(track_observations: dict[int, list[tuple]]) -> dict[int,
     rank scrambles the moment one frame drops or re-orders a lamp).
     """
     tracks = [(tid, obs) for tid, obs in track_observations.items() if tid is not None and obs]
-    persistent = sorted(tracks, key=lambda kv: len(kv[1]), reverse=True)[:4]
+    persistent = sorted(tracks, key=lambda kv: len(kv[1]), reverse=True)[:NUM_PAPI_LAMPS]
     ordered = sorted(persistent, key=lambda kv: sum(o[2] for o in kv[1]) / len(kv[1]))
     return {tid: rank for rank, (tid, _) in enumerate(ordered, start=1)}
 
@@ -193,14 +208,14 @@ def lamp_index_by_track(track_observations: dict[int, list[tuple]]) -> dict[int,
 def _reference_slot_centers(observations_by_frame: dict[int, list[tuple]]) -> list[float] | None:
     complete_frames: list[list[tuple]] = []
     for observations in observations_by_frame.values():
-        top_four = sorted(observations, key=lambda item: item[3], reverse=True)[:4]
-        if len(top_four) == 4:
+        top_four = sorted(observations, key=lambda item: item[3], reverse=True)[:NUM_PAPI_LAMPS]
+        if len(top_four) == NUM_PAPI_LAMPS:
             complete_frames.append(sorted(top_four, key=lambda item: item[2]))
     if not complete_frames:
         return None
     return [
         sum(frame[slot][2] for frame in complete_frames) / len(complete_frames)
-        for slot in range(4)
+        for slot in range(NUM_PAPI_LAMPS)
     ]
 
 
@@ -209,9 +224,9 @@ def _assign_observations_to_slots(
     reference_centers: list[float] | None,
 ) -> list[tuple[int, tuple]]:
     """Assign frame detections to Light 1..4 without compacting across missing slots."""
-    top_four = sorted(observations, key=lambda item: item[3], reverse=True)[:4]
+    top_four = sorted(observations, key=lambda item: item[3], reverse=True)[:NUM_PAPI_LAMPS]
     ordered = sorted(top_four, key=lambda item: item[2])
-    if reference_centers is None or len(ordered) == 4:
+    if reference_centers is None or len(ordered) == NUM_PAPI_LAMPS:
         return list(enumerate(ordered, start=1))
 
     # Pick the monotonic subset of reference slots that best matches this frame's
@@ -221,7 +236,7 @@ def _assign_observations_to_slots(
 
     best_slots: tuple[int, ...] | None = None
     best_cost: float | None = None
-    for slots in combinations(range(4), len(ordered)):
+    for slots in combinations(range(NUM_PAPI_LAMPS), len(ordered)):
         cost = sum(abs(observation[2] - reference_centers[slot]) for observation, slot in zip(ordered, slots, strict=False))
         if best_cost is None or cost < best_cost:
             best_cost = cost
@@ -282,7 +297,7 @@ def detect_lamp_transitions(
     back to ``elevation_angle_deg`` (the single per-video value).
     """
     stabilized_observations = denoise_track_observations(track_observations)
-    if set(stabilized_observations).issubset({1, 2, 3, 4}):
+    if set(stabilized_observations).issubset(PAPI_LAMP_TRACK_IDS):
         index_by_track = {track_id: track_id for track_id in stabilized_observations}
     else:
         index_by_track = lamp_index_by_track(stabilized_observations)
@@ -354,7 +369,7 @@ def aggregate_transition_state_events(
     2-class model (no "transition" states ever appear). Lamp identity uses the same
     ``lamp_index_by_track`` as the temporal method so both reference one physical-lamp numbering.
     """
-    if set(track_observations).issubset({1, 2, 3, 4}):
+    if set(track_observations).issubset(PAPI_LAMP_TRACK_IDS):
         index_by_track = {track_id: track_id for track_id in track_observations}
     else:
         index_by_track = lamp_index_by_track(track_observations)
@@ -456,7 +471,7 @@ def global_state_from_lamps(lamps: list[LampResult]) -> str:
 
     counts = Counter(lamp.state for lamp in lamps)
     detected_count = sum(counts[state] for state in DETECTED_LAMP_STATES)
-    if detected_count != 4:
+    if detected_count != NUM_PAPI_LAMPS:
         return "unknown"
     return _WHITE_COUNT_TO_STATE.get(counts["white"], "unknown")
 

@@ -17,7 +17,7 @@ from typing import Any
 from app.database import get_sessionmaker
 from app.repositories.model_registry import ModelRegistryRepository
 from app.services.datasets import DEFAULT_CLASS_NAMES, dataset_root
-from app.services.jobs.runner import JobContext
+from app.services.jobs.contracts import JobContext
 from app.services.model_registry import resolve_weights_path
 
 logger = logging.getLogger(__name__)

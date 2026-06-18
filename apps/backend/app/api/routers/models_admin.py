@@ -1,4 +1,4 @@
-"""Model-management endpoints (api-key gated).
+"""Model-management endpoints (operator-auth gated).
 
 Upload, promote-to-default, disable/enable, delete, and enqueue evaluation. Reads
 stay on ``meta.py`` (``GET /api/model``, ``/api/models``); everything here mutates
@@ -70,7 +70,7 @@ def upload_model(
     """Upload a .pt/.onnx model and register it.
 
     SECURITY: a .pt is a pickle; loading it executes code. This endpoint is
-    api-key gated for exactly that reason — only a trusted operator can reach it.
+    auth gated for exactly that reason: only a trusted operator can reach it.
     """
     settings = routes.get_settings()
     normalized_role = (role or "detector").strip().lower()

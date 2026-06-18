@@ -237,7 +237,11 @@ class InferenceService:
     def transition_model(self) -> Any | None:
         """The optional 3-class transition model, lazy-loaded; None when unavailable."""
         entry = self._registry.transition_entry()
-        if entry is None or not entry.available:
+        if entry is None:
+            return None
+        if entry.id in self._models:
+            return self._models[entry.id]
+        if not entry.available:
             return None
         return self._load_model(entry)
 
@@ -370,14 +374,15 @@ class InferenceService:
     def _resolve_transition(self, requested: str | None) -> tuple[Any, str]:
         """Legacy resolver kept for direct unit tests and transition_method compatibility."""
         method = (requested or self.settings.default_transition_method or "tracking").strip().lower()
+        serving_model = self.model
         if method == "model":
             transition_model = self.transition_model
             if transition_model is not None and self._is_three_class(transition_model):
                 return transition_model, "model"
-            if self._is_three_class(self.model):
-                return self.model, "model"
-            return self.model, "tracking"
-        return self.model, "tracking"
+            if self._is_three_class(serving_model):
+                return serving_model, "model"
+            return serving_model, "tracking"
+        return serving_model, "tracking"
 
     def _resolve_selected_model(
         self, model_id: str | None, transition_method: str | None

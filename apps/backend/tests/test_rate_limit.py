@@ -26,6 +26,10 @@ def _limited_app(*, enabled: bool = True) -> FastAPI:
     def analyze_frame() -> dict[str, bool]:
         return {"ok": True}
 
+    @app.post("/api/auth/login")
+    def login() -> dict[str, bool]:
+        return {"ok": True}
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -34,6 +38,7 @@ def _limited_app(*, enabled: bool = True) -> FastAPI:
         RateLimitMiddleware,
         enabled=enabled,
         general_limit_per_minute=2,
+        auth_limit_per_minute=1,
         analyze_limit_per_minute=1,
     )
     app.add_middleware(RequestIdMiddleware)
@@ -65,6 +70,16 @@ def test_analyze_bucket_uses_stricter_limit():
     assert blocked.headers["X-RateLimit-Limit"] == "1"
 
 
+def test_auth_login_uses_credential_attempt_bucket():
+    client = TestClient(_limited_app())
+
+    assert client.post("/api/auth/login").status_code == 200
+    blocked = client.post("/api/auth/login")
+
+    assert blocked.status_code == 429
+    assert blocked.headers["X-RateLimit-Limit"] == "1"
+
+
 def test_health_and_disabled_limiter_do_not_count():
     client = TestClient(_limited_app())
     for _ in range(5):
@@ -87,7 +102,11 @@ def test_stale_client_entries_are_swept(monkeypatch):
     clock = {"now": 1000.0}
     monkeypatch.setattr(middleware, "monotonic", lambda: clock["now"])
     limiter = RateLimitMiddleware(
-        None, enabled=True, general_limit_per_minute=5, analyze_limit_per_minute=1
+        None,
+        enabled=True,
+        general_limit_per_minute=5,
+        auth_limit_per_minute=2,
+        analyze_limit_per_minute=1,
     )
     for i in range(50):
         limiter._record_hit(f"10.0.0.{i}", "general", 5)

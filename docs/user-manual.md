@@ -4,8 +4,7 @@ This guide shows you how to use the PAPI app. It is written for the
 people who run it — drone operators, review engineers, and anyone
 checking PAPI lights. You do not need to know how the code works.
 
-To install the app first, see the
-[installation manual](installation-manual.md).
+To install the app first, see the installation manual.
 
 ## 1. What the app does
 
@@ -50,8 +49,8 @@ use to move around:
 - **Insights** — charts that explain the latest result.
 - **History** — past results.
 
-Two more items, **Models** and **Datasets**, appear only after you
-unlock admin mode (see section 9).
+Two more items, **Models** and **Datasets**, appear only after an
+operator signs in (see section 9).
 
 ### The Introduction page
 
@@ -76,12 +75,15 @@ examples or upload your own footage.
 ### 3.1 Try it with the built-in samples
 
 If you have no footage of your own, use the ready-made examples. On the
-empty page, under the upload buttons, you will see three sample cards:
+empty page, under the upload buttons, you will see four sample cards:
 
 - **Sample image** — one frame on the correct path (two white, two red).
 - **Sample image set** — ten frames that climb through every PAPI state.
 - **Sample video** — a two-minute clip of a full climb, including each
   lamp changing from red to white. It takes about half a minute.
+- **Snow sample** — the same climb with heavy snow added. It shows how
+  the weather-trained model keeps finding the lamps when the
+  clear-weather models lose them in the snow.
 
 Click any card and the analysis starts on its own. The runway and drone
 position are filled in for you.
@@ -222,22 +224,51 @@ In the top-right corner:
 - **Light / dark mode** — the sun/moon button switches the look. Handy
   for dark rooms during a demo. Also remembered.
 
-## 9. Advanced: managing models and data (admin)
+## 9. Advanced: managing models and data (operator login)
 
 These features are for technical users who maintain the app. They are
-hidden until you unlock admin mode.
+hidden until an operator signs in.
 
-### Unlocking admin mode
+### Signing in
 
-Click the **shield icon** in the top-right corner, type the **API key**,
-and click **Unlock**. On a normal local setup you can leave the key
-blank. Two new menu items appear: **Models** and **Datasets**. Click the
-shield again to lock it.
+Click **Sign in** in the top-right corner, or open:
+
+```
+http://localhost:5173/login
+```
+
+How you sign in depends on how the app was set up:
+
+- **Email and password** — if the app uses a login (a local operator
+  account, or a Supabase account), enter your email and password.
+- **API key** — if the app uses a key, type it in.
+- **Open admin** — on an open local setup, click **Open admin**. This is
+  for offline/local demos only.
+
+Once unlocked, two new menu items appear: **Models** and **Datasets**.
+Open the account page again and click **Sign out** to hide them. The login
+method is chosen by whoever installs the app (see the installation manual);
+for a client install, a real email-and-password login is recommended.
+
+### Demo credentials
+
+If the installer configured the documented local demo account, use:
+
+| Field | Value |
+| --- | --- |
+| Email | `demo.admin@papi.local` |
+| Password | `PapiDemo!2026` |
+
+These credentials are only for a local demo or handover machine. They do
+not work on a Supabase setup unless that same user was created in Supabase.
+Before any real production deployment, replace them with a client-owned
+email address and a freshly generated password hash.
 
 ### The Models page
 
 Click **Models** to manage the detectors. Each model shows its accuracy
-scores (mAP, precision, recall, F1) and details. Not sure what the
+scores (mAP, precision, recall, F1) and details; weather-trained models
+also show how well they hold up in clear, rain, fog, haze and snow. Not sure what the
 scores mean? Click **"What do these scores mean?"** for plain
 definitions. You can:
 
@@ -282,6 +313,7 @@ As on the Models page, running jobs appear in the jobs panel.
 | "Too many requests" | You sent many analyses very quickly | Wait a moment and try again |
 | Charts say "unavailable" | A chart failed to load (offline, ad-blocker) | Refresh the page |
 | Folder upload shows only one image | The browser could not read the folder | Try Firefox or Edge |
+| Sign-in fails | The installed auth mode and credentials do not match | Ask the installer whether the app is in `open`, `local`, `supabase`, or `api_key` mode |
 
 To see exactly what the backend received, open the built-in API docs at
 `http://localhost:8000/docs`.

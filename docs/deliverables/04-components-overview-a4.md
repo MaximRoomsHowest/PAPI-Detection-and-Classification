@@ -62,4 +62,4 @@ mainfont: "Calibri"
 - **React 19 + Vite 8** — team familiarity, fast HMR, mature ecosystem for charts (Plotly) and PDF export (jsPDF).
 - **Docker compose** — single-command `docker compose up -d --build` from a clean machine; reproducible on any machine.
 
-*Full design rationale, scope limits and open questions in [architecture-overview.md](../architecture-overview.md). Source of truth for components, ports, healthchecks and security floor: [compose.yaml](../../compose.yaml).*
+*Full design rationale, scope limits and open questions are covered in the architecture overview. The source of truth for components, ports, healthchecks and the security floor is `compose.yaml`.*

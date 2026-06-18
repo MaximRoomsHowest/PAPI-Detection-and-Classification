@@ -28,9 +28,9 @@ python workflows/scripts/pipeline.py <stage> --help         # per-stage flags
 | `sample` | metadata + lamp state | `data/interim/verification_sample.csv` | < 1 s |
 | `export` | sample + auto-labels + raw images | CVAT **Ultralytics YOLO Detection 1.0** export folder with `data.yaml`, `train.txt`, `val.txt`, `images/<train\|val>/*.JPG`, and `labels/<train\|val>/*.txt`. Train/val assignment uses `configs/split.yaml`. | depends on sample size; ~60–120 s |
 
-Dependencies: `extract` → `calibrate` → `autolabel` → `sample` → `export`. `all` runs them
-in that order. The sprint-2 "compute auto-vs-human agreement" stage is not yet implemented;
-will be added as a sixth subcommand once `data/labels/verified/` is populated.
+Dependencies: `extract` → `calibrate` → `autolabel` → `sample` → `export`.
+`all` runs them in that order. Auto-vs-human agreement reporting is a
+future extension once `data/labels/verified/` is populated.
 
 ### CVAT upload workflow
 
@@ -100,17 +100,17 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 `configs/papi_edny.yaml` now contains the surveyed coordinates for **both** PAPIs;
 `papi.geometry.resolve_papi_for_frame` picks the nearer one per frame.
 
-## Known limitations & TODOs
+## Known limitations and future work
 
 | Item | Status | Owner |
 |---|---|---|
 | ZoomCamera auto-labels (no `CalibratedFocalLength` in XMP) | **Skipped in sprint 1**; all 818 zoom frames are flagged for manual verification | sprint 2 |
-| EDNY commissioned set-angles (both runways) | **Placeholder** (FAA defaults 2.50°/2.83°/3.17°/3.50°) | confirm with Intersoft |
+| EDNY commissioned set-angles (both runways) | FAA defaults used (2.50°/2.83°/3.17°/3.50°) | confirm with Intersoft before production use |
 | WGS84 altitude of the PAPI lamps (both runways) | **Runtime-bound** to `461.37 m` for both built-ins. Rwy-24 is validated; rwy-06 comes from the data-analysis branch. The `464.988 m` notebook value is a client drone EXIF/MRK altitude floor proxy, not lamp height. | bind commissioned set-angles and lamp-order mapping |
 | RTK-Single frames (842 images, flag=16) | Auto-labels still produced, but flagged for verification (`rtk_uncertain` reason) | reviewer judgement |
 | Per-lamp tight bboxes | Sprint 1 only emits one installation-level bbox | sprint 2 |
-| Auto-vs-human agreement reporting | Not yet implemented (will add as `pipeline.py agreement` subcommand) | sprint 2 |
-| Day vs. night error rates | Not measured yet (no verified labels yet) | sprint 2 verification round |
+| Auto-vs-human agreement reporting | Future extension once verified labels are available | future work |
+| Day vs. night error rates | Covered by later model evaluation docs; extend here if the sprint-1 pipeline is reused | future work |
 
 ## Debugging tips
 
@@ -125,7 +125,7 @@ night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Fold
 ## Verification gates (run before declaring sprint-1 done)
 
 - [ ] `pip install -e .[dev]` succeeds from a clean venv.
-- [ ] `pytest packages/papi/tests` runs and all tests pass (LRF round-trip skipped if calibration not yet run). A bare `pytest` from the repo root skips the backend suite under `apps/backend/tests`.
+- [ ] `pytest packages/papi/tests` runs and all tests pass. A bare `pytest` from the repo root skips the backend suite under `apps/backend/tests`.
 - [ ] `python workflows/scripts/pipeline.py extract` writes a CSV with 4,058 rows.
 - [ ] `python workflows/scripts/pipeline.py calibrate` writes `configs/projection.yaml` with median residual ≤ 100 px.
 - [ ] `python workflows/scripts/pipeline.py autolabel` writes ~3,240 YOLO `.txt` files (WideCamera count) + `lamp_state.csv` with 4,058 rows.

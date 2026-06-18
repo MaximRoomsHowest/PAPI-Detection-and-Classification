@@ -262,13 +262,12 @@ async def test_production_lifespan_accepts_non_default_db_credentials(monkeypatc
         "postgresql+psycopg://operator:strong-pw@db.internal:5432/papi",
         raising=True,
     )
-    # Stub init_db + the YOLO pre-warm so the lifespan body doesn't
-    # try to hit a real DB or load a real model.
-    monkeypatch.setattr(main_module, "init_db", lambda: None)
+    # Stub the blocking startup bundle so the lifespan body doesn't try to hit a
+    # real DB or load a real model.
     monkeypatch.setattr(
         main_module,
-        "get_inference_service",
-        lambda: type("S", (), {"model": None})(),
+        "run_startup_tasks",
+        lambda _settings, _threads: None,
     )
 
     async with lifespan(app):

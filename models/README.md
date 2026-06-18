@@ -8,16 +8,16 @@ deployment status see the registry: [`models/MODELS.md`](MODELS.md).
 | Path | Type | Purpose |
 |---|---|---|
 | `models/base/*.pt` | Base weights | Upstream Ultralytics seeds (yolo26n / yolo26s / yolo26m) for fine-tuning. |
-| `models/runs/detect/<arch>-<dataset>-<res>/` | Trained runs | Each run's `args.yaml`, `results.csv`, plots, and `weights/best.pt` + `last.pt`. Named so the folder tells you the model — see MODELS.md §0. |
+| `models/runs/detect/<arch>-<dataset>-<res>/` | Trained runs | Promoted handover runs keep `weights/best.pt` plus `args.yaml`, `results.csv`, and optional `model_card.json` / `detector_train_meta.json`. Training-only plots, preview batches, and `last.pt` resume checkpoints are regenerated artifacts. |
 | `models/serving/best.pt` | Serving slot | The model the FastAPI backend loads by default. A **copy** of the active run's `best.pt`; the slot filename is stable (see below). |
 | `models/serving/model_card.json` | Provenance | Identifies which run is in the slot + its val metrics; served by `/api/model`. |
 | `models/serving/models.json` | Runtime registry | Backend-owned selector options served by `/api/models`; includes `small`, `nano`, and the optional transition classifier with availability checks. |
-| `models/serving/best_int8.onnx` | INT8 export | **DEPRECATED — do not use.** Quantised export of the **retired** yolo26n model; fails on CPU ONNX Runtime (`ConvInteger` unimplemented) and has no working replacement (MODELS.md §3.2.1). Kept only as a record of the attempt; deploy `best.pt` (or the OpenVINO export) instead. |
+| INT8 export | Retired path | **Not shipped.** The old quantised export failed on CPU ONNX Runtime (`ConvInteger` unimplemented). Deploy `best.pt`, the fp32 ONNX export, or the OpenVINO export instead. |
 
 > **Git tracking:** `.gitignore` ignores `*.pt`/`*.onnx` globally but
-> **un-ignores** `models/base/*`, `models/serving/*`, and `models/runs/**`,
-> so the weights under those paths **are** committed. Weights under
-> `data/runs/` (the data_analysis workspace) stay ignored.
+> **un-ignores** `models/base/*`, `models/serving/*`, and promoted
+> `models/runs/**` handover artifacts. Weights under `data/runs/` and
+> in-progress runs under `models/runs/experiments/` stay ignored.
 
 ## Selectable serving models
 

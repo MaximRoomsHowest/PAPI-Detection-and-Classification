@@ -18,12 +18,12 @@ function-definition time during that import.
 
 from __future__ import annotations
 
-import hmac
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException
 
 from app.config import get_settings
+from app.services.auth import AuthConfigError, AuthError, Principal, authenticate_request
 from app.services.inference import get_inference_service
 
 __all__ = [
@@ -34,12 +34,17 @@ __all__ = [
 ]
 
 
-def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None) -> None:
+def require_api_key(
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+) -> Principal:
     settings = get_settings()
-    # Constant-time comparison so a timing side-channel can't recover the key
-    # character-by-character (audit IMP-BE-9 / IMP-SEC-1).
-    if settings.api_key and not (x_api_key and hmac.compare_digest(x_api_key, settings.api_key)):
-        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+    try:
+        return authenticate_request(settings, authorization=authorization, x_api_key=x_api_key)
+    except AuthConfigError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 # The sub-routers are imported AFTER require_api_key / the seams are bound above
@@ -48,6 +53,7 @@ def require_api_key(x_api_key: Annotated[str | None, Header(alias="X-API-Key")] 
 # every original path, method, response_model and auth dependency intact.
 from app.api.routers import (  # noqa: E402 - must follow the definitions above
     analyze_router,
+    auth_router,
     datasets_router,
     jobs_router,
     logs_router,
@@ -58,12 +64,13 @@ from app.api.routers import (  # noqa: E402 - must follow the definitions above
 )
 
 router = APIRouter()
+router.include_router(auth_router)
 router.include_router(analyze_router)
 router.include_router(logs_router)
 router.include_router(stats_router)
 router.include_router(meta_router)
 # Model-lifecycle routers (upload / evaluate / datasets / training / jobs). Every
-# endpoint they carry is api-key gated via Depends(require_api_key).
+# endpoint they carry is operator-auth gated via Depends(require_api_key).
 router.include_router(models_admin_router)
 router.include_router(datasets_router)
 router.include_router(training_router)

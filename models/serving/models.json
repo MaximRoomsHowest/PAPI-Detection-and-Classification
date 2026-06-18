@@ -3,17 +3,21 @@
   "models": [
     {
       "id": "small",
-      "label": "yolo26s · full-data 1280 (serving)",
+      "label": "yolo26s \u00b7 full-data 1280 (serving)",
       "role": "detector",
       "path": "models/serving/best.pt",
       "class_count": 2,
       "default": true,
-      "description": "Current serving detector — yolo26s trained on the full labelled set at 1280px (run yolo26s-fulldata-1280).",
+      "description": "Current serving detector \u2014 yolo26s trained on the full labelled set at 1280px (run yolo26s-fulldata-1280).",
       "card_path": "models/serving/model_card.json",
       "weather_metrics": {
         "severity": "medium",
         "split": "test",
-        "clear": 0.968, "rain": 0.95, "fog": 0.972, "haze": 0.97, "snow": 0.05
+        "clear": 0.968,
+        "rain": 0.95,
+        "fog": 0.972,
+        "haze": 0.97,
+        "snow": 0.05
       },
       "classes": {
         "0": "PAPI-Red",
@@ -22,7 +26,7 @@
     },
     {
       "id": "nano-weather",
-      "label": "yolo26n · weather-robust 1280",
+      "label": "yolo26n \u00b7 weather-robust 1280",
       "role": "detector",
       "path": "models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt",
       "class_count": 2,
@@ -35,15 +39,29 @@
         "map50": 0.9469,
         "map50_95": 0.5532,
         "per_class": {
-          "red": { "precision": 0.8082, "recall": 0.919, "f1": 0.86, "map50": 0.9405 },
-          "white": { "precision": 0.9164, "recall": 0.8245, "f1": 0.868, "map50": 0.9534 }
+          "red": {
+            "precision": 0.8082,
+            "recall": 0.919,
+            "f1": 0.86,
+            "map50": 0.9405
+          },
+          "white": {
+            "precision": 0.9164,
+            "recall": 0.8245,
+            "f1": 0.868,
+            "map50": 0.9534
+          }
         },
         "note": "Held-out TEST split (flight-level, leak-free), full PR curve (conf=0.001, iou=0.5). Weather-condition mAP50 in models/MODELS.md."
       },
       "weather_metrics": {
         "severity": "medium",
         "split": "test",
-        "clear": 0.948, "rain": 0.951, "fog": 0.946, "haze": 0.944, "snow": 0.882
+        "clear": 0.948,
+        "rain": 0.951,
+        "fog": 0.946,
+        "haze": 0.944,
+        "snow": 0.882
       },
       "classes": {
         "0": "PAPI-Red",
@@ -51,16 +69,64 @@
       }
     },
     {
-      "id": "yolo26s-weather-aug",
-      "label": "yolo26s · weather-augmented (weather-ready)",
+      "id": "nano-weather-aug2",
+      "label": "yolo26n \u00b7 weather-robust v2 (strong aug)",
       "role": "detector",
-      "path": "models/runs/detect/yolo26s-weather-aug/weights/best.pt",
+      "path": "models/runs/detect/yolo26n-weather-aug2-1280/weights/best.pt",
       "class_count": 2,
-      "description": "yolo26s fine-tuned with weather augmentation (rain / fog / haze) for robust low-visibility detection — the weather-ready run (train-9).",
+      "description": "Weather-robust yolo26n, strong-augmentation retrain: mosaic + rotation + erasing + OpenCV weather (rain/fog/haze/snow/sunflare/shadow + warm/cool colour-temperature tints), cosine LR, FP32. Matches v1 on mAP@0.5 (0.947) with +3pp mAP@0.5:0.95 (0.583) and higher recall (better localization/generalization).",
+      "card_path": "models/runs/detect/yolo26n-weather-aug2-1280/model_card.json",
+      "val_metrics": {
+        "selection": "held_out_test_flight_split_full_pr_curve",
+        "precision": 0.8557,
+        "recall": 0.8895,
+        "map50": 0.9471,
+        "map50_95": 0.5832,
+        "per_class": {
+          "red": {
+            "precision": 0.8411,
+            "recall": 0.9294,
+            "f1": 0.8831,
+            "map50": 0.9551
+          },
+          "white": {
+            "precision": 0.8703,
+            "recall": 0.8496,
+            "f1": 0.8598,
+            "map50": 0.939
+          }
+        },
+        "note": "Held-out TEST split (flight-level, leak-free), conf=0.001 iou=0.5. Strong-aug retrain; weather-condition mAP50 in models/MODELS.md."
+      },
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      },
       "weather_metrics": {
         "severity": "medium",
         "split": "test",
-        "clear": 0.951, "rain": 0.916, "fog": 0.938, "haze": 0.934, "snow": 0.154
+        "clear": 0.944,
+        "rain": 0.941,
+        "fog": 0.948,
+        "haze": 0.948,
+        "snow": 0.912
+      }
+    },
+    {
+      "id": "yolo26s-weather-aug",
+      "label": "yolo26s \u00b7 weather-augmented (weather-ready)",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26s-weather-aug/weights/best.pt",
+      "class_count": 2,
+      "description": "yolo26s fine-tuned with weather augmentation (rain / fog / haze) for robust low-visibility detection \u2014 the weather-ready run (train-9).",
+      "weather_metrics": {
+        "severity": "medium",
+        "split": "test",
+        "clear": 0.951,
+        "rain": 0.916,
+        "fog": 0.938,
+        "haze": 0.934,
+        "snow": 0.154
       },
       "classes": {
         "0": "PAPI-Red",
@@ -69,7 +135,7 @@
     },
     {
       "id": "yolo26s-extra-aug",
-      "label": "yolo26s · extra augmentation",
+      "label": "yolo26s \u00b7 extra augmentation",
       "role": "detector",
       "path": "models/runs/detect/yolo26s-extra-aug/weights/best.pt",
       "class_count": 2,
@@ -81,7 +147,7 @@
     },
     {
       "id": "yolo26s-augmented",
-      "label": "yolo26s · augmented",
+      "label": "yolo26s \u00b7 augmented",
       "role": "detector",
       "path": "models/runs/detect/yolo26s-augmented/weights/best.pt",
       "class_count": 2,
@@ -93,7 +159,7 @@
     },
     {
       "id": "yolo26s-fulldata-640",
-      "label": "yolo26s · full-data 640",
+      "label": "yolo26s \u00b7 full-data 640",
       "role": "detector",
       "path": "models/runs/detect/yolo26s-fulldata-640/weights/best.pt",
       "class_count": 2,
@@ -105,7 +171,7 @@
     },
     {
       "id": "yolo26s-baseline",
-      "label": "yolo26s · baseline",
+      "label": "yolo26s \u00b7 baseline",
       "role": "detector",
       "path": "models/runs/detect/yolo26s-baseline/weights/best.pt",
       "class_count": 2,
@@ -117,7 +183,7 @@
     },
     {
       "id": "yolo26n-baseline",
-      "label": "yolo26n · baseline",
+      "label": "yolo26n \u00b7 baseline",
       "role": "detector",
       "path": "models/runs/detect/yolo26n-baseline/weights/best.pt",
       "class_count": 2,
@@ -129,7 +195,7 @@
     },
     {
       "id": "nano",
-      "label": "yolo26n · sequence 1280 (previous serving)",
+      "label": "yolo26n \u00b7 sequence 1280 (previous serving)",
       "role": "detector",
       "path": "models/runs/detect/yolo26n-sequence-1280/weights/best.pt",
       "class_count": 2,
@@ -146,7 +212,11 @@
       "weather_metrics": {
         "severity": "medium",
         "split": "test",
-        "clear": 0.953, "rain": 0.891, "fog": 0.947, "haze": 0.949, "snow": 0.003
+        "clear": 0.953,
+        "rain": 0.891,
+        "fog": 0.947,
+        "haze": 0.949,
+        "snow": 0.003
       },
       "classes": {
         "0": "PAPI-Red",
@@ -155,7 +225,7 @@
     },
     {
       "id": "transition",
-      "label": "yolo26s · transition (3-class)",
+      "label": "yolo26s \u00b7 transition (3-class)",
       "role": "transition",
       "path": "models/runs/detect/transition3class-yolo26s-1280/weights/best.pt",
       "class_count": 3,
@@ -165,9 +235,24 @@
         "map50": 0.6087,
         "map50_95": 0.3411,
         "per_class": {
-          "red": { "precision": 0.8435, "recall": 0.7686, "f1": 0.8043, "map50": 0.8981 },
-          "white": { "precision": 0.9701, "recall": 0.584, "f1": 0.7291, "map50": 0.8633 },
-          "transition": { "precision": 0.061, "recall": 0.3333, "f1": 0.1032, "map50": 0.0647 }
+          "red": {
+            "precision": 0.8435,
+            "recall": 0.7686,
+            "f1": 0.8043,
+            "map50": 0.8981
+          },
+          "white": {
+            "precision": 0.9701,
+            "recall": 0.584,
+            "f1": 0.7291,
+            "map50": 0.8633
+          },
+          "transition": {
+            "precision": 0.061,
+            "recall": 0.3333,
+            "f1": 0.1032,
+            "map50": 0.0647
+          }
         },
         "note": "Held-out 3-class test eval, measured 2026-06-10 against THIS checkpoint at the full PR curve (val-default conf). Test transition support is only 6 boxes, so the transition row carries wide uncertainty. Regenerate with workflows/scripts/evaluate_transition_model.py."
       },

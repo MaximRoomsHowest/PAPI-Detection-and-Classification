@@ -47,6 +47,9 @@ Stop-Process -Id $pid
 Set `VITE_PAPI_API_URL` in `.env` if the backend is not running on
 `http://127.0.0.1:8000`. The frontend calls:
 
+- `GET /api/auth/config`, `GET /api/auth/me`, and `POST /api/auth/login` for
+  the topbar sign-in/account control and `/login` page. Supabase, when enabled,
+  is handled by the backend; no `VITE_SUPABASE_*` variables are required.
 - `POST /api/analyze-frame` for a single uploaded image — and once per image of
   a folder upload in the default **Angle sweep** folder mode, so every frame
   keeps its own GPS-derived viewing angle.

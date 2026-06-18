@@ -1,19 +1,13 @@
 ---
 title: "PAPI Lights Detection and Classification — Project Management Summary"
 subtitle: "Sprint backlog · burndown · retrospectives · time tracking"
-date: "Interim — 3 June 2026"
+date: "Final — 19 June 2026"
 mainfont: "Calibri"
 fontsize: 11pt
 geometry: "a4paper, margin=2cm"
 ---
 
 # Project Management Summary
-
-<!--
-Internal note (not rendered): source for the project-management summary.
-Fill the TEAM markers (burndown, weeks 3–5 hours) before each export.
-Find them with: Select-String -Path 05-project-management-summary.md -Pattern "TEAM"
--->
 
 ## At a glance
 
@@ -27,8 +21,9 @@ Find them with: Select-String -Path 05-project-management-summary.md -Pattern "T
 
 Work is tracked on Trello, moving through **Product Backlog → Sprint
 Backlog → In Progress → Testing → Done**, planned across five weekly
-sprints. At the interim: 19 cards in the product backlog, 1 in the
-sprint backlog, 1 in progress, 1 in testing, and **29 done**.
+sprints. At final delivery, the committed scope was complete:
+**162 of 162 story points done**. A 9-point drone-simulation idea was
+kept as a stretch goal and was not included in the final scope.
 
 ![](charts/trello-board.png)
 
@@ -44,13 +39,21 @@ Board: <https://trello.com/b/iLrmBsgI/papi-industry-project-sprints>
 
 ## 2. Burndown chart
 
-*Burndown chart to be added before submission.*
+The burndown below is derived from the story points on the Trello
+cards. The dashed line is the ideal path. The solid line shows the
+actual remaining points after each sprint:
 
-<!-- TEAM: the board has no burndown power-up installed yet (only a backlog
-card to add one), so there is no chart to pull. Install a free burndown
-power-up on the board (e.g. Corrello or Screenful) and screenshot the chart
-it generates, or export the cards and plot remaining story points per day.
-Take the numbers from the board; do not invent them. -->
+- Start: 162
+- Sprint 1: 111
+- Sprint 2: 76
+- Sprint 3: 51
+- Sprint 4: 31
+- Sprint 5: 0
+
+The final 31 points were completed in Sprint 5. These covered testing,
+manuals, and the final presentation.
+
+![](charts/burndown.png)
 
 ## 3. Retrospectives
 
@@ -71,28 +74,43 @@ Format: **Glad / Sad / Mad / Add**.
 | Docker stack hardened | App.jsx grew too large | | Split App.jsx |
 | CI green by Wednesday | | | |
 
-### Sprint 3 (to hold 2026-06-05)
+### Sprint 3 (2026-06-05)
 
-*To be filled in after the retro.*
+| Glad | Sad | Mad | Add |
+|---|---|---|---|
+| Client-requested features were added before the interim | The angle calculation needed a full rebuild | The final demo scope kept changing | Keep geometry assumptions visible in the UI and docs |
+| Interim demo flow was stable | Some model work moved into the final weeks | | Test with real user flows earlier |
+
+### Sprint 4 (2026-06-12)
+
+| Glad | Sad | Mad | Add |
+|---|---|---|---|
+| Corrected angle calculation matched the client reference | Transition data was limited | Weather robustness remained uneven | Keep clear-weather and adverse-weather results separate |
+| Insights and History became more useful | Cloud deployment still needed follow-up | | Make model choices visible in the app |
+
+### Sprint 5 (2026-06-19)
+
+| Glad | Sad | Mad | Add |
+|---|---|---|---|
+| Final documents, poster, and presentation were completed | Some edge-hardware numbers could not be measured without client hardware | The final package took longer than expected | Freeze deliverable content earlier next time |
+| The project was handed over with manuals and source code | | | Keep a handover checklist from sprint 1 |
 
 ## 4. Time tracking
 
-Each member logs their hours in Toggl, tagged by work area. The figures
-cover the period logged so far — weeks 1–2 (sprints 1 and 2). Weeks 3–5
-follow as those exports come in. Source: `docs/timetrack-*.pdf`.
+Each member logged their hours in Toggl, tagged by work area. The
+figures below cover the full project period.
 
-| Member | Hours (weeks 1–2) |
+| Member | Hours |
 |---|---:|
-| Sousa Rodrigo | 86.8 |
-| Kattan Hamzzah | 84.0 |
-| Rooms Maxim | 79.3 |
-| Chekhun Maksym | 71.2 |
-| **Team total** | **321.4** |
+| Sousa Rodrigo | 148.2 |
+| Kattan Hamzzah | 146.8 |
+| Rooms Maxim | 151.5 |
+| Chekhun Maksym | 150.5 |
+| **Team total** | **597.0** |
 
 ![](charts/hours-by-member.png)
 
 ![](charts/hours-by-workarea.png)
 
-The load is even across the team (71–87 hours each). Most time went to
-Data & AI — the dataset, labelling and model work — where the hardest
-problems were.
+The load is even across the team (147–152 hours each). Most time went
+to Data & AI: the dataset, labelling, and model work.

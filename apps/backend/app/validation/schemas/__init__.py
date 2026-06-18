@@ -14,6 +14,7 @@ from app.validation.schemas.angle import (
     FramePoint,
     TransitionEvent,
 )
+from app.validation.schemas.auth import AuthConfig, AuthUser, LoginRequest, LoginResponse
 from app.validation.schemas.common import (
     BoundingBox,
     GlobalState,
@@ -73,6 +74,11 @@ __all__ = [
     # analysis
     "AnalysisPayload",
     "FrameBatchPayload",
+    # auth
+    "AuthConfig",
+    "AuthUser",
+    "LoginRequest",
+    "LoginResponse",
     # log
     "LogListItem",
     # system

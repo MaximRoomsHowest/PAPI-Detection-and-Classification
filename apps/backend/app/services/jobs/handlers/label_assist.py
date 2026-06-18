@@ -17,7 +17,7 @@ from app.services.datasets import (
     STAGING_SPLIT,
     dataset_root,
 )
-from app.services.jobs.runner import JobContext
+from app.services.jobs.contracts import JobContext
 from app.services.model_registry import resolve_weights_path
 
 

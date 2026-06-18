@@ -453,5 +453,8 @@ def extract_gps_metadata(media_path: Path) -> tuple[float, float, float] | None:
 
 def extract_gps_uncertainty(media_path: Path) -> tuple[float, float] | None:
     """RTK ``(sigma_horizontal_m, sigma_vertical_m)`` from a media file's DJI XMP, or None."""
-    head = _read_media_head(media_path)
-    return _xmp_uncertainty(_extract_dji_xmp_pose(head)) if head else None
+    pose = extract_gps_pose(media_path)
+    if pose is None:
+        return None
+    sigma_h, sigma_v = pose[3], pose[4]
+    return (sigma_h, sigma_v) if sigma_h is not None and sigma_v is not None else None

@@ -161,12 +161,14 @@ class RateLimitMiddleware:
         *,
         enabled: bool,
         general_limit_per_minute: int,
+        auth_limit_per_minute: int,
         analyze_limit_per_minute: int,
         window_seconds: int = 60,
     ) -> None:
         self.app = app
         self.enabled = enabled
         self.general_limit_per_minute = general_limit_per_minute
+        self.auth_limit_per_minute = auth_limit_per_minute
         self.analyze_limit_per_minute = analyze_limit_per_minute
         self.window_seconds = window_seconds
         self._hits: dict[tuple[str, str], deque[float]] = {}
@@ -207,6 +209,8 @@ class RateLimitMiddleware:
         await self.app(scope, receive, rate_limit_send)
 
     def _bucket_and_limit(self, path: str) -> tuple[str, int]:
+        if path == "/api/auth/login":
+            return "auth", self.auth_limit_per_minute
         if path.startswith("/api/analyze"):
             return "analyze", self.analyze_limit_per_minute
         return "general", self.general_limit_per_minute

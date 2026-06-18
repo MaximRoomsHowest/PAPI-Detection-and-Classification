@@ -27,6 +27,20 @@ copy .env.example .env
 The API will run at `http://127.0.0.1:8000`. Interactive docs at
 `http://127.0.0.1:8000/docs`.
 
+## Authentication
+
+The backend supports provider auth through `PAPI_AUTH_MODE`: `open`, `api_key`,
+`local`, `supabase`, and `local_supabase` (`auto` preserves the legacy local
+behavior). For the client local-machine handoff, choose `local` for one backend
+admin account or `supabase` for Supabase-managed users. The legacy
+`PAPI_API_KEY` remains supported as `X-API-Key` and can be kept as a
+break-glass fallback.
+
+Setup details and credential-generation commands live in
+[`../../docs/authentication.md`](../../docs/authentication.md). That guide also
+contains the demo-only local account used in the user manual; rotate it before
+any real deployment.
+
 ## Models
 
 Selectable inference models are owned by the backend registry:
@@ -62,6 +76,7 @@ disables it instead of failing startup.
 ## Endpoints
 
 - `GET /health` · `GET /health/ready` (readiness probe)
+- `GET /api/auth/config` · `GET /api/auth/me` · `POST /api/auth/login` · `POST /api/auth/logout`
 - `GET /media/{file_path}` (annotated artifacts)
 - `POST /api/analyze`
 - `POST /api/analyze-frame`
@@ -94,7 +109,8 @@ The single-frame endpoints return their results immediately and store a lightwei
 
 All HTTP responses include rate-limit headers when `PAPI_RATE_LIMIT_ENABLED`
 is true. The default buckets are broad for dashboard/API traffic
-(`PAPI_RATE_LIMIT_PER_MINUTE=600`) and stricter for expensive
+(`PAPI_RATE_LIMIT_PER_MINUTE=600`), stricter for login attempts
+(`PAPI_AUTH_RATE_LIMIT_PER_MINUTE=20`), and stricter for expensive
 `/api/analyze*` inference requests (`PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE=60`).
 Exceeded buckets return a JSON `429` with `Retry-After`.
 
@@ -105,6 +121,7 @@ app/
   api/                       FastAPI HTTP layer
     routes.py                Public import surface; assembles the sub-routers + require_api_key
     routers/                 Endpoints split by concern:
+      auth.py                  auth config, login, current user, logout
       analyze.py               analyze / analyze-frame / analyze-frames / analyze-sequence
       logs.py                  logs list, CSV export, detail
       stats.py                 aggregate stats
@@ -112,6 +129,7 @@ app/
   models/                    SQLAlchemy database entities
   repositories/              Database read/write logic
   services/                  Media, angle, runway, and state logic
+    auth.py                  provider-based operator auth
     inference/               Inference package:
       service.py               InferenceService facade (load, image/video/sequence)
       aggregation.py           per-lamp video verdict by track identity

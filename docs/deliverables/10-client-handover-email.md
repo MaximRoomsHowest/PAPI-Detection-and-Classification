@@ -6,23 +6,19 @@ fontsize: 10pt
 geometry: "a4paper, margin=2cm"
 ---
 
-> Template for the handover email to Daoud Uahabi at Intersoft
-> Electronics Services BV. Save the sent message and Daoud's
-> acknowledgement as PDFs and keep both on file as a record of the
-> handover.
+> Final handover email text for Daoud Uahabi at Intersoft Electronics
+> Services BV. Save the sent message and Daoud's acknowledgement as
+> PDFs and keep both on file as proof of handover.
 
-## Send-checklist (before hitting Send)
+## Handover checklist
 
-- [ ] Repo is on a tagged release (e.g. `v1.0-final`); CI green on
-      that commit.
-- [ ] `models/serving/best.pt` present and loadable from a clean clone
-      (or the installation manual explains the manual placement).
-- [ ] Source ZIP attached or linked.
-- [ ] All `<!-- TEAM: ... -->` placeholders below filled.
-- [ ] Email copied to all four team members + the project
-      supervisor.
-- [ ] Subject line includes "Industry Project" and the project
-      name (helps Daoud and his archive find it later).
+- Repository link included.
+- Source ZIP attached or linked.
+- User manual included.
+- Installation manual included.
+- Architecture / components overview included.
+- Model registry and configuration paths named.
+- The team stays reachable for 30 days after handover.
 
 ---
 
@@ -83,11 +79,10 @@ Five things worth flagging:
      papi_*.yaml geometry file plus retraining on capture from
      the new site.
 
-  3. The recommended edge deployment is [edge device — to be
-     confirmed once the WL051 hardware specs arrive], achieving
-     [N] fps at p50 (full numbers in §5 of the edge benchmark
-     report). The web demo on localhost is CPU-bound
-     and runs at ~ 0.4 fps — that's expected.
+  3. The final package includes measured laptop CPU and GPU reference
+     numbers. Intersoft's WL051 hardware specs were not available
+     during the project, so a final recommendation for that exact
+     workstation still needs to be confirmed on Intersoft hardware.
 
   4. Production deployment requires PAPI_ENV=production and a
      PAPI_API_KEY set in .env. The installation manual covers

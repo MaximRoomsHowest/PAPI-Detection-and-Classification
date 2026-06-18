@@ -208,18 +208,19 @@ Before exporting for the deliverables package:
 - [ ] Final approval: at least two team members signed off in
       Trello before upload.
 
-## 7. Open decisions
+## 7. Final poster choices
 
-**<!-- TEAM: capture these decisions in a quick sprint check
-before the final-week design pass. -->**
+The submitted poster uses the simple promotional direction from this
+brief:
 
-1. Image source: licensed photograph, AI render, or composite?
-2. Tagline: which of the four options (or another)?
-3. Design tool: Figma or Canva?
-4. Print run: digital-only for the deliverables package, or also
-   printed for the demo day / promotional table?
-5. Does the team want a sub-tagline in Dutch and / or French for
-   the bilingual promotional version?
+1. One main aviation image.
+2. The title `PAPI VISION`.
+3. The tagline `Safer landings, seen from the sky.`
+4. The four team-member names.
+5. `Howest · Industry Project · 2026`.
+
+The poster avoids technology names and feature lists. It is meant for
+promotion, not for technical explanation.
 
 ## 8. Sources
 

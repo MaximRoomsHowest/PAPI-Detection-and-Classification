@@ -16,7 +16,6 @@ Isolation rules that matter:
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from typing import Any
@@ -24,40 +23,9 @@ from typing import Any
 from app.config import Settings
 from app.database import get_sessionmaker
 from app.repositories.jobs import TERMINAL_STATUSES, JobRepository
+from app.services.jobs.contracts import JobCancelled, JobContext, JobHandler
 
 logger = logging.getLogger(__name__)
-
-
-class JobCancelled(Exception):
-    """Raised by a handler when it observes a cooperative cancel request."""
-
-
-class JobContext:
-    """The handle a handler uses to report progress and observe cancellation.
-
-    Wraps a ``JobRepository`` bound to the worker's own session. Handlers should
-    call ``check_cancelled()`` at natural checkpoints (between images, between
-    polls) so a cancel request takes effect promptly.
-    """
-
-    def __init__(self, job_id: str, settings: Settings, repo: JobRepository):
-        self.job_id = job_id
-        self.settings = settings
-        self._repo = repo
-
-    def progress(self, phase: str | None = None, fraction: float | None = None) -> None:
-        self._repo.set_progress(self.job_id, phase, fraction)
-
-    def cancelled(self) -> bool:
-        return self._repo.is_cancel_requested(self.job_id)
-
-    def check_cancelled(self) -> None:
-        if self.cancelled():
-            raise JobCancelled()
-
-
-# A handler takes (params, ctx) and returns a result dict (or None) stored on the job.
-JobHandler = Callable[[dict[str, Any], JobContext], dict[str, Any] | None]
 
 
 class JobRunner:

@@ -1,11 +1,25 @@
-import { useCallback, useState } from 'react'
-import { getApiKey, setAdminKey } from '../lib/api'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  clearAuthSession,
+  fetchAuthConfig,
+  fetchCurrentUser,
+  getApiKey,
+  getAuthSession,
+  loginUser,
+  logoutUser,
+  setAdminKey,
+} from '../lib/api'
 
-// "Admin mode" is a UI flag (show the management surface) kept separate from the
-// API key itself: an OPEN local deployment (no PAPI_API_KEY) still wants the
-// management pages, while a GATED deployment also needs the key for X-API-Key.
-// Entering a key implies admin mode; admin mode can also be on with no key (open).
+// "Admin mode" remains the UI flag that reveals management routes. Credentials are
+// now provider-backed: local/Supabase sessions use Authorization: Bearer, while
+// the old X-API-Key path stays as a backwards-compatible fallback.
 const ADMIN_MODE_KEY = 'papi.adminMode'
+const DEFAULT_AUTH_CONFIG = {
+  mode: 'auto',
+  password_login_enabled: false,
+  api_key_enabled: false,
+  supabase_enabled: false,
+}
 
 function readAdminMode() {
   try {
@@ -15,32 +29,108 @@ function readAdminMode() {
   }
 }
 
-export function useAdminKey() {
-  const [isAdmin, setIsAdmin] = useState(readAdminMode)
-  const [adminKey, setKey] = useState(() => getApiKey())
+function writeAdminMode(enabled) {
+  try {
+    if (enabled) window.localStorage.setItem(ADMIN_MODE_KEY, '1')
+    else window.localStorage.removeItem(ADMIN_MODE_KEY)
+  } catch {
+    /* accept the loss for this session */
+  }
+}
 
-  const unlock = useCallback((key) => {
+export function useAdminKey() {
+  const [isAdmin, setIsAdmin] = useState(() => readAdminMode() || Boolean(getAuthSession()) || Boolean(getApiKey()))
+  const [adminKey, setKey] = useState(() => getApiKey())
+  const [session, setSession] = useState(() => getAuthSession())
+  const [user, setUser] = useState(() => getAuthSession()?.user ?? null)
+  const [authConfig, setAuthConfig] = useState(DEFAULT_AUTH_CONFIG)
+  const [checking, setChecking] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      fetchAuthConfig().catch(() => DEFAULT_AUTH_CONFIG),
+      fetchCurrentUser().catch(() => ({ authenticated: false })),
+    ]).then(([config, currentUser]) => {
+      if (!active) return
+      const storedSession = getAuthSession()
+      const key = getApiKey()
+      const authenticated = Boolean(currentUser?.authenticated)
+      setAuthConfig(config || DEFAULT_AUTH_CONFIG)
+      setSession(storedSession)
+      setKey(key)
+      setUser(authenticated ? currentUser : storedSession?.user ?? null)
+      setIsAdmin(
+        readAdminMode()
+        || Boolean(key)
+        || Boolean(storedSession)
+        || (authenticated && currentUser.provider !== 'open'),
+      )
+      setChecking(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const unlockApiKey = useCallback((key) => {
     const trimmed = (key || '').trim()
     if (trimmed) setAdminKey(trimmed)
-    try {
-      window.localStorage.setItem(ADMIN_MODE_KEY, '1')
-    } catch {
-      /* accept the loss for this session */
-    }
+    clearAuthSession()
+    writeAdminMode(true)
     setIsAdmin(true)
     setKey(getApiKey())
+    setSession(null)
+    setUser(trimmed ? { authenticated: true, provider: 'api_key', roles: ['admin'] } : null)
+    setError(null)
+  }, [])
+
+  const unlockOpen = useCallback(() => {
+    setAdminKey(null)
+    clearAuthSession()
+    writeAdminMode(true)
+    setIsAdmin(true)
+    setKey(null)
+    setSession(null)
+    setUser({ authenticated: true, provider: 'open', roles: ['admin'] })
+    setError(null)
+  }, [])
+
+  const signIn = useCallback(async ({ email, password }) => {
+    setError(null)
+    const nextSession = await loginUser({ email, password })
+    writeAdminMode(true)
+    setSession(nextSession)
+    setUser(nextSession.user)
+    setKey(null)
+    setIsAdmin(true)
+    return nextSession
   }, [])
 
   const lock = useCallback(() => {
-    setAdminKey(null)
-    try {
-      window.localStorage.removeItem(ADMIN_MODE_KEY)
-    } catch {
-      /* accept the loss for this session */
-    }
+    logoutUser().catch(() => {})
+    writeAdminMode(false)
     setIsAdmin(false)
+    setSession(null)
+    setUser(null)
     setKey(null)
+    setError(null)
   }, [])
 
-  return { isAdmin, adminKey, unlock, lock }
+  return {
+    isAdmin,
+    adminKey,
+    session,
+    user,
+    authConfig,
+    checking,
+    error,
+    setError,
+    unlock: unlockApiKey,
+    unlockApiKey,
+    unlockOpen,
+    signIn,
+    lock,
+  }
 }

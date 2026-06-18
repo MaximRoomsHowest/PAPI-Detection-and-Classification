@@ -49,9 +49,10 @@ Container Apps ingress in the cloud deployment.
 
 ```
 apps/
-  backend/           FastAPI service, SQLAlchemy ORM, ultralytics
-                     YOLO inference, OpenCV media handling. HTTP layer
-                     split into app/api/routers/ (analyze/logs/stats/meta);
+  backend/           FastAPI service, SQLAlchemy ORM, provider-based auth,
+                     ultralytics YOLO inference, OpenCV media handling.
+                     HTTP layer split into app/api/routers/
+                     (auth/analyze/logs/stats/meta/jobs/models/datasets);
                      inference engine in app/services/inference/
   frontend/         Vite/React SPA (route shell + pages/, LiveDemo state
                      via React context), Plotly charts, jsPDF export
@@ -66,7 +67,7 @@ configs/
   papi_edny.yaml    PAPI geometry + camera intrinsics for EDNY
   projection.yaml   Calibrated DJI gimbal Euler convention (generated)
   split.yaml        Flight-level train/val/test split
-data/                Tracked READMEs + .gitkeep placeholders;
+data/                Tracked READMEs + .gitkeep directory markers;
                      raw data archived externally
 docs/                Label spec, pipeline doc, user manual,
                      installation manual, this file
@@ -205,7 +206,7 @@ band.)
 
 The client's tool reports the per-lamp red→white transition set-angles
 as approximately **2.32° / 2.55° / 3.12° / 3.6°** (the four lamps).
-These are **not yet bound**: `configs/papi_edny.yaml` still carries
+These are **not bound in v1.0**: `configs/papi_edny.yaml` still carries
 `set_angle_deg: null` per lamp and falls back to FAA defaults
 (`[2.50, 2.83, 3.17, 3.50]` for a 3.0° glideslope) with a
 `transition_half_width_deg` of 0.10. These set-angles parametrise the
@@ -296,12 +297,17 @@ each view is its own component under `src/pages/`. The routes:
 | `/runways` | `RunwaysPage` | Manage runway geometry (select / add custom runways) used by the angle calculation |
 | `/insights` | `InsightsPage` | Tabbed charts (angle-vs-state, transitions, session summary) + model/dataset metrics, all from real backend output; PDF export |
 | `/history` | `HistoryPage` | Recent persisted analyses, artifacts, and model runtime status |
+| `/login` | `LoginPage` | Operator sign-in for local password, optional Supabase, open-local, or legacy API-key mode |
+| `/models` | `ModelsPage` | Admin-only model registry, upload, evaluate, compare, promote, enable/disable, and delete |
+| `/datasets` | `DatasetsPage` | Admin-only dataset upload, assisted labeling, review, and training-bundle preparation |
 
 Theme is driven by CSS custom properties on `html[data-theme]`.
 Brand identity: Intersoft navy (`#00426e`), Poppins typography,
 restrained palette.
 
-API client lives in `src/lib/api.js` — the analyze calls
+API client lives in `src/lib/api.js` — the auth calls
+(`/api/auth/config`, `/api/auth/login`, `/api/auth/me`,
+`/api/auth/logout`), analyze calls
 (`analyzeMedia`, `analyzeFrame`, `analyzeFrames`, `analyzeSequence`)
 plus the log / stats / model / runway / readiness fetchers all wrap
 `fetch` (with a per-call timeout). `analyzeSequence` posts the folder
@@ -318,26 +324,35 @@ to `/api/analyze-sequence` for the folder→video path.
   - Both runtime containers run as non-root users (`papi`, `nginx`).
   - Postgres bound to `127.0.0.1` only; service-to-service access
     via the internal compose network.
-  - `PAPI_ENV=production` makes `PAPI_API_KEY` mandatory at startup.
+  - `PAPI_ENV=production` refuses open auth. Operators choose local
+    email/password sessions or the optional Supabase Auth adapter during
+    installation; the legacy `X-API-Key` provider and advanced `local_supabase`
+    combined mode remain available.
   - nginx ships baseline security headers (CSP, X-Frame-Options,
     Referrer-Policy, Permissions-Policy, X-Content-Type-Options).
   - Process-local rate limiting per client IP (defaults: 600
     requests/min general, 60/min on the analyze endpoints; returns
-    429 + `Retry-After`). uvicorn trusts the proxy's
+    429 + `Retry-After`). Login attempts have a separate default
+    bucket (`PAPI_AUTH_RATE_LIMIT_PER_MINUTE=20`). uvicorn trusts the proxy's
     `X-Forwarded-For` (`FORWARDED_ALLOW_IPS`) so buckets track real
     clients, not the nginx hop.
-- **CI**: GitHub Actions runs pytest + ruff + npm lint + npm build +
-  Docker build on every push (`.github/workflows/ci.yml`).
+- **Background jobs**: evaluation and assisted labeling run through the
+  single-worker job runner. Shared handler contracts live in
+  `app/services/jobs/contracts.py`, so handlers no longer import the runner.
+- **CI**: GitHub Actions runs pytest + ruff + npm lint + npm test +
+  npm build + Docker build on every push (`.github/workflows/ci.yml`).
+  Local coverage commands are available through `pytest --cov` and
+  `npm run test:coverage`.
 
 ## 8. Known scope limitations
 
 | Item | Status | Where to look |
 | --- | --- | --- |
 | ZoomCamera auto-labelling | Skipped sprint 1 | `configs/papi_edny.yaml:79` (focal_px = null) |
-| EDNY commissioned set-angles | FAA defaults used | `configs/papi_edny.yaml` (TODO comments) |
+| EDNY commissioned set-angles | FAA defaults used | `configs/papi_edny.yaml` documents the missing client values |
 | Multi-airport generalisation | Out of scope for v1.0 | One YAML per airport; geometry library already supports it |
 | Real-time inference (>10 fps) | ~0.4 fps on a laptop CPU | INT8 ONNX exists; GPU not configured |
-| Edge-device deployment | Not yet measured | `docs/edge-benchmark.md` template ready for the team |
+| Edge-device deployment | Laptop reference measured; dedicated edge hardware unavailable | `docs/edge-benchmark.md` records final benchmark status |
 
 ## 9. Sources of truth
 

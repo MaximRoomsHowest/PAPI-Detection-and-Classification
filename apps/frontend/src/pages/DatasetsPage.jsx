@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Upload, Wand2, Trash2, GraduationCap, ClipboardCheck } from 'lucide-react'
 import { useDatasets } from '../hooks/useDatasets'
@@ -242,6 +243,9 @@ export function DatasetsPage({ copy, isAdmin }) {
         <PapiGlyph size="brand" />
         <h1>{copy.models.adminRequired}</h1>
         <p className="lc-empty">{copy.models.adminRequiredHint}</p>
+        <Link className="cta-button" to="/login" state={{ from: { pathname: '/datasets' } }}>
+          {copy.admin.signIn}
+        </Link>
       </section>
     )
   }

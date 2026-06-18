@@ -8,13 +8,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   ADMIN_KEY_STORAGE,
+  AUTH_SESSION_STORAGE,
   cancelJob,
   commitLabels,
+  fetchAuthConfig,
+  fetchCurrentUser,
   deleteModel,
   evaluateModel,
   fetchDatasets,
   fetchJob,
   getApiKey,
+  getAuthSession,
+  loginUser,
+  logoutUser,
+  resolveMediaUrl,
+  setAuthSession,
   promoteModel,
   setAdminKey,
   uploadModel,
@@ -24,17 +32,23 @@ function jsonResponse(body, { ok = true, status = ok ? 200 : 500, statusText = '
   return { ok, status, statusText, json: async () => body }
 }
 
+function blobResponse(body = 'artifact-bytes', { ok = true, status = 200 } = {}) {
+  return { ok, status, blob: async () => new Blob([body]) }
+}
+
 let fetchMock
 
 beforeEach(() => {
   fetchMock = vi.fn().mockResolvedValue(jsonResponse({}))
   vi.stubGlobal('fetch', fetchMock)
   window.localStorage.removeItem(ADMIN_KEY_STORAGE)
+  window.localStorage.removeItem(AUTH_SESSION_STORAGE)
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
   window.localStorage.removeItem(ADMIN_KEY_STORAGE)
+  window.localStorage.removeItem(AUTH_SESSION_STORAGE)
 })
 
 describe('admin key plumbing', () => {
@@ -47,11 +61,111 @@ describe('admin key plumbing', () => {
   })
 
   it('attaches X-API-Key when an admin key is set', async () => {
-    setAdminKey('abc123')
+    setAdminKey('  abc123  ')
     fetchMock.mockResolvedValueOnce(jsonResponse([]))
     await fetchDatasets()
     const [, init] = fetchMock.mock.calls[0]
     expect(init.headers['X-API-Key']).toBe('abc123')
+  })
+
+  it('prefers a bearer user session over the legacy API key', async () => {
+    setAdminKey('abc123')
+    setAuthSession({ access_token: 'session-token', expires_at: Math.floor(Date.now() / 1000) + 3600 })
+    fetchMock.mockResolvedValueOnce(jsonResponse([]))
+    await fetchDatasets()
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.headers.Authorization).toBe('Bearer session-token')
+    expect(init.headers['X-API-Key']).toBeUndefined()
+  })
+
+  it('drops expired bearer sessions before building request headers', async () => {
+    setAdminKey('abc123')
+    setAuthSession({ access_token: 'expired-token', expires_at: Math.floor(Date.now() / 1000) - 1 })
+    expect(getAuthSession()).toBeNull()
+    fetchMock.mockResolvedValueOnce(jsonResponse([]))
+
+    await fetchDatasets()
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.headers.Authorization).toBeUndefined()
+    expect(init.headers['X-API-Key']).toBe('abc123')
+    expect(window.localStorage.getItem(AUTH_SESSION_STORAGE)).toBeNull()
+  })
+
+  it('loads auth configuration from the public auth endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        mode: 'supabase',
+        password_login_enabled: true,
+        api_key_enabled: false,
+        supabase_enabled: true,
+      }),
+    )
+
+    await expect(fetchAuthConfig()).resolves.toMatchObject({
+      mode: 'supabase',
+      supabase_enabled: true,
+    })
+
+    const [url] = fetchMock.mock.calls[0]
+    expect(url).toMatch(/\/api\/auth\/config$/)
+  })
+
+  it('stores the session from password login and clears a legacy admin key', async () => {
+    setAdminKey('legacy-secret')
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        access_token: 'session-token',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { authenticated: true, provider: 'local', email: 'admin@example.com', roles: ['admin'] },
+      }),
+    )
+
+    const session = await loginUser({ email: 'admin@example.com', password: 's3cret' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.method).toBe('POST')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(JSON.parse(init.body)).toEqual({ email: 'admin@example.com', password: 's3cret' })
+    expect(session.access_token).toBe('session-token')
+    expect(getAuthSession()?.access_token).toBe('session-token')
+    expect(getApiKey()).toBeFalsy()
+  })
+
+  it('clears stale credentials when current-user verification fails', async () => {
+    setAdminKey('legacy-secret')
+    setAuthSession({ access_token: 'stale-token', expires_at: Math.floor(Date.now() / 1000) + 3600 })
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: 'nope' }, { ok: false, status: 401 }))
+
+    await expect(fetchCurrentUser()).rejects.toThrow(/Could not verify auth session/)
+
+    expect(getAuthSession()).toBeNull()
+    expect(getApiKey()).toBeFalsy()
+  })
+
+  it('logout clears credentials even when the endpoint is unavailable', async () => {
+    setAdminKey('legacy-secret')
+    setAuthSession({ access_token: 'session-token', expires_at: Math.floor(Date.now() / 1000) + 3600 })
+    fetchMock.mockRejectedValueOnce(new Error('offline'))
+
+    await logoutUser()
+
+    expect(getAuthSession()).toBeNull()
+    expect(getApiKey()).toBeFalsy()
+  })
+
+  it('fetches media artifacts with the bearer session before rendering them', async () => {
+    const createObjectURL = vi.fn(() => 'blob:artifact-url')
+    vi.stubGlobal('URL', { createObjectURL })
+    setAuthSession({ access_token: 'session-token', expires_at: Math.floor(Date.now() / 1000) + 3600 })
+    fetchMock.mockResolvedValueOnce(blobResponse())
+
+    await expect(resolveMediaUrl('/media/annotated.webm')).resolves.toBe('blob:artifact-url')
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toMatch(/\/media\/annotated\.webm$/)
+    expect(init.headers.Authorization).toBe('Bearer session-token')
+    expect(createObjectURL).toHaveBeenCalled()
   })
 })
 

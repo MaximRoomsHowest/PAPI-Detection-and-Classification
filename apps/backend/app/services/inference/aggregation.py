@@ -2,6 +2,8 @@
 
 from collections import Counter
 
+from papi.lamp_state import NUM_PAPI_LAMPS
+
 from app.services.state import lamp_index_by_track
 from app.validation.schemas import LampResult
 
@@ -25,7 +27,7 @@ def aggregate_video_lamps(
             obs_by_index.setdefault(index, []).extend(obs)
 
     final_lamps: list[LampResult] = []
-    for index in range(1, 5):
+    for index in range(1, NUM_PAPI_LAMPS + 1):
         obs = obs_by_index.get(index, [])
         if not obs:
             final_lamps.append(LampResult(index=index, state="obscured", confidence=0.0))

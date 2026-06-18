@@ -4,7 +4,7 @@ import { Globe, Moon, Sun } from 'lucide-react'
 import clsx from 'clsx'
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../i18n/translations'
 import { useClickOutside } from '../hooks/useClickOutside'
-import { AdminUnlock } from './AdminUnlock'
+import { AdminAccessButton } from './AdminAccessButton'
 
 // The sticky application header: brand, primary nav, language menu and theme
 // toggle. Extracted from App.jsx so the App component stays as the route shell.
@@ -186,7 +186,7 @@ export function Topbar({ copy, theme, onToggleTheme, language, onSelectLanguage,
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
         </div>
-        {admin ? <AdminUnlock admin={admin} copy={copy} /> : null}
+        {admin ? <AdminAccessButton admin={admin} copy={copy} /> : null}
       </div>
     </header>
   )

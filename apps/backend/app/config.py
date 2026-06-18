@@ -25,9 +25,9 @@ class Settings(BaseSettings):
 
     app_name: str = "PAPI Backend"
     # ``environment`` flips the security floor. In "production" the startup
-    # check in main.py refuses to boot without a non-empty PAPI_API_KEY
-    # (audit B-CRIT-5). Use "production" only at real deploy time; local
-    # Compose, dev, and CI should stay on the default ("local").
+    # check in main.py refuses open auth and default database credentials.
+    # Use "production" only at real deploy time; local Compose, dev, and CI
+    # should stay on the default ("local").
     environment: str = Field(default="local", alias="PAPI_ENV")
     # Read from DATABASE_URL (Compose + .env.example) OR PAPI_DATABASE_URL
     # (matches every other setting's PAPI_ prefix and the production startup error
@@ -56,7 +56,29 @@ class Settings(BaseSettings):
     blob_container: str = Field(default="papi-media", alias="PAPI_BLOB_CONTAINER")
     azure_storage_connection_string: str | None = Field(default=None, alias="AZURE_STORAGE_CONNECTION_STRING")
     azure_storage_account_url: str | None = Field(default=None, alias="AZURE_STORAGE_ACCOUNT_URL")
+    # Authentication strategy:
+    #   auto     -> preserve legacy behavior: API key when PAPI_API_KEY is set, open otherwise
+    #   open     -> no user auth gate, intended only for local/offline demos
+    #   api_key  -> require X-API-Key
+    #   local    -> first-party email/password login, signed by PAPI_AUTH_SESSION_SECRET
+    #   supabase -> optional Supabase Auth bearer tokens, validated against the project Auth API
+    #   local_supabase -> accept both local sessions and Supabase Auth tokens/logins
+    auth_mode: str = Field(default="auto", alias="PAPI_AUTH_MODE")
+    auth_session_secret: str | None = Field(default=None, alias="PAPI_AUTH_SESSION_SECRET")
+    auth_session_ttl_minutes: int = Field(default=480, ge=5, le=10080, alias="PAPI_AUTH_SESSION_TTL_MINUTES")
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
+    local_admin_email: str | None = Field(default=None, alias="PAPI_LOCAL_ADMIN_EMAIL")
+    local_admin_password_hash: str | None = Field(default=None, alias="PAPI_LOCAL_ADMIN_PASSWORD_HASH")
+    supabase_url: str | None = Field(
+        default="https://mrkhpwtuyytlamrythwn.supabase.co",
+        alias="PAPI_SUPABASE_URL",
+    )
+    supabase_anon_key: str | None = Field(default=None, alias="PAPI_SUPABASE_ANON_KEY")
+    supabase_allowed_emails: Annotated[list[str], NoDecode] = Field(
+        default=[],
+        alias="PAPI_SUPABASE_ALLOWED_EMAILS",
+    )
+    supabase_required_role: str | None = Field(default=None, alias="PAPI_SUPABASE_REQUIRED_ROLE")
     # NoDecode disables pydantic-settings' built-in JSON decode for env values
     # so the @field_validator below receives the raw string and can parse
     # comma-separated lists. Without this the env source raises SettingsError
@@ -148,6 +170,12 @@ class Settings(BaseSettings):
     # and get a lower bucket than read-only dashboard/API traffic.
     rate_limit_enabled: bool = Field(default=True, alias="PAPI_RATE_LIMIT_ENABLED")
     rate_limit_per_minute: int = Field(default=600, ge=1, le=100000, alias="PAPI_RATE_LIMIT_PER_MINUTE")
+    auth_rate_limit_per_minute: int = Field(
+        default=20,
+        ge=1,
+        le=100000,
+        alias="PAPI_AUTH_RATE_LIMIT_PER_MINUTE",
+    )
     analyze_rate_limit_per_minute: int = Field(
         default=60,
         ge=1,
@@ -200,6 +228,15 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: Any) -> list[str]:
+        return cls._parse_string_list(value)
+
+    @field_validator("supabase_allowed_emails", mode="before")
+    @classmethod
+    def parse_supabase_allowed_emails(cls, value: Any) -> list[str]:
+        return cls._parse_string_list(value)
+
+    @classmethod
+    def _parse_string_list(cls, value: Any) -> list[str]:
         if isinstance(value, str):
             try:
                 parsed = json.loads(value)
@@ -209,6 +246,17 @@ class Settings(BaseSettings):
                 return [str(origin).strip() for origin in parsed if str(origin).strip()]
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @field_validator("auth_mode")
+    @classmethod
+    def validate_auth_mode(cls, value: str) -> str:
+        normalized = (value or "auto").strip().lower()
+        if normalized not in ("auto", "open", "api_key", "local", "supabase", "local_supabase"):
+            raise ValueError(
+                "auth_mode must be 'auto', 'open', 'api_key', 'local', 'supabase', "
+                "or 'local_supabase'"
+            )
+        return normalized
 
     @field_validator(
         "model_path",

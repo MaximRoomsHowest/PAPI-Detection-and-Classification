@@ -1,4 +1,4 @@
-"""Background-job status + cancellation endpoints (api-key gated).
+"""Background-job status + cancellation endpoints (operator-auth gated).
 
 The frontend polls ``GET /api/jobs/{id}`` while a job is queued/running. Both job
 kinds (evaluate / label_assist) report through the same shape.

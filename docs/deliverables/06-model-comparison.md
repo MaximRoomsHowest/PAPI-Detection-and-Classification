@@ -66,7 +66,7 @@ The decision criteria are spelled out in §4.
 Measured 2026-06-10 (`workflows/scripts/run_redwhite_test_eval.py`, full PR curve,
 IoU 0.5). The test split covers the
 day-wide and night-wide flights; the day-zoom flight is absent from the evaluated
-dataset (focal calibration pending) — see §3.2.
+dataset (focal calibration unavailable) — see §3.2.
 
 | Model | Detection F1 | mAP@0.5 | mAP@0.5:0.95 | Per-state F1 red | Per-state F1 white | Per-state F1 transition* |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -105,7 +105,7 @@ the same fps@p50 / RSS measurements consolidated for comparison.
 
 Measured 2026-06-10 on the project laptop (30 frames × 3 runs, bare `model.predict`;
 reproduce with `workflows/scripts/edge_benchmark.py`). No Jetson hardware is available — that
-column is honestly empty pending the client's WL051 specs. For GPU reference the
+column is honestly empty because the client's WL051 specs were unavailable. For GPU reference the
 laptop RTX 4070 runs yolo26s at p50 29.1 ms (34.4 fps).
 
 | Model | Params (M) | p50 latency laptop CPU (ms) | fps@p50 laptop CPU | fps@p50 Jetson Orin INT8 | RSS MB (steady) |

@@ -16,8 +16,10 @@
 #
 # For a real deployment, override at least:
 #   PAPI_LOCAL_POSTGRES_PASSWORD (strong random secret)
-#   PAPI_API_KEY               (required when PAPI_ENV=production)
-#   PAPI_ENV=production        (flips the security floor — see backend main.py)
+#   PAPI_ENV=production        (flips the security floor - see backend main.py)
+#   PAPI_AUTH_MODE=local       (or supabase; choose one for client local install)
+#   PAPI_AUTH_SESSION_SECRET + PAPI_LOCAL_ADMIN_* when using local
+#   PAPI_SUPABASE_ANON_KEY + allowlist/role when using supabase
 #   PAPI_BACKEND_BIND=0.0.0.0  (only if the API must be reached directly, off-host)
 
 services:
@@ -166,6 +168,7 @@ services:
       # CPU/GPU inference from accidental refresh loops or simple abuse.
       PAPI_RATE_LIMIT_ENABLED: ${PAPI_RATE_LIMIT_ENABLED:-true}
       PAPI_RATE_LIMIT_PER_MINUTE: ${PAPI_RATE_LIMIT_PER_MINUTE:-600}
+      PAPI_AUTH_RATE_LIMIT_PER_MINUTE: ${PAPI_AUTH_RATE_LIMIT_PER_MINUTE:-20}
       PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE: ${PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE:-60}
       # Trust X-Forwarded-For from the in-network nginx proxy so the rate
       # limiter buckets by real client IP instead of lumping every browser
@@ -176,9 +179,27 @@ services:
       # — acceptable for the demo threat model; tighten to the proxy IP/CIDR
       # if the port is ever LAN-exposed.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
-      # Security floor: ``production`` makes the API key mandatory at startup.
+      # Security floor: ``production`` refuses open auth and default DB credentials.
       PAPI_ENV: ${PAPI_ENV:-local}
+      # Auth mode: auto | open | api_key | local | supabase | local_supabase.
+      # For client local-machine setup, choose local OR supabase. auto preserves
+      # the old local-demo behavior: API key when PAPI_API_KEY is set, open otherwise.
+      PAPI_AUTH_MODE: ${PAPI_AUTH_MODE:-auto}
+      # Local first-party login. Generate the session secret with:
+      #   py -3.12 -c "import secrets; print(secrets.token_urlsafe(48))"
+      # Generate the password hash from apps/backend:
+      #   ..\..\.venv\Scripts\python.exe -c "from app.services.auth import hash_password; print(hash_password('replace-this-password'))"
+      PAPI_AUTH_SESSION_SECRET: ${PAPI_AUTH_SESSION_SECRET:-}
+      PAPI_AUTH_SESSION_TTL_MINUTES: ${PAPI_AUTH_SESSION_TTL_MINUTES:-480}
+      PAPI_LOCAL_ADMIN_EMAIL: ${PAPI_LOCAL_ADMIN_EMAIL:-}
+      PAPI_LOCAL_ADMIN_PASSWORD_HASH: ${PAPI_LOCAL_ADMIN_PASSWORD_HASH:-}
+      # Legacy API-key provider and optional break-glass fallback for local/supabase modes.
       PAPI_API_KEY: ${PAPI_API_KEY:-}
+      # Optional Supabase Auth adapter. Never put a service_role key here.
+      PAPI_SUPABASE_URL: ${PAPI_SUPABASE_URL:-https://mrkhpwtuyytlamrythwn.supabase.co}
+      PAPI_SUPABASE_ANON_KEY: ${PAPI_SUPABASE_ANON_KEY:-}
+      PAPI_SUPABASE_ALLOWED_EMAILS: ${PAPI_SUPABASE_ALLOWED_EMAILS:-}
+      PAPI_SUPABASE_REQUIRED_ROLE: ${PAPI_SUPABASE_REQUIRED_ROLE:-}
       # CPU thread budget for inference (torch + OpenBLAS + OpenCV + ONNX Runtime).
       # 0 = auto: resolved from the container's REAL cpu allotment (cgroup-aware on
       # Linux), which prevents thread oversubscription under a fractional-CPU cap.

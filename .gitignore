@@ -70,8 +70,25 @@ models/**/*.safetensors
 !models/base/*.onnx
 !models/serving/*.pt
 !models/serving/*.onnx
+models/serving/best_int8.onnx
 !models/runs/
-!models/runs/**
+!models/runs/README.md
+!models/runs/detect/
+!models/runs/detect/**/
+!models/runs/detect/**/args.yaml
+!models/runs/detect/**/results.csv
+!models/runs/detect/**/*.json
+!models/runs/detect/**/weights/
+!models/runs/detect/**/weights/best.pt
+!models/runs/detect/**/weights/best.onnx
+# Promoted model runs keep only runnable weights and compact metadata. Training
+# previews, plots, validation dumps, and resume checkpoints are regenerated.
+models/runs/detect/val-*/
+models/runs/detect/yolov8s-transfer/
+models/runs/detect/**/*.jpg
+models/runs/detect/**/*.jpeg
+models/runs/detect/**/*.png
+models/runs/detect/**/weights/last.pt
 # ...EXCEPT the training workspace: in-progress / experimental runs live under
 # models/ (so ALL models are in one place) but are NOT committed. Training scripts
 # write here (PAPI run project=models/runs/experiments); promote a finished run by

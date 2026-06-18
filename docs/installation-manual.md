@@ -6,8 +6,7 @@ from a fresh machine. Two supported paths:
 1. **Docker compose** — recommended for demos and reviewers.
 2. **Native development** — for the team's day-to-day work.
 
-> **Already installed?** See [user-manual.md](user-manual.md)
-> for usage.
+> **Already installed?** See the user manual for usage.
 
 ## 1. Prerequisites
 
@@ -65,8 +64,9 @@ React frontend, all behind one command.
 # Step 1 — create your environment file
 cp .env.example .env
 # Edit .env: at minimum, change POSTGRES_PASSWORD to a non-default value.
+# For client handoff, choose PAPI_AUTH_MODE=local or PAPI_AUTH_MODE=supabase.
 # Leave PAPI_ENV=local for development; switch to PAPI_ENV=production for
-# a real deployment (will require PAPI_API_KEY to be set).
+# a real deployment after configuring one auth provider.
 
 # Step 2 — build the images and start the stack
 docker compose up -d --build
@@ -189,29 +189,59 @@ python workflows/scripts/pipeline.py extract --limit 100
 
 For a real deployment (not a local demo):
 
-1. **Generate a strong API key** and set it — together with the
-   production flag — in `.env`:
-   ```bash
-   PAPI_API_KEY=$(openssl rand -base64 32)
-   echo "PAPI_API_KEY=$PAPI_API_KEY" >> .env
-   echo "PAPI_ENV=production" >> .env
-   ```
-   The backend will refuse to start without a key when
-   `PAPI_ENV=production` (audit B-CRIT-5). It will also refuse to
-   start with the default `papi:papi@localhost` database credentials
-   in production mode, so make sure `PAPI_DATABASE_URL` points at a
-   real database with rotated credentials.
+1. **Choose and configure an auth provider** before setting
+   `PAPI_ENV=production`:
+   - `PAPI_AUTH_MODE=local` for one backend-managed operator account.
+   - `PAPI_AUTH_MODE=supabase` for Supabase-managed users.
+   - `PAPI_AUTH_MODE=api_key` only for a legacy static-key deployment.
+
+   The backend refuses to start in production if auth would be left open.
+   For local auth, generate a real `PAPI_AUTH_SESSION_SECRET`, set
+   `PAPI_LOCAL_ADMIN_EMAIL`, and store only the generated
+   `PAPI_LOCAL_ADMIN_PASSWORD_HASH`. For Supabase, set the public anon key
+   plus either `PAPI_SUPABASE_ALLOWED_EMAILS` or
+   `PAPI_SUPABASE_REQUIRED_ROLE`.
 2. **Rotate the Postgres password** in `.env`. Both
    `POSTGRES_PASSWORD` and `PAPI_DATABASE_URL` must agree on the new
    value.
-3. **Set `FRONTEND_PAPI_API_URL`** to the public hostname the
+3. **Set `PAPI_ENV=production`** only after auth and database credentials
+   are no longer using demo/default values. Production startup also rejects
+   the default `papi:papi@localhost` database credentials.
+4. **Set `FRONTEND_PAPI_API_URL`** to the public hostname the
    browser will resolve.
-4. **Run behind a reverse proxy** that terminates TLS — see
+5. **Run behind a reverse proxy** that terminates TLS — see
    §7.1 below for a concrete Caddy recipe. Neither the nginx
    shipped inside `apps/frontend/Dockerfile` nor uvicorn is
    configured for HTTPS by itself.
-5. **Restrict the backend port**. Remove the host port mapping
+6. **Restrict the backend port**. Remove the host port mapping
    for backend `:8000` and let only the reverse proxy reach it.
+
+**Authentication.** The admin pages (Models, Datasets) and the analyze
+API can be protected. Choose a login method with `PAPI_AUTH_MODE` in
+`.env`:
+
+- `local` — a single operator email and password (recommended for a
+  client install). Set `PAPI_AUTH_SESSION_SECRET`,
+  `PAPI_LOCAL_ADMIN_EMAIL`, and a password **hash** in
+  `PAPI_LOCAL_ADMIN_PASSWORD_HASH` (never the plain password).
+- `supabase` — log in with Supabase accounts (set the Supabase URL and
+  anon key, plus an allowed-email list or a required role).
+- `api_key` — the legacy single `PAPI_API_KEY`.
+
+In production the backend refuses to start if login would be left open.
+Step-by-step commands are in the authentication guide that ships with the
+source code (`docs/authentication.md`).
+
+For a local handover demo with a visible login page, the documented demo
+account is:
+
+| Field | Value |
+| --- | --- |
+| Email | `demo.admin@papi.local` |
+| Password | `PapiDemo!2026` |
+
+Use it only with the demo `.env` block in `docs/authentication.md`, and
+replace it before production.
 
 ### 7.0 Azure Container Apps (scripted, what powers the public demo)
 
@@ -344,6 +374,8 @@ ruff check apps/backend packages/papi workflows/scripts
 
 # In apps/frontend with deps installed:
 npm run lint
+npm run test
+npm run test:coverage
 npm run build
 
 # With docker compose up:

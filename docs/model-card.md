@@ -66,8 +66,9 @@ in `MODELS.md §3.1.1`.
 - **Throughput** — ~0.4 fps on a laptop CPU; far from the "real-time on a
   resource-constrained device" requirement. That figure was measured on the previous
   yolo26n; the serving model is now the ~3.5× larger yolo26s, so CPU throughput will be
-  lower and needs re-measuring. GPU / ONNX-runtime / smaller-input paths are the levers,
-  and real edge-hardware numbers are still pending (`docs/edge-benchmark.md`).
+  lower. GPU, OpenVINO, and smaller-input paths are the practical levers.
+  Dedicated edge-hardware numbers were not available during the project
+  (`docs/edge-benchmark.md`).
 - **INT8 ONNX export** fails on CPU ONNX Runtime (`ConvInteger(10)` unimplemented).
 
 ## Ethical considerations

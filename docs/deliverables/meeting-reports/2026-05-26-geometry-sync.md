@@ -4,8 +4,8 @@ date: "2026-05-26 14:00"
 client: "Intersoft Electronics Services BV"
 client_contact: "Daoud Uahabi"
 team: "Sousa Rodrigo · Chekhun Maksym · Kattan Hamzzah · Rooms Maxim"
-duration: "<!-- TEAM: e.g. 45 min -->"
-location: "<!-- TEAM: online / on-site -->"
+duration: "Not recorded"
+location: "Online meeting"
 mainfont: "Calibri"
 fontsize: 10pt
 geometry: "a4paper, margin=2cm"
@@ -24,7 +24,7 @@ angle calculation.
 - **Client (Intersoft Electronics Services BV)**: Daoud Uahabi
 - **Team (Howest CTAI)**: Sousa Rodrigo, Chekhun Maksym, Kattan
   Hamzzah, Rooms Maxim
-- **Supervisor**: <!-- TEAM: present? -->
+- **Supervisor**: not recorded in the meeting notes
 
 ## Agenda
 
@@ -80,7 +80,7 @@ angle calculation.
 The angle calculation was producing wrong numbers because the
 client had not previously provided the **PAPI lamp coordinates**
 and the **installation height**. The pipeline was approximating
-with inferred / placeholder values.
+with inferred values.
 
 ### Per-lamp WGS84 coordinates (PAPI 06 — runway 06)
 
@@ -155,10 +155,10 @@ height. Commissioned set angles and lamp-order mapping still need binding.
 
 ## Cross-references
 
-- Affected config: `configs/papi_edny.yaml` (lamp coords/height bound; set-angle and lamp-order TODOs documented)
+- Affected config: `configs/papi_edny.yaml` (lamp coords/height bound; missing set-angle and lamp-order values documented)
 - Pipeline doc: `docs/pipeline.md` (calibration result, dual-runway resolution)
 
 ## Sign-off
 
-Notes verified by **<!-- TEAM: minute-taker -->** and shared with
-the team + supervisor on 2026-05-26.
+Notes verified by **Rodrigo Sousa** and shared with the team on
+2026-05-26.

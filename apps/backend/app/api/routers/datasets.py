@@ -1,4 +1,4 @@
-"""Dataset management + assisted-labeling endpoints (api-key gated)."""
+"""Dataset management + assisted-labeling endpoints (operator-auth gated)."""
 
 from __future__ import annotations
 

@@ -22,6 +22,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { RunwaysPage } from './pages/RunwaysPage'
 import { ModelsPage } from './pages/ModelsPage'
 import { DatasetsPage } from './pages/DatasetsPage'
+import { LoginPage } from './pages/LoginPage'
 import { useAdminKey } from './hooks/useAdminKey'
 
 // Real minimal 404 (audit F01): replaces the old catch-all that silently
@@ -57,7 +58,7 @@ function RouteEffects() {
   useEffect(() => {
     if (shouldResetReloadPath && !reloadResetHandledRef.current) {
       reloadResetHandledRef.current = true
-      if (location.pathname !== '/') {
+      if (location.pathname !== '/' && location.pathname !== '/login') {
         navigate('/', { replace: true })
         return
       }
@@ -72,6 +73,7 @@ function RouteEffects() {
 function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [language, setLanguage] = useState(initialLanguage)
+  const location = useLocation()
   const copy = translations[language]
   // Admin mode reveals the model-management surface and carries the API key (if any).
   const admin = useAdminKey()
@@ -164,6 +166,7 @@ function App() {
               <Route path="/runways" element={<RunwaysPage copy={copy} />} />
               <Route path="/insights" element={<InsightsPage copy={copy} plotTheme={plotTheme} />} />
               <Route path="/history" element={<HistoryPage copy={copy} />} />
+              <Route path="/login" element={<LoginPage copy={copy} admin={admin} />} />
               <Route path="/models" element={<ModelsPage copy={copy} isAdmin={admin.isAdmin} />} />
               <Route path="/datasets" element={<DatasetsPage copy={copy} isAdmin={admin.isAdmin} />} />
               <Route path="/demo" element={<Navigate to="/live-demo" replace />} />
@@ -175,7 +178,7 @@ function App() {
 
       <AppFooter copy={copy} />
 
-      <CookieConsent copy={copy} />
+      {location.pathname === '/login' ? null : <CookieConsent copy={copy} />}
 
       {/* Toasts supplement — never replace — the inline status/error banners,
           so a critical failure is still visible in page context. Theme tracks

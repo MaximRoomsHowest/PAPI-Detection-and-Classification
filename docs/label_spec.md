@@ -49,10 +49,11 @@ sinks below path):
 | 3 | 3.17° | Third; "high" |
 | 4 | 3.50° | Last to turn red; "well above path" |
 
-The set-angles in `configs/papi_edny.yaml` are flagged TODO — Intersoft has not yet confirmed
-the EDNY commissioned set-angles for either runway. Until then, the FAA defaults are used.
-When real values arrive, fill in `runways.<06|24>.papi.light_<i>.set_angle_deg` in the YAML
-and the lamp-state geometry recomputes correctly without code changes.
+Intersoft did not provide the EDNY commissioned set-angles for both
+runways during the project. The v1.0 configuration therefore uses FAA
+defaults. If real values are provided later, fill in
+`runways.<06|24>.papi.light_<i>.set_angle_deg` in the YAML and the
+lamp-state geometry recomputes correctly without code changes.
 
 **Dual runway**: the dataset contains flights targeting both runway 06 (5 night flights) and
 runway 24 (16 day flights). The per-frame `target_runway` column in `data/interim/lamp_state.csv`
@@ -90,15 +91,15 @@ PAPI lens transition, which is typically ~3 arcminutes ≈ 0.05°).
 - **Partial occlusion** (e.g. a row of taxiway lights overlapping with PAPI in the frame):
   keep the bbox tight to the PAPI cluster; do not annotate adjacent ground lights as PAPI.
 - **Auto-label projects to "wrong" pixels**: usually means GPS/gimbal jitter or RTK-Single
-  position noise. Verifiers correct the bbox; the next sprint computes per-regime agreement so
-  these aren't averaged away.
+  position noise. Verifiers correct the bbox; per-regime agreement should
+  be checked when new verified labels are added.
 - **`global_state == TRANSITION`** but the verifier sees a discrete state — record the verifier
   state in CVAT; the agreement script will flag this as a per-lamp transition-width tuning
   signal.
 
-## Sprint-2 additions (placeholder)
+## Future additions
 
-- ZoomCamera auto-labels once Intersoft provides calibrated focal length.
+- ZoomCamera auto-labels once calibrated focal length is available.
 - A "false positive" / "no PAPI visible" class for negative samples once we have other-runway
   or non-airport frames.
 

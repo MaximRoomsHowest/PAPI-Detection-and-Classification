@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Star, Trash2, Upload, BarChart3, EyeOff, Eye, Info, X, Filter, Search, CloudSnow } from 'lucide-react'
 import { useModelManagement } from '../hooks/useModelManagement'
@@ -706,6 +707,9 @@ export function ModelsPage({ copy, isAdmin }) {
         <PapiGlyph size="brand" />
         <h1>{copy.models.adminRequired}</h1>
         <p className="lc-empty">{copy.models.adminRequiredHint}</p>
+        <Link className="cta-button" to="/login" state={{ from: { pathname: '/models' } }}>
+          {copy.admin.signIn}
+        </Link>
       </section>
     )
   }

@@ -1,5 +1,6 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { translations } from '../i18n/translations.js'
 import { ModelsPage } from './ModelsPage.jsx'
@@ -41,7 +42,7 @@ function renderPage(element) {
   document.body.appendChild(container)
   const root = createRoot(container)
   act(() => {
-    root.render(element)
+    root.render(<MemoryRouter>{element}</MemoryRouter>)
   })
   return {
     container,

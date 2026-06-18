@@ -11,13 +11,20 @@ GitHub. Please do not file public issues for security problems.
 
 ## Security posture
 
-- The API requires an `X-API-Key` header when `PAPI_ENV=production`; the backend
-  refuses to start in production without one and rejects the default database
-  credentials. The key is compared in constant time.
+- The API has provider-based operator auth. Production refuses to start if auth
+  resolves to open access and still rejects the default database credentials.
+  Supported providers are first-party local email/password sessions, the legacy
+  constant-time `X-API-Key` check, optional Supabase Auth bearer-token
+  validation, and an advanced `local_supabase` mode for deliberate fallback
+  deployments.
+- Supabase support is optional and uses the public anon key only. Operator
+  authorization is based on `app_metadata` roles or an explicit email allowlist;
+  user-controlled `user_metadata` is not trusted.
 - Uploaded media is validated by type and size; annotated artifacts are served
-  from a path-traversal-guarded route behind the same API key.
-- Process-local rate limiting is enabled by default, with a stricter bucket for
-  expensive `/api/analyze*` inference requests and `Retry-After` on 429s.
+  from a path-traversal-guarded route behind the same operator-auth gate.
+- Process-local rate limiting is enabled by default, with stricter buckets for
+  `/api/auth/login` credential attempts and expensive `/api/analyze*`
+  inference requests, plus `Retry-After` on 429s.
 - Drone metadata (latitude / longitude / altitude) is range-validated before it
   reaches the geometry math.
 - Postgres is bound to loopback in the bundled `compose.yaml`, the backend API
@@ -34,8 +41,8 @@ blocking before final hand-off, once the initial findings are triaged.
 
 ## Known gaps (tracked, not yet implemented)
 
-Secret scanning and a formal threat model are tracked improvements in the
-project audit notes.
+Secret scanning, credential rotation policy, and a formal threat model are
+tracked improvements in the project audit notes.
 
 ## Third-party licensing
 

@@ -3,10 +3,63 @@ import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages'
 const API_BASE_URL = (import.meta.env.VITE_PAPI_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '')
 const ENV_API_KEY = import.meta.env.VITE_PAPI_API_KEY
 
+export const AUTH_SESSION_STORAGE = 'papi.authSession.v1'
+
 // localStorage slot for a RUNTIME admin key. A deployed read-only demo can keep
 // the management UI hidden until an operator pastes the key here; it is preferred
 // over the build-time VITE_PAPI_API_KEY so an operator can unlock without a rebuild.
 export const ADMIN_KEY_STORAGE = 'papi.adminKey'
+
+function readJsonStorage(key) {
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function removeStorage(key) {
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    /* accept the loss for this session */
+  }
+}
+
+export function getAuthSession() {
+  const session = readJsonStorage(AUTH_SESSION_STORAGE)
+  if (!session?.access_token) return null
+  if (Number.isFinite(session.expires_at) && session.expires_at * 1000 <= Date.now()) {
+    removeStorage(AUTH_SESSION_STORAGE)
+    return null
+  }
+  return session
+}
+
+export function setAuthSession(session) {
+  try {
+    if (session?.access_token) {
+      window.localStorage.setItem(
+        AUTH_SESSION_STORAGE,
+        JSON.stringify({
+          access_token: session.access_token,
+          token_type: session.token_type || 'bearer',
+          expires_at: session.expires_at,
+          user: session.user || null,
+        }),
+      )
+    } else {
+      window.localStorage.removeItem(AUTH_SESSION_STORAGE)
+    }
+  } catch {
+    /* accept the loss for this session */
+  }
+}
+
+export function clearAuthSession() {
+  setAuthSession(null)
+}
 
 export function getApiKey() {
   try {
@@ -20,8 +73,9 @@ export function getApiKey() {
 
 /** Store (or clear, when falsy) the runtime admin key. */
 export function setAdminKey(key) {
+  const trimmed = (key || '').trim()
   try {
-    if (key) window.localStorage.setItem(ADMIN_KEY_STORAGE, key)
+    if (trimmed) window.localStorage.setItem(ADMIN_KEY_STORAGE, trimmed)
     else window.localStorage.removeItem(ADMIN_KEY_STORAGE)
   } catch {
     /* accept the loss for this session */
@@ -77,6 +131,11 @@ const ANALYZE_TIMEOUT_MS = positiveNumberEnv(
 
 function buildHeaders(extra = {}) {
   const headers = { ...extra }
+  const session = getAuthSession()
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`
+    return headers
+  }
   const key = getApiKey()
   if (key) {
     headers['X-API-Key'] = key
@@ -211,13 +270,14 @@ export function mediaUrl(path) {
 }
 
 /**
- * Resolve a backend artifact URL for display. When an API key is configured,
- * browser media tags cannot add X-API-Key, so fetch the artifact once and render
- * it through an object URL instead of a bare /media src.
+ * Resolve a backend artifact URL for display. Browser media tags cannot add
+ * Authorization or X-API-Key headers, so fetch protected artifacts once and
+ * render them through object URLs instead of bare /media src values.
  */
 export async function resolveMediaUrl(path, signal) {
   const url = mediaUrl(path)
-  if (!url || !getApiKey() || url.startsWith('blob:')) {
+  const hasRequestCredentials = Boolean(getAuthSession()?.access_token || getApiKey())
+  if (!url || !hasRequestCredentials || url.startsWith('blob:')) {
     return url
   }
 
@@ -257,6 +317,53 @@ export async function fetchHealth(signal) {
     return response.ok
   } catch {
     return false
+  }
+}
+
+export async function fetchAuthConfig() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/config`)
+  if (!response.ok) {
+    throw new Error(`Could not load auth configuration (${response.status})`)
+  }
+  return parseJsonBody(response, 'Auth configuration')
+}
+
+export async function fetchCurrentUser() {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/me`, {
+    headers: buildHeaders(),
+  })
+  if (!response.ok) {
+    clearAuthSession()
+    setAdminKey(null)
+    throw new Error(`Could not verify auth session (${response.status})`)
+  }
+  return parseJsonBody(response, 'Current user')
+}
+
+export async function loginUser({ email, password }) {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!response.ok) throw await errorFrom(response, 'Could not sign in')
+  const session = await parseJsonBody(response, 'Auth session')
+  setAuthSession(session)
+  setAdminKey(null)
+  return session
+}
+
+export async function logoutUser() {
+  try {
+    await fetchWithTimeout(`${API_BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      headers: buildHeaders(),
+    })
+  } catch {
+    /* Server-side logout is best-effort; local credentials are discarded below. */
+  } finally {
+    clearAuthSession()
+    setAdminKey(null)
   }
 }
 

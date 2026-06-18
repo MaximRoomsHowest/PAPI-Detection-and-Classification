@@ -229,7 +229,7 @@ function sampleButton(container, label) {
 }
 
 describe('FrameStage sample picker', () => {
-  it('renders the three localized sample cards inside the empty dropzone', () => {
+  it('renders the five localized sample cards inside the empty dropzone', () => {
     const { container } = render(<FrameStage {...makeProps()} />)
 
     const picker = container.querySelector(`[role="group"][aria-label="${copy.live.samplePickerTitle}"]`)
@@ -242,6 +242,7 @@ describe('FrameStage sample picker', () => {
       copy.live.sampleImageSetLabel,
       copy.live.sampleVideoLabel,
       copy.live.sampleWeatherLabel,
+      copy.live.sampleWeatherRainLabel,
     ])
   })
 

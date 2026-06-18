@@ -78,9 +78,16 @@ Copy-Item models\base\yolo26s.pt models\serving\best.pt -Force
 
 ```powershell
 # from the repo root
-Copy-Item .env.example .env   # set POSTGRES_PASSWORD etc. before any real deploy
+Copy-Item .env.example .env   # set auth/database secrets before any real deploy
 docker compose up -d --build
 ```
+
+For operator access during client local-machine setup, choose either
+`PAPI_AUTH_MODE=local` for a local admin account or `PAPI_AUTH_MODE=supabase`
+for Supabase-managed users. `api_key` remains available for legacy deployments.
+For a local demo login, the documented demo account is
+`demo.admin@papi.local` / `PapiDemo!2026` after the matching `.env` block has
+been configured. See [`docs/authentication.md`](docs/authentication.md).
 
 For native development (Postgres in Docker, backend + frontend run locally),
 follow the step-by-step path in
@@ -137,8 +144,10 @@ model / runway / metadata change.
   a single request) is still served for API callers that want one row per image.
 
 All endpoints accept optional drone metadata fields (`runway_id`, `drone_id`,
-`drone_latitude`, `drone_longitude`, `drone_altitude_m`) and respect
-`VITE_PAPI_API_URL` / `VITE_PAPI_API_KEY` env vars.
+`drone_latitude`, `drone_longitude`, `drone_altitude_m`). Protected endpoints
+accept backend-issued bearer sessions first and the legacy `X-API-Key` fallback
+when configured. The browser-side backend URL still comes from
+`VITE_PAPI_API_URL`.
 
 ## Test Videos
 
@@ -180,7 +189,7 @@ Start here when looking for a part of the project:
 - **Model card**: [`docs/model-card.md`](docs/model-card.md) · **Data card**: [`docs/data-card.md`](docs/data-card.md)
 - **Model registry**: [`models/MODELS.md`](models/MODELS.md) · **Edge benchmark**: [`docs/edge-benchmark.md`](docs/edge-benchmark.md)
 - **Project documentation index**: [`docs/deliverables/README.md`](docs/deliverables/README.md)
-- **Security policy**: [`SECURITY.md`](SECURITY.md) · **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- **Authentication setup**: [`docs/authentication.md`](docs/authentication.md) · **Security policy**: [`SECURITY.md`](SECURITY.md) · **Contributing**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 **License**: proprietary to Intersoft Electronics Services BV — see
 [`LICENSE`](LICENSE), which also records the Ultralytics **AGPL-3.0**

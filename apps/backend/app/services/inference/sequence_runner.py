@@ -14,11 +14,14 @@ from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
+from papi.lamp_state import NUM_PAPI_LAMPS
+
 from app.services.inference.angle_resolver import build_angle_track, frame_angle_map
 from app.services.inference.overlay import draw_overlay
 from app.services.inference.video_writer import open_video_writer
 from app.services.state import (
     DETECTION_CLASS_TO_STATE,
+    TrackObservation,
     bind_lamps_to_runway_display,
     bind_transitions_to_runway_display,
     confidence_from_lamps,
@@ -59,7 +62,7 @@ def _frame_lamp_states(lamps) -> list[FrameLampState]:
             redness=lamp.redness,
         )
         for lamp in lamps
-        if 1 <= lamp.index <= 4
+        if 1 <= lamp.index <= NUM_PAPI_LAMPS
     ]
 
 
@@ -75,7 +78,7 @@ def _ranked_lamps_for_frame(
                 break
 
     lamps: list[LampResult] = []
-    for lamp_index in range(1, 5):
+    for lamp_index in range(1, NUM_PAPI_LAMPS + 1):
         observation = by_lamp.get(lamp_index)
         if observation is None:
             lamps.append(LampResult(index=lamp_index, state="obscured", confidence=0.0))
@@ -98,7 +101,7 @@ def _ranked_lamps_for_frame(
 def _aggregate_ranked_lamps(ranked_observations: dict[int, list[tuple]]) -> list[LampResult]:
     """Summarize a video by all observed frames, not only the final frame."""
     lamps: list[LampResult] = []
-    for lamp_index in range(1, 5):
+    for lamp_index in range(1, NUM_PAPI_LAMPS + 1):
         observations = ranked_observations.get(lamp_index, [])
         if not observations:
             lamps.append(LampResult(index=lamp_index, state="obscured", confidence=0.0))
@@ -202,10 +205,10 @@ def run_tracked_sequence(
         runway_id,
         expected_frame_count,
     )
-    # ByteTrack id -> [(frame_index, color_state, center_x, confidence, redness)].
+    # ByteTrack id -> tracked lamp samples.
     # The post-loop transition paths convert this to per-frame left-to-right slots
     # before numbering lights, because tiny PAPI lamps can swap tracker ids.
-    track_observations: dict[int, list[tuple]] = {}
+    track_observations: dict[int, list[TrackObservation]] = {}
     frame_count = 0
     last_detections: list[dict] = []
     # Open the writer LAST before the try below, so nothing fallible runs between
@@ -254,13 +257,13 @@ def run_tracked_sequence(
                 # bbox ride along so the post-loop slot binding can build chart and
                 # final-frame payloads from the same gap-preserving observations.
                 track_observations.setdefault(int(track_id), []).append(
-                    (
-                        frame_count,
-                        color,
-                        center_x,
-                        float(det.get("confidence", 0.0)),
-                        det.get("redness"),
-                        bbox,
+                    TrackObservation(
+                        frame_index=frame_count,
+                        state=color,
+                        center_x=center_x,
+                        confidence=float(det.get("confidence", 0.0)),
+                        redness=det.get("redness"),
+                        bbox=bbox,
                     )
                 )
             # Rank from ALL observations-so-far (not just this frame): the clip-learned

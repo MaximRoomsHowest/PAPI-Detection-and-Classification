@@ -1,4 +1,4 @@
-"""Training-launcher endpoint (api-key gated).
+"""Training-launcher endpoint (operator-auth gated).
 
 The backend never trains in-process. ``POST /api/training/prepare`` packages the
 dataset + a runnable command for the existing trainer; the user runs it on their

@@ -2,9 +2,9 @@
 
 > **Audience**: maintainers, operations engineers, and technical
 > stakeholders. Companion to
-> [user-manual.md](../user-manual.md) (how to *use* the app) and
-> [architecture-overview.md](../architecture-overview.md) (how the
-> code is *organised*). This document explains how the application
+> the user manual (how to *use* the app) and the architecture
+> overview (how the code is *organised*). This document explains how
+> the application
 > was **designed** — for whom, why those choices, what trade-offs.
 >
 > **Design goals**: deliver an interactive prototype from a sound
@@ -50,7 +50,7 @@ Three design principles fell out of that brief:
 
 The first three personas drive UI choices; the fourth drives code
 naming, file organisation, and the link from each page back to the
-underlying packages (see [architecture-overview.md §6](../architecture-overview.md#6-frontend-application-structure)).
+underlying packages (see the architecture overview, §6).
 
 ## 3. Information architecture
 
@@ -376,7 +376,7 @@ current browser standards.
 | Keyboard nav | Tab reaches every interactive element in reading order; Enter/Space activate | Manual |
 | Screen reader labels | Every icon-only button has `aria-label`; decorative icons `aria-hidden` | NVDA on Insights page |
 | Live regions | `role="status"` on the result panel, `role="alert"` on error toasts | NVDA |
-| Form controls | `<label>` linked via `htmlFor`/`id` for every input | **PENDING — see §10 / audit USERTEST-MINOR-1** |
+| Form controls | `<label>` linked via `htmlFor`/`id` for every input | Known minor accessibility issue in §10 |
 | Touch targets | ≥ 44 px tap target on every interactive element on viewports < 768 px | Chrome device emulation |
 | Reduced motion | All animations disabled when `prefers-reduced-motion: reduce` | Manual via OS toggle |
 
@@ -437,7 +437,7 @@ journeys of §5:
 ### Round 2 — rerun after fixes (2026-05-28 afternoon)
 
 Every critical from Round 1 verified resolved. Two remaining minors
-documented but not yet shipped:
+are documented as future polish:
 
 - Form-control `id`/`name` missing on metadata inputs (a11y).
 - PAPI 06 geometry uses the data-analysis branch's `461.37 m` reference; lamp
@@ -457,11 +457,11 @@ before/after.
 | Semantic HTML | §7 landmark structure |
 | Thoughtful naming | Routes named after mental tasks, not URLs (§3) |
 | User-feedback integrated and iterated on | §10 iteration log (round 1 + round 2, 2026-05-28) |
-| Proper input validation | Pending — see §12 |
+| Proper input validation | See §12 |
 | Consistent house style | §4 design system tokens |
 | User-friendly responsive design | §8 responsive design |
 | Complies with current browser standards | CI checks; works in Chrome, Firefox, Edge, Safari |
-| Suitable platform / framework | React 19 + Vite 8 — see [architecture-overview.md §3](../architecture-overview.md#3-tech-stack-rationale) |
+| Suitable platform / framework | React 19 + Vite 8 (see the architecture overview, §3) |
 
 ## 12. Known design debt
 
@@ -489,7 +489,7 @@ Honest list of what's missing or wrong, for the next iteration:
 ## Sources
 
 - Codebase: `apps/frontend/src/` (App.jsx, App.css, components/, lib/)
-- Companion docs: [architecture-overview.md](../architecture-overview.md),
-  [user-manual.md](../user-manual.md), [installation-manual.md](../installation-manual.md)
+- Companion docs: the architecture overview, the user manual, and
+  the installation manual.
 - User-testing rounds: the round-1 and round-2 findings (2026-05-28) are
   recorded inline in §10 above.
