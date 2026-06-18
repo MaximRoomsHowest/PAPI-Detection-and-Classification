@@ -5,7 +5,7 @@ import {
   analyzeMedia,
   analyzeSequence,
   fetchModels,
-  positiveNumberEnv,
+  getClientLimits,
   resolveMediaUrl,
   revokeMediaUrl,
 } from '../lib/api'
@@ -23,11 +23,9 @@ import {
 import { useRunwayManagement } from './useRunwayManagement'
 import { useChartExport } from './useChartExport'
 
-// Client-side mirror of the backend PAPI_MAX_BATCH_FRAMES cap so an oversized folder is
-// rejected up front instead of uploading the whole batch only to be 413'd (audit).
-// positiveNumberEnv (api.js) also rejects negative/zero/NaN overrides, which a bare
-// Number(...) || 200 would let through as a nonsensical cap.
-const MAX_BATCH_FRAMES = positiveNumberEnv(import.meta.env.VITE_PAPI_MAX_BATCH_FRAMES, 200)
+// The backend PAPI_MAX_BATCH_FRAMES cap is mirrored at runtime via getClientLimits()
+// (fetched from /api/limits), so an oversized folder is rejected up front instead of
+// uploading the whole batch only to be 413'd — without baking the value into the bundle.
 
 // Video and folder-as-sequence analyses are one long backend await with no
 // per-frame callbacks. Cycle through human-readable work steps so the UI feels
@@ -596,9 +594,10 @@ export function useAnalysis(copy) {
         if (!files.length) {
           throw new Error(copy.live.noFolderImages)
         }
-        if (files.length > MAX_BATCH_FRAMES) {
+        const maxSequenceFrames = getClientLimits().maxBatchFrames
+        if (files.length > maxSequenceFrames) {
           throw new Error(
-            copy.live.tooManyImages.replace('{count}', files.length).replace('{max}', MAX_BATCH_FRAMES),
+            copy.live.tooManyImages.replace('{count}', files.length).replace('{max}', maxSequenceFrames),
           )
         }
         const result = await withStepProgress(
@@ -624,9 +623,10 @@ export function useAnalysis(copy) {
         if (!frames.length) {
           throw new Error(copy.live.noFolderImages)
         }
-        if (frames.length > MAX_BATCH_FRAMES) {
+        const maxFolderFrames = getClientLimits().maxBatchFrames
+        if (frames.length > maxFolderFrames) {
           throw new Error(
-            copy.live.tooManyImages.replace('{count}', frames.length).replace('{max}', MAX_BATCH_FRAMES),
+            copy.live.tooManyImages.replace('{count}', frames.length).replace('{max}', maxFolderFrames),
           )
         }
         let bestScore = -1

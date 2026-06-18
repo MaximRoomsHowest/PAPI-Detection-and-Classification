@@ -32,24 +32,35 @@ export function hasApiKeyConfigured() {
   return Boolean(getApiKey())
 }
 
-// Upload + timeout guards (audit F-MAJ-8). Defaults are intentionally close
-// to the backend's own limits so users see a fast client-side error rather
-// than waiting for a 413 / hung request.
-const DEFAULT_MAX_UPLOAD_MB = 500
+// Timeout guards (audit F-MAJ-8) are genuinely client-side concerns, so they stay env-
+// configurable at build time. Upload SIZE/COUNT limits, however, mirror the backend and
+// are fetched at runtime from /api/limits (see refreshUploadLimits) so the backend env is
+// the single source of truth — changing PAPI_MAX_* in .env propagates here without a
+// rebuild, instead of duplicating the value in a baked VITE_PAPI_MAX_* constant.
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000
 
 // Parse a numeric env override, falling back to the default when the value is absent
-// OR unparseable. Bare Number('abc') is NaN, which would silently disable the upload
-// guard (`size > NaN` is always false) and make setTimeout(…, NaN) fire immediately,
-// aborting every request (audit F1). Exported so other env caps (e.g. the
-// useAnalysis batch-frame mirror) reuse the same negative/zero/NaN handling.
+// OR unparseable. Bare Number('abc') is NaN, which would make setTimeout(…, NaN) fire
+// immediately, aborting every request (audit F1).
 export function positiveNumberEnv(raw, fallback) {
   const value = Number(raw)
   return Number.isFinite(value) && value > 0 ? value : fallback
 }
 
-const MAX_UPLOAD_BYTES =
-  positiveNumberEnv(import.meta.env.VITE_PAPI_MAX_UPLOAD_MB, DEFAULT_MAX_UPLOAD_MB) * 1024 * 1024
+// Client-side upload guards mirror the BACKEND's PAPI_MAX_* env (single source of truth),
+// fetched once at app start via refreshUploadLimits(). Until that resolves they are no-ops
+// (Infinity): the backend still enforces and returns a clear 413, so nothing is wrongly
+// rejected before the limits load. The guards exist only for fast, friendly pre-checks.
+let clientLimits = {
+  maxUploadBytes: Infinity,
+  maxBatchUploadBytes: Infinity,
+  maxBatchFrames: Infinity,
+}
+
+export function getClientLimits() {
+  return clientLimits
+}
+
 const REQUEST_TIMEOUT_MS = positiveNumberEnv(
   import.meta.env.VITE_PAPI_REQUEST_TIMEOUT_MS,
   DEFAULT_REQUEST_TIMEOUT_MS,
@@ -82,22 +93,23 @@ function formatBytes(bytes) {
 }
 
 function checkUploadSize(files) {
+  // Both caps come from the backend (the single source) via refreshUploadLimits.
+  const { maxUploadBytes, maxBatchUploadBytes } = clientLimits
   const fileList = Array.isArray(files) ? files : [files]
   let totalBytes = 0
   for (const file of fileList) {
     if (!file || typeof file.size !== 'number') continue
-    if (file.size > MAX_UPLOAD_BYTES) {
+    if (file.size > maxUploadBytes) {
       throw new Error(
-        `File "${file.name}" is ${formatBytes(file.size)}, which exceeds the ${formatBytes(MAX_UPLOAD_BYTES)} per-file limit. Compress or trim the file before uploading.`,
+        `File "${file.name}" is ${formatBytes(file.size)}, which exceeds the ${formatBytes(maxUploadBytes)} per-file limit. Compress or trim the file before uploading.`,
       )
     }
     totalBytes += file.size
   }
   // Folder uploads can be many files at once; cap aggregate size too.
-  const aggregateLimit = MAX_UPLOAD_BYTES * 4
-  if (fileList.length > 1 && totalBytes > aggregateLimit) {
+  if (fileList.length > 1 && totalBytes > maxBatchUploadBytes) {
     throw new Error(
-      `Folder upload totals ${formatBytes(totalBytes)} across ${fileList.length} files, exceeding the ${formatBytes(aggregateLimit)} batch limit.`,
+      `Folder upload totals ${formatBytes(totalBytes)} across ${fileList.length} files, exceeding the ${formatBytes(maxBatchUploadBytes)} batch limit.`,
     )
   }
 }
@@ -331,6 +343,27 @@ export async function fetchModels() {
 
 // Stable error code for a failed /api/models load — the UI layer owns the translation.
 export const MODEL_OPTIONS_ERROR_CODE = 'model-options-unavailable'
+
+// Fetch the backend's upload limits and update the client-side guards in place. Called
+// once at app start (see App). The backend env (PAPI_MAX_*) is the single source of
+// truth; on any failure the prior (permissive) limits stay and the backend still enforces
+// with a clear 413, so an upload is never wrongly blocked client-side.
+export async function refreshUploadLimits() {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/limits`, { headers: buildHeaders() })
+    if (!response.ok) return
+    const body = await parseJsonBody(response, 'Upload limits')
+    const toBytes = (mb) => (Number.isFinite(mb) && mb > 0 ? mb * 1024 * 1024 : Infinity)
+    const toCount = (n) => (Number.isFinite(n) && n > 0 ? n : Infinity)
+    clientLimits = {
+      maxUploadBytes: toBytes(body.max_upload_mb),
+      maxBatchUploadBytes: toBytes(body.max_batch_upload_mb),
+      maxBatchFrames: toCount(body.max_batch_frames),
+    }
+  } catch {
+    /* keep current limits; the backend remains the hard enforcer */
+  }
+}
 
 export async function fetchStats(options = {}) {
   // Same camelCase filter set as fetchLogs/logsCsvUrl (limit/offset are simply

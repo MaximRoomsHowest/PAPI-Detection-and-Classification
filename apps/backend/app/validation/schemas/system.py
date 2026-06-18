@@ -128,3 +128,19 @@ class SystemInfo(BaseModel):
     cuda_device_count: int = 0
     device_configured: str
     app_version: str
+
+
+class UploadLimits(BaseModel):
+    """Client-relevant upload limits served so the frontend mirrors the backend's
+    ``PAPI_MAX_*`` env at RUNTIME instead of baking ``VITE_PAPI_MAX_*`` into the bundle at
+    build time. This makes the backend env the single source of truth: a ``.env`` change
+    propagates to the client-side guards (and, via the nginx entrypoint, the proxy) without
+    a frontend rebuild. The backend remains the hard enforcer; these only drive fast,
+    friendly client-side pre-checks.
+    """
+
+    max_upload_mb: int
+    max_batch_upload_mb: int
+    max_batch_frames: int
+    max_video_seconds: int
+    max_image_megapixels: int

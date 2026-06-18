@@ -43,6 +43,7 @@ from app.validation.schemas.system import (
     InferenceStats,
     ModelInfo,
     SystemInfo,
+    UploadLimits,
     ValMetrics,
     WeatherMetrics,
 )
@@ -80,6 +81,7 @@ __all__ = [
     "ModelInfo",
     "InferenceStats",
     "SystemInfo",
+    "UploadLimits",
     # runway
     "RunwayLight",
     "RunwayResponse",

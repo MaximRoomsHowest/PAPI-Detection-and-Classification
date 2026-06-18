@@ -35,12 +35,9 @@ vi.mock('../lib/api', () => ({
   // resolves per-frame artifact urls through it.
   mediaUrl: (path) => path,
   MODEL_OPTIONS_ERROR_CODE: 'model-options-unavailable',
-  // Mirror the real implementation — useAnalysis derives its batch cap from it at
-  // module scope, so the mock must behave, not just exist.
-  positiveNumberEnv: (raw, fallback) => {
-    const value = Number(raw)
-    return Number.isFinite(value) && value > 0 ? value : fallback
-  },
+  // useAnalysis reads its batch-frame cap from the runtime-fetched limits, so the mock
+  // returns a concrete cap (the backend default) for the too-many-images guard.
+  getClientLimits: () => ({ maxUploadBytes: Infinity, maxBatchUploadBytes: Infinity, maxBatchFrames: 200 }),
 }))
 
 vi.mock('sonner', () => ({

@@ -490,6 +490,23 @@ def test_models_endpoint_returns_selectable_models(client):
     assert body[1]["available"] is False
 
 
+def test_limits_endpoint_exposes_upload_limits(client):
+    # The frontend fetches these at runtime so the backend env is the single source of
+    # truth for upload size — every field must be present and a positive int.
+    response = client.get("/api/limits")
+
+    assert response.status_code == 200
+    body = response.json()
+    for key in (
+        "max_upload_mb",
+        "max_batch_upload_mb",
+        "max_batch_frames",
+        "max_video_seconds",
+        "max_image_megapixels",
+    ):
+        assert isinstance(body[key], int) and body[key] > 0
+
+
 def test_analyze_frame_passes_model_id_to_inference_and_persists_it(client):
     response = client.post(
         "/api/analyze-frame",

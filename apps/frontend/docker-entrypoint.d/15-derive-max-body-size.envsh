@@ -1,0 +1,15 @@
+# Derive nginx's client_max_body_size from the backend's batch upload budget, so a single
+# env var (PAPI_MAX_BATCH_UPLOAD_MB) is the source of truth for the proxy too — instead of a
+# separate NGINX_CLIENT_MAX_BODY_SIZE / PAPI_NGINX_MAX_BODY_SIZE that has to be kept in sync.
+#
+# +48m of multipart headroom above the budget (the backend's own transport cap uses +10m;
+# the extra slack covers many-file folder-upload boundaries) so a legal batch clears nginx
+# instead of 413'ing before the backend sees it.
+#
+# This is sourced (note the .envsh extension) by the nginx image's docker-entrypoint BEFORE
+# the stock 20-envsubst-on-templates.sh, so the export reaches the config render. When
+# PAPI_MAX_BATCH_UPLOAD_MB is unset (e.g. the image run standalone), the Dockerfile's
+# NGINX_CLIENT_MAX_BODY_SIZE default stands.
+if [ -n "${PAPI_MAX_BATCH_UPLOAD_MB:-}" ]; then
+    export NGINX_CLIENT_MAX_BODY_SIZE="$((PAPI_MAX_BATCH_UPLOAD_MB + 48))m"
+fi

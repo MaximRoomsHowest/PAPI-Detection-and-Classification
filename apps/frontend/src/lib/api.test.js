@@ -33,6 +33,7 @@ import {
   fetchStats,
   logsCsvUrl,
   mediaUrl,
+  refreshUploadLimits,
   resolveMediaUrl,
 } from './api.js'
 import { REQUEST_TIMEOUT_ERROR_CODE } from './errorMessages.js'
@@ -378,8 +379,19 @@ describe('analyze* — error surfacing', () => {
 })
 
 describe('upload size guard', () => {
-  // The default MAX_UPLOAD_BYTES is 500 MB per file (VITE_PAPI_MAX_UPLOAD_MB).
-  // We test slightly over the limit to avoid false-negatives from rounding.
+  // The guards now mirror the backend's limits, fetched at runtime via refreshUploadLimits
+  // (/api/limits). Load them first, then re-stub fetch fresh so the guard's "reject before
+  // any upload fetch" assertion isn't tripped by the limits fetch itself.
+  beforeEach(async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ max_upload_mb: 500, max_batch_upload_mb: 2000, max_batch_frames: 200 })),
+    )
+    await refreshUploadLimits()
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({})))
+  })
+
+  // 500 MB per file / 2000 MB aggregate (from /api/limits above); test slightly over.
   const overSized = 501 * 1024 * 1024
 
   it('rejects a single file that exceeds the per-file cap', async () => {

@@ -8,6 +8,7 @@ import {
   initialTheme,
   setPreference,
 } from './lib/storage'
+import { refreshUploadLimits } from './lib/api'
 import { translations } from './i18n/translations'
 import { Topbar } from './components/Topbar'
 import { AppFooter } from './components/AppFooter'
@@ -111,6 +112,12 @@ function App() {
     // Persist so the choice survives a reload (regression FE-MOD-CRIT-3).
     setPreference(STORAGE_KEYS.theme, theme)
   }, [theme])
+
+  // Mirror the backend's upload limits into the client-side guards once at startup, so the
+  // backend PAPI_MAX_* env is the single source of truth (no baked VITE_PAPI_MAX_* values).
+  useEffect(() => {
+    refreshUploadLimits()
+  }, [])
 
   useEffect(() => {
     setPreference(STORAGE_KEYS.language, language)

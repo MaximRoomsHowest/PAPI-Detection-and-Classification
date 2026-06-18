@@ -16,7 +16,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 import app.api.routes as routes
 from app.services.runways import RunwayLimitError, add_runway, delete_runway, list_runways
-from app.validation.schemas import ModelInfo, RunwayCreate, RunwayResponse, SystemInfo
+from app.validation.schemas import (
+    ModelInfo,
+    RunwayCreate,
+    RunwayResponse,
+    SystemInfo,
+    UploadLimits,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -78,6 +84,21 @@ def get_model_info(
 @router.get("/models", response_model=list[ModelInfo])
 def get_model_options(_auth: Annotated[None, Depends(routes.require_api_key)] = None) -> list[ModelInfo]:
     return routes.get_inference_service().model_options()
+
+
+@router.get("/limits", response_model=UploadLimits)
+def get_upload_limits(_auth: Annotated[None, Depends(routes.require_api_key)] = None) -> UploadLimits:
+    """Upload limits the frontend mirrors at runtime so the backend env is the single
+    source of truth — a ``PAPI_MAX_*`` change in ``.env`` drives the client-side guards
+    (and the nginx body cap) without rebaking ``VITE_PAPI_MAX_*`` into the bundle."""
+    settings = routes.get_settings()
+    return UploadLimits(
+        max_upload_mb=settings.max_upload_mb,
+        max_batch_upload_mb=settings.max_batch_upload_mb,
+        max_batch_frames=settings.max_batch_frames,
+        max_video_seconds=settings.max_video_seconds,
+        max_image_megapixels=settings.max_image_megapixels,
+    )
 
 
 @router.get("/system", response_model=SystemInfo)

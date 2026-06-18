@@ -272,12 +272,12 @@ services:
         VITE_PAPI_API_URL: ${FRONTEND_PAPI_API_URL:-}
     container_name: papi-frontend
     environment:
-      # Proxy-level request-body cap, rendered into nginx's client_max_body_size
-      # by the image's envsubst entrypoint at container start (audit IS-7). Must
-      # track PAPI_MAX_BATCH_UPLOAD_MB (+ ~10m multipart headroom) or nginx 413s
-      # a legal batch upload before the backend sees it. NEVER name frontend env
-      # vars after nginx runtime variables (host, uri, scheme, ...).
-      NGINX_CLIENT_MAX_BODY_SIZE: ${PAPI_NGINX_MAX_BODY_SIZE:-2048m}
+      # Single source of truth for the upload cap: the frontend image's
+      # 15-derive-max-body-size.envsh hook renders nginx's client_max_body_size from this
+      # SAME batch budget (+ headroom) at container start, so changing PAPI_MAX_BATCH_UPLOAD_MB
+      # in .env moves the backend limit AND the proxy cap together — no separate nginx knob to
+      # keep in sync (audit IS-7). Must equal the backend's PAPI_MAX_BATCH_UPLOAD_MB above.
+      PAPI_MAX_BATCH_UPLOAD_MB: ${PAPI_MAX_BATCH_UPLOAD_MB:-2000}
     depends_on:
       backend:
         condition: service_healthy

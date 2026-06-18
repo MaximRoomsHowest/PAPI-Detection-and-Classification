@@ -39,16 +39,22 @@ EXPOSE 8080
 # SPA-aware nginx config (react-router fallback to /index.html) + security
 # headers (audit F-MAJ-13 / DCK-MAJ-6). Shipped as a TEMPLATE: the image's
 # stock 20-envsubst-on-templates.sh renders it to /etc/nginx/conf.d/default.conf
-# at container start, substituting the body-size knob below — so the upload cap
-# can follow PAPI_MAX_BATCH_UPLOAD_MB without an image rebuild (audit IS-7).
+# at container start, substituting the body-size knob below.
 # Do NOT also COPY a literal conf.d/default.conf: the render would silently
-# overwrite it and mask template errors. Default = 400 MB budget + 10m headroom.
+# overwrite it and mask template errors.
 # NGINX_CONF selects WHICH template ships in the image: the default proxies
 # /api + /media to the compose backend; the Azure Container Apps build passes
 # NGINX_CONF=nginx.azure.conf.template (sidecar backend on localhost:8000).
 # envsubst only substitutes variables that exist in the container environment,
 # so nginx runtime vars ($uri, $host, ...) pass through untouched.
+#
+# Single source of truth for the upload cap: the 15-derive-max-body-size.envsh hook
+# (sourced before the envsubst step) sets NGINX_CLIENT_MAX_BODY_SIZE from the backend's
+# PAPI_MAX_BATCH_UPLOAD_MB + headroom, so one .env var drives the proxy too. The ENV below
+# is only the STANDALONE fallback (image run without PAPI_MAX_BATCH_UPLOAD_MB); it tracks
+# the config.py batch default (2000 MB) + 48m headroom.
 ENV NGINX_CLIENT_MAX_BODY_SIZE=2048m
+COPY docker-entrypoint.d/15-derive-max-body-size.envsh /docker-entrypoint.d/15-derive-max-body-size.envsh
 ARG NGINX_CONF=nginx.conf.template
 COPY ${NGINX_CONF} /etc/nginx/templates/default.conf.template
 
