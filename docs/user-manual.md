@@ -1,320 +1,307 @@
 # PAPI Lights Detection and Classification — User Manual
 
-For end users of the PAPI Lights Detection and Classification application: drone operators,
-review engineers, and technical stakeholders. If you want to install the system
-from scratch, see [installation-manual.md](installation-manual.md)
-instead.
+This guide shows you how to use the PAPI app. It is written for the
+people who run it — drone operators, review engineers, and anyone
+checking PAPI lights. You do not need to know how the code works.
 
-## 1. What this application does
+To install the app first, see the
+[installation manual](installation-manual.md).
 
-PAPI Lights Detection and Classification analyses drone footage of a four-light **PAPI**
-(Precision Approach Path Indicator) installation and reports:
+## 1. What the app does
 
-- The state of each of the four lamps (white / red / transition).
-- The global glidepath state — one of five legal patterns plus a
-  TRANSITION shadow:
+You give it a drone photo or video of a runway's four PAPI lights.
+It tells you:
 
-  | Pattern | Meaning |
+- The colour of each of the four lamps: **white**, **red**, or
+  **changing** (in between).
+- The overall glidepath verdict — what the lamp pattern means for the
+  approach:
+
+  | Lamps | Meaning |
   | --- | --- |
-  | 4 white | Far too high — well above glidepath |
-  | 3 white + 1 red | Too high — slightly above |
-  | 2 white + 2 red | Correct glidepath — on path |
-  | 1 white + 3 red | Too low — slightly below |
-  | 4 red | Far too low — immediate correction needed |
-  | TRANSITION | Any lamp in its angular blend zone |
+  | 4 white | Far too high |
+  | 3 white, 1 red | A little too high |
+  | 2 white, 2 red | On the correct path |
+  | 1 white, 3 red | A little too low |
+  | 4 red | Far too low |
+  | Transition | A lamp is mid-change between red and white |
 
-- The drone's elevation angle relative to each lamp (when GPS /
-  altitude metadata is available).
+- The drone's viewing angle to the lights — when the photo or video
+  carries GPS and height information.
+- A copy of your image or video with the lights boxed and labelled.
 
-- An annotated copy of the input image / video showing the detected
-  bounding boxes and per-lamp state labels.
+The app was trained on footage from **Bodensee-Airport
+Friedrichshafen (EDNY)**. It can be set up for other airports later.
 
-The system was trained on data captured at **Bodensee-Airport
-Friedrichshafen (EDNY)**. It can be retrained for other airports
-by updating `configs/papi_edny.yaml` with new lamp coordinates and
-re-running the data pipeline.
+## 2. Getting started
 
-## 2. Opening the demo
-
-After installation, navigate to:
+Open the app in your browser:
 
 ```
 http://localhost:5173/
 ```
 
-You should see the **Introduction** page with the project title
-and an "Try It Out" button. Click it (or use the top navigation)
-to reach the **Live Demo** page.
+You land on the **Introduction** page. Across the top is the menu you
+use to move around:
 
-## 3. Running an analysis
+- **Introduction** — the welcome page.
+- **Live Demo** — upload footage and get a result. This is the main page.
+- **Runways** — manage the runways the app knows.
+- **Insights** — charts that explain the latest result.
+- **History** — past results.
 
-The Live Demo page accepts input in three ways. Pick whichever
-matches your data.
+Two more items, **Models** and **Datasets**, appear only after you
+unlock admin mode (see section 9).
 
-### 3.0 No data of your own? Use the built-in samples
+### The Introduction page
 
-The empty stage offers **premade test data** — three cards under the
-upload button, built from a real EDNY runway-24 capture in which the
-drone climbs through every PAPI set angle at a ~300 m stand-off. Each
-sample ships the drone telemetry that was actually recorded with its
-frames, so the displayed viewing angle always matches what the lamps
-show:
+The Introduction page is a welcome screen — nothing here changes your
+data. It has:
 
-- **Sample image** — one on-slope frame (~2.8°, two white + two red).
-- **Sample image set** — a ten-frame angle sweep analysed as a tracked
-  sequence; the verdict walks through all five PAPI states.
-- **Sample video** — a two-minute clip (60 frames at 0.5 fps) covering
-  the whole climb (~1.2° → ~3.9°), including every lamp's red→white
-  transition. Analysis takes roughly half a minute.
+- A short summary of the four things the app reports.
+- An interactive **glide path simulator**. Drag the **Approach angle**
+  slider (2.0° to 4.0°) and watch the four lamps change colour and the
+  verdict update — from "Far too low", through "Correct glidepath", to
+  "Far too high". Click **Sweep** to play the angle up and down on its
+  own. It is a quick way to learn how PAPI lights work.
+- An **airport snapshot** for Friedrichshafen, with a small map.
 
-Click a card and the analysis starts automatically — runway and
-telemetry are filled in for you. Uploading your own media afterwards
-clears the sample's metadata.
+Click **Try it out** (or **Live Demo** in the menu) to start.
 
-### 3.1 Single image upload
+## 3. Live Demo — analysing footage
 
-1. Make sure the **Analysis runway** selector matches the runway the
-   drone was facing. The default is `PAPI 24` (Friedrichshafen runway
-   24 — the lamp altitudes are confirmed). Switch to `PAPI 06` if the
-   footage was captured on the runway 06 approach.
-2. Optionally pick a different **Inference model**. The options come
-   from the backend (`GET /api/models`): the default *Small detector*
-   (current serving model), the previous *Nano detector*, and the
-   experimental *Transition classifier* — entries whose weights are
-   not installed are shown disabled with the reason.
-3. Click **Upload media** and choose an image file (`.jpg`, `.jpeg`,
-   `.png`, `.bmp`, `.webp`). **The analysis starts automatically** as
-   soon as the upload is read — there is no separate "run" button.
-4. If the image carries no GPS / altitude metadata, a **"No drone
-   metadata found"** prompt appears. Fill in **Latitude**,
-   **Longitude**, and **Altitude (m)** (or upload a telemetry file)
-   and click **Apply metadata** to re-run the analysis with the
-   per-lamp elevation-angle calculation. Dismissing it keeps the
-   result without a viewing angle.
-5. The annotated frame appears in the central panel; per-lamp
-   results and metrics appear on the right. Changing the model,
-   runway, or metadata afterwards? Click **Re-run analysis** to
-   apply it to the same upload.
+This is where you do the real work. You can try it with the built-in
+examples or upload your own footage.
 
-### 3.2 Video upload
+### 3.1 Try it with the built-in samples
 
-Same procedure, but the file is an `.mp4`, `.mov`, `.avi`, or
-`.mkv`. The backend extracts frames automatically and analyses each
-frame in sequence. Output is a single aggregate result with an
-annotated video artifact.
+If you have no footage of your own, use the ready-made examples. On the
+empty page, under the upload buttons, you will see three sample cards:
 
-**Limits**: 100 MB maximum per upload, 600 frames maximum per
-video, 150 seconds maximum duration (whichever cap is lower; defaults,
-configurable via `PAPI_MAX_VIDEO_FRAMES` / `PAPI_MAX_VIDEO_SECONDS`).
+- **Sample image** — one frame on the correct path (two white, two red).
+- **Sample image set** — ten frames that climb through every PAPI state.
+- **Sample video** — a two-minute clip of a full climb, including each
+  lamp changing from red to white. It takes about half a minute.
 
-If a video stops decoding partway (a damaged or partially
-downloaded file), the result carries a **decode warning**: the
-banner states how many of the promised frames could be decoded, and
-the verdict covers only those frames. The same warning appears on
-the History detail view, and partial analyses are marked with a
-**Partial** badge in the History table and flagged in the CSV
-export (`truncated_at_frame` / `decode_shortfall` columns).
+Click any card and the analysis starts on its own. The runway and drone
+position are filled in for you.
 
-### 3.3 Folder upload (two modes)
+### 3.2 Analyse your own footage
 
-1. Click **Upload folder** instead and pick a directory containing
-   multiple image files.
-2. Choose a **Folder mode** — the two buttons next to the upload
-   controls:
+Before you upload, set two things at the top of the page:
 
-   - **Angle sweep** (the default) — every image is analysed
-     **separately**, so each frame uses its own GPS metadata and gets
-     its own viewing angle. You can step through the per-frame
-     results, and this mode is what drives the angle-vs-state charts
-     on the Insights page. A telemetry *file* is ignored here (each
-     image carries its own GPS); enter a manual drone position or
-     switch modes if you need to override it.
-   - **Video sequence** — the folder is analysed as a **single
-     time-sequenced video**: the images are ordered by filename and
-     treated as consecutive frames of one clip, so the lamps are
-     tracked across frames and red↔white transitions are detected
-     over time. You get **one aggregated result** plus one annotated
-     video — no per-image frame stepping. (Name the files in capture
-     order, e.g. `frame_000.jpg … frame_NNN.jpg`, so the sequence
-     plays correctly.) The metadata fields apply to the whole
-     sequence.
+1. **Analysis runway** — pick the runway the drone was facing. The
+   default is **PAPI 24**. Choose **PAPI 06** for the other approach.
+2. **Inference model** (optional) — which detector to use. The default
+   (**Small detector**) is right for normal use. Other models appear
+   here if they are installed.
 
-3. The analysis runs automatically after the upload. If you switch
-   the folder mode afterwards, the page shows a **"Re-run to apply"**
-   prompt — click it to re-analyse in the new mode.
+Then upload, in one of three ways:
 
-If you instead want an independent result for every image through a
-single request, that batch mode is still available on the backend at
-`POST /api/analyze-frames` via the API docs; the folder button in the
-UI uses the two modes described above.
+- **One image** — click **Upload media** and choose a photo (JPG, PNG,
+  BMP, or WEBP). The analysis starts as soon as the file loads — there
+  is no separate "run" button.
+- **A video** — same button; choose a video (MP4, MOV, AVI, or MKV).
+  The app reads the frames and gives one combined result plus an
+  annotated video.
+- **A folder of images** — click **Upload folder**, then choose how to
+  treat them:
+  - **Angle sweep** (the default) — each image is analysed on its own,
+    with its own angle. Use this to compare angles across a descent. It
+    is what feeds the charts on the Insights page.
+  - **Video sequence** — the images are treated as one video, in
+    filename order. The app tracks the lamps across frames and finds the
+    red↔white changes over time. You get one combined result. Name the
+    files in order (for example `frame_000.jpg`, `frame_001.jpg`, …).
 
-## 4. Reading the results
+If you change the runway, model, or folder mode after a run, click
+**Re-run analysis** to apply it.
 
-### State summary (right panel)
+### 3.3 If the app asks for the drone position
 
-- The coloured dot and large label show the **global glidepath
-  state** (e.g. "Correct glidepath", "Too low").
-- The summary line below it shows the lamp pattern that produced
-  this state.
-- When the result has **no computed viewing angle**, a compact
-  **"Result based on"** provenance strip appears above the summary
-  showing the runway the result was scored against and that no
-  telemetry was available. (When the angle *is* available, the
-  angle readout itself already shows the runway and telemetry
-  source, so the strip is hidden.)
+If your file has no GPS or height information, a **"No drone metadata
+found"** notice appears. To get the viewing angle, fill in
+**Latitude**, **Longitude**, and **Altitude (m)** — all three, or none
+— and click **Apply metadata**. You can also upload a telemetry file.
+If you skip this, you still get the colour result, just without an angle.
 
-### Lamp cards
+### 3.4 File limits
 
-One card per lamp, ordered left-to-right as they appear in the
-image. Each card shows:
+- Up to **100 MB** per upload.
+- Up to **600 frames** and **150 seconds** per video.
 
-- The lamp number (1–4) and its detected state (White / Red /
-  Transition / Occluded).
-- The model's confidence in that detection (0–100 %). A real
-  detection below 50 % confidence is flagged with a ⚠ cue and amber
-  styling so a shaky verdict is not presented as certain.
+If a video is damaged and only part of it can be read, you get a
+warning saying how many frames were used, and the result covers only
+those frames. It is marked **Partial** in History.
 
-### Metric cards
+## 4. Reading the result
 
-Two cards at the bottom of the right panel:
+After a run, the middle of the page shows your image or video with the
+lamps boxed. The right side shows the verdict.
 
-- **Detection confidence**: average model confidence across the
-  four lamps for this frame.
-- **Processing time**: wall-clock milliseconds the backend took
-  to run inference on the frame (or the whole video).
+- **Top:** a coloured dot and a large label give the **overall
+  verdict** (for example "Correct glidepath" or "Too low"). The line
+  under it shows the lamp pattern behind the verdict.
+- **Lamp cards:** one card per lamp, left to right. Each shows the lamp
+  number (1–4), its colour (White, Red, Transition, or Occluded if it
+  cannot be seen), and how sure the app is (0–100%). A weak detection
+  (under 50%) is flagged, so a shaky reading is not shown as certain.
+- **Two small cards at the bottom:**
+  - **Detection confidence** — the average confidence over the four
+    lamps.
+  - **Processing time** — how long the analysis took, in milliseconds.
 
-These are **real measurements** from the backend, not preset values.
+These numbers are real measurements, not examples. The result panel
+stays empty until you run something.
 
-### Live data only — no demo presets
+## 5. Insights — charts that explain a result
 
-Everything on the Live Demo page comes from a **real backend
-analysis** of your upload. Until you run one, the result panel
-simply stays empty; there are no canned demonstration scenarios.
-(Earlier builds shipped preset "DEMO" tabs — they have been removed
-so jurors and reviewers can never mistake illustration for live
-data.)
+Click **Insights** in the menu. It explains your most recent Live Demo
+run, or a run you opened from History. Every chart uses real results —
+nothing is faked.
 
-## 5. The Insights page
+When the data is there, you will see:
 
-Click **Insights** in the top navigation. Every chart here is built
-from **real backend output** — there is no synthetic data. By default
-the page reviews the latest Live Demo analysis in the current browser
-session; opening a row from History loads that persisted run at
-`/insights?log=...` instead.
+- **Transition angle per light** — where each lamp changed between red
+  and white.
+- **Redness vs. angle** — one graph per lamp, plotting colour against
+  viewing angle. This is the main evidence chart for the client.
+- **Lamp state over the sweep** and **Elevation angle over frame** —
+  the descent, frame by frame.
+- **Session distributions** — the mix of lamp states and confidence for
+  the run.
+- **Model & dataset** — the facts about the model and data behind the
+  result.
 
-- **Current analysis** — visualisations of the run you just executed
-  on the Live Demo page, or the History log loaded into Insights:
-  - **Measured transition angle per light** — where each lamp crossed
-    red↔white, with the observed blend zone. FAA default set angles
-    are reference lines only until commissioned per-lamp values are
-    wired to the frontend.
-  - **Redness vs. angle** — one graph per lamp, plotting the measured
-    red-channel redness against real elevation angle. This is the
-    client-facing transition evidence view.
-  - **Lamp state over the sweep** and **Elevation angle over frame** —
-    the frame-by-frame descent evidence when telemetry is available.
-  - **Session distributions** — per-light state mix and detection
-    confidence for the reviewed run.
-- **Model & dataset** — the live model and dataset facts (identity,
-  role, training run, split, threshold, and validation metrics) read
-  from the backend. These metrics describe box detection quality; they
-  are not a commissioned-angle verdict.
+Top right:
 
-Use **Download charts (PDF)** in the top right to export the rendered
-charts as a multi-page PDF for inclusion in reports. When transition
-events exist, **Download transitions (CSV)** exports the raw event
-rows with source, log id, lamp, frame, angle, method, and flicker
-status. If you have not run or loaded an analysis yet, the page points
-you back to Live Demo.
+- **Download charts (PDF)** — save the charts as a PDF for a report.
+- **Download transitions (CSV)** — save the raw red↔white change events
+  as a spreadsheet (when there are any).
 
-## 5a. The History page
+If you have not run anything yet, the page points you back to Live Demo.
 
-Click **History** in the top navigation to review past analyses. It
-lists recent backend runs (newest first) with their verdict, runway,
-confidence, and annotated artifact, and reflects the backend's
-persisted analysis log. It is read straight from the backend, so it
-populates only when the backend is running.
+## 6. History — past results
 
-The list can be narrowed with **six filters**: runway, state, model,
-media type (images/videos), an "analyzed on or after" date, and a
-minimum-confidence threshold. The summary cards above the table
-(analysis count, average confidence, processing times) always describe
-exactly the rows the active filters select — a small **"filtered"**
-chip appears on them whenever a filter is active, while the model and
-accuracy cards keep describing the serving model itself.
+Click **History** to see earlier runs, newest first. Each row shows the
+verdict, runway, confidence, and the annotated file. History needs the
+app's backend running.
 
-**Export CSV** downloads the filtered rows as a spreadsheet; the
-filename encodes the active filters so a narrowed export is
-distinguishable from a full one. Clicking a row opens the detail
-dialog with the per-lamp states, raw detections, and the annotated
-artifact. Use the row's **Insights** action to open that persisted
-analysis in the Insights page without rerunning inference.
+Narrow the list with the **filters**: runway, state, model, media type
+(images or videos), a date ("on or after"), and a minimum confidence.
+The summary cards above the table always match the rows you have
+filtered to, and show a small **"filtered"** chip when a filter is on.
 
-## 5b. The Runways page
+- **Export CSV** — download the filtered rows as a spreadsheet.
+- **Click a row** — open the full detail, with each lamp's state and the
+  annotated file.
+- **Insights** (on a row) — open that run in the Insights page without
+  analysing it again.
 
-The **Runways** tab lists the runway geometries the app can analyse an approach
-against. Each runway defines the four PAPI lamp positions (latitude, longitude,
-altitude) used by the elevation-angle calculation.
+## 7. Runways
 
-- Built-in runways (e.g. EDNY) ship with the app and are read-only.
-- You can register a custom runway by entering its four lamp coordinates; it then
-  becomes selectable in the runway dropdown on the Live Demo page.
-- Custom runways can be removed when no longer needed (built-ins are protected).
+Click **Runways** to see the runways the app can score an approach
+against. Each runway holds the positions of its four PAPI lamps, which
+the app uses to work out the viewing angle.
 
-You only need this page when working with a runway the app does not already know
-about — for the bundled demo footage, a default runway is preselected.
+- Built-in runways (like EDNY) come with the app and cannot be changed.
+- To add your own runway, enter its four lamp coordinates. It then
+  appears in the runway dropdown on the Live Demo page.
+- You can delete runways you added (built-in ones are protected).
 
-## 6. Theme and language
+You only need this page for a runway the app does not already know. For
+the sample footage, a runway is chosen for you.
 
-Top-right corner:
+## 8. Language and theme
 
-- **EN / DE / NL / FR** language picker. Changes UI text on the fly.
-  The choice is remembered across page reloads (and an unset choice
-  follows the browser language on first visit).
-- **Moon / Sun icon**: toggles between light and dark mode. Useful
-  during presentations in dark rooms. The choice is also remembered
-  across reloads.
+In the top-right corner:
 
-## 7. Troubleshooting
+- **Language** — click the language button (EN) to switch between
+  **English, Deutsch, Nederlands, Français**. The text changes straight
+  away, and your choice is remembered.
+- **Light / dark mode** — the sun/moon button switches the look. Handy
+  for dark rooms during a demo. Also remembered.
 
-| Symptom | Likely cause | Fix |
+## 9. Advanced: managing models and data (admin)
+
+These features are for technical users who maintain the app. They are
+hidden until you unlock admin mode.
+
+### Unlocking admin mode
+
+Click the **shield icon** in the top-right corner, type the **API key**,
+and click **Unlock**. On a normal local setup you can leave the key
+blank. Two new menu items appear: **Models** and **Datasets**. Click the
+shield again to lock it.
+
+### The Models page
+
+Click **Models** to manage the detectors. Each model shows its accuracy
+scores (mAP, precision, recall, F1) and details. Not sure what the
+scores mean? Click **"What do these scores mean?"** for plain
+definitions. You can:
+
+- **Set default** — make a model the one used when a request does not
+  pick one (also the Live Demo's starting choice).
+- **Evaluate** — test a model on a dataset and split; the result fills
+  in its scores.
+- **Compare** — tick two or more models to see them side by side.
+- **Enable / Disable** and **Delete** — manage which models show
+  (built-in ones are protected).
+- **Upload model** — add your own model file (`.pt` or `.onnx`), give it
+  a name and a role (detector or transition). Only upload model files
+  you trust.
+
+Long jobs such as an evaluation show in a **jobs panel** with a progress
+bar; you can cancel a running job or clear finished ones.
+
+### The Datasets page
+
+Click **Datasets** to manage training data. Each dataset shows its type,
+its classes, and its train / validation / test counts. You can:
+
+- **Upload dataset** — add a labelled YOLO dataset as a `.zip`.
+- **Assisted labeling** — upload plain images and pick a model to
+  pre-label them. Then **Review labels**: fix or delete the predicted
+  boxes, skip bad images, and click **Commit labels**.
+- **Train** — on a ready dataset, set the options (epochs, image size,
+  batch, transition oversample) and click **Download bundle**. You run
+  the training on your own GPU, then bring the new model back with
+  **Upload model**.
+
+As on the Models page, running jobs appear in the jobs panel.
+
+## 10. Troubleshooting
+
+| Problem | Why | What to do |
 | --- | --- | --- |
-| Frontend shows "Chart unavailable" | Plotly chunk failed to load (offline, ad-blocker, CSP) | Check browser console; usually transient — refresh |
-| Backend returns 503 "Model file not found" | `models/serving/best.pt` missing on the host | Copy a model into `models/serving/` per the install guide |
-| Backend returns 400 "Provide drone_latitude / longitude / altitude_m together" | Filled in some metadata fields but not all three | Either fill all three or clear all three |
-| Backend returns 413 / "Upload exceeds 100 MB" | Input file too large | Compress / trim, or raise `PAPI_MAX_UPLOAD_MB` in `.env` |
-| Backend returns 429 "Rate limit exceeded" | Too many requests from one client per minute (default: 60 analyze, 600 other) | Wait for the `Retry-After` interval, or adjust `PAPI_ANALYZE_RATE_LIMIT_PER_MINUTE` / `PAPI_RATE_LIMIT_PER_MINUTE` in `.env` |
-| Result shows "Only N of M source frames could be decoded" | Damaged or partially transferred media file | Re-export / re-upload the source; the verdict covers the decoded frames only |
-| "Angle unavailable" on the result | The uploaded file had no GPS / altitude metadata | Supply the values manually in the metadata fields |
-| Folder upload only shows one image | Browser couldn't read the directory | Try a different browser (Firefox & Edge both support `webkitdirectory`) |
-| Page title shows "frontend" not "PAPI Lights Detection and Classification" | Old browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |
-| Cookie consent popup keeps appearing | Stale cached bundle | The popup was removed; refresh to load the new build |
+| "Angle unavailable" on a result | The file had no GPS / height info | Type the drone position in the metadata fields |
+| Asked to fill all three position fields | You filled some but not all of latitude, longitude, altitude | Fill all three, or clear all three |
+| "Only N of M frames could be read" | The video is damaged or only partly uploaded | Re-export and upload again; the result covers the readable frames |
+| Upload rejected as too large | The file is over 100 MB | Trim or compress it |
+| "Too many requests" | You sent many analyses very quickly | Wait a moment and try again |
+| Charts say "unavailable" | A chart failed to load (offline, ad-blocker) | Refresh the page |
+| Folder upload shows only one image | The browser could not read the folder | Try Firefox or Edge |
 
-If you need to inspect what the backend actually received: the
-FastAPI interactive docs at `http://localhost:8000/docs` show every
-endpoint with a "Try it out" panel that mirrors the frontend flow.
+To see exactly what the backend received, open the built-in API docs at
+`http://localhost:8000/docs`.
 
-## 8. Known limitations
+## 11. Good to know
 
-- ZoomCamera footage (DJI Matrice 4E zoom lens) is **not
-  auto-labelled** in this build — only WideCamera frames. The model
-  still runs on zoom frames but the detection quality is degraded.
-- The system is tuned for **Friedrichshafen (EDNY)** specifically.
-  Generalisation to other airports requires retraining + a new
-  geometry config.
-- Real-time inference target was ≥ 10 fps. On a laptop CPU the
-  current build measures ~ 0.4 fps (≈ 2,700 ms / frame; see
-  `docs/edge-benchmark.md`). GPU is not yet configured.
-- Daytime PAPI footage has lens-flare cases where a red lamp can
-  visually saturate to white. These edge cases are documented in
-  `docs/label_spec.md` under "Failure modes".
+- The app is tuned for **Friedrichshafen (EDNY)**. Other airports need
+  retraining and a new runway setup.
+- On a normal laptop (no GPU) a video is slow — roughly **0.4 frames per
+  second**. A GPU is much faster.
+- The set angles shown for transitions are FAA defaults, used as
+  reference lines until the real commissioned angles are added.
+- Some daytime footage with strong lens flare can make a red lamp look
+  white. These cases are known.
 
-## 9. Where to file feedback
+## 12. Help and feedback
 
-- For software bugs: open an issue on
-  [GitHub](https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification/issues).
-- For dataset / model questions: the BigBrain project hub at
-  [intersoft-papi-detection](https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification#intersoft-papi-detection)
-  is the team's working knowledge base.
-- For client-facing feedback: route through Intersoft Electronics
-  Services BV (contact via the team supervisor).
+- **Software bugs:** open an issue on the project's
+  [GitHub page](https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification/issues).
+- **Model or data questions:** the team's knowledge base is the working
+  reference.
+- **Client questions:** go through Intersoft Electronics Services BV
+  (via the team supervisor).
