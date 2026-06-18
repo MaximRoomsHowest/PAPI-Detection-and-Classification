@@ -197,10 +197,10 @@
     flex-wrap: wrap;
   }
 
-  /* Full row is not enough: the selector's own inline contents (label +
-     segmented options + status note) also have to wrap, or they clip past the
-     viewport at ~380px (audit 2026-06-12). Stack them as rows and give the
-     note a full line of its own instead of an 18ch sliver. */
+  /* Full row is not enough: the selector's own inline contents (label + dropdown +
+     status note) also have to wrap, or they clip past the viewport at ~380px (audit
+     2026-06-12). Stack them as rows and give the note a full line of its own instead
+     of an 18ch sliver. */
   .demo-actions .model-selector {
     width: 100%;
     flex-wrap: wrap;
@@ -208,8 +208,9 @@
     padding: 8px 12px;
   }
 
-  .demo-actions .model-selector__options {
-    flex-wrap: wrap;
+  .demo-actions .model-selector__select {
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .demo-actions .model-selector small {

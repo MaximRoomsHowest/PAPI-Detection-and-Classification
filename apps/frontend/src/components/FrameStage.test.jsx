@@ -241,6 +241,7 @@ describe('FrameStage sample picker', () => {
       copy.live.sampleSingleImageLabel,
       copy.live.sampleImageSetLabel,
       copy.live.sampleVideoLabel,
+      copy.live.sampleWeatherLabel,
     ])
   })
 

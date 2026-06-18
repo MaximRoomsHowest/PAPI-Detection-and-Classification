@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Star, Trash2, Upload, BarChart3, EyeOff, Eye, Info, X } from 'lucide-react'
+import { Star, Trash2, Upload, BarChart3, EyeOff, Eye, Info, X, Filter, Search } from 'lucide-react'
 import { useModelManagement } from '../hooks/useModelManagement'
 import { useDatasets } from '../hooks/useDatasets'
 import { useJobs } from '../hooks/useJobs'
@@ -550,6 +550,105 @@ function ComparePanel({ models, ids, copy, onClear }) {
   )
 }
 
+const DEFAULT_FILTERS = { query: '', role: 'all', status: 'all', sort: 'default' }
+
+// Pure filter+sort over the registry. Search matches label OR id; role/status narrow
+// the set; sort reorders (registry order is the default and preserves the backend's
+// served-first ordering). Kept out of the component so it is trivially testable and
+// memoisable.
+function filterAndSortModels(models, filters) {
+  const q = filters.query.trim().toLowerCase()
+  const list = models.filter((m) => {
+    if (q && !`${m.model_label || ''} ${m.model_id || ''}`.toLowerCase().includes(q)) return false
+    if (filters.role !== 'all' && (m.model_role || 'detector') !== filters.role) return false
+    if (filters.status === 'available' && !m.available) return false
+    if (filters.status === 'unavailable' && m.available) return false
+    return true
+  })
+  const sorted = [...list]
+  if (filters.sort === 'name') {
+    sorted.sort((a, b) => (a.model_label || a.model_id || '').localeCompare(b.model_label || b.model_id || ''))
+  } else if (filters.sort === 'accuracy') {
+    const acc = (m) => (Number.isFinite(m.val_metrics?.map50) ? m.val_metrics.map50 : -1)
+    sorted.sort((a, b) => acc(b) - acc(a))
+  } else if (filters.sort === 'classes') {
+    sorted.sort((a, b) => (classCountOf(b) ?? 0) - (classCountOf(a) ?? 0))
+  }
+  return sorted
+}
+
+// Search + role/status filters + sort for the registry grid. Presentational and
+// controlled: the parent owns `filters` and recomputes the visible set.
+function ModelsToolbar({ filters, onChange, count, total, copy }) {
+  const t = copy.models.toolbar
+  const active =
+    filters.query !== '' || filters.role !== 'all' || filters.status !== 'all' || filters.sort !== 'default'
+  return (
+    <div className="models-toolbar" role="group" aria-label={t.title}>
+      <span className="models-toolbar__title">
+        <Filter size={15} aria-hidden="true" />
+        {t.title}
+      </span>
+
+      <label className="stats-filter models-toolbar__search">
+        <span>{t.search}</span>
+        <span className="models-toolbar__search-field">
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="search"
+            value={filters.query}
+            placeholder={t.searchPlaceholder}
+            onChange={(event) => onChange({ query: event.target.value })}
+            aria-label={t.search}
+          />
+        </span>
+      </label>
+
+      <label className="stats-filter">
+        <span>{t.role}</span>
+        <select value={filters.role} onChange={(event) => onChange({ role: event.target.value })} aria-label={t.role}>
+          <option value="all">{t.roleAll}</option>
+          <option value="detector">{copy.models.roles.detector}</option>
+          <option value="transition">{copy.models.roles.transition}</option>
+        </select>
+      </label>
+
+      <label className="stats-filter">
+        <span>{t.status}</span>
+        <select
+          value={filters.status}
+          onChange={(event) => onChange({ status: event.target.value })}
+          aria-label={t.status}
+        >
+          <option value="all">{t.statusAll}</option>
+          <option value="available">{t.statusAvailable}</option>
+          <option value="unavailable">{t.statusUnavailable}</option>
+        </select>
+      </label>
+
+      <label className="stats-filter">
+        <span>{t.sort}</span>
+        <select value={filters.sort} onChange={(event) => onChange({ sort: event.target.value })} aria-label={t.sort}>
+          <option value="default">{t.sortDefault}</option>
+          <option value="name">{t.sortName}</option>
+          <option value="accuracy">{t.sortAccuracy}</option>
+          <option value="classes">{t.sortClasses}</option>
+        </select>
+      </label>
+
+      {active && (
+        <button type="button" className="ghost-button models-toolbar__reset" onClick={() => onChange({ reset: true })}>
+          <X size={15} aria-hidden="true" /> {t.reset}
+        </button>
+      )}
+
+      <span className="models-toolbar__count mono" aria-live="polite">
+        {t.results.replace('{count}', count).replace('{total}', total)}
+      </span>
+    </div>
+  )
+}
+
 export function ModelsPage({ copy, isAdmin }) {
   const { models, loading, error, upload, promote, setDisabled, remove, evaluate } = useModelManagement()
   const { datasets, loading: datasetsLoading } = useDatasets()
@@ -558,8 +657,12 @@ export function ModelsPage({ copy, isAdmin }) {
   const [evalModel, setEvalModel] = useState(null)
   const [busyId, setBusyId] = useState(null)
   const [compareIds, setCompareIds] = useState(() => new Set())
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
 
   const evaluateJobs = useMemo(() => jobs.filter((job) => job.kind === 'evaluate'), [jobs])
+  const visibleModels = useMemo(() => filterAndSortModels(models, filters), [models, filters])
+  const onFilterChange = (patch) =>
+    setFilters((prev) => (patch.reset ? DEFAULT_FILTERS : { ...prev, ...patch }))
 
   if (!isAdmin) {
     return (
@@ -655,8 +758,18 @@ export function ModelsPage({ copy, isAdmin }) {
 
       {models.length > 0 && <MetricsGuide copy={copy} />}
 
+      {models.length > 0 && (
+        <ModelsToolbar
+          filters={filters}
+          onChange={onFilterChange}
+          count={visibleModels.length}
+          total={models.length}
+          copy={copy}
+        />
+      )}
+
       <div className="model-grid">
-        {models.map((model) => (
+        {visibleModels.map((model) => (
           <ModelCard
             key={model.model_id}
             model={model}
@@ -681,6 +794,10 @@ export function ModelsPage({ copy, isAdmin }) {
           />
         ))}
       </div>
+
+      {models.length > 0 && visibleModels.length === 0 && (
+        <p className="lc-empty">{copy.models.toolbar.noMatch}</p>
+      )}
 
       <ComparePanel models={models} ids={compareIds} copy={copy} onClear={() => setCompareIds(new Set())} />
 

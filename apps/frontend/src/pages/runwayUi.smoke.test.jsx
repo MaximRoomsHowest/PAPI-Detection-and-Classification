@@ -149,33 +149,74 @@ describe('runway UI smoke', () => {
     expect(setSelectedRunwayId).toHaveBeenCalledWith(builtinRunway.id)
   })
 
-  it('renders selectable inference models and disables unavailable entries', () => {
+  it('renders selectable inference models grouped by role and disables unavailable entries', () => {
     const setSelectedModelId = vi.fn()
-    mocks.contextValue = makeContext({ setSelectedModelId })
+    mocks.contextValue = makeContext({
+      setSelectedModelId,
+      selectedModelId: 'small',
+      modelOptions: [
+        { model_id: 'small', model_label: 'Small detector', model_role: 'detector', available: true },
+        { model_id: 'nano', model_label: 'Nano detector', model_role: 'detector', available: true },
+        {
+          model_id: 'transition',
+          model_label: 'Transition classifier',
+          model_role: 'transition',
+          available: false,
+          disabled_reason: 'missing',
+        },
+      ],
+    })
 
     const { container } = render(<MediaUploadControls copy={copy} />)
 
     expect(container.textContent).toContain(copy.live.inferenceModel)
-    const buttons = [...container.querySelectorAll('.model-selector__option')]
-    expect(buttons.map((button) => button.textContent.trim())).toEqual([
-      'Small detector',
-      'Transition classifier',
+    const select = container.querySelector('.model-selector__select')
+    expect(select).not.toBeNull()
+    // Detectors and the transition model are split into two <optgroup>s.
+    expect([...select.querySelectorAll('optgroup')].map((group) => group.label)).toEqual([
+      copy.live.modelGroupDetectors,
+      copy.live.modelGroupTransition,
     ])
-    // aria-disabled, not the disabled attribute: the button stays focusable so keyboard
-    // focus isn't dropped and the disabled reason stays reachable (FE-8).
-    expect(buttons[1].disabled).toBe(false)
-    expect(buttons[1].getAttribute('aria-disabled')).toBe('true')
 
+    const options = [...select.querySelectorAll('option')]
+    const optByText = (text) => options.find((option) => option.textContent.includes(text))
+    expect(optByText('Small detector')).toBeTruthy()
+    expect(optByText('Nano detector')).toBeTruthy()
+    // Unavailable registry entries render as disabled <option>s (native, unselectable) and
+    // surface the disabled reason in the visible label.
+    expect(optByText('Small detector').disabled).toBe(false)
+    const transition = optByText('Transition classifier')
+    expect(transition.disabled).toBe(true)
+    expect(transition.textContent).toContain('missing')
+
+    // Choosing an available model fires setSelectedModelId with its id.
+    select.value = 'nano'
     act(() => {
-      buttons[1].dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      select.dispatchEvent(new Event('change', { bubbles: true }))
     })
+    expect(setSelectedModelId).toHaveBeenCalledWith('nano')
+  })
+
+  it('ignores inference-model changes while an analysis is in progress', () => {
+    const setSelectedModelId = vi.fn()
+    mocks.contextValue = makeContext({
+      setSelectedModelId,
+      isAnalyzing: true,
+      selectedModelId: 'small',
+      modelOptions: [
+        { model_id: 'small', model_label: 'Small detector', model_role: 'detector', available: true },
+        { model_id: 'nano', model_label: 'Nano detector', model_role: 'detector', available: true },
+      ],
+    })
+
+    const { container } = render(<MediaUploadControls copy={copy} />)
+    const select = container.querySelector('.model-selector__select')
+    select.value = 'nano'
+    act(() => {
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    // Mid-analysis switching is blocked; the controlled value snaps the selection back.
     expect(setSelectedModelId).not.toHaveBeenCalled()
-
-    act(() => {
-      buttons[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-
-    expect(setSelectedModelId).toHaveBeenCalledWith('small')
   })
 
   it('shows the model that produced a backend result', () => {

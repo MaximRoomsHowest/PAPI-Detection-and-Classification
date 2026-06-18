@@ -14,16 +14,30 @@ export function MediaUploadControls({ copy }) {
     modelOptionsError,
     isAnalyzing,
   } = useLiveDemo()
-  // Until the registry has loaded (or after a failed load) there is no real entry to
-  // show — render one NEUTRAL placeholder so the segmented control keeps its shape
-  // without flashing a raw registry id as if it were a translated label (audit FE-15).
-  const options = modelOptions.length
-    ? modelOptions
-    : [{ model_id: '', model_label: '…', available: true }]
   // One PERSISTENT status line for the loading/error text: a conditionally-mounted
   // live region is added to the DOM together with its content, so screen readers
   // never announce it. Empty once the options are ready.
   const statusText = modelOptionsError || (modelOptionsLoading ? copy.live.modelLoading : '')
+  // Group the registry into Detectors (2-class) and the Transition (3-class) model so the
+  // dropdown stays scannable as the registry grows. Registry order is preserved within each
+  // group; an entry with no role is treated as a detector.
+  const modelGroups = [
+    {
+      id: 'detector',
+      label: copy.live.modelGroupDetectors,
+      items: modelOptions.filter((model) => model.model_role !== 'transition'),
+    },
+    {
+      id: 'transition',
+      label: copy.live.modelGroupTransition,
+      items: modelOptions.filter((model) => model.model_role === 'transition'),
+    },
+  ].filter((group) => group.items.length > 0)
+  // Whether the controlled value maps to a real option. Until the registry loads (or if the
+  // current selection went unavailable and reset to ""), a disabled "…" placeholder keeps the
+  // controlled <select> valid without flashing a raw registry id as a label (audit FE-15).
+  const currentModelId = selectedModelId ?? ''
+  const hasModelMatch = modelOptions.some((model) => model.model_id === currentModelId)
 
   return (
     <div className="demo-actions">
@@ -52,42 +66,52 @@ export function MediaUploadControls({ copy }) {
           onChange={handleMediaChange}
         />
       </label>
-      <div className="model-selector" role="group" aria-label={copy.live.inferenceModel}>
-        <span className="model-selector__label">{copy.live.inferenceModel}</span>
-        <div className="model-selector__options">
-          {options.map((model) => {
-            const unavailable = model.available === false
-            // Block model switching mid-analysis: setSelectedModelId arms the auto-run, so a click
-            // during an in-flight run queues a wasted re-run and flashes the stale-model result first (audit).
-            // aria-disabled + an onClick guard instead of `disabled`: a disabled attribute would
-            // drop keyboard focus to <body> mid-analysis and hide the disabled_reason from
-            // screen readers; the title carries the reason as the accessible description (FE-8).
-            const blocked = unavailable || isAnalyzing
-            const reason = unavailable
-              ? model.disabled_reason || copy.live.modelUnavailable
-              : isAnalyzing
-                ? copy.live.restartDisabledBusy
-                : model.description || model.model_role || model.model_id
-            return (
-              <button
-                key={model.model_id || 'placeholder'}
-                type="button"
-                className={`model-selector__option${selectedModelId === model.model_id ? ' is-active' : ''}`}
-                aria-pressed={selectedModelId === model.model_id}
-                aria-disabled={blocked || undefined}
-                title={reason || undefined}
-                onClick={() => {
-                  if (!blocked) {
-                    setSelectedModelId(model.model_id)
-                  }
-                }}
-              >
-                {model.model_label || model.model_id}
-              </button>
-            )
-          })}
-        </div>
+      <div className="model-selector">
+        <span className="model-selector__label" id="model-selector-label">
+          {copy.live.inferenceModel}
+        </span>
+        <select
+          className="model-selector__select"
+          aria-labelledby="model-selector-label"
+          aria-describedby={statusText ? 'model-selector-status' : undefined}
+          // No real entries yet (registry loading or failed) → nothing to choose.
+          disabled={modelOptions.length === 0}
+          // Keep the control ENABLED during analysis so keyboard focus survives, but ignore the
+          // change: switching mid-run arms a wasted auto-run and flashes a stale result first. The
+          // controlled value snaps the selection back; the title carries the busy reason (FE-8).
+          title={isAnalyzing ? copy.live.restartDisabledBusy : copy.live.inferenceModel}
+          value={currentModelId}
+          onChange={(event) => {
+            if (!isAnalyzing) {
+              setSelectedModelId(event.target.value)
+            }
+          }}
+        >
+          {!hasModelMatch && (
+            <option value={currentModelId} disabled>
+              …
+            </option>
+          )}
+          {modelGroups.map((group) => (
+            <optgroup key={group.id} label={group.label}>
+              {group.items.map((model) => {
+                // Unavailable registry entries render as disabled <option>s: native, unselectable,
+                // and the disabled reason rides along in the visible label so it stays reachable.
+                const unavailable = model.available === false
+                const label = model.model_label || model.model_id
+                return (
+                  <option key={model.model_id} value={model.model_id} disabled={unavailable}>
+                    {unavailable
+                      ? `${label} — ${model.disabled_reason || copy.live.modelUnavailable}`
+                      : label}
+                  </option>
+                )
+              })}
+            </optgroup>
+          ))}
+        </select>
         <small
+          id="model-selector-status"
           className={modelOptionsError ? 'model-selector__error' : undefined}
           role="status"
           aria-live="polite"

@@ -443,8 +443,8 @@
   cursor: pointer;
 }
 
-/* Inference model selector — a segmented control matching the runway selector's
-   bordered surface; unavailable registry entries are visible but disabled. */
+/* Inference model selector — a compact dropdown matching the runway selector's bordered
+   surface (inline label + native <select>); unavailable registry entries render disabled. */
 .model-selector {
   display: inline-flex;
   align-items: center;
@@ -466,52 +466,36 @@
   font-weight: 600;
 }
 
-.model-selector__options {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 3px;
+.model-selector__select {
+  flex: 1 1 auto;
+  min-width: 14ch;
+  /* Keep the closed control compact even though option labels are long
+     ("yolo26s · full-data 1280 (serving)"); the selected text truncates. */
+  max-width: 28ch;
   overflow: hidden;
-}
-
-.model-selector__option {
+  text-overflow: ellipsis;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-strong);
   font: inherit;
-  padding: 6px 12px;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.model-selector__option + .model-selector__option {
-  border-left: 1px solid var(--border);
-}
-
-.model-selector__option.is-active {
-  /* Lit segment: a soft top-down sheen on the accent fill + an inset catch-light,
-     so the selected detector reads as an illuminated, engaged control. */
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--accent) 90%, #fff),
-    var(--accent)
-  );
-  color: var(--surface);
-  font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-/* aria-disabled (not the disabled attribute) keeps blocked options focusable so
-   keyboard focus survives mid-analysis and the title reason stays reachable. */
-.model-selector__option:disabled,
-.model-selector__option[aria-disabled='true'] {
-  opacity: 0.45;
+.model-selector__select:disabled {
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 
-.model-selector__option:focus-visible {
-  /* --focus, not --accent: the active option's background IS var(--accent), so an
-     accent outline would be invisible on it (WCAG 2.4.7). */
+.model-selector__select:focus-visible {
   outline: 2px solid var(--focus);
-  outline-offset: -2px;
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Unavailable registry entries are listed but greyed and unselectable in the popup. */
+.model-selector__select option:disabled {
+  color: var(--text-muted);
 }
 
 .model-selector small {

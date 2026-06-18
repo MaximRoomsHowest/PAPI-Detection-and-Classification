@@ -55,6 +55,67 @@
   color: var(--danger);
 }
 
+/* --- Models toolbar (search / filter / sort) --------------------------- */
+/* Mirrors the Insights .stats-filter-bar look (and reuses its .stats-filter
+   control groups) but without the grid-column span, since .lc-page is not a grid. */
+.models-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.models-toolbar__title {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 7px;
+  margin-right: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.models-toolbar__title svg {
+  color: var(--accent);
+}
+
+/* Search input with a leading magnifier inside the recessed field. */
+.models-toolbar__search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.models-toolbar__search-field svg {
+  position: absolute;
+  left: 8px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.models-toolbar__search-field input {
+  padding-left: 28px;
+}
+
+.models-toolbar__reset {
+  align-self: center;
+}
+
+.models-toolbar__count {
+  margin-left: auto;
+  align-self: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* --- Cards grid -------------------------------------------------------- */
 .model-grid,
 .dataset-grid {

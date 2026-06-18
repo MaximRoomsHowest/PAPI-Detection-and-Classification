@@ -266,8 +266,7 @@
 
 /* While a row's detail is loading the trigger carries aria-disabled (not the
    disabled attribute, to keep focus for the modal a11y flow). Give it matching
-   visual busy state so the announced state and the look agree (mirrors the
-   .model-selector__option[aria-disabled] treatment). */
+   visual busy state so the announced state and the look agree. */
 .history-link[aria-disabled='true'] {
   cursor: default;
   opacity: 0.55;
