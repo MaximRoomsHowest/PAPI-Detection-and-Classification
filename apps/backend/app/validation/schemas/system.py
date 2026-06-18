@@ -23,6 +23,23 @@ class ValMetrics(BaseModel):
     note: str | None = None
 
 
+class WeatherMetrics(BaseModel):
+    """Per-condition robustness — mAP@0.5 on the held-out test split re-rendered under
+    synthetic weather (pure-OpenCV augmentation). Surfaced on the Models page so a viewer
+    can see how a detector holds up as conditions degrade; the ``snow`` column is the
+    decisive differentiator (bright speckle mimics white lamps, so only a weather-trained
+    model survives it). All optional — a model without a weather eval omits the block.
+    """
+
+    severity: str | None = None  # synthetic-weather strength evaluated ("medium" | "heavy")
+    split: str | None = None  # evaluation split the conditions were measured on ("test")
+    clear: float | None = None
+    rain: float | None = None
+    fog: float | None = None
+    haze: float | None = None
+    snow: float | None = None
+
+
 class ModelInfo(BaseModel):
     model_id: str | None = None
     model_label: str | None = None
@@ -62,6 +79,9 @@ class ModelInfo(BaseModel):
     base_weights: str | None = None
     dataset_split_evaluated: str | None = None
     val_metrics: ValMetrics | None = None
+    # Per-condition synthetic-weather robustness (mAP@0.5), when a weather eval exists
+    # for this model. Drives the Models page "Weather robustness" bars + compare group.
+    weather_metrics: WeatherMetrics | None = None
     loaded_at: str | None = None
 
 

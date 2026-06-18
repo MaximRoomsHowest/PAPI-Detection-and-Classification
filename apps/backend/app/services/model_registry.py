@@ -24,7 +24,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.config import REPO_ROOT, Settings
-from app.validation.schemas import ValMetrics
+from app.validation.schemas import ValMetrics, WeatherMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,13 @@ def _sanitize_card(card: dict[str, Any], label: str) -> dict[str, Any]:
         except ValidationError:
             logger.warning("Model card %s: ignoring malformed 'val_metrics'.", label)
             card["val_metrics"] = None
+    weather_metrics = card.get("weather_metrics")
+    if weather_metrics is not None:
+        try:
+            WeatherMetrics.model_validate(weather_metrics)
+        except ValidationError:
+            logger.warning("Model card %s: ignoring malformed 'weather_metrics'.", label)
+            card["weather_metrics"] = None
     return card
 
 
@@ -251,6 +258,8 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
                 card = dict(raw)
             if isinstance(raw.get("val_metrics"), dict):
                 card["val_metrics"] = raw["val_metrics"]
+            if isinstance(raw.get("weather_metrics"), dict):
+                card["weather_metrics"] = raw["weather_metrics"]
             if isinstance(raw.get("classes"), dict):
                 card["classes"] = raw["classes"]
             card.setdefault("model_id", model_id)
@@ -327,6 +336,26 @@ def load_model_registry(settings: Settings) -> ModelRegistry:
     return ModelRegistry(default_model_id=default_model_id, entries=tuple(resolved))
 
 
+def _frozen_weather_metrics(settings: Settings) -> dict[str, dict[str, Any]]:
+    """Map model_id -> weather_metrics from the frozen ``models.json``.
+
+    Per-condition weather robustness is STATIC reference data tied to the committed
+    registry — unlike ``val_metrics``, which the evaluate job writes back per-row to the
+    mutable DB and which is therefore deliberately NOT reconciled from JSON. Sourcing
+    weather metrics from the JSON keeps them in sync with ``models.json`` edits without a
+    DB column or migration, so the DB-backed registry surfaces them unchanged. Empty on
+    any read failure (no models.json in the single-model/dev path).
+    """
+    data = _read_json(settings.model_registry_path)
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for raw in data.get("models", []):
+        if isinstance(raw, dict) and isinstance(raw.get("weather_metrics"), dict):
+            out[str(raw.get("id"))] = raw["weather_metrics"]
+    return out
+
+
 def registry_from_rows(rows: list[Any], settings: Settings) -> ModelRegistry:
     """Build the in-memory frozen registry from ``model_registry`` table rows.
 
@@ -338,6 +367,8 @@ def registry_from_rows(rows: list[Any], settings: Settings) -> ModelRegistry:
     """
     entries: list[ModelRegistryEntry] = []
     default_id = ""
+    # Static per-model weather robustness lives in the frozen JSON, not the mutable DB.
+    frozen_weather = _frozen_weather_metrics(settings)
     for row in rows:
         path = _resolve_registry_path(str(row.storage_path or ""), settings, settings.model_registry_path)
         if path is None:
@@ -356,6 +387,9 @@ def registry_from_rows(rows: list[Any], settings: Settings) -> ModelRegistry:
             card["classes"] = row.classes_json
         if isinstance(row.val_metrics_json, dict):
             card["val_metrics"] = row.val_metrics_json
+        weather = frozen_weather.get(str(row.id))
+        if isinstance(weather, dict):
+            card["weather_metrics"] = weather
         card = _sanitize_card(card, str(row.id))
         entries.append(
             ModelRegistryEntry(

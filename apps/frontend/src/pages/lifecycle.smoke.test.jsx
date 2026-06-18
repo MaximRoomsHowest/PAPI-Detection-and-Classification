@@ -139,6 +139,40 @@ describe('ModelsPage', () => {
     expect(container.textContent).toContain(copy.models.title)
     unmount()
   })
+
+  it('renders the per-condition weather robustness bars when weather_metrics is present', () => {
+    mocks.models.models = [
+      {
+        model_id: 'nano-weather',
+        model_label: 'Weather nano',
+        model_role: 'detector',
+        source: 'builtin',
+        is_default: false,
+        available: true,
+        disabled: false,
+        protected: false,
+        val_metrics: { map50: 0.947 },
+        weather_metrics: { severity: 'medium', split: 'test', clear: 0.948, rain: 0.951, fog: 0.946, haze: 0.944, snow: 0.882 },
+      },
+    ]
+    const { container, unmount } = renderPage(<ModelsPage copy={copy} isAdmin />)
+    expect(container.textContent).toContain(copy.models.weather.title)
+    for (const cond of ['clear', 'rain', 'fog', 'haze', 'snow']) {
+      expect(container.textContent).toContain(copy.models.weather[cond])
+    }
+    // The decisive snow value is shown, formatted to three decimals by metricValue.
+    expect(container.textContent).toContain('0.882')
+    unmount()
+  })
+
+  it('omits the weather section when a model has no weather_metrics', () => {
+    mocks.models.models = [
+      { model_id: 'x', model_label: 'Plain', model_role: 'detector', source: 'builtin', is_default: true, available: true, disabled: false, protected: true, val_metrics: { map50: 0.9 } },
+    ]
+    const { container, unmount } = renderPage(<ModelsPage copy={copy} isAdmin />)
+    expect(container.textContent).not.toContain(copy.models.weather.title)
+    unmount()
+  })
 })
 
 describe('DatasetsPage', () => {

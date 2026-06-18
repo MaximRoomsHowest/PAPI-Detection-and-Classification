@@ -291,6 +291,36 @@
   text-align: right;
 }
 
+/* Per-condition synthetic-weather robustness — set off from the val-metric bars by a
+   dashed rule so the snow row reads as the headline differentiator. */
+.model-card__weather {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.model-card__weather-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.model-card__weather-title svg {
+  color: var(--accent);
+}
+
+.model-card__weather-note {
+  margin: 6px 0 0;
+  font-size: 0.66rem;
+  color: var(--faint);
+}
+
 .model-card__cred {
   display: flex;
   flex-wrap: wrap;

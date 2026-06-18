@@ -52,6 +52,7 @@ from app.validation.schemas import (
     LampResult,
     ModelInfo,
     ValMetrics,
+    WeatherMetrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -498,6 +499,14 @@ class InferenceService:
             except ValueError:  # pydantic ValidationError subclasses ValueError
                 logger.warning("Ignoring malformed val_metrics for model '%s'.", entry.id)
 
+        weather_metrics = card.get("weather_metrics")
+        parsed_weather_metrics: WeatherMetrics | None = None
+        if isinstance(weather_metrics, dict):
+            try:
+                parsed_weather_metrics = WeatherMetrics(**weather_metrics)
+            except ValueError:
+                logger.warning("Ignoring malformed weather_metrics for model '%s'.", entry.id)
+
         # When loaded, report the digest recorded AT LOAD TIME so it always describes
         # the in-memory model; a differing on-disk hash means an operator swapped the
         # checkpoint under the running service and a restart is pending (audit SHA-1).
@@ -543,6 +552,7 @@ class InferenceService:
             base_weights=card.get("base_weights"),
             dataset_split_evaluated=card.get("split_evaluated"),
             val_metrics=parsed_val_metrics,
+            weather_metrics=parsed_weather_metrics,
             loaded_at=loaded_at_value,
         )
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Star, Trash2, Upload, BarChart3, EyeOff, Eye, Info, X, Filter, Search } from 'lucide-react'
+import { Star, Trash2, Upload, BarChart3, EyeOff, Eye, Info, X, Filter, Search, CloudSnow } from 'lucide-react'
 import { useModelManagement } from '../hooks/useModelManagement'
 import { useDatasets } from '../hooks/useDatasets'
 import { useJobs } from '../hooks/useJobs'
@@ -38,6 +38,10 @@ function classCountOf(model) {
   if (model?.classes) return Object.keys(model.classes).length
   return typeof model?.class_count === 'number' ? model.class_count : null
 }
+
+// Fixed display order for the synthetic-weather robustness bars — clear first as the
+// baseline, snow last as the decisive differentiator (only a weather-trained model holds it).
+const WEATHER_CONDITIONS = ['clear', 'rain', 'fog', 'haze', 'snow']
 
 // A 0–1 detection score as a labelled bar: the fill makes "0.99 vs 0.51" legible at a
 // glance (a column of bare numbers does not). Non-finite → empty track + em-dash.
@@ -98,6 +102,23 @@ function ModelCard({ model, copy, busy, onPromote, onToggleDisabled, onDelete, o
         <ScoreBar label={copy.insights.metricPrecision} value={vm.precision} />
         <ScoreBar label={copy.insights.metricRecall} value={vm.recall} />
       </div>
+
+      {/* Per-condition synthetic-weather robustness (mAP@0.5). Only the handful of models
+          with a weather eval carry this; the snow bar is the headline. */}
+      {model.weather_metrics && (
+        <div className="model-card__weather">
+          <h4 className="model-card__weather-title">
+            <CloudSnow size={13} aria-hidden="true" />
+            {copy.models.weather.title}
+          </h4>
+          <div className="model-card__scores">
+            {WEATHER_CONDITIONS.map((cond) => (
+              <ScoreBar key={cond} label={copy.models.weather[cond]} value={model.weather_metrics[cond]} />
+            ))}
+          </div>
+          <p className="model-card__weather-note mono">{copy.models.weather.note}</p>
+        </div>
+      )}
 
       <div className="model-card__cred mono">
         <span><i>{copy.models.compare.split}</i>{textValue(model.dataset_split_evaluated)}</span>
@@ -430,6 +451,7 @@ function ComparePanel({ models, ids, copy, onClear }) {
   const classNames = Array.from(
     new Set(chosen.flatMap((m) => Object.keys(m.val_metrics?.per_class || {}))),
   ).sort()
+  const hasWeather = chosen.some((m) => m.weather_metrics)
 
   const groups = [
     {
@@ -448,6 +470,20 @@ function ComparePanel({ models, ids, copy, onClear }) {
             rows: classNames.map((cls) => ({
               label: `F1 · ${lampStateLabel(cls, copy)}`,
               get: (m) => m.val_metrics?.per_class?.[cls]?.f1,
+              better: 'high',
+              fmt: metricValue,
+              bar: true,
+            })),
+          },
+        ]
+      : []),
+    ...(hasWeather
+      ? [
+          {
+            title: copy.models.compare.groupWeather,
+            rows: WEATHER_CONDITIONS.map((cond) => ({
+              label: copy.models.weather[cond],
+              get: (m) => m.weather_metrics?.[cond],
               better: 'high',
               fmt: metricValue,
               bar: true,

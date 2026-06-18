@@ -44,6 +44,7 @@ from app.validation.schemas.system import (
     ModelInfo,
     SystemInfo,
     ValMetrics,
+    WeatherMetrics,
 )
 from app.validation.schemas.training import (
     EvaluateRequest,
@@ -75,6 +76,7 @@ __all__ = [
     "LogListItem",
     # system
     "ValMetrics",
+    "WeatherMetrics",
     "ModelInfo",
     "InferenceStats",
     "SystemInfo",

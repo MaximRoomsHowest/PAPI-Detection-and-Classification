@@ -10,6 +10,11 @@
       "default": true,
       "description": "Current serving detector — yolo26s trained on the full labelled set at 1280px (run yolo26s-fulldata-1280).",
       "card_path": "models/serving/model_card.json",
+      "weather_metrics": {
+        "severity": "medium",
+        "split": "test",
+        "clear": 0.968, "rain": 0.95, "fog": 0.972, "haze": 0.97, "snow": 0.05
+      },
       "classes": {
         "0": "PAPI-Red",
         "1": "PAPI-White"
@@ -35,6 +40,11 @@
         },
         "note": "Held-out TEST split (flight-level, leak-free), full PR curve (conf=0.001, iou=0.5). Weather-condition mAP50 in models/MODELS.md."
       },
+      "weather_metrics": {
+        "severity": "medium",
+        "split": "test",
+        "clear": 0.948, "rain": 0.951, "fog": 0.946, "haze": 0.944, "snow": 0.882
+      },
       "classes": {
         "0": "PAPI-Red",
         "1": "PAPI-White"
@@ -47,6 +57,11 @@
       "path": "models/runs/detect/yolo26s-weather-aug/weights/best.pt",
       "class_count": 2,
       "description": "yolo26s fine-tuned with weather augmentation (rain / fog / haze) for robust low-visibility detection — the weather-ready run (train-9).",
+      "weather_metrics": {
+        "severity": "medium",
+        "split": "test",
+        "clear": 0.951, "rain": 0.916, "fog": 0.938, "haze": 0.934, "snow": 0.154
+      },
       "classes": {
         "0": "PAPI-Red",
         "1": "PAPI-White"
@@ -127,6 +142,11 @@
         "map50": 0.9141,
         "map50_95": 0.474,
         "note": "Validation-split box metrics from models/MODELS.md; previous serving model."
+      },
+      "weather_metrics": {
+        "severity": "medium",
+        "split": "test",
+        "clear": 0.953, "rain": 0.891, "fog": 0.947, "haze": 0.949, "snow": 0.003
       },
       "classes": {
         "0": "PAPI-Red",

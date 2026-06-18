@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from app.config import Settings
 from app.services.inference import InferenceService
@@ -35,6 +37,38 @@ def test_model_info_detects_onnx_backend_without_loading_model(tmp_path):
     assert info.loaded is False
     assert info.confidence_threshold == 0.55
     assert info.device == "cpu"
+
+
+def test_model_info_surfaces_weather_metrics_from_card(tmp_path):
+    """Per-condition weather robustness in the model card reaches /api/model unparsed."""
+    model_path = tmp_path / "models" / "best.pt"
+    model_path.parent.mkdir(parents=True)
+    model_path.write_bytes(b"pt fixture")
+    (model_path.parent / "model_card.json").write_text(
+        json.dumps(
+            {
+                "weather_metrics": {
+                    "severity": "medium",
+                    "split": "test",
+                    "clear": 0.95,
+                    "rain": 0.94,
+                    "fog": 0.93,
+                    "haze": 0.92,
+                    "snow": 0.88,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(storage_dir=tmp_path / "storage", model_path=model_path)
+
+    info = InferenceService(settings).model_info()
+
+    assert info.weather_metrics is not None
+    assert info.weather_metrics.severity == "medium"
+    assert info.weather_metrics.split == "test"
+    assert info.weather_metrics.clear == 0.95
+    assert info.weather_metrics.snow == 0.88
 
 
 def test_pixel_budget_rejects_oversized_frame(tmp_path):
