@@ -1,0 +1,6 @@
+# Shell scripts and nginx docker-entrypoint hooks run inside Linux containers. Force LF so a
+# Windows checkout (core.autocrlf) can't rewrite them with CRLF — a trailing \r would land
+# inside `export NGINX_CLIENT_MAX_BODY_SIZE=...` and corrupt the rendered nginx config.
+*.sh text eol=lf
+*.envsh text eol=lf
+apps/frontend/docker-entrypoint.d/** text eol=lf

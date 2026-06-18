@@ -26,6 +26,7 @@ from app.config import Settings
 from app.models.dataset import Dataset
 from app.repositories.datasets import DatasetRepository
 from app.services.datasets import (
+    DEFAULT_CLASS_NAMES,
     IMAGE_SUFFIXES,
     dataset_root,
     ensure_dataset_dirs,
@@ -68,12 +69,14 @@ BUILTIN_EVAL_DATASETS: tuple[dict, ...] = (
     {
         "id": "builtin-detector-redwhite",
         "name": "Built-in · red/white (detector)",
-        "class_names": {0: "papi_light_red", 1: "papi_light_white"},
+        # Derived from the canonical DEFAULT_CLASS_NAMES so the seed can never drift from
+        # the trainer/evaluator's class map (single source of truth).
+        "class_names": {k: DEFAULT_CLASS_NAMES[k] for k in (0, 1)},
     },
     {
         "id": "builtin-transition-3class",
         "name": "Built-in · red/white/transition",
-        "class_names": {0: "papi_light_red", 1: "papi_light_white", 2: "papi_light_transition"},
+        "class_names": dict(DEFAULT_CLASS_NAMES),
     },
 )
 
