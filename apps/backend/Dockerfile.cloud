@@ -80,15 +80,11 @@ COPY models/serving /models/serving
 # degraded image (audit: the IR was once untracked and absent on fresh builds).
 RUN test -f /models/serving/best_openvino_model/best.xml \
  || (echo "ERROR: OpenVINO IR missing at /models/serving/best_openvino_model/ — commit it (git add models/serving/best_openvino_model) or set PAPI_INFERENCE_BACKEND=pt and drop this check." && exit 1)
-COPY models/runs/detect/transition3class-yolo26s-1280/weights/best.pt /models/runs/detect/transition3class-yolo26s-1280/weights/best.pt
-COPY models/runs/detect/yolo26n-baseline/weights/best.pt /models/runs/detect/yolo26n-baseline/weights/best.pt
-COPY models/runs/detect/yolo26s-augmented/weights/best.pt /models/runs/detect/yolo26s-augmented/weights/best.pt
-COPY models/runs/detect/yolo26s-baseline/weights/best.pt /models/runs/detect/yolo26s-baseline/weights/best.pt
-COPY models/runs/detect/yolo26s-extra-aug/weights/best.pt /models/runs/detect/yolo26s-extra-aug/weights/best.pt
-COPY models/runs/detect/yolo26s-fulldata-640/weights/best.pt /models/runs/detect/yolo26s-fulldata-640/weights/best.pt
-COPY models/runs/detect/yolo26s-weather-aug/weights/best.pt /models/runs/detect/yolo26s-weather-aug/weights/best.pt
-COPY models/runs/detect/yolo26n-sequence-1280/weights/best.pt /models/runs/detect/yolo26n-sequence-1280/weights/best.pt
-COPY models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt /models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt
+# Every registered detect/ run's serving best.pt, in ONE COPY. The repo-root .dockerignore
+# whitelists only `models/runs/detect/**/weights/best.pt`, so this brings in exactly the
+# selectable model weights (no last.pt / onnx / plots) and stays in lockstep with models.json
+# automatically — adding a model needs no edit here (this is what broke the build before).
+COPY models/runs/detect /models/runs/detect
 
 RUN groupadd --system papi \
  && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \

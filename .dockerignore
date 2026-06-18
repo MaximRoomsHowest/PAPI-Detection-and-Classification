@@ -29,36 +29,13 @@ backups/
 test_videos/
 workflows/notebooks/
 models/base/
+# Cloud image weights: keep only the serving best.pt of every committed detect/ run, via ONE
+# broad pattern (no per-model lockstep with Dockerfile.cloud / models.json). Adding a model =
+# drop its best.pt under models/runs/detect/<run>/weights/ + register it in models.json; nothing
+# here changes. Everything else under runs/ (last.pt, onnx, openvino, args/results) stays out of
+# the image to keep it lean.
 models/runs/**
-!models/runs/
-!models/runs/detect/
-!models/runs/detect/transition3class-yolo26s-1280/
-!models/runs/detect/transition3class-yolo26s-1280/weights/
-!models/runs/detect/transition3class-yolo26s-1280/weights/best.pt
-!models/runs/detect/yolo26n-baseline/
-!models/runs/detect/yolo26n-baseline/weights/
-!models/runs/detect/yolo26n-baseline/weights/best.pt
-!models/runs/detect/yolo26s-augmented/
-!models/runs/detect/yolo26s-augmented/weights/
-!models/runs/detect/yolo26s-augmented/weights/best.pt
-!models/runs/detect/yolo26s-baseline/
-!models/runs/detect/yolo26s-baseline/weights/
-!models/runs/detect/yolo26s-baseline/weights/best.pt
-!models/runs/detect/yolo26s-extra-aug/
-!models/runs/detect/yolo26s-extra-aug/weights/
-!models/runs/detect/yolo26s-extra-aug/weights/best.pt
-!models/runs/detect/yolo26s-fulldata-640/
-!models/runs/detect/yolo26s-fulldata-640/weights/
-!models/runs/detect/yolo26s-fulldata-640/weights/best.pt
-!models/runs/detect/yolo26s-weather-aug/
-!models/runs/detect/yolo26s-weather-aug/weights/
-!models/runs/detect/yolo26s-weather-aug/weights/best.pt
-!models/runs/detect/yolo26n-sequence-1280/
-!models/runs/detect/yolo26n-sequence-1280/weights/
-!models/runs/detect/yolo26n-sequence-1280/weights/best.pt
-!models/runs/detect/yolo26n-weather-flightsplit-1280/
-!models/runs/detect/yolo26n-weather-flightsplit-1280/weights/
-!models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt
+!models/runs/detect/**/weights/best.pt
 
 # Editor / OS
 .idea/
