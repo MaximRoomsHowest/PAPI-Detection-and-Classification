@@ -38,8 +38,10 @@ dev = [
 # 06/07/08. Install with `pip install -e .[notebooks]`.
 notebooks = [
     "onnxruntime>=1.20",
+    # opencv-python also powers the synthetic weather augmentation (workflows/scripts/weather_aug.py).
+    # The weather pipeline is deliberately pure OpenCV/NumPy — an albumentations/albucore SIMD
+    # backend was found to corrupt async CUDA training on this GPU/driver, so it is NOT a dependency.
     "opencv-python>=4.10",
-    "albumentations>=1.4",
     "matplotlib>=3.8",
     "jupyter>=1.0",
     # Only the data-analysis notebook (05) reads .xlsx via pandas; not a core dep.

@@ -49,6 +49,11 @@ in `MODELS.md §3.1.1`.
 
 ## Limitations & caveats
 
+- **Not robust to snow** — the serving yolo26s was trained on clear imagery; on synthetic
+  snow its mAP@0.5 collapses to ≈0.03 (bright speckle mimics white lamps). Rain/fog/haze are
+  handled well. A weather-augmented nano (`yolo26n-weather`, `models/MODELS.md §3.2b`) holds
+  ≈0.82 under snow and is the adverse-weather alternative; the planned fix is a yolo26s
+  retrain with weather augmentation (MODELS.md §6).
 - **Daytime is the hard case** — sun glare and washed-out red/white separation; report
   day vs night metrics separately rather than letting strong night performance hide it.
 - **Geometry inputs still carry calibration risk** — rwy-24 uses the validated

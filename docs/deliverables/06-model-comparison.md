@@ -114,6 +114,30 @@ laptop RTX 4070 runs yolo26s at p50 29.1 ms (34.4 fps).
 | yolo26s | 9.1 | 316.1 | 3.2 | no hardware | 2549 |
 | yolo26m | 24.0 | not trained | — | — | — |
 
+### 3.4 Weather robustness
+
+§3.1–3.3 compare clear-weather imagery. Because adverse-weather robustness is a stated
+client requirement, we additionally trained a weather-augmented nano
+(`yolo26n-weather-flightsplit-1280`, MODELS.md §3.2b) and scored every detector on seeded
+synthetic weather variants of the held-out test split
+(`workflows/scripts/eval_weather_robustness.py`, mAP@0.5, **heavy** severity):
+
+| Model | clear | rain | fog | haze | snow |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| yolo26n-weather (new) | 0.948 | **0.948** | 0.943 | 0.945 | **0.821** |
+| yolo26n (clear-trained) | 0.953 | 0.799 | 0.890 | 0.944 | 0.003 |
+| yolo26s (serving) | **0.968** | 0.921 | **0.971** | **0.970** | 0.026 |
+| yolo26s-weather-aug (train-9) | 0.951 | 0.902 | 0.924 | 0.929 | 0.082 |
+
+**Snow is decisive**: only the weather-augmented nano stays usable (0.82); the serving
+yolo26s and every other model — including the older train-9 "weather-aug" detector —
+collapse to ≤0.08, because bright snow speckle mimics white lamps. The new nano is also
+the most rain-robust. The cost is ~2 pp on clear and on fog/haze, where the larger yolo26s
+leads. This adds a **weather-robustness axis** to the size/latency tradeoff: yolo26s is the
+best clear-weather accuracy model, but `yolo26n-weather` is the choice when adverse-weather
+reliability (especially snow) and nano-class speed (≈2× the CPU fps of yolo26s, §3.3) both
+matter.
+
 ## 4. Decision criteria
 
 A larger variant earns its place if it satisfies **all** of:
@@ -147,6 +171,12 @@ target (criterion 1) leans on GPU-class hardware — the laptop RTX 4070
 already delivers 34 fps, and the edge tier awaits WL051 specs. Criterion 4
 is unaffected at the reference tier. Accuracy gain where the model was
 weakest justified the promotion for v1.0.**
+
+**Weather caveat (added 2026-06-18)**: the yolo26s verdict holds for clear weather,
+but §3.4 shows it is **not robust to snow** (mAP@0.5 collapses to 0.03). A weather-augmented
+nano (`yolo26n-weather`) now exists as the adverse-weather / fast-edge option, and the
+natural v1.1 step is a yolo26s flight-split retrain *with* `--weather-aug` to get one model
+that is both most-accurate-in-clear and snow-robust (MODELS.md §6).
 
 **What we would change if we had another sprint**: Train yolo26m on the same
 split to complete the size sweep (it was skipped for v1.0: the 8 GB laptop GPU

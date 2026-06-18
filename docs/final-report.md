@@ -57,7 +57,8 @@ fewer than 4 lamps are confidently detected.
 Two methods ship, selectable per analysis:
 
 - **Temporal tracking (default)** — red↔white flips on stable ByteTrack identities.
-  Robust in production; head-to-head F1 0.278 on the pre-cleanup test set.
+  Robust in production; head-to-head F1 0.278 (5 of 10 flips recalled, 21 false flips) on the
+  two-flight pre-cleanup test set.
 - **Learned 3-class model** (`transition3class-yolo26s-1280`, opt-in via the model selector) —
   after the 2026-06-09 label cleanup (487 → 250 transition boxes; ~49% of the old labels were
   stable-colour mislabels, removed by a colour-verdict gate) the retrained model hallucinates
@@ -104,12 +105,22 @@ the system is honest about it (`docs/data-card.md`). The geometry layer is alrea
 labelled sample at a second airport → zero-shot eval with the EDNY model → fine-tune if the
 F1 drop exceeds ~5 pp.
 
+**Adverse weather** is the other domain axis. The serving yolo26s trained on clear imagery and
+**collapses under snow** (synthetic-snow mAP@0.5 ≈0.03; rain/fog/haze are handled well). A
+weather-augmented nano (`yolo26n-weather-flightsplit-1280`) trained on synthetic
+rain/fog/haze/snow/sun-flare/shadow holds **≈0.82 mAP@0.5 under heavy snow** and is the most
+rain-robust model, at a ~2 pp clear-weather cost — measured on the held-out test split by
+`workflows/scripts/eval_weather_robustness.py` (MODELS.md §3.2b). It is registered as
+`nano-weather`; folding weather augmentation into a yolo26s serving retrain is the v1.1 step.
+
 ## 7. Reproducibility
 
 - **Training**: Ultralytics args committed per run (`models/runs/**/args.yaml`):
   yolo26s-fulldata-1280 — seed 0, deterministic, imgsz 1280, batch 4, 54 epochs (~5.2 h);
-  yolo26n-sequence-1280 — seed 42, deterministic, imgsz 1280, batch 2, 50 epochs (~8.9 h).
-  Both on the project laptop's RTX 4070 (8 GB).
+  yolo26n-sequence-1280 — seed 42, deterministic, imgsz 1280, batch 2, 50 epochs (~8.9 h);
+  yolo26n-weather-flightsplit-1280 — seed 0, deterministic, imgsz 1280, batch 8, AMP, 42 epochs
+  (~2.0 h), OpenCV synthetic-weather aug on the leak-free flight split.
+  All on the project laptop's RTX 4070 (8 GB).
 - **Split**: flight-level, committed (`configs/split.yaml`); QA gate
   (`workflows/scripts/qa_transition_dataset.py`) hard-fails on split leakage.
 - **Evaluation**: every number above names its committed harness and artifact; the 2-class
@@ -129,6 +140,7 @@ F1 drop exceeds ~5 pp.
 | Edge hardware numbers | Pending WL051 specs; laptop reference only |
 | Transition-model recall | 2/6 at full PR curve; needs label quantity (CVAT pass) before promotion |
 | Cross-airport generalisation | Untested; roadmap above |
+| Adverse-weather robustness | Serving yolo26s collapses under snow (≈0.03); weather-robust `nano-weather` exists (≈0.82, MODELS.md §3.2b); yolo26s weather retrain pending |
 | Rwy-06 commissioned set-angles | Pending from client (FAA defaults in config; flagged per analysis) |
 | Lamp↔set-angle binding | Config order does not match the data's empirical angles; transitions.csv is authoritative |
 

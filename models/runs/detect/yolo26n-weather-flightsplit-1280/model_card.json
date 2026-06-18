@@ -1,0 +1,47 @@
+{
+  "model_id": "yolo26n-weather-flightsplit-1280",
+  "training_run": "yolo26n-weather-flightsplit-1280",
+  "base_weights": "yolo26n.pt",
+  "task": "detect",
+  "imgsz": 1280,
+  "batch": 8,
+  "epochs_configured": 100,
+  "epochs_trained": 42,
+  "seed": 0,
+  "deterministic": true,
+  "split_evaluated": "val",
+  "val_metrics": {
+    "selection": "best_fitness_epoch",
+    "epoch": 22,
+    "precision": 0.8246,
+    "recall": 0.8629,
+    "map50": 0.8839,
+    "map50_95": 0.4143,
+    "note": "Validation-split box (B) detection metrics from results.csv - not the held-out test regime and not per-class (red/white). Fill per-state F1 from the evaluation notebook (04_*)."
+  },
+  "final_epoch_metrics": {
+    "epoch": 42,
+    "precision": 0.7946,
+    "recall": 0.8397,
+    "map50": 0.8624,
+    "map50_95": 0.4094
+  },
+  "test_metrics": {
+    "split": "held-out flight-level test (leak-free)",
+    "precision": 0.8623,
+    "recall": 0.8717,
+    "map50": 0.9469,
+    "map50_95": 0.5532,
+    "per_class": {
+      "papi_light_red": {"precision": 0.8082, "recall": 0.919, "f1": 0.86, "map50": 0.9405},
+      "papi_light_white": {"precision": 0.9164, "recall": 0.8245, "f1": 0.868, "map50": 0.9534}
+    },
+    "note": "Authoritative headline metrics (match models.json and MODELS.md). Full PR curve, conf=0.001, iou=0.5. The val_metrics above are the in-training validation split and are intentionally lower."
+  },
+  "source_results_csv": "models/runs/detect/yolo26n-weather-flightsplit-1280/results.csv",
+  "generated_by": "workflows/scripts/populate_model_metrics.py",
+  "classes": {
+    "0": "papi_light_red",
+    "1": "papi_light_white"
+  }
+}

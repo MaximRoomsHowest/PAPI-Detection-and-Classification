@@ -16,6 +16,31 @@
       }
     },
     {
+      "id": "nano-weather",
+      "label": "yolo26n · weather-robust 1280",
+      "role": "detector",
+      "path": "models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt",
+      "class_count": 2,
+      "description": "Weather-robust yolo26n: leak-free flight-split + OpenCV synthetic weather aug (rain/fog/haze/snow/sunflare/shadow). Holds up under snow/rain where the other models collapse; ~2pp behind yolo26s on clear. Fast/edge + bad-weather option.",
+      "card_path": "models/runs/detect/yolo26n-weather-flightsplit-1280/model_card.json",
+      "val_metrics": {
+        "selection": "held_out_test_flight_split_full_pr_curve",
+        "precision": 0.8623,
+        "recall": 0.8717,
+        "map50": 0.9469,
+        "map50_95": 0.5532,
+        "per_class": {
+          "red": { "precision": 0.8082, "recall": 0.919, "f1": 0.86, "map50": 0.9405 },
+          "white": { "precision": 0.9164, "recall": 0.8245, "f1": 0.868, "map50": 0.9534 }
+        },
+        "note": "Held-out TEST split (flight-level, leak-free), full PR curve (conf=0.001, iou=0.5). Weather-condition mAP50 in models/MODELS.md."
+      },
+      "classes": {
+        "0": "PAPI-Red",
+        "1": "PAPI-White"
+      }
+    },
+    {
       "id": "yolo26s-weather-aug",
       "label": "yolo26s · weather-augmented (weather-ready)",
       "role": "detector",

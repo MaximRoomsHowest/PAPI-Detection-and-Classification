@@ -29,6 +29,28 @@ DEFAULT_PROJECT = REPO_ROOT / "models" / "runs" / "experiments"
 CLASS_NAMES = {0: "papi_light_red", 1: "papi_light_white", 2: "papi_light_transition"}
 
 
+def _setup_weather(args: argparse.Namespace) -> None:
+    """Install the OpenCV weather-aug training hook when ``--weather-aug`` is set (no-op otherwise).
+
+    Weather aug is injected by overriding Ultralytics' ``Albumentations.__call__`` with a pure-OpenCV
+    effect (the albumentations/albucore SIMD backend corrupts async CUDA training on this GPU). The
+    hook runs in the MAIN process, so weather runs force ``workers=0``. See weather_aug.py and
+    train_detector_model.py.
+    """
+    if not args.weather_aug:
+        return
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from weather_aug import install_training_hook
+
+    if args.workers != 0:
+        print(f"[weather-aug] forcing --workers 0 (was {args.workers}); the OpenCV aug hook runs "
+              "in the main process and would be invisible to spawned dataloader workers.")
+        args.workers = 0
+    install_training_hook(args.weather_severity, args.weather_prob, seed=0)
+
+
 def _label_for(image_line: str) -> Path:
     return Path(image_line.replace("/images/", "/labels/")).with_suffix(".txt")
 
@@ -66,6 +88,13 @@ def build_oversampled_yaml(combined_dir: Path, factor: int) -> tuple[Path, dict]
 
 
 def train(args: argparse.Namespace) -> dict:
+    if args.stable_cuda:
+        import os
+
+        # Per-kernel CUDA serialization; workaround for the async within-step kernel-execution
+        # race seen on torch 2.5.1+cu121 + driver 610.62 + RTX 4070 Laptop (weather/AMP training
+        # crashes with assorted CUDA faults). ~5x slower but stable. See train_detector_model.py.
+        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     import torch
     from ultralytics import YOLO
 
@@ -78,7 +107,9 @@ def train(args: argparse.Namespace) -> dict:
         # args drive the rest, so the other flags are ignored. Lets a checkpointed run mature
         # without discarding completed epochs.
         run_dir = args.project / args.name
-        YOLO(str(run_dir / "weights" / "last.pt")).train(resume=True)
+        # Weather aug is a runtime monkeypatch (not in args.yaml), so re-install it on resume.
+        _setup_weather(args)
+        YOLO(str(run_dir / "weights" / "last.pt")).train(resume=True, augmentations=[])
         print(json.dumps({"resumed": str(run_dir)}, indent=2))
         return {"resumed": str(run_dir)}
 
@@ -86,6 +117,7 @@ def train(args: argparse.Namespace) -> dict:
     epochs = 2 if args.smoke else args.epochs
     imgsz = 640 if args.smoke else args.imgsz
     name = "smoke-transition3class" if args.smoke else args.name
+    _setup_weather(args)  # installs the OpenCV weather hook + forces workers=0 when --weather-aug
 
     model = YOLO(str(args.base))
     model.train(
@@ -96,6 +128,8 @@ def train(args: argparse.Namespace) -> dict:
         translate=0.1, scale=0.5, mosaic=args.mosaic,
         # close_mosaic only matters when mosaic is on; 0 when it's off avoids a no-op/warning.
         close_mosaic=(10 if args.mosaic > 0 else 0), erasing=0.0, mixup=0.0, copy_paste=0.0,
+        # Synthetic weather injected by _setup_weather as a pure-OpenCV hook; [] keeps the default block out.
+        augmentations=[],
         patience=args.patience, workers=args.workers, seed=0, plots=True, cache=False,
         amp=args.amp,
         project=str(args.project), name=name, exist_ok=True,
@@ -104,6 +138,8 @@ def train(args: argparse.Namespace) -> dict:
     metrics_path = run_dir / "transition_train_meta.json"
     meta = {"base": str(args.base), "data": str(yaml_path), "imgsz": imgsz, "epochs": epochs,
             "batch": args.batch, "workers": args.workers, "amp": args.amp, "oversample": oversample,
+            "weather_aug": args.weather_aug, "weather_severity": args.weather_severity,
+            "weather_prob": args.weather_prob, "stable_cuda": args.stable_cuda,
             "note": "INTERIM: flip-anchored + AI-spot-checked labels; colour-safe aug; not a full human pass"}
     metrics_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"run_dir": str(run_dir), **oversample}, indent=2))
@@ -131,6 +167,17 @@ def main() -> int:
         "(can corrupt red/white/transition labels) AND high RAM use on 20MP frames.",
     )
     p.add_argument("--oversample", type=int, default=4)
+    # Synthetic weather augmentation (AlbumentationsX), injected via Ultralytics' augmentations=
+    # kwarg, REPLACING its default ToGray/CLAHE block (which would corrupt the colour label).
+    p.add_argument("--weather-aug", action="store_true", dest="weather_aug",
+                   help="Inject colour-safe synthetic weather (rain/fog/haze/snow/sunflare/shadow).")
+    p.add_argument("--weather-severity", dest="weather_severity", default="medium",
+                   choices=["light", "medium", "heavy"])
+    p.add_argument("--weather-prob", dest="weather_prob", type=float, default=0.35,
+                   help="Fraction of training images that receive one weather effect (default 0.35).")
+    p.add_argument("--stable-cuda", action="store_true", dest="stable_cuda",
+                   help="Set CUDA_LAUNCH_BLOCKING=1 (per-kernel serialization). Workaround for "
+                        "driver async-execution faults during weather/AMP training; ~5x slower but stable.")
     p.add_argument("--resume", action="store_true", help="continue the run from its last.pt")
     p.add_argument("--smoke", action="store_true")
     args = p.parse_args()

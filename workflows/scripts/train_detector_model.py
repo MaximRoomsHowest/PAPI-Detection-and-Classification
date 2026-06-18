@@ -29,13 +29,35 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+# Put this dir on sys.path at MODULE import so spawned dataloader workers (Windows spawn re-imports
+# the main module) can unpickle weather_aug.WeatherAug inserted into the training pipeline.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "data" / "datasets" / "papi-2class-detection-flightsplit" / "data.yaml"
 DEFAULT_BASE = REPO_ROOT / "models" / "base" / "yolo26s.pt"
 DEFAULT_PROJECT = REPO_ROOT / "models" / "runs" / "experiments"
 CLASS_NAMES = {0: "papi_light_red", 1: "papi_light_white"}
+
+
+def _setup_weather(args: argparse.Namespace) -> None:
+    """Install the worker-safe OpenCV weather transform when ``--weather-aug`` is set (no-op otherwise).
+
+    Weather is injected as a picklable WeatherAug appended to Ultralytics' training Compose (see
+    weather_aug.install_weather_transform) — pure OpenCV, no albumentations/albucore (whose SIMD
+    backend corrupts async CUDA training). Because the transform pickles to spawned workers, this runs
+    with ``workers>0`` (parallel), which keeps mosaic+weather stable AND fast — unlike the old
+    main-process monkeypatch that forced workers=0 and re-triggered the async CUDA race under mosaic.
+    ``model.train(augmentations=[])`` keeps any stray albumentations default block out of the pipeline.
+    """
+    if not args.weather_aug:
+        return
+    from weather_aug import install_weather_transform
+
+    install_weather_transform(args.weather_severity, args.weather_prob, seed=0)
 
 
 def _test_metrics(model, data: Path, imgsz: int, project: Path, name: str) -> dict:
@@ -79,6 +101,16 @@ def _cap_cpu_threads(n: int) -> None:
 
 def train(args: argparse.Namespace) -> dict:
     _cap_cpu_threads(args.cpu_threads)
+    if args.stable_cuda:
+        import os
+
+        # Per-kernel CUDA serialization. Workaround for an async within-step kernel-execution
+        # race seen on torch 2.5.1+cu121 + NVIDIA driver 610.62 + RTX 4070 Laptop, where
+        # weather-augmented (and AMP) training crashes at random iterations with assorted CUDA
+        # faults (illegal memory access / misaligned address / illegal instruction). Disabling
+        # AMP, cuDNN, pinned memory, and per-step sync did NOT help; only this does. ~5x slower
+        # but stable. Must be set before the first CUDA call (i.e. before importing torch).
+        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     import torch
     from ultralytics import YOLO
 
@@ -96,22 +128,39 @@ def train(args: argparse.Namespace) -> dict:
 
     if args.resume:
         run_dir = args.project / args.name
-        YOLO(str(run_dir / "weights" / "last.pt")).train(resume=True)
+        # Weather aug is a runtime monkeypatch (not serialized into args.yaml), so re-install it on
+        # resume from the same --weather-* flags used for the original run.
+        _setup_weather(args)
+        YOLO(str(run_dir / "weights" / "last.pt")).train(resume=True, augmentations=[])
         print(json.dumps({"resumed": str(run_dir)}, indent=2))
         return {"resumed": str(run_dir)}
 
     epochs = 2 if args.smoke else args.epochs
     imgsz = 640 if args.smoke else args.imgsz
     name = "smoke-detector2class" if args.smoke else args.name
+    _setup_weather(args)  # appends the worker-safe OpenCV weather transform when --weather-aug
+    cache = {"true": True, "false": False, "ram": "ram", "disk": "disk"}.get(str(args.cache).lower(), False)
 
     model = YOLO(str(args.base))
     model.train(
         data=str(args.data), epochs=epochs, imgsz=imgsz, batch=args.batch, device=args.device,
-        # Colour-safe augmentation: hue/sat jitter would swap red<->white (class == colour).
-        hsv_h=0.0, hsv_s=0.0, hsv_v=0.2, fliplr=0.5, flipud=0.0, degrees=0.0,
-        translate=0.1, scale=0.5, shear=0.0, perspective=0.0,
-        mosaic=0.0, close_mosaic=0, mixup=0.0, copy_paste=0.0, erasing=0.0, auto_augment=None,
-        patience=args.patience, workers=args.workers, seed=0, plots=True, cache=False, amp=args.amp,
+        # COLOUR-SAFE INVARIANT: hsv_h=hsv_s=0 always — hue/sat jitter would swap red<->white
+        # (the class IS the colour). hsv_v (brightness) and the geometric/mosaic/erasing knobs are
+        # colour-preserving, so they are tunable (--mosaic/--erasing/--degrees/--perspective/...) to
+        # regularise against overfitting. Colour-TEMPERATURE variety (warm/cool, season/time-of-day)
+        # comes from the OpenCV weather transform, NOT from hsv_h/s.
+        hsv_h=0.0, hsv_s=0.0, hsv_v=args.hsv_v, fliplr=0.5, flipud=0.0, degrees=args.degrees,
+        translate=args.translate, scale=args.scale, shear=args.shear, perspective=args.perspective,
+        mosaic=args.mosaic, close_mosaic=(10 if args.mosaic > 0 else 0),
+        mixup=0.0, copy_paste=0.0, erasing=args.erasing, auto_augment=None,
+        # Synthetic weather + warm/cool tints injected by _setup_weather as a worker-safe OpenCV
+        # transform; augmentations=[] keeps any default ToGray/CLAHE block out.
+        augmentations=[],
+        # Pipeline / generalisation knobs (research-backed anti-overfit): cosine LR schedule,
+        # multi-scale training, stronger weight decay, optional shallow freeze, optional wall-clock cap.
+        cos_lr=args.cos_lr, multi_scale=args.multi_scale, weight_decay=args.weight_decay,
+        freeze=args.freeze, time=args.time_hours,
+        patience=args.patience, workers=args.workers, seed=0, plots=True, cache=cache, amp=args.amp,
         project=str(args.project), name=name, exist_ok=True,
     )
     run_dir = args.project / name
@@ -124,10 +173,23 @@ def train(args: argparse.Namespace) -> dict:
         except Exception as exc:  # noqa: BLE001 - training already saved; test eval is best-effort
             test = {"error": str(exc)}
 
+    aug_desc = (f"colour-safe (hsv_h/s=0, hsv_v={args.hsv_v}, fliplr=0.5) geom("
+                f"degrees={args.degrees}, shear={args.shear}, perspective={args.perspective}, "
+                f"translate={args.translate}, scale={args.scale}) mosaic={args.mosaic} erasing={args.erasing}")
+    if args.weather_aug:
+        aug_desc += (" + OpenCV weather/tints (rain/fog/haze/snow/sunflare/shadow/warm/cool) "
+                     f"severity={args.weather_severity} p={args.weather_prob}")
     meta = {
         "base": str(args.base), "data": str(args.data), "imgsz": imgsz, "epochs": epochs,
         "batch": args.batch, "workers": args.workers, "amp": args.amp,
-        "augmentation": "colour-safe (hsv_h/s=0, hsv_v=0.2, fliplr=0.5, no mosaic/mixup/copy_paste/erasing)",
+        "augmentation": aug_desc,
+        "aug": {"hsv_v": args.hsv_v, "degrees": args.degrees, "shear": args.shear,
+                "perspective": args.perspective, "translate": args.translate, "scale": args.scale,
+                "mosaic": args.mosaic, "erasing": args.erasing, "cache": str(args.cache)},
+        "pipeline": {"cos_lr": args.cos_lr, "multi_scale": args.multi_scale,
+                     "weight_decay": args.weight_decay, "freeze": args.freeze, "time_hours": args.time_hours},
+        "weather_aug": args.weather_aug, "weather_severity": args.weather_severity,
+        "weather_prob": args.weather_prob, "stable_cuda": args.stable_cuda,
         "split": "flight-level (leak-free) from configs/split.yaml",
         "classes": CLASS_NAMES, "best_weights": str(best), "test_metrics": test,
     }
@@ -159,6 +221,45 @@ def main() -> int:
     # for detection. On by default now that the pipeline is smoke-validated; --no-amp opts out.
     p.add_argument("--amp", action=argparse.BooleanOptionalAction, default=True,
                    help="Mixed-precision training (default on; --no-amp to disable).")
+    # Synthetic weather augmentation (AlbumentationsX), injected via Ultralytics' augmentations=
+    # kwarg. Off by default to keep the baseline reproducible; --weather-aug trains the
+    # weather-robust variant. Severity scales fog/haze/snow/shadow intensity; prob is the
+    # fraction of images that get exactly one weather effect (rest stay clear).
+    p.add_argument("--weather-aug", action="store_true", dest="weather_aug",
+                   help="Inject colour-safe synthetic weather (rain/fog/haze/snow/sunflare/shadow).")
+    p.add_argument("--weather-severity", dest="weather_severity", default="medium",
+                   choices=["light", "medium", "heavy"])
+    p.add_argument("--weather-prob", dest="weather_prob", type=float, default=0.35,
+                   help="Fraction of training images that receive one weather/colour effect (default 0.35). "
+                        "The pool includes rain/fog/haze/snow/sunflare/shadow + warm/cool day-time tints.")
+    # Colour-SAFE regularisation knobs (defaults reproduce the conservative baseline; raise them to
+    # fight overfitting). hsv_h/hsv_s are deliberately NOT exposed — they would relabel red<->white.
+    p.add_argument("--mosaic", type=float, default=0.0,
+                   help="4-image mosaic prob (strong regulariser; tiles images, no colour blend). "
+                        "close_mosaic=10 auto-applied when >0.")
+    p.add_argument("--erasing", type=float, default=0.0, help="Random-erasing (cutout) prob; occlusion regulariser.")
+    p.add_argument("--hsv-v", dest="hsv_v", type=float, default=0.2, help="Brightness (value) jitter; colour-safe.")
+    p.add_argument("--degrees", type=float, default=0.0, help="Max rotation degrees (drone roll / angle variety).")
+    p.add_argument("--shear", type=float, default=0.0, help="Max shear degrees (perspective variety).")
+    p.add_argument("--perspective", type=float, default=0.0, help="Perspective warp (0-0.001; viewing-angle variety).")
+    p.add_argument("--translate", type=float, default=0.1, help="Max translate fraction.")
+    p.add_argument("--scale", type=float, default=0.5, help="Scale gain (+/-).")
+    p.add_argument("--cache", default="False",
+                   help="Image cache: 'ram'/'disk'/False. 'disk'/'ram' keeps mosaic fast with parallel workers.")
+    # Pipeline / generalisation knobs (research-backed anti-overfit; see models/MODELS.md).
+    p.add_argument("--cos-lr", action="store_true", dest="cos_lr",
+                   help="Cosine LR schedule (better generalisation, less plateau than linear).")
+    p.add_argument("--multi-scale", dest="multi_scale", type=float, default=0.0,
+                   help="Multi-scale training jitter (e.g. 0.5); scale robustness for multi-distance lamps.")
+    p.add_argument("--weight-decay", dest="weight_decay", type=float, default=0.0005,
+                   help="Optimizer weight decay (raise modestly, e.g. 0.001, to regularise on small data).")
+    p.add_argument("--freeze", type=int, default=None,
+                   help="Freeze the first N layers (shallow freeze can help small-data nano; None = no freeze).")
+    p.add_argument("--time-hours", dest="time_hours", type=float, default=None,
+                   help="Hard wall-clock cap in hours (Ultralytics 'time'; overrides epochs, anneals the schedule).")
+    p.add_argument("--stable-cuda", action="store_true", dest="stable_cuda",
+                   help="Set CUDA_LAUNCH_BLOCKING=1 (per-kernel serialization). Workaround for "
+                        "driver async-execution faults during weather/AMP training; ~5x slower but stable.")
     p.add_argument("--smoke", action="store_true")
     p.add_argument("--resume", action="store_true")
     args = p.parse_args()

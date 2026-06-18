@@ -217,6 +217,91 @@ is NO working INT8 artifact and no INT8 numbers anywhere in the docs. Revisit wi
 a static-QDQ pipeline once an edge target (WL051) is confirmed; until then the
 fp32 ONNX export above is the deployment alternative to PyTorch.
 
+### 3.2b `yolo26n-weather-flightsplit-1280` — weather-robust nano (2026-06-18)
+
+> Leak-free flight-split retrain of yolo26n with **synthetic weather augmentation**
+> (rain / fog / haze / snow / sun-flare / shadow), built to stay usable in adverse
+> weather. Registered as `nano-weather` in `models/serving/models.json`; **not** the
+> serving default (yolo26s §3.1 still leads on clear). It is the only model evaluated
+> that survives snow — see §3.2b.2.
+
+| Field | Value |
+| --- | --- |
+| **Path** | `models/runs/detect/yolo26n-weather-flightsplit-1280/` |
+| **Arch** | yolo26n (≈ 2.6 M params) |
+| **Base** | `models/base/yolo26n.pt` |
+| **Classes** | 2 — `papi_light_red` (0), `papi_light_white` (1) |
+| **Dataset** | `data/datasets/papi-2class-detection-flightsplit/` — flight-level leak-free split (`configs/split.yaml`) |
+| **imgsz** | 1280 · **batch** 8 · **AMP** on |
+| **Epochs** | 100 configured, early-stopped at 42 (patience 20); `best.pt` = epoch 22 |
+| **Augmentation** | colour-safe (`hsv_h/s=0`, `hsv_v=0.2`, `fliplr=0.5`, no mosaic/mixup/copy_paste/erasing) **plus** pure-OpenCV synthetic weather on ≈35% of frames (see note below) |
+| **Training config / log** | `args.yaml` / `results.csv`; honest test metrics in `detector_train_meta.json` |
+| **Status** | registered `nano-weather` (non-default) — weather-robust / fast-edge option |
+
+#### 3.2b.1 Held-out test eval (leak-free flight split)
+
+Honest test-split metrics (full PR curve, conf=0.001, IoU 0.5), written by the trainer
+into `detector_train_meta.json`. Unlike §3.1 (random per-frame split, optimistic), this
+is a **clean** flight-level held-out estimate — comparable to the old nano's §3.2.1a
+(mAP@0.5 0.949) but honest *and* weather-trained.
+
+| Metric | Aggregate | red | white |
+| --- | ---: | ---: | ---: |
+| precision | 0.862 | 0.808 | 0.916 |
+| recall | 0.872 | 0.919 | 0.825 |
+| F1 | — | 0.860 | 0.868 |
+| mAP@0.5 | 0.947 | 0.941 | 0.953 |
+| mAP@0.5:0.95 | 0.553 | — | — |
+
+#### 3.2b.2 Weather robustness (the reason this model exists)
+
+Measured with `workflows/scripts/eval_weather_robustness.py` — seeded synthetic weather
+applied to the held-out **test** images (labels unchanged; weather is non-spatial), each
+model scored per condition. mAP@0.5, two severities (`output/weather-robustness-{medium,heavy}.json`):
+
+**Medium severity**
+
+| Condition | nano-weather | nano (old) | yolo26s (serving) | yolo26s-weather-aug (train-9) |
+| --- | ---: | ---: | ---: | ---: |
+| clear | 0.948 | 0.953 | **0.968** | 0.951 |
+| rain | **0.951** | 0.891 | 0.950 | 0.916 |
+| fog | 0.946 | 0.947 | **0.972** | 0.938 |
+| haze | 0.944 | 0.949 | **0.970** | 0.934 |
+| snow | **0.882** | 0.003 | 0.050 | 0.154 |
+
+**Heavy severity**
+
+| Condition | nano-weather | nano (old) | yolo26s (serving) | yolo26s-weather-aug (train-9) |
+| --- | ---: | ---: | ---: | ---: |
+| clear | 0.948 | 0.953 | **0.968** | 0.951 |
+| rain | **0.948** | 0.799 | 0.921 | 0.902 |
+| fog | 0.943 | 0.890 | **0.971** | 0.924 |
+| haze | 0.945 | 0.944 | **0.970** | 0.929 |
+| snow | **0.821** | 0.003 | 0.026 | 0.082 |
+
+Takeaways:
+- **Snow is the decisive differentiator.** Only `nano-weather` stays usable (0.82–0.88);
+  every other model — including the old `yolo26s-weather-aug` (train-9), whose weather aug
+  was rain/fog/haze only — collapses to ≤0.16, because bright snow speckle mimics white
+  lamps. This is the headline robustness result.
+- **Rain** is most robust on `nano-weather` (0.95 at both severities); the old nano drops to
+  0.80 under heavy rain.
+- **Fog / haze**: the larger yolo26s leads (~0.97); `nano-weather` holds ~0.94. Synthetic
+  fog is a contrast-reducing veil, not a whiteout, so no model collapses here.
+- **Clear**: `nano-weather` costs ~2 pp vs yolo26s (0.948 vs 0.968) — the price of weather
+  generalisation at nano capacity.
+
+> **Weather-augmentation implementation note.** Weather aug is **pure OpenCV/NumPy**
+> (`workflows/scripts/weather_aug.py`), injected into training by overriding Ultralytics'
+> `Albumentations.__call__` (`_setup_weather`, which also forces `workers=0`). An earlier
+> AlbumentationsX implementation was abandoned: its `albucore` SIMD backend corrupted
+> asynchronous CUDA training on this stack (torch 2.5.1+cu121 / driver 610.x / RTX 4070
+> Laptop), crashing every weather run with assorted CUDA faults (illegal memory access /
+> misaligned address / illegal instruction), while Ultralytics' own OpenCV augmentation ran
+> fine. The OpenCV reimplementation trains on the normal fast async+AMP path (≈2 h) and adds
+> no AGPL dependency. The `--stable-cuda` trainer flag (sets `CUDA_LAUNCH_BLOCKING=1`) remains
+> as a documented escape hatch but is no longer needed.
+
 ### 3.3 Comparison / experiment runs
 
 Empirical input for the alternative-model comparison
@@ -347,14 +432,20 @@ CVAT relabel grows the transition class (§6).
 
 ## 6. Open items
 
-- **Retrain the serving detector without leakage / colour-jitter (highest priority).**
-  `yolo26s-fulldata-1280` trained on the random per-frame `PAPI_Split` with default
-  colour-jitter augmentation (see the §3.1.2 caveat). Retrain on the flight-level split
-  (`configs/split.yaml`) with colour-safe settings (`hsv_h=0, hsv_s=0, mosaic=0,
-  mixup=0, copy_paste=0`, no h-flip) and re-report metrics on the matching held-out
-  partition. The colour-safe recipe already exists in
-  `workflows/scripts/train_transition_model.py` (3-class) — mirror its aug block for
-  the 2-class detector.
+- **Retrain the *serving* detector (yolo26s) without leakage / colour-jitter (highest priority).**
+  `yolo26s-fulldata-1280` still trains on the random per-frame `PAPI_Split` with default
+  colour-jitter augmentation (see the §3.1.2 caveat). The leak-free, colour-safe 2-class
+  trainer now exists — `workflows/scripts/train_detector_model.py` (flight-level split,
+  `hsv_h/s=0`, no mosaic/mixup) — and **§3.2b `yolo26n-weather-flightsplit-1280` is a clean
+  leak-free retrain at nano** (honest test mAP@0.5 0.947). The remaining gap is a **yolo26s**
+  flight-split retrain for the serving slot; run it with `--base models/base/yolo26s.pt`
+  (optionally `--weather-aug` for all-weather robustness) and re-report on the held-out
+  partition before promoting.
+- **Weather robustness (was an open client requirement) — now addressed at nano.** §3.2b
+  shows the serving yolo26s and the old train-9 "weather-aug" model both **collapse under
+  snow** (mAP@0.5 ≤0.05), while `nano-weather` holds 0.82–0.88. Consider promoting
+  `nano-weather` for adverse-weather deployment, or fold `--weather-aug` into the yolo26s
+  serving retrain above for a single robust serving model.
 - ZoomCamera `calibrated_focal_px` is `null` in `configs/papi_edny.yaml`;
   zoom-camera frames are degraded for every model here until that lands.
 - Set-angles for both runways are FAA defaults; no commissioned-angle

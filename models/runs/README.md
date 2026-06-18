@@ -10,9 +10,10 @@ models/runs/detect/yolo26s-augmented/
 models/runs/detect/yolo26s-baseline/
 models/runs/detect/yolo26n-baseline/
 models/runs/detect/yolo26s-extra-aug/        <- extra-augmentation experiment
-models/runs/detect/yolo26s-weather-aug/      <- weather-augmentation experiment
+models/runs/detect/yolo26s-weather-aug/      <- weather-augmentation experiment (train-9; rain/fog/haze only)
 models/runs/detect/yolov8s-transfer/
 models/runs/detect/yolo26n-sequence-1280/           <- previous serving (rollback)
+models/runs/detect/yolo26n-weather-flightsplit-1280/ <- weather-robust nano (2026-06-18; leak-free + OpenCV weather)
 ```
 
 Each run tracks `args.yaml`, `results.csv`, training/validation plots, and
@@ -67,3 +68,19 @@ fog — the headline result behind the weather-degradation graphs.
 
 `val-5` / `val-6` / `val-7` are additional validation runs imported from the
 same branch (provenance not recorded in their folders — no `args.yaml`).
+
+### Weather-robust nano (2026-06-18) — supersedes the experiments above
+
+`yolo26n-weather-flightsplit-1280` is a clean, leak-free retrain that actually *trains*
+on synthetic weather (rain / fog / haze / **snow** / sun-flare / shadow), not just
+rain/fog/haze, and is evaluated on the held-out **test** split. Full record + the
+medium/heavy robustness tables: [`models/MODELS.md` §3.2b](../MODELS.md). It is the only
+model that survives snow (the old `yolo26s-weather-aug` train-9 collapses there too).
+
+The weather transforms are now **pure OpenCV/NumPy**
+([`workflows/scripts/weather_aug.py`](../../workflows/scripts/weather_aug.py)) — the old
+AlbumentationsX/`albucore` path corrupted async CUDA training (MODELS.md §3.2b note). The
+reproducible multi-model eval is
+[`workflows/scripts/eval_weather_robustness.py`](../../workflows/scripts/eval_weather_robustness.py),
+which supersedes the manual `09_weather_evaluation.ipynb` flow (that notebook still imports
+albumentations and will not run against the current OpenCV-only environment).
