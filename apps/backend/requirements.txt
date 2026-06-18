@@ -24,6 +24,10 @@ lap==0.5.13
 # the single source of truth.
 opencv-python-headless==4.13.0.92
 exifread==3.5.1
+# Shared packages/papi geometry helpers are imported by backend state modules.
+# Pin explicitly so Docker images do not rely on the root editable install used
+# by CI/developer virtual environments.
+pymap3d==3.2.0
 # ONNX stack — only exercised when PAPI_MODEL_PATH points at a .onnx model (the
 # INT8 edge-export serving path); the default .pt path never imports these
 # (audit DCK-RE DEP-1).

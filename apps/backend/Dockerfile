@@ -24,12 +24,12 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Pre-install CPU-only torch BEFORE requirements.txt so ultralytics doesn't pull
 # the multi-hundred-MB CUDA wheel. Pins live in torch-requirements.txt so CI's
 # pip-audit can scan them (audit IS-1).
-COPY torch-requirements.txt ./
+COPY apps/backend/torch-requirements.txt ./
 RUN pip install --index-url https://download.pytorch.org/whl/cpu \
         -r torch-requirements.txt
 
 # Copy only requirements first for better layer caching.
-COPY requirements.txt ./
+COPY apps/backend/requirements.txt ./
 # ultralytics hard-depends on the full opencv-python (GUI build → needs libGL +
 # libxcb at runtime). Force the headless build to own the cv2/ files so the
 # runtime image needs no X11/GL libs (audit DCK-D2): install the tree, then drop
@@ -48,7 +48,7 @@ RUN pip install -r requirements.txt \
 # budget). The backend transparently falls back to best.pt when openvino is absent, so leaving
 # this off is fully supported — the IR bind-mounted via ./models is simply unused.
 ARG INSTALL_ACCEL=false
-COPY requirements-accel.txt ./
+COPY apps/backend/requirements-accel.txt ./
 RUN if [ "$INSTALL_ACCEL" = "true" ]; then pip install -r requirements-accel.txt; fi
 
 # ---- runtime stage --------------------------------------------------------
@@ -87,8 +87,11 @@ COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app/apps/backend
 
-# Backend source.
-COPY app ./app
+# Backend source plus the shared PAPI package imported by runtime state and
+# detector modules. The repository-root build context is required so both
+# trees are available without duplicating shared constants inside the backend.
+COPY apps/backend/app ./app
+COPY packages/papi/src/papi ./papi
 
 # Non-root runtime user owning the app + storage + model mount points and a
 # home dir (ultralytics writes its settings/cache under $HOME on first use)

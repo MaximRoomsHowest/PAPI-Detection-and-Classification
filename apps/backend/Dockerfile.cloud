@@ -68,6 +68,7 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app/apps/backend
 
 COPY apps/backend/app ./app
+COPY packages/papi/src/papi ./papi
 COPY configs /app/configs
 # The serving slot (default weights + registry + model card) and the committed
 # registry weights. .dockerignore keeps this to weights/best.pt, not full

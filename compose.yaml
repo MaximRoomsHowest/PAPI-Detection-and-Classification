@@ -15,7 +15,7 @@
 #   open http://localhost:5173
 #
 # For a real deployment, override at least:
-#   POSTGRES_PASSWORD          (strong random secret)
+#   PAPI_LOCAL_POSTGRES_PASSWORD (strong random secret)
 #   PAPI_API_KEY               (required when PAPI_ENV=production)
 #   PAPI_ENV=production        (flips the security floor — see backend main.py)
 #   PAPI_BACKEND_BIND=0.0.0.0  (only if the API must be reached directly, off-host)
@@ -32,11 +32,13 @@ services:
     image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
     container_name: papi-postgres
     environment:
-      POSTGRES_DB: papi_backend
+      POSTGRES_DB: ${PAPI_LOCAL_POSTGRES_DB:?Set PAPI_LOCAL_POSTGRES_DB in .env}
       # ${VAR:?msg} fails fast if the variable is missing from .env (audit
-      # DCK-MAJ-1: no more hardcoded papi:papi credentials in compose).
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      # DCK-MAJ-1: no hardcoded credentials in compose). Local-only names keep
+      # Azure deployment exports such as POSTGRES_USER/POSTGRES_PASSWORD from
+      # silently overriding this persistent local database.
+      POSTGRES_USER: ${PAPI_LOCAL_POSTGRES_USER:?Set PAPI_LOCAL_POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${PAPI_LOCAL_POSTGRES_PASSWORD:?Set PAPI_LOCAL_POSTGRES_PASSWORD in .env}
     ports:
       # Bind to loopback only (audit DCK-CRIT-1: never expose dev postgres
       # on the LAN with default credentials). The backend container reaches
@@ -75,7 +77,8 @@ services:
 
   backend:
     build:
-      context: ./apps/backend
+      context: .
+      dockerfile: apps/backend/Dockerfile
       args:
         # Install the OpenVINO accelerator (~+400 MB) so local CPU inference uses the IR like the
         # cloud image (~1.5x faster at a 2-CPU budget). Default off keeps the local image lean; the
@@ -87,7 +90,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/papi_backend
+      DATABASE_URL: postgresql+psycopg://${PAPI_LOCAL_POSTGRES_USER}:${PAPI_LOCAL_POSTGRES_PASSWORD}@postgres:5432/${PAPI_LOCAL_POSTGRES_DB}
       PAPI_MODEL_REGISTRY_PATH: /models/serving/models.json
       PAPI_MODEL_PATH: /models/serving/best.pt
       # Optional 3-class transition classifier. Documented in the volumes note below,

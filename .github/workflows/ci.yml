@@ -131,7 +131,8 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
         with:
-          context: apps/backend
+          context: .
+          file: apps/backend/Dockerfile
           push: false
           load: true
           tags: papi-backend:ci
