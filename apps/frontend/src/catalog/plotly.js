@@ -18,6 +18,10 @@ export const plotlyPalette = {
   white: statusCopy.white.color,
   red: statusCopy.red.color,
   transition: statusCopy.transition.color,
+  // The two muted "no real detection" states, single-sourced from statusCopy so charts
+  // can't drift from the cards: obscured = detector found nothing, unknown = occluded tone.
+  obscured: statusCopy.obscured.color,
+  unknown: statusCopy.occluded.color,
   warn: '#f0a22f',
 }
 

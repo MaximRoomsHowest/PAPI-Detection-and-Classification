@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pause, Play } from 'lucide-react'
 import { stateCatalog } from '../../catalog/stateCatalog'
 import { translateState } from '../../i18n/translate'
+import { prefersReducedMotion } from '../../lib/reducedMotion'
 import { PapiGlyph } from '../PapiGlyph'
 
 // Interactive cross-section of a four-box PAPI approach. The lamp logic is the
@@ -24,10 +25,7 @@ const VERTICAL_EXAGGERATION = 8
 // One full down-and-up sweep takes this long when autoplay is on.
 const SWEEP_DEG_PER_MS = ((MAX_ANGLE - MIN_ANGLE) * 2) / 18_000
 
-const PREFERS_REDUCED_MOTION =
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const PREFERS_REDUCED_MOTION = prefersReducedMotion()
 
 // SVG geometry (user units). The PAPI unit is the origin every ray fans out
 // from; the aircraft rides a ray at the current approach angle.

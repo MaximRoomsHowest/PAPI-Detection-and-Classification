@@ -1,4 +1,5 @@
 import { SUPPORTED_LANGUAGES } from '../i18n/translations'
+import { DEFAULT_RUNWAY_ID } from './runwaySelection'
 
 // localStorage keys for the small persistence surface. Centralising them
 // here keeps writes/reads in sync and makes them easy to grep.
@@ -76,9 +77,9 @@ export function readStoredString(key, fallback) {
   }
 }
 
-// Initial runway selection: persisted id -> backend default ('papi_24'). The id is
+// Initial runway selection: persisted id -> backend default (DEFAULT_RUNWAY_ID). The id is
 // reconciled against the fetched runway list at runtime (a custom runway may have
 // been deleted in another tab), so no static allowlist is applied here.
 export function initialRunwayId() {
-  return readStoredString(STORAGE_KEYS.runway, 'papi_24')
+  return readStoredString(STORAGE_KEYS.runway, DEFAULT_RUNWAY_ID)
 }

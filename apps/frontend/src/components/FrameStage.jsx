@@ -18,6 +18,7 @@ import {
 import clsx from 'clsx'
 import { toast } from 'sonner'
 import { FOLDER_MODE_SEQUENCE } from '../lib/analysisMode'
+import { prefersReducedMotion } from '../lib/reducedMotion'
 
 const SAMPLE_RUNWAY_ID = 'papi_24'
 // Real EDNY rwy-24 assets (committed under public/demo-samples/), drawn from
@@ -224,9 +225,7 @@ export function FrameStage({
     video.pause()
     const clamped = Math.min(Math.max(videoSeek.frame, 0), timelineFrameCount - 1)
     video.currentTime = (clamped / timelineFrameCount) * video.duration
-    const reduceMotion =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduceMotion = prefersReducedMotion()
     video.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' })
     // timelineFrameCount is derived state that is stable for a given analysis;
     // the request nonce is the real trigger.

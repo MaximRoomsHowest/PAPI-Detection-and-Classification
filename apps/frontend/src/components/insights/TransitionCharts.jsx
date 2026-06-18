@@ -211,7 +211,7 @@ const TransitionAngleChart = memo(function TransitionAngleChart({ summary, plotT
 // Discrete colour per state code (insightsTransforms.STATE_BAND_CODES order).
 const BAND_COLORS = [
   'rgba(127, 135, 148, 0.12)', // unknown: faint neutral — "not seen this frame"
-  '#9aa5b1', // obscured
+  plotlyPalette.unknown, // obscured band — rendered with the muted occluded tone
   plotlyPalette.red,
   plotlyPalette.transition,
   WHITE_FILL,
