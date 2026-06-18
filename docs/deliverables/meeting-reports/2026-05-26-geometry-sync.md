@@ -155,7 +155,6 @@ height. Commissioned set angles and lamp-order mapping still need binding.
 
 ## Cross-references
 
-- BigBrain summary: `02-courses/industry-project/intersoft-client-meeting-2026-05-26-summary.md`
 - Affected config: `configs/papi_edny.yaml` (lamp coords/height bound; set-angle and lamp-order TODOs documented)
 - Pipeline doc: `docs/pipeline.md` (calibration result, dual-runway resolution)
 

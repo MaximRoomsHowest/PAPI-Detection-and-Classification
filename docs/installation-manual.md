@@ -358,12 +358,10 @@ this exact set on every push.
 ## 9. Uninstalling
 
 ```bash
-# Tear down containers + named volumes:
-docker compose down -v
-
-# Remove built images:
-docker rmi papi-detection-and-classification-backend
-docker rmi papi-detection-and-classification-frontend
+# Tear down containers + named volumes AND remove the images built for this
+# project (the --rmi local flag matches the compose project name automatically,
+# so this works no matter what directory you cloned into):
+docker compose down -v --rmi local
 
 # Delete the venv (native install only):
 rm -rf .venv     # Linux/macOS
@@ -376,7 +374,6 @@ directory if you want to remove the project entirely.
 ## 10. Where to ask for help
 
 - [GitHub Issues](https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification/issues) — bug reports + feature requests.
-- The team's BigBrain hub at `03-projects/intersoft-papi-detection`
-  for design rationale and meeting decisions.
-- The audit doc `03-projects/papi-codebase-audit-2026-05-27` for
-  known issues and their current status.
+- `docs/` in this repository — architecture overview, model card, data
+  card, user manual, and the meeting reports under `docs/deliverables/`
+  capture the design rationale and the decisions taken with the client.

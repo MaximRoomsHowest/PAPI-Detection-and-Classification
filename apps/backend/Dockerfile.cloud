@@ -87,7 +87,8 @@ COPY models/runs/detect/yolo26s-baseline/weights/best.pt /models/runs/detect/yol
 COPY models/runs/detect/yolo26s-extra-aug/weights/best.pt /models/runs/detect/yolo26s-extra-aug/weights/best.pt
 COPY models/runs/detect/yolo26s-fulldata-640/weights/best.pt /models/runs/detect/yolo26s-fulldata-640/weights/best.pt
 COPY models/runs/detect/yolo26s-weather-aug/weights/best.pt /models/runs/detect/yolo26s-weather-aug/weights/best.pt
-COPY models/runs/yolo26n-sequence-1280/weights/best.pt /models/runs/yolo26n-sequence-1280/weights/best.pt
+COPY models/runs/detect/yolo26n-sequence-1280/weights/best.pt /models/runs/detect/yolo26n-sequence-1280/weights/best.pt
+COPY models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt /models/runs/detect/yolo26n-weather-flightsplit-1280/weights/best.pt
 
 RUN groupadd --system papi \
  && useradd --system --gid papi --create-home --shell /usr/sbin/nologin papi \

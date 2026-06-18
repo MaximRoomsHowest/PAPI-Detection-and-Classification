@@ -52,11 +52,11 @@ Specifically:
 
   • Source code            — main branch, tagged `v1.0-final`
   • Source ZIP             — attached (papi-vision-source-v1.0-final.zip)
-  • User manual            — docs/user-manual.pdf
-  • Installation manual    — docs/installation-manual.pdf
-  • Architecture overview  — docs/architecture-overview.pdf
-  • Design document        — docs/deliverables/01-design-document.pdf
-  • Edge benchmark report  — docs/edge-benchmark.pdf (incl. cost projection)
+  • User manual            — docs/user-manual.md
+  • Installation manual    — docs/installation-manual.md
+  • Architecture overview  — docs/architecture-overview.md
+  • Design document        — docs/deliverables/01-design-document.md
+  • Edge benchmark report  — docs/edge-benchmark.md (incl. cost projection)
   • Model registry         — models/MODELS.md
   • Configs                — configs/papi_edny.yaml (lamp coords as you
                              provided on 2026-05-26 and 2026-06-01)
@@ -146,11 +146,11 @@ Concreet:
 
   • Broncode               — branch main, tag `v1.0-final`
   • Broncode (ZIP)         — in bijlage
-  • Gebruikershandleiding  — docs/user-manual.pdf
-  • Installatiehandleiding — docs/installation-manual.pdf
-  • Architectuuroverzicht  — docs/architecture-overview.pdf
-  • Ontwerpdocument        — docs/deliverables/01-design-document.pdf
-  • Edge-benchmark         — docs/edge-benchmark.pdf
+  • Gebruikershandleiding  — docs/user-manual.md
+  • Installatiehandleiding — docs/installation-manual.md
+  • Architectuuroverzicht  — docs/architecture-overview.md
+  • Ontwerpdocument        — docs/deliverables/01-design-document.md
+  • Edge-benchmark         — docs/edge-benchmark.md
   • Modelregister          — models/MODELS.md
   • Configuratie           — configs/papi_edny.yaml
 

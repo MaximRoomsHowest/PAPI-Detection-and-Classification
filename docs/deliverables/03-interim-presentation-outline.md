@@ -78,7 +78,7 @@ input, evidence, output.
 Visual: 2×2 grid — day rwy24 wide, night rwy06 wide, day rwy24
 zoom, day rwy24 transition close-up.
 
-Numbers (verbatim from BigBrain hub):
+Numbers (from the dataset analysis):
 
 - **4 058 frames** from a single DJI Matrice 4E drone, single
   airport (Friedrichshafen, EDNY).

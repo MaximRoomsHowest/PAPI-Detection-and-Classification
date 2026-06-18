@@ -20,7 +20,7 @@
 |---|---|---|---|
 | 1 | Interim presentation | `03-interim-presentation-outline.md` (content) → team styles into slides | drafting |
 | 2 | Project-management summary | `05-project-management-summary.md` | template + team to fill |
-| 3 | Meeting reports (1 PDF, 3 reports) | `meeting-reports/*.md` | ready — kickoff (05-18) / geometry sync (05-26) / scope & features (06-01) |
+| 3 | Meeting reports (1 PDF, 5 reports) | `meeting-reports/*.md` | ready — kickoff (05-18) / geometry sync (05-26) / scope & features (06-01) / week-4 check-in (06-08) / handover (06-15) |
 | 4 | MCT functional analysis | N/A (team is CTAI) | not applicable |
 
 ## Final deliverables
@@ -28,7 +28,7 @@
 | # | Deliverable | Source file | Status |
 |---|---|---|---|
 | 1 | Final presentation + proof of handover | `09-final-presentation-outline.md` + `10-client-handover-email.md` | ✅ drafted |
-| 2 | Weekly meeting reports bundle (≥5 weeks) | `meeting-reports/*.md` | ✅ 3 drafted; team adds final-week meeting |
+| 2 | Weekly meeting reports bundle (≥5 weeks) | `meeting-reports/*.md` | ✅ 5 drafted (kickoff, geometry sync, scope & features, week-4 check-in, handover) |
 | 3 | User manual | `../user-manual.md` → PDF | ✅ source ready, PDF export at handover |
 | 4 | Installation manual | `../installation-manual.md` → PDF | ✅ source ready, PDF export at handover |
 | 5 | Project-management documentation (final version) | `05-project-management-summary.md` updated | ✅ template; team fills numbers |
@@ -44,7 +44,7 @@
 | A | Design document | `01-design-document.md` | ✅ drafted |
 | B | Edge benchmark — measurements + cost projection + conclusion | `../edge-benchmark.md` §5/§7/§8 | partial — §7/§8 structures done, §5 needs hardware |
 | C | Model registry / lineage | `../../models/MODELS.md` | ✅ drafted |
-| D | Alternative-model comparison | `06-model-comparison.md` | ✅ scaffolded; team fills numbers after training |
+| D | Alternative-model comparison | `06-model-comparison.md` | ✅ filled — measured numbers (2026-06-10) |
 | E | Frontend test suite | `apps/frontend/{vitest config + .test.jsx}` | in progress (Track B) |
 
 ## File-numbering convention
@@ -86,7 +86,6 @@ Two-digit prefix on every file so `ls` sorts them in presentation order.
 These are referenced by the deliverables but live elsewhere — keep
 the canonical copy in one place and link to it:
 
-- **Project hub**: BigBrain `03-projects/intersoft-papi-detection.md`
-- **Audit backlog**: BigBrain `03-projects/papi-improvements-audit-2026-05-27.md`
+- **Project overview**: `docs/final-report.md` and `docs/architecture-overview.md`
 - **Trello board**: <https://trello.com/b/iLrmBsgI/papi-industry-project-sprints>
 - **GitHub repo**: <https://github.com/MaximRoomsHowest/PAPI-Detection-and-Classification>

@@ -91,8 +91,8 @@ while `LRFTargetAbsAlt` is the WGS84 absolute (`459.3`). Always use `lrf_target_
 
 ## Dual-runway finding (2026-05-19)
 
-The initial BigBrain note claimed "all flights target the standard four-light PAPI on runway
-06". The pipeline disagreed: per-frame haversine distance shows **all 16 day flights (3,432
+An early assumption was that all flights target the standard four-light PAPI on runway
+06. The pipeline disagreed: per-frame haversine distance shows **all 16 day flights (3,432
 frames) target runway 24** (which has its PAPI cluster at ~(47.6735, 9.5182)), and **all 5
 night flights (626 frames) target runway 06** (PAPI at ~(47.6688, 9.5040)). Folder names like
 `300mday2up` refer to the runway-24 standoff, not runway 06.
