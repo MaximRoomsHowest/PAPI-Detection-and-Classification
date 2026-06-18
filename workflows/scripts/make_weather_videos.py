@@ -36,6 +36,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import cv2
@@ -74,6 +75,11 @@ class _FfmpegWriter:
 
     def __init__(self, exe: str, path: Path, fps: float, width: int, height: int, crf: int):
         self.path = path
+        # stderr -> a temp file, NOT a PIPE: we only drain stderr in close() (after every frame
+        # has been written to stdin), so on a long/large clip a PIPE could fill its OS buffer and
+        # deadlock ffmpeg against our stdin.write(). A temp file can't fill and still preserves
+        # ffmpeg's error text for the return-code check below.
+        self._err = tempfile.TemporaryFile()
         self._proc = subprocess.Popen(
             [exe, "-y", "-loglevel", "error",
              "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{width}x{height}",
@@ -81,17 +87,24 @@ class _FfmpegWriter:
              "-an", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
              "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
              "-crf", str(crf), "-movflags", "+faststart", str(path)],
-            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=self._err,
         )
 
     def write(self, frame_bgr: np.ndarray) -> None:
         self._proc.stdin.write(np.ascontiguousarray(frame_bgr, dtype=np.uint8).tobytes())
 
     def close(self) -> None:
-        if self._proc.stdin:
-            self._proc.stdin.close()
-        err = self._proc.stderr.read() if self._proc.stderr else b""
+        # stdin may already be closed if ffmpeg died mid-write (BrokenPipeError); guard so this
+        # cleanup never raises a secondary error that masks the real failure surfaced below.
+        try:
+            if self._proc.stdin:
+                self._proc.stdin.close()
+        except OSError:
+            pass
         rc = self._proc.wait()
+        self._err.seek(0)
+        err = self._err.read()
+        self._err.close()
         if rc != 0:
             raise RuntimeError(f"ffmpeg encode failed (rc={rc}): {err.decode('utf-8', 'replace')[:800]}")
 
