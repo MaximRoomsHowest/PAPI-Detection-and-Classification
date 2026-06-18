@@ -127,7 +127,7 @@ If you skip this, you still get the colour result, just without an angle.
 
 ### 3.4 File limits
 
-- Up to **100 MB** per upload.
+- Up to **500 MB** per file (up to **2 GB** total for a folder upload).
 - Up to **600 frames** and **150 seconds** per video.
 
 If a video is damaged and only part of it can be read, you get a
@@ -278,7 +278,7 @@ As on the Models page, running jobs appear in the jobs panel.
 | "Angle unavailable" on a result | The file had no GPS / height info | Type the drone position in the metadata fields |
 | Asked to fill all three position fields | You filled some but not all of latitude, longitude, altitude | Fill all three, or clear all three |
 | "Only N of M frames could be read" | The video is damaged or only partly uploaded | Re-export and upload again; the result covers the readable frames |
-| Upload rejected as too large | The file is over 100 MB | Trim or compress it |
+| Upload rejected as too large | The file is over 500 MB | Trim or compress it |
 | "Too many requests" | You sent many analyses very quickly | Wait a moment and try again |
 | Charts say "unavailable" | A chart failed to load (offline, ad-blocker) | Refresh the page |
 | Folder upload shows only one image | The browser could not read the folder | Try Firefox or Edge |

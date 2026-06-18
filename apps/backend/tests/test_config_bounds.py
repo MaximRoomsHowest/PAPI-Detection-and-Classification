@@ -66,7 +66,9 @@ def test_max_batch_upload_mb_zero_rejected(monkeypatch):
 
 def test_max_batch_upload_mb_default_matches_proxy_budget(monkeypatch):
     monkeypatch.delenv("PAPI_MAX_BATCH_UPLOAD_MB", raising=False)
-    assert Settings().max_batch_upload_mb == 400
+    # Default folder/batch budget; the frontend nginx cap (PAPI_NGINX_MAX_BODY_SIZE,
+    # default 2048m) and the backend transport cap (budget + 10 MB) must stay above it.
+    assert Settings().max_batch_upload_mb == 2000
 
 
 def test_max_image_megapixels_zero_rejected(monkeypatch):

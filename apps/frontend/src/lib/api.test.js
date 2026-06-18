@@ -378,9 +378,9 @@ describe('analyze* — error surfacing', () => {
 })
 
 describe('upload size guard', () => {
-  // The default MAX_UPLOAD_BYTES is 100 MB per file (VITE_PAPI_MAX_UPLOAD_MB).
+  // The default MAX_UPLOAD_BYTES is 500 MB per file (VITE_PAPI_MAX_UPLOAD_MB).
   // We test slightly over the limit to avoid false-negatives from rounding.
-  const overSized = 101 * 1024 * 1024
+  const overSized = 501 * 1024 * 1024
 
   it('rejects a single file that exceeds the per-file cap', async () => {
     const big = makeFile('big.jpg', overSized)
@@ -392,8 +392,9 @@ describe('upload size guard', () => {
   })
 
   it('rejects a folder batch that exceeds the aggregate cap', async () => {
-    // 5 × 95 MB = 475 MB > the 400 MB aggregate cap (4 × per-file).
-    const files = Array.from({ length: 5 }, (_, i) => makeFile(`f${i}.jpg`, 95 * 1024 * 1024))
+    // 5 × 450 MB = 2250 MB > the 2000 MB aggregate cap (4 × per-file); each file
+    // is under the 500 MB per-file cap, so only the aggregate guard fires.
+    const files = Array.from({ length: 5 }, (_, i) => makeFile(`f${i}.jpg`, 450 * 1024 * 1024))
     await expect(
       analyzeFrames(files, {
         runwayId: '24',

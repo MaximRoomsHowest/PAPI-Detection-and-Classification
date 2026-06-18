@@ -134,17 +134,17 @@ services:
       # nvidia-container-toolkit) — out of scope for this CPU demo stack.
       PAPI_DEVICE: ${PAPI_DEVICE:-cpu}
       PAPI_CONFIDENCE_THRESHOLD: ${PAPI_CONFIDENCE_THRESHOLD:-0.4}
-      PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-100}
+      PAPI_MAX_UPLOAD_MB: ${PAPI_MAX_UPLOAD_MB:-500}
       PAPI_MAX_IMAGE_MEGAPIXELS: ${PAPI_MAX_IMAGE_MEGAPIXELS:-80}
       PAPI_MAX_VIDEO_FRAMES: ${PAPI_MAX_VIDEO_FRAMES:-600}
       PAPI_MAX_VIDEO_SECONDS: ${PAPI_MAX_VIDEO_SECONDS:-150}
-      # NOTE: raising this past ~400 MB also requires raising the frontend
-      # nginx cap (PAPI_NGINX_MAX_BODY_SIZE on the frontend service below,
-      # default 410m — env-templated, no rebuild needed), or proxied uploads
-      # die at nginx with a 413 before the backend ever sees them (audit IS-7).
-      # The backend's own transport cap follows this value + 10 MB headroom
-      # automatically (app/middleware.py).
-      PAPI_MAX_BATCH_UPLOAD_MB: ${PAPI_MAX_BATCH_UPLOAD_MB:-400}
+      # NOTE: raising this also requires raising the frontend nginx cap
+      # (PAPI_NGINX_MAX_BODY_SIZE on the frontend service below, default 2048m —
+      # env-templated, no rebuild needed), or proxied uploads die at nginx with a
+      # 413 before the backend ever sees them (audit IS-7). The backend's own
+      # transport cap follows this value + 10 MB headroom automatically
+      # (app/middleware.py).
+      PAPI_MAX_BATCH_UPLOAD_MB: ${PAPI_MAX_BATCH_UPLOAD_MB:-2000}
       # Aggregate cap on /api/analyze-frames batch size (audit B-MAJ-5).
       # 200 keeps a folder upload of a normal flight under a few minutes
       # of CPU inference; raise via .env if the demo needs a bigger sweep.
@@ -277,7 +277,7 @@ services:
       # track PAPI_MAX_BATCH_UPLOAD_MB (+ ~10m multipart headroom) or nginx 413s
       # a legal batch upload before the backend sees it. NEVER name frontend env
       # vars after nginx runtime variables (host, uri, scheme, ...).
-      NGINX_CLIENT_MAX_BODY_SIZE: ${PAPI_NGINX_MAX_BODY_SIZE:-410m}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${PAPI_NGINX_MAX_BODY_SIZE:-2048m}
     depends_on:
       backend:
         condition: service_healthy

@@ -48,7 +48,7 @@ EXPOSE 8080
 # NGINX_CONF=nginx.azure.conf.template (sidecar backend on localhost:8000).
 # envsubst only substitutes variables that exist in the container environment,
 # so nginx runtime vars ($uri, $host, ...) pass through untouched.
-ENV NGINX_CLIENT_MAX_BODY_SIZE=410m
+ENV NGINX_CLIENT_MAX_BODY_SIZE=2048m
 ARG NGINX_CONF=nginx.conf.template
 COPY ${NGINX_CONF} /etc/nginx/templates/default.conf.template
 

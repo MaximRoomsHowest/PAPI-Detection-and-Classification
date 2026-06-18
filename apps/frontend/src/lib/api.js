@@ -35,7 +35,7 @@ export function hasApiKeyConfigured() {
 // Upload + timeout guards (audit F-MAJ-8). Defaults are intentionally close
 // to the backend's own limits so users see a fast client-side error rather
 // than waiting for a 413 / hung request.
-const DEFAULT_MAX_UPLOAD_MB = 100
+const DEFAULT_MAX_UPLOAD_MB = 500
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000
 
 // Parse a numeric env override, falling back to the default when the value is absent

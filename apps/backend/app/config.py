@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     # Per-file upload ceiling in megabytes (media.save_upload streams and aborts
     # past max_upload_mb * 1024 * 1024 bytes). >= 1 MB; upper bound keeps a typo'd
     # env var from effectively disabling the limit.
-    max_upload_mb: int = Field(default=100, ge=1, le=10000, alias="PAPI_MAX_UPLOAD_MB")
+    max_upload_mb: int = Field(default=500, ge=1, le=10000, alias="PAPI_MAX_UPLOAD_MB")
     # Hard cap on DECODED pixels per image/frame. The byte-size cap above does NOT bound
     # decode amplification: a small, highly-compressed file (or video frame) can decode to
     # gigabytes — a "decompression bomb". 80 MP covers legitimate high-res drone stills and
@@ -128,7 +128,7 @@ class Settings(BaseSettings):
     # Aggregate upload-body budget for folder/batch endpoints. The per-file
     # PAPI_MAX_UPLOAD_MB cap still applies, but without this a default
     # 200-frame batch could carry 20 GB of files in one request.
-    max_batch_upload_mb: int = Field(default=400, ge=1, le=10000, alias="PAPI_MAX_BATCH_UPLOAD_MB")
+    max_batch_upload_mb: int = Field(default=2000, ge=1, le=10000, alias="PAPI_MAX_BATCH_UPLOAD_MB")
     # FPS assigned to a folder->video sequence: the uploaded images are treated as
     # consecutive video frames, so this sets annotated-playback speed and the
     # transition frame-gap timing. It does not affect detection.
