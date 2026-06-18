@@ -15,9 +15,16 @@ from .geometry import elevation_angle_deg
 LampState = str  # "white" | "red" | "transition"
 
 # A standard PAPI unit is exactly four lamps, indexed 1..4 innermost-to-outermost
-# (config keys ``light_1``..``light_4``). Named so the iteration bound below reads
-# as "for each lamp" rather than a bare ``range(1, 5)``.
-_NUM_LAMPS = 4
+# (config keys ``light_1``..``light_4``). The single source of truth for the lamp count
+# across the backend + workflows; named so iteration bounds read as "for each lamp"
+# rather than a bare ``range(1, 5)``.
+NUM_PAPI_LAMPS = 4
+_NUM_LAMPS = NUM_PAPI_LAMPS  # internal alias (kept for the existing call sites below)
+
+# FAA standard per-lamp set angles for a 3.0deg glideslope (lamp 1..4, lowest..highest). The
+# canonical CODE-level default; runway configs may override per-runway via
+# ``faa_default_set_angles_deg`` in configs/papi_*.yaml (which currently echo this standard).
+FAA_DEFAULT_SET_ANGLES_DEG = (2.50, 2.83, 3.17, 3.50)
 
 
 def _set_angle(papi_config: dict[str, Any], light_no: int) -> float:

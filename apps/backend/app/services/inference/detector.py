@@ -4,6 +4,8 @@ just binds ``self.model`` / ``self.settings.confidence_threshold`` / ``self.devi
 
 from typing import Any
 
+from papi.lamp_state import NUM_PAPI_LAMPS
+
 
 def lamp_redness(frame: Any, x1: int, y1: int, x2: int, y2: int) -> float | None:
     """Measured "redness" of a lamp crop: the red-channel fraction (R/(R+G+B)),
@@ -53,7 +55,7 @@ def detect_frame(
     device: str,
     imgsz: int = 1280,
     iou: float = 0.7,
-    max_det: int = 4,
+    max_det: int = NUM_PAPI_LAMPS,
     half: bool = False,
 ) -> list[dict]:
     """Run YOLO on a single frame.

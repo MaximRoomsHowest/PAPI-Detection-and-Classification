@@ -1,5 +1,6 @@
 from datetime import datetime
 from math import isfinite
+from typing import get_args
 
 from sqlalchemy import ColumnElement, desc, func, select
 from sqlalchemy.orm import Session
@@ -8,17 +9,11 @@ from app.config import get_settings
 from app.models import AnalysisLog
 from app.services.media import media_url_for_path
 from app.services.storage import get_media_storage
-from app.validation.schemas import AnalysisPayload, InferenceStats, LogListItem
+from app.validation.schemas import AnalysisPayload, GlobalState, InferenceStats, LogListItem
 
-_GLOBAL_STATES = {
-    "far_too_high",
-    "too_high",
-    "correct_glidepath",
-    "too_low",
-    "far_too_low",
-    "transition",
-    "unknown",
-}
+# Single-sourced from the GlobalState Literal (the response contract) so the persisted
+# verdict whitelist can never drift from the API's allowed values.
+_GLOBAL_STATES = set(get_args(GlobalState))
 
 
 class AnalysisLogRepository:

@@ -11,6 +11,9 @@ associated with each event; it annotates the transition, it does not decide it.
 
 from collections import Counter
 
+from papi.global_state import WHITE_COUNT_TO_CODE
+from papi.lamp_state import FAA_DEFAULT_SET_ANGLES_DEG
+
 from app.validation.schemas import AngleResult, BoundingBox, LampResult, TransitionEvent
 
 DETECTION_CLASS_TO_STATE = {
@@ -38,16 +41,14 @@ DETECTED_LAMP_STATES = frozenset({"red", "white"})
 # hence confidence 0.0 and no bbox.
 _OBSCURED_LAMP_STATE = "obscured"
 
-# Runtime fallback for angle-based inference when one lamp slot is missing.
-# VALUES match faa_default_set_angles_deg in configs/papi_edny.yaml and
-# packages/papi/src/papi/lamp_state.py — but deliberately as a SET, not a
-# per-slot binding: which image slot carries which set angle flips with the
-# approach direction (rwy 06 vs 24 view the same array from opposite sides),
-# and the EDNY transition data shows image-lamp 1 flipping at ~3.43 deg on
-# rwy 24 — the reverse of the config-comment convention. Inference therefore
-# only uses the COUNT of set angles below the viewing angle, never a
-# slot-indexed lookup (see infer_single_missing_lamp_from_angle).
-FAA_DEFAULT_SET_ANGLES_DEG = (2.50, 2.83, 3.17, 3.50)
+# Runtime fallback for angle-based inference when one lamp slot is missing. The set-angle
+# values are single-sourced from papi.lamp_state.FAA_DEFAULT_SET_ANGLES_DEG (imported above) —
+# used here deliberately as a SET, not a per-slot binding: which image slot carries which set
+# angle flips with the approach direction (rwy 06 vs 24 view the same array from opposite
+# sides), and the EDNY transition data shows image-lamp 1 flipping at ~3.43 deg on rwy 24 — the
+# reverse of the config-comment convention. Inference therefore only uses the COUNT of set
+# angles below the viewing angle, never a slot-indexed lookup (see
+# infer_single_missing_lamp_from_angle).
 TRANSITION_HALF_WIDTH_DEG = 0.10
 
 
@@ -425,16 +426,19 @@ def transition_events_from_state_runs(
     return events
 
 
-# Exact white-lamp count -> glidepath state for a complete 4-lamp PAPI unit.
-# The five states are defined purely by how many lamps are white vs red, so this
-# is an exact lookup, not a ratio. Mirrors the offline decoder
-# (packages/papi/src/papi/global_state.py:derive_global_state) by construction.
+# Exact white-lamp count -> glidepath state for a complete 4-lamp PAPI unit. The white-count
+# ORDERING is single-sourced from the offline decoder (papi.global_state.WHITE_COUNT_TO_CODE);
+# only the API display vocabulary (the response contract) is backend-specific, so the two can
+# no longer drift on which count means "too high" vs "too low".
+_CODE_TO_API_STATE = {
+    "4W": "far_too_high",       # 4 white
+    "3W1R": "too_high",         # 3 white + 1 red
+    "2W2R": "correct_glidepath",  # 2 white + 2 red
+    "1W3R": "too_low",          # 1 white + 3 red
+    "4R": "far_too_low",        # 4 red
+}
 _WHITE_COUNT_TO_STATE = {
-    4: "far_too_high",       # 4 white
-    3: "too_high",           # 3 white + 1 red
-    2: "correct_glidepath",  # 2 white + 2 red
-    1: "too_low",            # 1 white + 3 red
-    0: "far_too_low",        # 4 red
+    count: _CODE_TO_API_STATE[code] for count, code in WHITE_COUNT_TO_CODE.items()
 }
 
 

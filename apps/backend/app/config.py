@@ -9,6 +9,11 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parents[1]
 
+# The two per-analysis transition-derivation methods. Single source of truth, reused by the
+# default-method validator below and the per-request validation in the inference service, so
+# adding a method only touches one tuple.
+TRANSITION_METHODS = ("tracking", "model")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -240,8 +245,9 @@ class Settings(BaseSettings):
     @classmethod
     def validate_default_transition_method(cls, value: str) -> str:
         normalized = (value or "tracking").strip().lower()
-        if normalized not in ("tracking", "model"):
-            raise ValueError("default_transition_method must be 'tracking' or 'model'")
+        if normalized not in TRANSITION_METHODS:
+            allowed = " or ".join(map(repr, TRANSITION_METHODS))
+            raise ValueError(f"default_transition_method must be {allowed}")
         return normalized
 
     @field_validator("storage_backend")

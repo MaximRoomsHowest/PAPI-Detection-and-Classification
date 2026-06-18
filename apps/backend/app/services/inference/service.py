@@ -9,7 +9,7 @@ from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
-from app.config import Settings
+from app.config import TRANSITION_METHODS, Settings
 from app.services.inference.aggregation import aggregate_video_lamps
 from app.services.inference.angle_resolver import (
     angle_for_media,
@@ -397,8 +397,8 @@ class InferenceService:
                 raise ValueError(f"Model '{entry.id}' is unavailable: {reason}")
             model = self._load_model(entry)
             method = (transition_method or "").strip().lower() if explicit_method else None
-            if method not in ("tracking", "model", None):
-                raise ValueError("transition_method must be 'tracking' or 'model'")
+            if method is not None and method not in TRANSITION_METHODS:
+                raise ValueError(f"transition_method must be {' or '.join(map(repr, TRANSITION_METHODS))}")
             if method is None:
                 method = "model" if entry.role == "transition" or entry.class_count >= 3 else "tracking"
             if method == "model" and not self._is_three_class(model):
@@ -414,8 +414,8 @@ class InferenceService:
             if explicit_method
             else (self.settings.default_transition_method or "tracking").strip().lower()
         )
-        if explicit_method and requested_method not in ("tracking", "model"):
-            raise ValueError("transition_method must be 'tracking' or 'model'")
+        if explicit_method and requested_method not in TRANSITION_METHODS:
+            raise ValueError(f"transition_method must be {' or '.join(map(repr, TRANSITION_METHODS))}")
         if requested_method == "model":
             transition_entry = self._registry.transition_entry()
             if transition_entry is not None and transition_entry.available:
