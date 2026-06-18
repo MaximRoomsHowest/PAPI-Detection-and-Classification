@@ -3,9 +3,9 @@
 # Test-only deps (pytest, httpx2) live in requirements-dev.txt so the production
 # image never ships test tooling (audit DCK-D5). Install dev/test deps with:
 #   pip install -r requirements-dev.txt
-fastapi==0.136.3
+fastapi==0.137.2
 uvicorn[standard]==0.49.0
-sqlalchemy==2.0.50
+sqlalchemy==2.0.51
 psycopg[binary]==3.3.4
 pydantic-settings==2.14.1
 python-multipart==0.0.32
@@ -15,7 +15,7 @@ PyYAML==6.0.3
 # MUST stay on the 8.4.x line: the serving model is a yolo26s detector and the
 # YOLO26 architecture only exists in Ultralytics >= 8.4. An 8.3.x pin cannot load
 # models/serving/best.pt on a clean install (Docker/CI) — do not downgrade.
-ultralytics==8.4.62
+ultralytics==8.4.70
 lap==0.5.13
 # Headless OpenCV: the backend never opens a GUI window, so the -headless wheel
 # drops the libGL/X11 stack — which also lets the Dockerfile skip the libgl1
@@ -31,11 +31,11 @@ pymap3d==3.2.0
 # ONNX stack — only exercised when PAPI_MODEL_PATH points at a .onnx model (the
 # INT8 edge-export serving path); the default .pt path never imports these
 # (audit DCK-RE DEP-1).
-onnx==1.21.0
+onnx==1.22.0
 # Dependabot proposed 1.26.0, but the latest version resolvable on our index is
 # 1.23.2 — pinning a non-existent version would break the image build, so we take
 # the installable ceiling (still a bump from 1.20.1). Revisit if the index gains 1.26.x.
-onnxruntime==1.23.2
+onnxruntime==1.27.0
 # Azure Blob Storage is only used when PAPI_STORAGE_BACKEND=azure_blob. Local
 # Docker Compose keeps filesystem storage, but the cloud Container App streams
 # uploaded/annotated media through Blob Storage for restart-safe persistence.
