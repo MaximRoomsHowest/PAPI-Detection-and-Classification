@@ -9,6 +9,10 @@ const POLL_MS = 2500
 export function useJobs() {
   const [jobs, setJobs] = useState([])
   const [error, setError] = useState(null)
+  // Separate from `error` (which the 2.5s poll resets on every success): a failed
+  // cancel/dismiss/clear must stay visible until the next successful action, not be
+  // wiped by the next poll tick (audit 2026-06-19).
+  const [actionError, setActionError] = useState(null)
   const timerRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -36,9 +40,18 @@ export function useJobs() {
     }
   }, [load])
 
+  // Cancel/dismiss/clear catch their own failures and surface them via actionError
+  // instead of rejecting into the onClick handler (an unhandled rejection with no user
+  // feedback — the action looked wired but silently failed). audit 2026-06-19.
   const cancel = useCallback(
     async (jobId) => {
-      await cancelJob(jobId)
+      try {
+        await cancelJob(jobId)
+        setActionError(null)
+      } catch (err) {
+        setActionError(err)
+        return
+      }
       load()
     },
     [load],
@@ -51,6 +64,9 @@ export function useJobs() {
       setJobs((current) => current.filter((job) => job.id !== jobId))
       try {
         await deleteJob(jobId)
+        setActionError(null)
+      } catch (err) {
+        setActionError(err)
       } finally {
         load()
       }
@@ -62,11 +78,17 @@ export function useJobs() {
   // clears the jobs it shows). Refreshes from the server afterwards.
   const clearFinished = useCallback(
     async (kind) => {
-      await clearFinishedJobs({ kind })
+      try {
+        await clearFinishedJobs({ kind })
+        setActionError(null)
+      } catch (err) {
+        setActionError(err)
+        return
+      }
       load()
     },
     [load],
   )
 
-  return { jobs, error, refetch: load, cancel, dismiss, clearFinished }
+  return { jobs, error, actionError, refetch: load, cancel, dismiss, clearFinished }
 }

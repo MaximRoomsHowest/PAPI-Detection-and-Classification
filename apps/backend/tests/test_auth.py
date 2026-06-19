@@ -362,6 +362,7 @@ def test_production_supabase_requires_role_or_allowlist():
     settings = _settings(
         environment="production",
         auth_mode="supabase",
+        supabase_url="https://test.supabase.co",
         supabase_anon_key="anon",
         supabase_allowed_emails=[],
         supabase_required_role=None,
@@ -378,6 +379,7 @@ def test_production_local_supabase_requires_supabase_config():
         auth_session_secret="dev-secret",
         local_admin_email="admin@example.com",
         local_admin_password_hash=hash_password("s3cret", salt=b"abcdef1234567890"),
+        supabase_url="https://test.supabase.co",
         supabase_anon_key=None,
     )
 
@@ -392,6 +394,7 @@ def test_production_local_supabase_accepts_both_provider_configs():
         auth_session_secret="dev-secret",
         local_admin_email="admin@example.com",
         local_admin_password_hash=hash_password("s3cret", salt=b"abcdef1234567890"),
+        supabase_url="https://test.supabase.co",
         supabase_anon_key="anon",
         supabase_allowed_emails=["operator@example.com"],
     )

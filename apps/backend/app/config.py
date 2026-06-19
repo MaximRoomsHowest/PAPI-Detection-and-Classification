@@ -14,6 +14,13 @@ REPO_ROOT = BACKEND_ROOT.parents[1]
 # adding a method only touches one tuple.
 TRANSITION_METHODS = ("tracking", "model")
 
+# Environment values that are explicitly NON-production. ANY other value — including a
+# typo like "prod" or a real-but-unlisted value like "staging"/"live" — is treated as
+# production-like by the security floor, so an unrecognised PAPI_ENV can never silently
+# boot with open auth or the default DB credentials (audit 2026-06-19: the floor used to
+# gate on the exact string "production").
+NON_PRODUCTION_ENVIRONMENTS = frozenset({"local", "dev", "development", "test", "testing", "ci"})
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -29,6 +36,17 @@ class Settings(BaseSettings):
     # Use "production" only at real deploy time; local Compose, dev, and CI
     # should stay on the default ("local").
     environment: str = Field(default="local", alias="PAPI_ENV")
+
+    @property
+    def is_production_like(self) -> bool:
+        """True for any env that is NOT an explicitly recognised local/dev/CI value.
+
+        The production security floor uses this (not an exact "production" match) so a
+        misconfigured PAPI_ENV fails CLOSED — an unknown value enforces the guards
+        rather than silently disabling them.
+        """
+        return self.environment.strip().lower() not in NON_PRODUCTION_ENVIRONMENTS
+
     # Read from DATABASE_URL (Compose + .env.example) OR PAPI_DATABASE_URL
     # (matches every other setting's PAPI_ prefix and the production startup error
     # message). Previously only the bare field name was matched, so a
@@ -69,10 +87,12 @@ class Settings(BaseSettings):
     api_key: str | None = Field(default=None, alias="PAPI_API_KEY")
     local_admin_email: str | None = Field(default=None, alias="PAPI_LOCAL_ADMIN_EMAIL")
     local_admin_password_hash: str | None = Field(default=None, alias="PAPI_LOCAL_ADMIN_PASSWORD_HASH")
-    supabase_url: str | None = Field(
-        default="https://mrkhpwtuyytlamrythwn.supabase.co",
-        alias="PAPI_SUPABASE_URL",
-    )
+    # Default MUST be None: the production startup guard (_required_for_startup in
+    # services/auth.py) can only fail-fast on a MISSING url if the field is actually
+    # absent. A baked-in real project url defeats that guard and would silently route
+    # client auth to whatever endpoint shipped as the default (audit 2026-06-19). The
+    # example project url lives in .env.example only.
+    supabase_url: str | None = Field(default=None, alias="PAPI_SUPABASE_URL")
     supabase_anon_key: str | None = Field(default=None, alias="PAPI_SUPABASE_ANON_KEY")
     supabase_allowed_emails: Annotated[list[str], NoDecode] = Field(
         default=[],

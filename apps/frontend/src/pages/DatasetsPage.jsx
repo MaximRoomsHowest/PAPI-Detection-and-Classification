@@ -225,7 +225,8 @@ function TrainModal({ open, onClose, copy, dataset, models, onPrepared }) {
 export function DatasetsPage({ copy, isAdmin }) {
   const { datasets, loading, error, uploadBundle, startAssisted, remove } = useDatasets()
   const { models, loading: modelsLoading } = useModelManagement()
-  const { jobs, cancel, dismiss, clearFinished, refetch: refetchJobs } = useJobs()
+  const { jobs, cancel, dismiss, clearFinished, refetch: refetchJobs, actionError: jobsActionError } =
+    useJobs()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [assistedOpen, setAssistedOpen] = useState(false)
   const [reviewDataset, setReviewDataset] = useState(null)
@@ -305,6 +306,7 @@ export function DatasetsPage({ copy, isAdmin }) {
         onClearFinished={() =>
           Promise.all([clearFinished('label_assist'), clearFinished('train_prepare')])
         }
+        actionError={jobsActionError}
         copy={copy}
       />
 

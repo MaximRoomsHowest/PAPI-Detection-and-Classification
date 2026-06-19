@@ -40,15 +40,36 @@ COLOUR_SAFE_AUG: dict[str, float] = {
 }
 
 
-def build_command(*, base: str, epochs: int, imgsz: int, batch: int, oversample: int, name: str) -> str:
-    # epochs/imgsz/batch/oversample are ints (schema-validated); name is the only
-    # free-text field, so harden it before it lands in the shell string.
-    return (
-        "python workflows/scripts/train_transition_model.py "
-        "--combined ./dataset "
+def build_command(
+    *, base: str, epochs: int, imgsz: int, batch: int, oversample: int, name: str, class_count: int
+) -> str:
+    """Build the copy-paste trainer command, routed by the dataset's class count.
+
+    A 3-class dataset (red/white/transition) trains with the transition trainer
+    (``--combined <dir>``, supports ``--oversample``); a 2-class dataset (red/white)
+    trains with the detector trainer (``--data <data.yaml>``, no oversample). Wiring
+    every dataset to the transition trainer mislabels 2-class detector bundles, since
+    that trainer overrides the data.yaml names with the 3-class map (audit 2026-06-19).
+
+    epochs/imgsz/batch/oversample are ints (schema-validated); ``name`` is the only
+    free-text field, so it is hardened before it lands in the shell string.
+    """
+    safe_name = _safe_run_name(name)
+    common = (
         f"--base models/base/{base} "
         f"--epochs {epochs} --imgsz {imgsz} --batch {batch} --device 0 "
-        f"--oversample {oversample} --name {_safe_run_name(name)}"
+        f"--name {safe_name}"
+    )
+    if class_count >= 3:
+        return (
+            "python workflows/scripts/train_transition_model.py "
+            "--combined ./dataset "
+            f"{common} --oversample {oversample}"
+        )
+    return (
+        "python workflows/scripts/train_detector_model.py "
+        "--data ./dataset/data.yaml "
+        f"{common}"
     )
 
 
@@ -59,7 +80,7 @@ def _readme(manifest: dict[str, Any]) -> str:
         "1. Unzip this archive. The labelled YOLO dataset is under ./dataset.\n"
         "2. From the PAPI repo root (with the .venv active and a CUDA GPU), run:\n\n"
         f"   {manifest['command']}\n\n"
-        "   (Point --combined at the unzipped ./dataset directory.)\n\n"
+        "   (The dataset path in the command is relative to the unzipped ./dataset folder.)\n\n"
         "3. When training finishes, upload the resulting best.pt back into the app\n"
         "   via the Models page (Upload model) to make it selectable for inference.\n\n"
         "Augmentation is colour-safe by design (hsv_h=0, hsv_s=0): hue/saturation\n"

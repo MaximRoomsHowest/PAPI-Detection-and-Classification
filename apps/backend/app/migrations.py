@@ -52,6 +52,39 @@ _STARTUP_WIDENINGS: tuple[tuple[str, str, str, int], ...] = (
 )
 
 
+# Composite + partial indexes that match the Index()/invariant declarations on the
+# models but that ``create_all`` only builds on a FRESH table — so an in-place upgrade
+# of a pre-existing deployment misses them and the hot History/jobs queries fall back to
+# sequential scans (audit 2026-06-19). (name, table, idempotent DDL).
+_STARTUP_INDEXES: tuple[tuple[str, str, str], ...] = (
+    (
+        "ix_logs_state_created",
+        "analysis_logs",
+        "CREATE INDEX IF NOT EXISTS ix_logs_state_created ON analysis_logs (global_state, created_at)",
+    ),
+    (
+        "ix_logs_media_created",
+        "analysis_logs",
+        "CREATE INDEX IF NOT EXISTS ix_logs_media_created ON analysis_logs (media_type, created_at)",
+    ),
+    (
+        "ix_jobs_status_created",
+        "jobs",
+        "CREATE INDEX IF NOT EXISTS ix_jobs_status_created ON jobs (status, created_at)",
+    ),
+    # Enforce the "exactly one default model" invariant at the DB layer — it is otherwise
+    # maintained only by set_default's Python loop, so a partial/failed commit or a manual
+    # SQL edit could leave two defaults and make serving-model resolution nondeterministic.
+    # A partial unique index permits at most one row with is_default true (audit 2026-06-19).
+    (
+        "uq_model_registry_one_default",
+        "model_registry",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_model_registry_one_default "
+        "ON model_registry (is_default) WHERE is_default",
+    ),
+)
+
+
 def _add_column_sql(dialect_name: str, table: str, column: str, ddl_type: str) -> str:
     if dialect_name == "postgresql":
         # IF NOT EXISTS additionally makes concurrent replica startups race-safe.
@@ -91,6 +124,18 @@ def run_startup_migrations(engine: Engine) -> None:
         logger.info("Startup migration: adding %s.%s (%s).", table, column, ddl_type)
         with engine.begin() as conn:
             conn.execute(text(_add_column_sql(engine.dialect.name, table, column, ddl_type)))
+
+    # Index pass (all dialects). Each statement is idempotent (IF NOT EXISTS) and runs in
+    # its own transaction so one failure — e.g. pre-existing duplicate defaults blocking
+    # the unique index — is logged without aborting startup or the remaining indexes.
+    for index_name, table, ddl in _STARTUP_INDEXES:
+        if not inspector.has_table(table):
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+        except Exception:  # noqa: BLE001 - an index build must never block startup
+            logger.exception("Startup migration: creating index %s failed.", index_name)
 
     if engine.dialect.name != "postgresql":
         # SQLite does not enforce VARCHAR widths, so an "undersized" column

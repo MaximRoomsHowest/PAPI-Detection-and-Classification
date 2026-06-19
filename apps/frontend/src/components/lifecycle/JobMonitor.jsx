@@ -4,9 +4,10 @@ const ACTIVE_STATUSES = new Set(['queued', 'running'])
 
 // Shared background-job list with live progress, used on the Models (evaluate) and
 // Datasets (labeling + training) pages. Driven by the polling useJobs hook.
-// onDismiss removes one terminal job; onClearFinished clears them all at once —
-// both optional so a caller can render a read-only monitor.
-export function JobMonitor({ jobs, onCancel, onDismiss, onClearFinished, copy, kinds }) {
+// onCancel/onDismiss/onClearFinished are all optional so a caller can render a
+// read-only monitor; each action button is gated on its handler. actionError surfaces
+// a failed cancel/dismiss/clear (otherwise a silent no-op).
+export function JobMonitor({ jobs, onCancel, onDismiss, onClearFinished, actionError, copy, kinds }) {
   const filtered = kinds ? jobs.filter((job) => kinds.includes(job.kind)) : jobs
   if (!filtered.length) {
     return null
@@ -23,6 +24,11 @@ export function JobMonitor({ jobs, onCancel, onDismiss, onClearFinished, copy, k
           </button>
         )}
       </div>
+      {actionError && (
+        <p className="job-monitor__error mono" role="alert">
+          {copy.jobs.actionFailed}
+        </p>
+      )}
       <ul className="job-list">
         {filtered.map((job) => {
           const active = ACTIVE_STATUSES.has(job.status)
@@ -39,6 +45,7 @@ export function JobMonitor({ jobs, onCancel, onDismiss, onClearFinished, copy, k
                 <div
                   className="job-progress"
                   role="progressbar"
+                  aria-label={copy.jobs.kinds[job.kind] ?? job.kind}
                   aria-valuenow={pct}
                   aria-valuemin={0}
                   aria-valuemax={100}
@@ -52,9 +59,11 @@ export function JobMonitor({ jobs, onCancel, onDismiss, onClearFinished, copy, k
                 </p>
               )}
               {active ? (
-                <button className="ghost-button job-cancel" type="button" onClick={() => onCancel(job.id)}>
-                  <XCircle size={14} aria-hidden="true" /> {copy.jobs.cancel}
-                </button>
+                onCancel && (
+                  <button className="ghost-button job-cancel" type="button" onClick={() => onCancel(job.id)}>
+                    <XCircle size={14} aria-hidden="true" /> {copy.jobs.cancel}
+                  </button>
+                )
               ) : (
                 onDismiss && (
                   <button className="ghost-button job-cancel" type="button" onClick={() => onDismiss(job.id)}>

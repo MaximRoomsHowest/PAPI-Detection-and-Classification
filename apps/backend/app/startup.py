@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from app.config import Settings
+from app.config import NON_PRODUCTION_ENVIRONMENTS, Settings
 from app.database import init_db
 from app.runtime_threads import (
     apply_runtime_threads,
@@ -32,8 +32,19 @@ DEFAULT_DB_CREDENTIAL_MARKER = "papi:papi@"
 
 def validate_production_startup(settings: Settings) -> None:
     """Fail fast on production deployments that are still using local defaults."""
-    if settings.environment.lower() != "production":
+    if not settings.is_production_like:
         return
+
+    if settings.environment.strip().lower() != "production":
+        # An unrecognised env (e.g. "prod", "staging", "live") is treated as
+        # production-like and the floor is ENFORCED rather than silently skipped.
+        logger.warning(
+            "PAPI_ENV=%r is not a recognised non-production value; enforcing the "
+            "production security floor (auth + DB-credential checks). Use one of %s "
+            "for a local/dev/CI run.",
+            settings.environment,
+            sorted(NON_PRODUCTION_ENVIRONMENTS),
+        )
 
     validate_auth_startup(settings)
     if DEFAULT_DB_CREDENTIAL_MARKER in settings.database_url:

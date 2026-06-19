@@ -218,7 +218,7 @@ def authenticate_supabase_token(settings: Settings, token: str) -> Principal:
 def validate_auth_startup(settings: Settings) -> None:
     """Fail fast when production auth would be unsafe or unusable."""
 
-    if settings.environment.lower() != "production":
+    if not settings.is_production_like:
         return
 
     mode = resolved_auth_mode(settings)

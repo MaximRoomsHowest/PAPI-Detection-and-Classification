@@ -87,7 +87,16 @@ class JobRunner:
         except JobCancelled:
             repo.mark_cancelled(job_id)
         except Exception as exc:  # noqa: BLE001 - any handler failure becomes a failed job
-            logger.exception("Job %s (%s) failed.", job_id, kind_of(repo, job_id))
+            # The handler's session may be in a PendingRollback state — the failure
+            # can itself BE a failed commit (connection blip / deadlock). Roll it back
+            # before any further use, and log only job_id (no extra DB read): a read
+            # here would run OUTSIDE the inner try and, on a broken session, raise and
+            # strand the job in 'running' — the exact guarantee this block upholds.
+            try:
+                session.rollback()
+            except Exception:  # noqa: BLE001 - rollback is best-effort recovery
+                logger.exception("Rollback failed while handling job %s failure.", job_id)
+            logger.exception("Job %s failed.", job_id)
             try:
                 repo.mark_failed(job_id, str(exc) or exc.__class__.__name__)
             except Exception:  # noqa: BLE001 - last-ditch; the job stays 'running' otherwise
@@ -107,11 +116,6 @@ class JobRunner:
         its terminal state, using the SIGTERM grace window instead of being abandoned
         (which would leave it 'running' until the next startup reconcile)."""
         self._executor.shutdown(wait=wait)
-
-
-def kind_of(repo: JobRepository, job_id: str) -> str:
-    job = repo.get(job_id)
-    return job.kind if job else "?"
 
 
 @lru_cache(maxsize=1)

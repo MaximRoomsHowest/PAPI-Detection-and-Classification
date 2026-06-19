@@ -60,6 +60,10 @@ def prepare_training(
     base = _base_weights_name(settings, payload.base_model_id, db)
     hyper = payload.hyperparams
     name = (payload.name or f"papi-{payload.dataset_id[:8]}").strip()
+    # Route the trainer by the dataset's class count: 2-class -> detector trainer,
+    # 3-class -> transition trainer. Unknown (no class names) keeps the historical
+    # transition default (audit 2026-06-19).
+    class_count = len(dataset.class_names_json) if isinstance(dataset.class_names_json, dict) else 3
 
     repo = JobRepository(db)
     job = repo.create(
@@ -77,6 +81,7 @@ def prepare_training(
         batch=hyper.batch,
         oversample=hyper.oversample,
         name=name,
+        class_count=class_count,
     )
     manifest = {
         "dataset_id": payload.dataset_id,

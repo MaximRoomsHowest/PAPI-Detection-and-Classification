@@ -689,7 +689,7 @@ function ModelsToolbar({ filters, onChange, count, total, copy }) {
 export function ModelsPage({ copy, isAdmin }) {
   const { models, loading, error, upload, promote, setDisabled, remove, evaluate } = useModelManagement()
   const { datasets, loading: datasetsLoading } = useDatasets()
-  const { jobs, cancel, dismiss, clearFinished } = useJobs()
+  const { jobs, cancel, dismiss, clearFinished, actionError: jobsActionError } = useJobs()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [evalModel, setEvalModel] = useState(null)
   const [busyId, setBusyId] = useState(null)
@@ -787,6 +787,7 @@ export function ModelsPage({ copy, isAdmin }) {
         onCancel={cancel}
         onDismiss={dismiss}
         onClearFinished={() => clearFinished('evaluate')}
+        actionError={jobsActionError}
         copy={copy}
       />
 

@@ -10,7 +10,6 @@ from typing import Any
 from uuid import uuid4
 
 from app.config import TRANSITION_METHODS, Settings
-from app.services.inference.aggregation import aggregate_video_lamps
 from app.services.inference.angle_resolver import (
     angle_for_media,
     angle_from_samples,
@@ -129,11 +128,19 @@ class InferenceService:
                     drone_samples, transition_method, model_id,
                 )
             if media_type == "video":
-                return self.analyze_video(
+                payload = self.analyze_video(
                     media_path, runway_id, original_filename, drone_id, drone_metadata,
-                    drone_samples, transition_method, model_id,
+                    drone_samples, transition_method, model_id, defer_export=True,
                 )
-            raise ValueError(f"Unsupported media type: {media_type}")
+            else:
+                raise ValueError(f"Unsupported media type: {media_type}")
+        # Persist the annotated artifact AFTER releasing the lock: an Azure blob upload
+        # is seconds of network I/O that must not extend the held inference lock and
+        # stall a concurrent live/single-image request. Mirrors analyze_frame_sequence
+        # (the folder path was already fixed; video was not — audit 2026-06-19). Local
+        # mode is a no-op rewrite to the same /media URL.
+        self._persist_deferred_export(payload)
+        return payload
 
     def reload_registry(self) -> None:
         """Rebuild the registry from the DB and evict stale cached models.
@@ -685,6 +692,7 @@ class InferenceService:
         drone_samples: list[DroneSample] | None = None,
         transition_method: str | None = None,
         model_id: str | None = None,
+        defer_export: bool = False,
     ) -> AnalysisPayload:
         cv2 = self._require_cv2()
         start = perf_counter()
@@ -748,6 +756,10 @@ class InferenceService:
                 # few frames (VFR / sloppy muxers) — only a >5% (and >2 frame)
                 # gap is a real mid-stream decode failure worth flagging.
                 shortfall_tolerance=max(2, source_frame_count // 20),
+                # When called from analyze() under the held lock, keep the artifact
+                # local here and let analyze() persist it after releasing the lock so a
+                # slow blob upload never blocks live inference (audit 2026-06-19).
+                defer_export=defer_export,
             )
         finally:
             cap.release()
@@ -946,17 +958,6 @@ class InferenceService:
         if artifact_url is None:
             raise RuntimeError("Could not create media URL for annotated artifact.")
         return reference, artifact_url
-
-    @staticmethod
-    def _aggregate_video_lamps(
-        track_observations: dict[int, list[tuple]],
-    ) -> list[LampResult]:
-        """Legacy stable-track aggregation helper kept for direct unit tests.
-
-        Delegates to ``aggregation.aggregate_video_lamps`` (kept as a static method
-        so unit tests can call ``InferenceService._aggregate_video_lamps`` directly).
-        """
-        return aggregate_video_lamps(track_observations)
 
     def _detect_frame(
         self,

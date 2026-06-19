@@ -9,7 +9,12 @@ from __future__ import annotations
 
 import re
 
-from app.services.telemetry.sample import DroneSample, _coerce_float, _make_sample
+from app.services.telemetry.sample import (
+    DroneSample,
+    _capped_indices,
+    _coerce_float,
+    _make_sample,
+)
 
 _NUMBER = r"[+-]?\d+(?:\.\d+)?"
 
@@ -51,7 +56,15 @@ def _srt_time_to_seconds(stamp: str) -> float | None:
 
 def _parse_srt(text: str) -> list[DroneSample]:
     samples: list[DroneSample] = []
+    # Bound memory like the CSV/JSON parsers (audit #14 parity): count the cues in a
+    # cheap first pass (match objects are transient/GC'd), then build DroneSamples only
+    # for a uniformly-strided subset. Without this a pathological SRT of millions of
+    # minimal cues allocates every sample before the post-parse cap in __init__ runs.
+    total = sum(1 for _ in _SRT_CUE_RE.finditer(text))
+    keep = frozenset(_capped_indices(total))
     for order, cue in enumerate(_SRT_CUE_RE.finditer(text)):
+        if order not in keep:
+            continue
         body = cue.group("body")
         lat = lon = alt = None
 

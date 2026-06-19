@@ -97,11 +97,11 @@ Supabase is intentionally optional. No Supabase SDK is installed in the frontend
 or backend; the backend validates bearer tokens directly against the Supabase
 Auth API using the public anon key.
 
-For the provided project, set:
+For your Supabase project, set:
 
 ```dotenv
 PAPI_AUTH_MODE=supabase
-PAPI_SUPABASE_URL=https://mrkhpwtuyytlamrythwn.supabase.co
+PAPI_SUPABASE_URL=https://your-project-ref.supabase.co
 PAPI_SUPABASE_ANON_KEY=<supabase-public-anon-key>
 ```
 
@@ -138,7 +138,7 @@ PAPI_AUTH_MODE=local_supabase
 PAPI_AUTH_SESSION_SECRET=<generated-session-secret>
 PAPI_LOCAL_ADMIN_EMAIL=admin@example.com
 PAPI_LOCAL_ADMIN_PASSWORD_HASH=<generated-password-hash>
-PAPI_SUPABASE_URL=https://mrkhpwtuyytlamrythwn.supabase.co
+PAPI_SUPABASE_URL=https://your-project-ref.supabase.co
 PAPI_SUPABASE_ANON_KEY=<supabase-public-anon-key>
 PAPI_SUPABASE_REQUIRED_ROLE=papi_operator
 ```

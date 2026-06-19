@@ -413,9 +413,28 @@ def test_safe_run_name_neutralises_shell_metacharacters():
     assert _safe_run_name("") == "papi-train"
     assert len(_safe_run_name("x" * 200)) <= 64
     # The cleaned name is what lands in the command string (no raw metacharacters).
-    cmd = build_command(base="yolo26s.pt", epochs=1, imgsz=640, batch=2, oversample=4, name="a; rm b")
+    cmd = build_command(
+        base="yolo26s.pt", epochs=1, imgsz=640, batch=2, oversample=4, name="a; rm b", class_count=3
+    )
     assert "; rm" not in cmd
     assert "--name a-rm-b" in cmd
+
+    # Trainer routing by class count (audit 2026-06-19): a 3-class dataset uses the
+    # transition trainer; a 2-class dataset uses the detector trainer with its data.yaml
+    # and no --oversample (wiring everything to the transition trainer mislabels 2-class
+    # detector bundles).
+    transition_cmd = build_command(
+        base="yolo26s.pt", epochs=1, imgsz=640, batch=2, oversample=4, name="t", class_count=3
+    )
+    assert "train_transition_model.py" in transition_cmd
+    assert "--combined ./dataset" in transition_cmd
+    assert "--oversample 4" in transition_cmd
+    detector_cmd = build_command(
+        base="yolo26s.pt", epochs=1, imgsz=640, batch=2, oversample=4, name="d", class_count=2
+    )
+    assert "train_detector_model.py" in detector_cmd
+    assert "--data ./dataset/data.yaml" in detector_cmd
+    assert "--oversample" not in detector_cmd
 
 
 def test_parse_yolo_label_line_validates():

@@ -590,6 +590,12 @@
   gap: 10px;
 }
 
+.job-monitor__error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
 .job-clear {
   font-size: 0.76rem;
 }

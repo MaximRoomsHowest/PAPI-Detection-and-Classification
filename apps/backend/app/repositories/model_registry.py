@@ -89,8 +89,15 @@ class ModelRegistryRepository:
             raise KeyError(model_id)
         if target.disabled:
             raise ValueError(f"Model '{model_id}' is disabled and cannot be promoted to default.")
+        # Clear every OTHER default and FLUSH before marking the target, so the
+        # transaction never holds two is_default=True rows at once — the partial unique
+        # index uq_model_registry_one_default is checked per-statement on SQLite, so a
+        # set-new-then-clear-old order would raise IntegrityError (audit 2026-06-19).
         for row in self.list_all():
-            row.is_default = row.id == model_id
+            if row.id != model_id and row.is_default:
+                row.is_default = False
+        self.db.flush()
+        target.is_default = True
         self.db.commit()
         self.db.refresh(target)
         return target

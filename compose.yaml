@@ -195,8 +195,10 @@ services:
       PAPI_LOCAL_ADMIN_PASSWORD_HASH: ${PAPI_LOCAL_ADMIN_PASSWORD_HASH:-}
       # Legacy API-key provider and optional break-glass fallback for local/supabase modes.
       PAPI_API_KEY: ${PAPI_API_KEY:-}
-      # Optional Supabase Auth adapter. Never put a service_role key here.
-      PAPI_SUPABASE_URL: ${PAPI_SUPABASE_URL:-https://mrkhpwtuyytlamrythwn.supabase.co}
+      # Optional Supabase Auth adapter. Never put a service_role key here. No
+      # default: set PAPI_SUPABASE_URL to your own project url when using a supabase
+      # auth mode (empty/unset keeps it absent so the production guard fails fast).
+      PAPI_SUPABASE_URL: ${PAPI_SUPABASE_URL:-}
       PAPI_SUPABASE_ANON_KEY: ${PAPI_SUPABASE_ANON_KEY:-}
       PAPI_SUPABASE_ALLOWED_EMAILS: ${PAPI_SUPABASE_ALLOWED_EMAILS:-}
       PAPI_SUPABASE_REQUIRED_ROLE: ${PAPI_SUPABASE_REQUIRED_ROLE:-}
