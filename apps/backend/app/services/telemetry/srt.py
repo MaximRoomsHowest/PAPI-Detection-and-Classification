@@ -29,6 +29,15 @@ _SRT_CUE_RE = re.compile(
     re.DOTALL,
 )
 
+# Cheap cue-HEADER counter (no body capture, no DOTALL) used only to size the cap
+# before building samples. Re-running the full body-capturing _SRT_CUE_RE just to
+# count would scan every (potentially huge) body twice — doubling worst-case CPU on a
+# hostile file. This matches the same counter+timecode header _SRT_CUE_RE starts each
+# cue with, so the count aligns for well-formed input (audit 2026-06-19).
+_SRT_CUE_HEAD_RE = re.compile(
+    r"\d{1,9}\s*\n\s*\d{2}:\d{2}:\d{2}[.,]\d{1,3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{1,3}"
+)
+
 # Bracketed modern DJI fields, e.g. "[latitude: 47.67]" / "[abs_alt : 520.0]".
 # The key may use ':' or '=', with or without surrounding spaces; the value is the
 # first number that follows. ``rel_alt`` is deliberately NOT matched as altitude.
@@ -60,7 +69,7 @@ def _parse_srt(text: str) -> list[DroneSample]:
     # cheap first pass (match objects are transient/GC'd), then build DroneSamples only
     # for a uniformly-strided subset. Without this a pathological SRT of millions of
     # minimal cues allocates every sample before the post-parse cap in __init__ runs.
-    total = sum(1 for _ in _SRT_CUE_RE.finditer(text))
+    total = sum(1 for _ in _SRT_CUE_HEAD_RE.finditer(text))
     keep = frozenset(_capped_indices(total))
     for order, cue in enumerate(_SRT_CUE_RE.finditer(text)):
         if order not in keep:

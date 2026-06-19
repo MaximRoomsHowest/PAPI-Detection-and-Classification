@@ -1,4 +1,30 @@
+import pytest
 from app.config import REPO_ROOT, Settings
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ("local", False),
+        ("dev", False),
+        ("development", False),
+        ("test", False),
+        ("testing", False),
+        ("ci", False),
+        ("LOCAL", False),
+        (" local ", False),
+        ("production", True),
+        ("PRODUCTION", True),
+        # The whole point of the fix: an unrecognised / typo'd / empty env is treated as
+        # production-like so the security floor FAILS CLOSED rather than silently off.
+        ("prod", True),
+        ("staging", True),
+        ("live", True),
+        ("", True),
+    ],
+)
+def test_is_production_like_fails_closed_on_unknown_env(env, expected):
+    assert Settings(environment=env).is_production_like is expected
 
 
 def test_default_model_path_points_to_repo_models_serving():

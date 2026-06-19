@@ -89,6 +89,30 @@ def _readme(manifest: dict[str, Any]) -> str:
     )
 
 
+def _portable_data_yaml(text: str) -> str:
+    """Rewrite a dataset data.yaml's ``path:`` to a portable relative value.
+
+    On disk, datasets.write_data_yaml stamps ``path: <server-absolute datasets_dir>``,
+    which does not exist on the operator's machine — so the bundled
+    ``--data ./dataset/data.yaml`` (the 2-class detector branch) would resolve no
+    images and training would fail. ``path: .`` makes Ultralytics resolve train/val/test
+    relative to the yaml's own directory (the unzipped ./dataset folder) wherever it
+    lands (audit 2026-06-19; the transition trainer sidesteps this by rebuilding the
+    yaml from its --combined dir at runtime, so this is also harmless there).
+    """
+    out: list[str] = []
+    replaced = False
+    for line in text.splitlines():
+        if not replaced and line.lstrip().startswith("path:"):
+            out.append("path: .")
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        out.insert(0, "path: .")
+    return "\n".join(out) + "\n"
+
+
 def build_training_bundle(settings: Settings, root: Path, job_id: str, manifest: dict[str, Any]) -> Path:
     out_dir = settings.jobs_dir / job_id
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +126,13 @@ def build_training_bundle(settings: Settings, root: Path, job_id: str, manifest:
                 continue
             if "_staging" in rel.parts or CANDIDATES_DIR_NAME in rel.parts:
                 continue
-            archive.write(path, f"dataset/{rel.as_posix()}")
+            rel_posix = rel.as_posix()
+            if rel_posix == "data.yaml":
+                # Make the bundled yaml portable so it resolves against the unzipped
+                # ./dataset folder, not the backend's absolute datasets_dir (audit).
+                archive.writestr(f"dataset/{rel_posix}", _portable_data_yaml(path.read_text(encoding="utf-8")))
+                continue
+            archive.write(path, f"dataset/{rel_posix}")
         archive.writestr("manifest.json", json.dumps(manifest, indent=2))
         archive.writestr("README.txt", _readme(manifest))
     return bundle

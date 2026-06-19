@@ -892,3 +892,75 @@ def test_api_key_gates_mutations(tmp_path, monkeypatch):
     finally:
         for fn in caches:
             fn.cache_clear()
+
+
+def test_set_default_holds_one_default_under_unique_index():
+    """The partial unique index uq_model_registry_one_default is created by
+    run_startup_migrations (NOT create_all), so the normal fixture DB lacks it and the
+    other promote tests can't catch a two-defaults regression. This installs the index
+    and asserts set_default's clear-then-flush-then-set ordering swaps the default
+    without an IntegrityError (the pre-fix set-new-then-clear order raised one on
+    SQLite, which enforces the partial unique index per-statement). audit 2026-06-19.
+    """
+    from app import models  # noqa: F401 - register tables
+    from app.migrations import run_startup_migrations
+    from app.models.model_registry import ModelRegistryRow
+    from app.repositories.model_registry import ModelRegistryRepository
+    from sqlalchemy import create_engine, inspect
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    run_startup_migrations(engine)
+    indexes = {ix["name"] for ix in inspect(engine).get_indexes("model_registry")}
+    assert "uq_model_registry_one_default" in indexes
+
+    session = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)()
+    try:
+        repo = ModelRegistryRepository(session)
+        repo.seed_from_frozen(_frozen_registry())
+
+        def sole_default() -> str:
+            ids = [r.id for r in session.query(ModelRegistryRow).filter_by(is_default=True).all()]
+            assert len(ids) == 1, ids
+            return ids[0]
+
+        assert sole_default() == "small"
+        repo.set_default("transition")  # would raise IntegrityError under the old ordering
+        assert sole_default() == "transition"
+        repo.set_default("small")
+        assert sole_default() == "small"
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def test_training_bundle_data_yaml_is_portable(tmp_path):
+    """build_training_bundle must rewrite the dataset data.yaml's server-absolute
+    'path:' to a portable value, else the 2-class detector bundle
+    (--data ./dataset/data.yaml) resolves no images on the operator's machine.
+    audit 2026-06-19.
+    """
+    from app.services.training_prepare import _portable_data_yaml, build_training_bundle
+
+    rewritten = _portable_data_yaml("path: /srv/papi/datasets/abc\ntrain: train.txt\nnames:\n  0: red\n")
+    assert "path: ." in rewritten
+    assert "/srv/papi/datasets/abc" not in rewritten
+    assert "train: train.txt" in rewritten  # other lines preserved
+
+    root = tmp_path / "ds"
+    (root / "images").mkdir(parents=True)
+    abs_path = root.resolve().as_posix()
+    (root / "data.yaml").write_text(
+        f"path: {abs_path}\ntrain: train.txt\nval: val.txt\ntest: test.txt\nnames:\n  0: red\n  1: white\n",
+        encoding="utf-8",
+    )
+    (root / "train.txt").write_text("./images/a.jpg\n", encoding="utf-8")
+    settings = SimpleNamespace(jobs_dir=tmp_path / "jobs")
+
+    bundle = build_training_bundle(settings, root, "job1", {"command": "train ..."})
+    with zipfile.ZipFile(bundle) as archive:
+        yml = archive.read("dataset/data.yaml").decode("utf-8")
+    assert "path: ." in yml
+    assert abs_path not in yml

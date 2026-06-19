@@ -280,6 +280,19 @@ def test_sample_count_is_capped_to_the_hard_limit(caplog) -> None:
     assert any("downsampled" in record.getMessage() for record in caplog.records)
 
 
+def test_srt_sample_count_is_capped_to_the_hard_limit() -> None:
+    # The SRT parser caps IN-PARSER (count cues, then build only a strided subset) so a
+    # pathological .srt can't allocate millions of samples before the post-parse cap
+    # (audit 2026-06-19). Build > cap minimal valid cues and assert the output is bounded.
+    n = MAX_TELEMETRY_SAMPLES + 1_000
+    cues = "\n".join(
+        f"{i}\n00:00:00,000 --> 00:00:00,033\n[latitude: 47.6] [longitude: 9.5] [abs_alt: 500.0]\n"
+        for i in range(1, n + 1)
+    )
+    samples = parse_telemetry("huge.srt", cues.encode("utf-8"))
+    assert len(samples) == MAX_TELEMETRY_SAMPLES
+
+
 def test_resample_logs_when_frame_indices_outrun_the_video(caplog) -> None:
     # An SRT from a longer recording than the uploaded clip: every trailing frame
     # reuses the nearest in-range fix (correct), but the log must say so.
