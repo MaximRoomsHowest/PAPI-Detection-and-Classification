@@ -119,10 +119,13 @@ jobs:
 
       - name: Compose config sanity
         # Catches a syntactically-broken compose.yaml before the slow image builds
-        # (audit CI3). Dummy credentials satisfy the ${VAR:?} fail-fast guards.
+        # (audit CI3). Dummy credentials satisfy the PAPI_LOCAL_POSTGRES_* ${VAR:?}
+        # fail-fast guards in the postgres service (renamed from POSTGRES_* in
+        # 728eb6c to avoid clashing with Azure's own POSTGRES_* runtime exports).
         env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
+          PAPI_LOCAL_POSTGRES_USER: ci
+          PAPI_LOCAL_POSTGRES_PASSWORD: ci
+          PAPI_LOCAL_POSTGRES_DB: ci
         run: docker compose -f compose.yaml config -q
 
       - name: Set up Docker Buildx
