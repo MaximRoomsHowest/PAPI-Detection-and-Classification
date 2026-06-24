@@ -24,7 +24,7 @@ dependencies = [
     # Pinned exactly (matches apps/backend/requirements.txt) so training/eval runs are
     # reproducible: a floor like >=8.4 lets the default augmentation set drift between
     # installs, which for a colour detector can silently change label-vs-pixel semantics.
-    "ultralytics==8.4.62",
+    "ultralytics==8.4.75",
 ]
 
 [project.optional-dependencies]
