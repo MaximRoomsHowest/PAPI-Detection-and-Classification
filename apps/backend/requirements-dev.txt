@@ -4,7 +4,7 @@
 # only requirements.txt, so pytest/httpx2 never ship in the container (audit DCK-D5).
 -r requirements.txt
 
-pytest==9.0.3
-pytest-cov==7.0.0
+pytest==9.1.1
+pytest-cov==7.1.0
 # httpx2 backs FastAPI's TestClient (Starlette). Test-only — no runtime import.
-httpx2==2.3.0
+httpx2==2.4.0
