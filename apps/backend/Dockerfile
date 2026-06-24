@@ -5,7 +5,7 @@
 # build-essential lives ONLY here so the runtime image ships no compilers
 # (audit DCK-D3: build-essential used to leak into the final image). Base is
 # pinned by digest for reproducible builds (audit DCK-D8).
-FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS builder
+FROM python:3.14-slim@sha256:63a4c7f612a00f92042cbdcc7cdc6a306f38485af0a200b9c89de7d9b1607d15 AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -53,7 +53,7 @@ RUN if [ "$INSTALL_ACCEL" = "true" ]; then pip install -r requirements-accel.txt
 
 # ---- runtime stage --------------------------------------------------------
 # Slim final image: no compilers, no GUI libs, no curl, no test tooling.
-FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
+FROM python:3.14-slim@sha256:63a4c7f612a00f92042cbdcc7cdc6a306f38485af0a200b9c89de7d9b1607d15 AS runtime
 
 # No DATABASE_URL here: baking even the default dev credentials into image ENV
 # exposes them to every `docker inspect`/registry scan, and compose always supplies
