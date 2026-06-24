@@ -31,7 +31,7 @@ services:
     #   docker volume rm <project>_papi_postgres_data
     # (`docker compose down -v` also works, but additionally wipes
     # papi_backend_storage — the uploaded originals and annotated exports.)
-    image: postgres:18-alpine@sha256:96d56f7f57c6aacd1fcb908bc83b345ec5f83231ee486dd66a1baadce274db88
+    image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
     container_name: papi-postgres
     environment:
       POSTGRES_DB: ${PAPI_LOCAL_POSTGRES_DB:?Set PAPI_LOCAL_POSTGRES_DB in .env}
