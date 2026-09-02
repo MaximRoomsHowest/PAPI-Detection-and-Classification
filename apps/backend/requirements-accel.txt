@@ -14,4 +14,4 @@
 # runtime always reads a compatible IR. If OpenVINO is absent or fails to load on a
 # given host, the loader transparently falls back to best.pt — so this is purely an
 # accelerator, never a hard dependency.
-openvino==2026.2.0
+openvino==2026.3.1
