@@ -16,6 +16,6 @@
 #     NO fixed release exists in any version; ignore-listed in ci.yml.
 # 2.11.0 over 2.10.0 because PYSEC-2026-139 caps at <=2.10.x — moving to 2.11
 # clears it outright and its old ignore-list entry is removed. torchvision
-# 0.26.0 is the matching release (requires torch==2.11.0 exactly).
-torch==2.11.0
-torchvision==0.26.0
+# 0.26.0 is the matching release (requires torch==2.13.0 exactly).
+torch==2.13.0
+torchvision==0.28.0
